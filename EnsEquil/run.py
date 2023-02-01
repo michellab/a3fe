@@ -3,7 +3,9 @@
 
 import subprocess as _subprocess
 import os as _os
-from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any
+import numpy as _np
+from time import sleep as _sleep
+from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
 equil_fn = 1
 
@@ -61,26 +63,30 @@ def run_calc(block_size: float = 1, ensemble_size: int = 5, input_dir: str = "./
 
     lam_windows = []
     for lam in lam_vals:
-        lam_windows.append(LamWindow(lam, ensemble_size, input_dir, output_dir))
+        lam_windows.append(LamWindow(lam, block_size, ensemble_size, input_dir, output_dir))
 
     # Run initial SOMD simulations
     for win in lam_windows:
         # Add 0.5 ns buffer to give chance for the equilibration to be detected.
         win.run(2*block_size + 0.5)
 
-    # Periodically check the simulations and analyse/ resubmit as necessary
-    running_wins = lam_windows
-    while running_wins:
-        for win in running_wins:
-            # Check if the window has finished
-            if not win.running:
-                pass
-                # Check if the simulation has equilibrated
-                #if win.
+    with open("data.txt", "w") as file:
+        # Periodically check the simulations and analyse/ resubmit as necessary
+        running_wins = lam_windows
+        while running_wins:
+            _sleep(60 * 5) # Check every 5 minutes
+            for win in running_wins:
+                # Check if the window has finished
+                if not win.running:
+                    # Check if the simulation has equilibrated
+                    if win.equilibrated:
+                        file.write(f"Lambda: {win.lam:.3f} has equilibrated at {win.equil_time:.3f} ns \n")
+                    else:
+                        win.run(block_size) 
 
-                # If not, resubmit the simulation
+                    # If not, resubmit the simulation
 
-                # Else, analyse the simulation
+                    # Else, analyse the simulation
     
         #running_windows = [win for win in running_wins if win.running]
 
@@ -123,7 +129,8 @@ class Simulation():
         self.running = False
         self.output_subdir = output_dir + "/lambda_" + f"{lam:.3f}" + "/run_" + str(run_no).zfill(2)
         self.tot_simtime = 0 # ns
-        self.time_per_cycle = self._get_time_per_cycle() # ns
+        # Now read useful parameters from the simulation file options
+        self._add_attributes_from_simfile()
 
         # Create the output subdirectory
         _subprocess.call(["mkdir", "-p", self.output_subdir])
@@ -174,9 +181,10 @@ class Simulation():
                 raise FileNotFoundError("Required input file " + file + " not found.")
 
 
-    def _get_time_per_cycle(self) -> float:
+    def _add_attributes_from_simfile(self) -> None:
         """
-        Get the time per SOMD cycles, in ns
+        Read the SOMD simulation option file and
+        add useful attributes to the Simulation object.
         
         Returns
         -------
@@ -186,6 +194,7 @@ class Simulation():
         
         timestep = None # ns
         nmoves = None # number of moves per cycle
+        nrg_freq = None # number of timesteps between energy calculations
         with open(self.input_dir + "/sim.cfg", "r") as ifile:
             lines = ifile.readlines()
             for line in lines:
@@ -193,12 +202,15 @@ class Simulation():
                     timestep = float(line.split("=")[1].split()[0])
                 if line.startswith("nmoves ="):
                     nmoves = float(line.split("=")[1])
+                if line.startswith("energy frequency ="):
+                    nrg_freq = float(line.split("=")[1])
 
-        if timestep is None or nmoves is None:
+        if None in [timestep, nmoves, nrg_freq]:
             raise ValueError("Could not find timestep or nmoves in sim.cfg.")
 
-        time_per_cycle = timestep * nmoves / 1_000_000
-        return time_per_cycle
+        self.timestep = timestep / 1_000_000 # fs to ns
+        self.nrg_freq = nrg_freq
+        self.time_per_cycle = timestep * nmoves / 1_000_000 # fs to ns
 
 
     def run(self, duration: float = 2.5) -> None:
@@ -257,6 +269,40 @@ class Simulation():
             for line in lines:
                 ofile.write(line)
 
+    
+    def read_gradients(self) -> _Tuple[_np.ndarray, _np.ndarray]:
+        """
+        Read the gradients from the output file.
+
+        Returns
+        -------
+        times : np.ndarray
+            Array of times, in ns.
+        grads : np.ndarray
+            Array of gradients, in kcal/mol.
+        """
+        # Read the output file
+        with open(self.output_subdir + "/simfile.dat", "r") as ifile:
+            lines = ifile.readlines()
+
+        steps = []
+        grads = []
+
+        for line in lines:
+            vals = line.split()
+            if not line.startswith("#"):
+                step = int(vals[0].strip())
+                grad = float(vals[2].strip())
+                steps.append(step)
+                grads.append(grad)
+
+        times = [x * self.timestep / 1_000_000 for x in steps] # Convert steps to time in ns
+
+        times = _np.array(times)
+        grads = _np.array(grads)
+
+        return times, grads
+
 
 class LamWindow():
     """A class to hold and manipulate a set of SOMD simulations at a given lambda value."""
@@ -290,10 +336,10 @@ class LamWindow():
         self.ensemble_size = ensemble_size
         self.input_dir = input_dir
         self.output_dir = output_dir
-        self.check_equil = equil_fn
         self.equilibrated = False
         self.equil_time = None
         self.running = False
+        self.tot_simtime = 0 # ns
         # Create the required simulations for this lambda value
         self.sims = []
         for i in range(1, ensemble_size + 1):
@@ -317,6 +363,7 @@ class LamWindow():
         # Run the simulations
         for sim in self.sims:
             sim.run(duration)
+            self.tot_simtime += duration
 
 
     @property
@@ -357,13 +404,70 @@ class LamWindow():
         self._equilibrated : bool
             True if the simulation is equilibrated, False otherwise.
         """
-        self.equilibrated, self.equil_time =  self.check_equil()
+        self.equilibrated, self.equil_time = self.check_equil()
         return self._equilibrated
 
         
     @equilibrated.setter
     def equilibrated(self, value: bool) -> None:
         self._equilibrated = value
+
+    
+    def check_equil(self) -> _Tuple[bool, _Optional[float]]:
+        """
+        Check if the ensemble of simulations at the lambda window is
+        equilibrated.
+
+        Returns
+        -------
+        equilibrated : bool
+            True if the simulation is equilibrated, False otherwise.
+        equil_time : float
+            Time taken to equilibrate, in ns.
+        """
+        # Conversion between time and gradient indices. Minus one because no energies are recorded until
+        # after the first nrg_freq steps
+        time_to_ind = 1 / (self.sims[0].timestep * self.sims[0].nrg_freq) - 1
+        idx_block_size = int(self.block_size * time_to_ind)
+
+        # Read dh/dl data from all simulations and calculate the gradient of the
+        # gradient, d_dh_dl
+        d_dh_dls = []
+        times, _ = self.sims[0].read_gradients()[0]
+        equilibrated = False
+        equil_time = None
+
+        for sim in self.sims:
+            _, dh_dl = sim.read_gradients() # Times should be the same for all sims
+            # Create array of nan so that d_dh_dl has the same length as times irrespective of
+            # the block size
+            d_dh_dl = _np.full(len(dh_dl), _np.nan)
+            for i in range(len(dh_dl)):
+                if i < 2 * idx_block_size:
+                    continue
+                else:
+                    later_block_av = _np.mean(dh_dl[i - idx_block_size: i])
+                    earlier_block_av = _np.mean(dh_dl[i - 2 * idx_block_size: i - idx_block_size])
+                    d_dh_dl[i] = (later_block_av - earlier_block_av) / self.block_size # Gradient of dh/dl in kcal mol-1 ns-1
+            d_dh_dls.append(d_dh_dl)
+
+        # Calculate the mean gradient
+        d_dh_dls = _np.array(d_dh_dls)
+        mean_d_dh_dl = _np.mean(d_dh_dls, axis=0)
+
+        # Check if the mean gradient has been 0 at any point
+        last_grad = mean_d_dh_dl[0]
+        for i, grad in enumerate(mean_d_dh_dl):
+            # Check if gradient has passed through 0
+            if _np.sign(last_grad) != _np.sign(grad):
+                equil_time = times[i]
+                break
+            last_grad = grad
+
+        if equil_time:
+            equilibrated = True 
+
+        return equilibrated, equil_time
 
 
 def get_lam_vals(input_dir: str = "./input") -> _List[float]:
