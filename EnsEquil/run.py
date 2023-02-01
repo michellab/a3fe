@@ -5,6 +5,7 @@ import subprocess as _subprocess
 import os as _os
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any
 
+equil_fn = 1
 
 def canvas(with_attribution=True):
     """
@@ -33,7 +34,7 @@ def test():
     print("Running calculation...")
 
 
-def run_calc(block_size: float = 2, ensemble_size: int = 5, input_dir: str = "./input", 
+def run_calc(block_size: float = 1, ensemble_size: int = 5, input_dir: str = "./input", 
              output_dir: str = "./output") -> None:
     """
     Run ensemble of SOMD free energy calculation with automated 
@@ -41,7 +42,7 @@ def run_calc(block_size: float = 2, ensemble_size: int = 5, input_dir: str = "./
 
     Parameters
     ----------
-    block_size : float, Optional, default: 2
+    block_size : float, Optional, default: 1
         Size of blocks to use for equilibration detection, in ns.
     ensemble_size : int, Optional, default: 5
         Number of replica simulations to run.
@@ -58,14 +59,30 @@ def run_calc(block_size: float = 2, ensemble_size: int = 5, input_dir: str = "./
     # Create all simulation objects. In doing so, their directories will be created.
     lam_vals = get_lam_vals(input_dir)
 
-    simulations = []
-    for run_no in range(1, ensemble_size + 1):
-        for lam in lam_vals:
-            simulations.append(Simulation(lam, run_no, input_dir, output_dir))
+    lam_windows = []
+    for lam in lam_vals:
+        lam_windows.append(LamWindow(lam, ensemble_size, input_dir, output_dir))
 
     # Run initial SOMD simulations
-    for simulation in simulations:
-        simulation.run(float(block_size + 0.5))
+    for win in lam_windows:
+        # Add 0.5 ns buffer to give chance for the equilibration to be detected.
+        win.run(2*block_size + 0.5)
+
+    # Periodically check the simulations and analyse/ resubmit as necessary
+    running_wins = lam_windows
+    while running_wins:
+        for win in running_wins:
+            # Check if the window has finished
+            if not win.running:
+                pass
+                # Check if the simulation has equilibrated
+                #if win.
+
+                # If not, resubmit the simulation
+
+                # Else, analyse the simulation
+    
+        #running_windows = [win for win in running_wins if win.running]
 
     # Check the results of the simulations
 
@@ -102,7 +119,6 @@ class Simulation():
         # Check that the input directory contains the required files
         self._validate_input()
         self.output_dir = _os.path.abspath(output_dir)
-        self.equil_time = None
         self.job_id = None
         self.running = False
         self.output_subdir = output_dir + "/lambda_" + f"{lam:.3f}" + "/run_" + str(run_no).zfill(2)
@@ -114,6 +130,35 @@ class Simulation():
         # Create a soft link to the input dir to simplify running simulations
         _subprocess.call(["cp", "-r", self.input_dir, self.output_subdir + "/input"])
 
+
+    @property
+    def running(self) -> bool:
+        """
+        Check if the simulation is still running,
+        and update the running attribute accordingly.
+
+        Returns
+        -------
+        self._running : bool
+            True if the simulation is still running, False otherwise.
+        """
+        # Check if the job is still running
+        cmd = f"squeue -j -h {self.jobid}"
+        process = _subprocess.Popen(cmd, shell=True, stdin = _subprocess.PIPE,
+                                    stdout = _subprocess.PIPE, stderr = _subprocess.STDOUT,
+                                    close_fds=True)
+        process_output = process.stdout.read()
+        if len(process_output) > 0:
+            self._running = True
+        else:
+            self._running = False
+
+        return self._running
+
+    @running.setter
+    def running(self, value: bool) -> None:
+        self._running = value
+    
     
     def _validate_input(self) -> None:
         """ Check that the required input files are present. """
@@ -181,6 +226,7 @@ class Simulation():
         
         process_output = process.stdout.read()
         jobid = int((process_output.split()[-1]))
+        self.running = True
         self.tot_simtime += duration
         self.jobid = jobid
 
@@ -210,6 +256,114 @@ class Simulation():
         with open(self.output_subdir + "/input/sim.cfg", "w+") as ofile:
             for line in lines:
                 ofile.write(line)
+
+
+class LamWindow():
+    """A class to hold and manipulate a set of SOMD simulations at a given lambda value."""
+
+    def __init__(self, lam: float, block_size: float = 1,
+                ensemble_size: int = 5, input_dir: str = "./input",
+                output_dir: str = "./output") -> None:
+        """
+        Initialise a LamWindow object.
+
+        Parameters
+        ----------
+        lam : float
+            Lambda value for the simulation.
+        block_size : float, Optional, default: 1
+            Size of the blocks to use for equilibration detection,
+            in ns.
+        ensemble_size : int, Optional, default: 5
+            Number of simulations to run at this lambda value.
+        input_dir : str, Optional, default: "./input"
+            Path to the input directory.
+        output_dir : str
+            Path to the output directory.
+
+        Returns
+        -------
+        None
+        """
+        self.lam = lam
+        self.block_size = block_size
+        self.ensemble_size = ensemble_size
+        self.input_dir = input_dir
+        self.output_dir = output_dir
+        self.check_equil = equil_fn
+        self.equilibrated = False
+        self.equil_time = None
+        self.running = False
+        # Create the required simulations for this lambda value
+        self.sims = []
+        for i in range(1, ensemble_size + 1):
+            sim = Simulation(lam, i, input_dir, output_dir)
+            self.sims.append(sim)
+
+
+    def run(self, duration: float = 2.5) -> None:
+        """
+        Run all simulations at the lambda value.
+
+        Parameters
+        ----------
+        duration : float, Optional, default: 2.5
+            Duration of simulation, in ns.
+
+        Returns
+        -------
+        None
+        """
+        # Run the simulations
+        for sim in self.sims:
+            sim.run(duration)
+
+
+    @property
+    def running(self) -> bool:
+        """
+        Check if all the simulations at the lambda window are still running
+        and update the running attribute accordingly.
+
+        Returns
+        -------
+        self._running : bool
+            True if the simulation is still running, False otherwise.
+        """
+        all_finished = True
+        for sim in self.sims:
+            if sim.running:
+                all_finished = False
+                break
+        self._running = not all_finished
+
+        return self._running
+
+
+    @running.setter
+    def running(self, value: bool) -> None:
+        self._running = value
+
+
+    @property
+    def equilibrated(self) -> bool:
+        """
+        Check if the ensemble of simulations at the lambda window is
+        equilibrated, and update the equilibration time and status if
+        so.
+
+        Returns
+        -------
+        self._equilibrated : bool
+            True if the simulation is equilibrated, False otherwise.
+        """
+        self.equilibrated, self.equil_time =  self.check_equil()
+        return self._equilibrated
+
+        
+    @equilibrated.setter
+    def equilibrated(self, value: bool) -> None:
+        self._equilibrated = value
 
 
 def get_lam_vals(input_dir: str = "./input") -> _List[float]:
