@@ -174,13 +174,15 @@ class Simulation():
         self._set_n_cycles(n_cycles)
 
         # Run SOMD
-        #process = _subprocess.Popen(["sbatch", self.output_subdir + "/input/run_somd.sh", self.lam, duration],
-                                    #stin = _subprocess.PIPE, stdout = _subprocess.PIPE, stderr = _subprocess.STDOUT,
-                                    #close_fds=True)
-        #process_output = process.stdout.read()
-        #jobid = int((process_output.split()[-1]))
-        #self.tot_simtime += duration
-        #self.jobid = jobid
+        cmd = f"~/Documents/research/scripts/abfe/rbatch.sh --chdir {self.output_subdir} {self.output_subdir}/input/run_somd.sh {self.lam}"
+        process = _subprocess.Popen(cmd, shell=True, stdin = _subprocess.PIPE,
+                                    stdout = _subprocess.PIPE, stderr = _subprocess.STDOUT,
+                                    close_fds=True)
+        
+        process_output = process.stdout.read()
+        jobid = int((process_output.split()[-1]))
+        self.tot_simtime += duration
+        self.jobid = jobid
 
 
     def _set_n_cycles(self, n_cycles: int) -> None:
