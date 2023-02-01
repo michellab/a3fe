@@ -7,9 +7,9 @@ import sys
 
 import pytest
 
-import EnsEquil
+import run
 
 
-def test_EnsEquil_imported():
+def test_run_imported():
     """Sample test, will always pass so long as import statement worked."""
-    assert "EnsEquil" in sys.modules
+    assert "run" in sys.modules
