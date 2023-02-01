@@ -56,16 +56,16 @@ def run_calc(block_size: float = 2, ensemble_size: int = 5, input_dir: str = "./
     """
 
     # Create all simulation objects. In doing so, their directories will be created.
-    lam_vals = get_lam_vals(input_dir, output_dir)
+    lam_vals = get_lam_vals(input_dir)
 
     simulations = []
-    for run in range(1, ensemble_size + 1):
+    for run_no in range(1, ensemble_size + 1):
         for lam in lam_vals:
-            simulations.append(Simulation(lam, run, input_dir, output_dir))
+            simulations.append(Simulation(lam, run_no, input_dir, output_dir))
 
     # Run initial SOMD simulations
-    #for simulation in simulations:
-        #simulation.run(block_size + 0.5)
+    for simulation in simulations:
+        simulation.run(float(block_size + 0.5))
 
     # Check the results of the simulations
 
@@ -77,10 +77,8 @@ def run_calc(block_size: float = 2, ensemble_size: int = 5, input_dir: str = "./
 class Simulation():
     """Class to store information about a single SOMD simulation."""
     
-    def __init__(self, lam: float, run: int, input_dir: str = "./input",
-                    output_dir: str = "./output",
-                    equilibrated: str = False, running: bool = False,
-                    jobid: str = None) -> None:
+    def __init__(self, lam: float, run_no: int, input_dir: str = "./input",
+                    output_dir: str = "./output") -> None:
         """
         Initialise a Simulation object.
 
@@ -88,16 +86,10 @@ class Simulation():
         ----------
         lam : float
             Lambda value for the simulation.
-        run : int
+        run_no : int
             Index of repeat for the simulation.
         output_dir : str
             Path to the output directory.
-        equilibrated : bool, Optional, default: False
-            Whether or not the simulation has equilibrated.
-        running : bool, Optional, default: False
-            Whether or not the simulation is currently running.
-        jobid : str, Optional, default: None
-            SLURM job ID for the simulation.
 
         Returns
         -------
@@ -105,23 +97,25 @@ class Simulation():
         """
 
         self.lam = lam
-        self.run = run
+        self.run_no = run_no
         self.input_dir = _os.path.abspath(input_dir)
         # Check that the input directory contains the required files
-        self.validate_input()
+        self._validate_input()
         self.output_dir = _os.path.abspath(output_dir)
-        self.equilibrated = equilibrated
-        self.running = running
-        self.jobid = jobid
-        self.output_subdir = output_dir + "/lambda_" + f"{lam:.3f}" + "/run_" + str(run).zfill(2)
+        self.equil_time = None
+        self.job_id = None
+        self.running = False
+        self.output_subdir = output_dir + "/lambda_" + f"{lam:.3f}" + "/run_" + str(run_no).zfill(2)
+        self.tot_simtime = 0 # ns
+        self.time_per_cycle = self._get_time_per_cycle() # ns
 
         # Create the output subdirectory
         _subprocess.call(["mkdir", "-p", self.output_subdir])
         # Create a soft link to the input dir to simplify running simulations
-        _subprocess.call(["ln", "-s", self.input_dir, self.output_subdir + "/input"])
+        _subprocess.call(["cp", "-r", self.input_dir, self.output_subdir + "/input"])
 
     
-    def validate_input(self) -> None:
+    def _validate_input(self) -> None:
         """ Check that the required input files are present. """
 
         # Check that the input directory exists
@@ -135,7 +129,34 @@ class Simulation():
                 raise FileNotFoundError("Required input file " + file + " not found.")
 
 
-    def run(self, duration: float = 2.5) -> int:
+    def _get_time_per_cycle(self) -> float:
+        """
+        Get the time per SOMD cycles, in ns
+        
+        Returns
+        -------
+        time_per_cycle : int
+            Time per cycle, in ns.
+        """
+        
+        timestep = None # ns
+        nmoves = None # number of moves per cycle
+        with open(self.input_dir + "/sim.cfg", "r") as ifile:
+            lines = ifile.readlines()
+            for line in lines:
+                if line.startswith("timestep ="):
+                    timestep = float(line.split("=")[1].split()[0])
+                if line.startswith("nmoves ="):
+                    nmoves = float(line.split("=")[1])
+
+        if timestep is None or nmoves is None:
+            raise ValueError("Could not find timestep or nmoves in sim.cfg.")
+
+        time_per_cycle = timestep * nmoves / 1_000_000
+        return time_per_cycle
+
+
+    def run(self, duration: float = 2.5) -> None:
         """
         Run a SOMD simulation.
 
@@ -146,22 +167,50 @@ class Simulation():
 
         Returns
         -------
-        jobid : int
-            The SLURM job ID for the simulation.
+        None
         """
+        # Need to modify the config file to set the correction n_cycles
+        n_cycles = int(duration / self.time_per_cycle)
+        self._set_n_cycles(n_cycles)
 
         # Run SOMD
-        process = _subprocess.Popen(["sbatch", self.output_subdir + "/input/run_somd.sh", self.lam, duration],
-                                    stin = _subprocess.PIPE, stdout = _subprocess.PIPE, stderr = _subprocess.STDOUT,
-                                    close_fds=True)
-        process_output = process.stdout.read()
-        jobid = int((process_output.split()[-1]))
+        #process = _subprocess.Popen(["sbatch", self.output_subdir + "/input/run_somd.sh", self.lam, duration],
+                                    #stin = _subprocess.PIPE, stdout = _subprocess.PIPE, stderr = _subprocess.STDOUT,
+                                    #close_fds=True)
+        #process_output = process.stdout.read()
+        #jobid = int((process_output.split()[-1]))
+        #self.tot_simtime += duration
+        #self.jobid = jobid
 
-        return jobid
+
+    def _set_n_cycles(self, n_cycles: int) -> None:
+        """
+        Set the number of cycles in the SOMD config file.
+
+        Parameters
+        ----------
+        n_cycles : int
+            Number of cycles to set in the config file.
+
+        Returns
+        -------
+        None
+        """
+        # Find the line with n_cycles and replace
+        with open(self.output_subdir + "/input/sim.cfg", "r") as ifile:
+            lines = ifile.readlines()
+            for i, line in enumerate(lines):
+                if line.startswith("ncycles ="):
+                    lines[i] = "ncycles = " + str(n_cycles) + "\n"
+                    break
+
+        # Now write the new file
+        with open(self.output_subdir + "/input/sim.cfg", "w+") as ofile:
+            for line in lines:
+                ofile.write(line)
 
 
-def get_lam_vals(input_dir: str = "./input", 
-                 output_dir: str = "./output") -> _List[float]:
+def get_lam_vals(input_dir: str = "./input") -> _List[float]:
     """
     Create required output directories.
 
@@ -169,8 +218,6 @@ def get_lam_vals(input_dir: str = "./input",
     ----------
     input_dir : str
         Path to the input directory.
-    output_dir : str
-        Path to the output directory.
 
     Returns
     -------
