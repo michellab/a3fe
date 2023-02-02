@@ -125,10 +125,10 @@ class Simulation():
         # Check that the input directory contains the required files
         self._validate_input()
         self.output_dir = _os.path.abspath(output_dir)
-        self.job_id = None
-        self.running = False
-        self.output_subdir = output_dir + "/lambda_" + f"{lam:.3f}" + "/run_" + str(run_no).zfill(2)
-        self.tot_simtime = 0 # ns
+        self.job_id: _Optional[int] = None
+        self.running: bool = False
+        self.output_subdir: str = output_dir + "/lambda_" + f"{lam:.3f}" + "/run_" + str(run_no).zfill(2)
+        self.tot_simtime: float = 0 # ns
         # Now read useful parameters from the simulation file options
         self._add_attributes_from_simfile()
 
@@ -205,7 +205,7 @@ class Simulation():
                 if line.startswith("energy frequency ="):
                     nrg_freq = float(line.split("=")[1])
 
-        if None in [timestep, nmoves, nrg_freq]:
+        if timestep is None or nmoves is None or nrg_freq is None:
             raise ValueError("Could not find timestep or nmoves in sim.cfg.")
 
         self.timestep = timestep / 1_000_000 # fs to ns
@@ -298,10 +298,10 @@ class Simulation():
 
         times = [x * self.timestep / 1_000_000 for x in steps] # Convert steps to time in ns
 
-        times = _np.array(times)
-        grads = _np.array(grads)
+        times_arr = _np.array(times)
+        grads_arr = _np.array(grads)
 
-        return times, grads
+        return times_arr, grads_arr
 
 
 class LamWindow():
@@ -336,10 +336,10 @@ class LamWindow():
         self.ensemble_size = ensemble_size
         self.input_dir = input_dir
         self.output_dir = output_dir
-        self.equilibrated = False
-        self.equil_time = None
-        self.running = False
-        self.tot_simtime = 0 # ns
+        self.equilibrated: bool = False
+        self.equil_time: _Optional[float] = None
+        self.running: bool = False
+        self.tot_simtime: float = 0 # ns
         # Create the required simulations for this lambda value
         self.sims = []
         for i in range(1, ensemble_size + 1):
@@ -452,7 +452,6 @@ class LamWindow():
             d_dh_dls.append(d_dh_dl)
 
         # Calculate the mean gradient
-        d_dh_dls = _np.array(d_dh_dls)
         mean_d_dh_dl = _np.mean(d_dh_dls, axis=0)
 
         # Check if the mean gradient has been 0 at any point
@@ -486,14 +485,14 @@ def get_lam_vals(input_dir: str = "./input") -> _List[float]:
     """
 
     # Read number of lambda windows from input file
-    lam_vals = []
+    lam_vals_str = []
     with open(input_dir + "/sim.cfg", "r") as ifile:
         lines = ifile.readlines()
         for line in lines:
             if line.startswith("lambda array ="):
-                lam_vals = line.split("=")[1].split(",")
+                lam_vals_str = line.split("=")[1].split(",")
                 break
-    lam_vals = [float(lam) for lam in lam_vals]
+    lam_vals = [float(lam) for lam in lam_vals_str]
 
     return lam_vals
 
