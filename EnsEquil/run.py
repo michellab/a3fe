@@ -67,6 +67,7 @@ def run_calc(block_size: float = 1, ensemble_size: int = 5, input_dir: str = "./
     for win in lam_windows:
         # Add 0.5 ns buffer to give chance for the equilibration to be detected.
         win.run(2*block_size + 0.5)
+        win._update_log()
 
     # Periodically check the simulations and analyse/ resubmit as necessary
     running_wins = lam_windows
@@ -81,9 +82,9 @@ def run_calc(block_size: float = 1, ensemble_size: int = 5, input_dir: str = "./
                 else:
                     win.run(block_size) 
 
-            # Write status after checking for running and equilibration, as this updates the 
-            # _running and _equilibrated attributes
-            win._update_log()
+                # Write status after checking for running and equilibration, as this updates the 
+                # _running and _equilibrated attributes
+                win._update_log()
 
         running_wins = [win for win in running_wins if win.running]
 
@@ -145,7 +146,7 @@ class Simulation():
             True if the simulation is still running, False otherwise.
         """
         # Check if the job is still running
-        cmd = f"squeue -j -h {self.jobid}"
+        cmd = f"squeue -j -h {self.job_id}"
         process = _subprocess.Popen(cmd, shell=True, stdin = _subprocess.PIPE,
                                     stdout = _subprocess.PIPE, stderr = _subprocess.STDOUT,
                                     close_fds=True)
@@ -232,10 +233,10 @@ class Simulation():
                                     close_fds=True)
         
         process_output = process.stdout.read()
-        jobid = int((process_output.split()[-1]))
+        job_id = int((process_output.split()[-1]))
         self.running = True
         self.tot_simtime += duration
-        self.jobid = jobid
+        self.job_id = job_id
 
 
     def _set_n_cycles(self, n_cycles: int) -> None:
@@ -302,8 +303,8 @@ class Simulation():
     def _update_log(self)-> None:
         """ Write the status of the simulation to a log file. """
 
-        with open(self.output_subdir, "a") as ofile:
-            ofile.write("##############################################"\n)
+        with open(f"{self.output_subdir}/status.log", "a") as ofile:
+            ofile.write("##############################################\n")
             for var in vars(self):
                 ofile.write(f"{var}: {getattr(self, var)} \n")
 
@@ -480,6 +481,9 @@ class LamWindow():
             ofile.write("##############################################\n")
             for var in vars(self):
                 ofile.write(f"{var}: {getattr(self, var)} \n")
+
+        for sim in self.sims:
+            sim._update_log()
 
 
 def get_lam_vals(input_dir: str = "./input") -> _List[float]:
