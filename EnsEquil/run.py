@@ -7,8 +7,6 @@ import numpy as _np
 from time import sleep as _sleep
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
-equil_fn = 1
-
 def canvas(with_attribution=True):
     """
     Placeholder function to show example docstring (NumPy format).
@@ -70,29 +68,26 @@ def run_calc(block_size: float = 1, ensemble_size: int = 5, input_dir: str = "./
         # Add 0.5 ns buffer to give chance for the equilibration to be detected.
         win.run(2*block_size + 0.5)
 
-    with open("data.txt", "w") as file:
-        # Periodically check the simulations and analyse/ resubmit as necessary
-        running_wins = lam_windows
-        while running_wins:
-            _sleep(60 * 5) # Check every 5 minutes
-            for win in running_wins:
-                # Check if the window has finished
-                if not win.running:
-                    # Check if the simulation has equilibrated
-                    if win.equilibrated:
-                        file.write(f"Lambda: {win.lam:.3f} has equilibrated at {win.equil_time:.3f} ns \n")
-                    else:
-                        win.run(block_size) 
+    # Periodically check the simulations and analyse/ resubmit as necessary
+    running_wins = lam_windows
+    while running_wins:
+        _sleep(20 * 1) # Check every minute
+        for win in running_wins:
+            # Check if the window has now finished - calling win.running updates the win._running attribute
+            if not win.running:
+                # Check if the simulation has equilibrated and if not, resubmit
+                if win.equilibrated:
+                    file.write(f"Lambda: {win.lam:.3f} has equilibrated at {win.equil_time:.3f} ns \n")
+                else:
+                    win.run(block_size) 
 
-                    # If not, resubmit the simulation
+            # Write status after checking for running and equilibration, as this updates the 
+            # _running and _equilibrated attributes
+            win._update_log()
 
-                    # Else, analyse the simulation
-    
-        #running_windows = [win for win in running_wins if win.running]
+        running_wins = [win for win in running_wins if win.running]
 
-    # Check the results of the simulations
-
-    # Cycle of analysis/ resubmission as necessary
+        # Now perform the final analysis
 
     # Save data and perform final analysis
 
@@ -304,6 +299,15 @@ class Simulation():
         return times_arr, grads_arr
 
 
+    def _update_log(self)-> None:
+        """ Write the status of the simulation to a log file. """
+
+        with open(self.output_subdir, "a") as ofile:
+            ofile.write("##############################################"\n)
+            for var in vars(self):
+                ofile.write(f"{var}: {getattr(self, var)} \n")
+
+
 class LamWindow():
     """A class to hold and manipulate a set of SOMD simulations at a given lambda value."""
 
@@ -467,6 +471,15 @@ class LamWindow():
             equilibrated = True 
 
         return equilibrated, equil_time
+
+
+    def _update_log(self)-> None:
+        """ Write the status of the lambda window to a log file. """
+
+        with open(f"{self.output_dir}/lambda_{self.lam:.3f}/status.log", "a") as ofile:
+            ofile.write("##############################################\n")
+            for var in vars(self):
+                ofile.write(f"{var}: {getattr(self, var)} \n")
 
 
 def get_lam_vals(input_dir: str = "./input") -> _List[float]:
