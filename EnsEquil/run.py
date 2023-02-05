@@ -88,7 +88,7 @@ def run_calc(block_size: float = 1, ensemble_size: int = 5, input_dir: str = "./
 
         running_wins = [win for win in running_wins if win.running]
 
-        # Now perform the final analysis
+    # All simulations are now fini
 
     # Save data and perform final analysis
 
@@ -369,6 +369,8 @@ class LamWindow():
         for sim in self.sims:
             sim.run(duration)
             self.tot_simtime += duration
+
+        self._running = True
 
 
     @property
