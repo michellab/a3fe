@@ -9,6 +9,7 @@ from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, O
 
 from .analyse import analyse
 
+
 def canvas(with_attribution=True):
     """
     Placeholder function to show example docstring (NumPy format).
@@ -32,77 +33,190 @@ def canvas(with_attribution=True):
     return quote
 
 
-def test():
-    print("Running calculation...")
-
-
-def run_calc(block_size: float = 1, ensemble_size: int = 5, input_dir: str = "./input", 
-             output_dir: str = "./output") -> None:
+class Ensemble():
     """
-    Run ensemble of SOMD free energy calculation with automated 
-    equilibration detection.
-
-    Parameters
-    ----------
-    block_size : float, Optional, default: 1
-        Size of blocks to use for equilibration detection, in ns.
-    ensemble_size : int, Optional, default: 5
-        Number of replica simulations to run.
-    input_dir : str, Optional, default: "./input"
-        Path to directory containing input files.
-    output_dir : str, Optional, default: "./input"
-        Path to the output directory.
-
-    Returns
-    -------
-    None
+    Class to hold and manipulate an ensemble of SOMD simulations.
     """
 
-    # Create all simulation objects. In doing so, their directories will be created.
-    lam_vals = get_lam_vals(input_dir)
+    def __init__(self, block_size: float = 1, ensemble_size: int = 5,
+                 input_dir: str = "./input",
+                 output_dir: str = "./output") -> None:
+        """ 
+        Initialise an ensemble of SOMD simulations.
 
-    lam_windows = []
-    for lam in lam_vals:
-        lam_windows.append(LamWindow(lam, block_size, ensemble_size, input_dir, output_dir))
+        Parameters
+        ----------
+        block_size : float, Optional, default: 1
+            Size of blocks to use for equilibration detection, in ns.
+        ensemble_size : int, Optional, default: 5
+            Number of simulations to run in the ensemble.
+        input_dir : str, Optional, default: "./input"
+            Path to directory containing input files for the simulations.
+        output_dir : str, Optional, default: "./output"
+            Path to directory to store output files from the simulations.
 
-    # Run initial SOMD simulations
-    for win in lam_windows:
-        # Add 0.5 ns buffer to give chance for the equilibration to be detected.
-        win.run(2*block_size + 0.5)
-        win._update_log()
+        Returns
+        -------
+        None
+        """
+        self.block_size = block_size
+        self.ensemble_size = ensemble_size
+        self.input_dir = input_dir
+        self.output_dir = output_dir
+        self._running: bool = False
+        self._active_slurm_jobs: _List[int] = []
+        self.lam_vals: _List[float] = self._get_lam_vals()
+        self.lam_windows: _List[LamWindow] = []
+        self.running_wins: _List[LamWindow] = []
 
-    # Periodically check the simulations and analyse/ resubmit as necessary
-    running_wins = lam_windows
-    with open(f"{output_dir}/status.log", "w") as file:
-        file.write("Starting equilibration detection \n")
-        while running_wins:
-            _sleep(20 * 1) # Check every minute
-            for win in running_wins:
-                # Check if the window has now finished - calling win.running updates the win._running attribute
-                if not win.running:
-                    # Check if the simulation has equilibrated and if not, resubmit
-                    if win.equilibrated:
-                        file.write(f"Lambda: {win.lam:.3f} has equilibrated at {win.equil_time:.3f} ns \n")
-                    else:
-                        win.run(block_size) 
+        # Creating lambda window objects sets up required input directories
+        for lam in self.lam_vals:
+            self.lam_windows.append(LamWindow(lam, self.block_size,
+                                    self.ensemble_size, self.input_dir,
+                                    output_dir))
 
-                    # Write status after checking for running and equilibration, as this updates the 
-                    # _running and _equilibrated attributes
-                    win._update_log()
+    def run(self) -> None:
+        """ Run the ensemble of simulations with adaptive equilibration detection,
+        and perform analysis once finished."""
 
-            running_wins = [win for win in running_wins if win.running]
+        # Run initial SOMD simulations
+        for win in self.lam_windows:
+            # Add buffer to give chance for the equilibration to be detected.
+            win.run(2 * self.block_size + 0.5 * self.block_size)
+            win._update_log()
 
-    # All simulations are now finished, so perform final analysis
-    analyse(lam_windows)
+        # Periodically check the simulations and analyse/ resubmit as necessary
+        self.running_wins = self.lam_windows
+        with open(f"{self.output_dir}/status.log", "w") as file:
+            file.write("Starting equilibration detection \n")
+            while self.running_wins:
+                _sleep(20 * 1)  # Check 20 seconds
+                for win in self.running_wins:
+                    # Check if the window has now finished - calling win.running updates the win._running attribute
+                    if not win.running:
+                        # Check if the simulation has equilibrated and if not, resubmit
+                        if win.equilibrated:
+                            file.write(f"Lambda: {win.lam:.3f} has equilibrated at {win.equil_time:.3f} ns \n")
+                        else:
+                            win.run(self.block_size)
 
-    # Save data and perform final analysis
+                        # Write status after checking for running and equilibration, as this updates the
+                        # _running and _equilibrated attributes
+                        win._update_log()
+
+                self.running_wins = [win for win in self.running_wins if win.running]
+
+        # All simulations are now finished, so perform final analysis
+        self.analyse()
+
+        # Save data and perform final analysis
+
+    def _get_lam_vals(self) -> _List[float]:
+        """
+        Return list of lambda values for the simulations,
+        based on the configuration file.
+
+        Returns
+        -------
+        lam_vals : List[float]
+            List of lambda values for the simulations.
+        """
+
+        # Read number of lambda windows from input file
+        lam_vals_str = []
+        with open(self.input_dir + "/sim.cfg", "r") as ifile:
+            lines = ifile.readlines()
+            for line in lines:
+                if line.startswith("lambda array ="):
+                    lam_vals_str = line.split("=")[1].split(",")
+                    break
+        lam_vals = [float(lam) for lam in lam_vals_str]
+
+        return lam_vals
+
+    def analyse(self) -> None:
+        """ Analyse the results of the ensemble of simulations. Requires that 
+        all lambda windows have equilibrated.  """
+
+        # Remove unequilibrated data from the equilibrated output directory
+        for win in self.lam_windows:
+            equil_time = win.equil_time
+            equil_index = int(equil_time / (win.sims[0].timestep * win.sims[0].nrg_freq))
+            for sim in win.sims:
+                in_simfile = sim.output_subdir + "/simfile.dat"
+                out_simfile = sim.output_subdir + "/simfile_equilibrated.dat"
+                self._write_equilibrated_data(in_simfile, out_simfile, equil_index)
+
+        # Analyse data with MBAR and compute uncertainties
+        output_dir = self.output_dir
+        ensemble_size = self.ensemble_size
+        # This is nasty - assumes naming always the same
+        for run in range(1, ensemble_size + 1):
+            with open(f"{self.output_dir}/freenrg-MBAR-run_{run}.dat", "w") as ofile:
+                _subprocess.run(["/home/finlayclark/sire.app/bin/analyse_freenrg",
+                                "mbar", "-i", f"{output_dir}/lambda*/run_0{run}/simfile.dat",
+                                "-p", "100", "--overlap", "--temperature",
+                                "298.0"], stdout=ofile)
+
+        # TODO: Make convergence plots (which should be flat)
+
+    def _write_equilibrated_data(self, in_simfile: str,
+                                 out_simfile: str,
+                                 equil_index: int) -> None:
+        """
+        Remove unequilibrated data from a simulation file and write a new
+        file containing only the equilibrated data.
+
+        Parameters
+        ----------
+        in_simfile : str
+            Path to simulation file.
+        out_simfile : str
+            Path to new simulation file, containing only the equilibrated data
+            from the original file.
+        equil_index : int
+            Index of the first equilibrated frame, given by 
+            equil_time / (timestep * nrg_freq)
+
+        Returns
+        -------
+        None
+        """
+        with open(in_simfile, "r") as ifile:
+            lines = ifile.readlines()
+
+        # Figure out how many lines come before the data
+        non_data_lines = 0
+        for line in lines:
+            if line.startswith("#"):
+                non_data_lines += 1
+            else:
+                break
+
+        # Overwrite the original file with one containing only the equilibrated data
+        with open(out_simfile, "w") as ofile:
+            for line in lines[equil_index + non_data_lines:]:
+                ofile.write(line)
+
+    def _update_log(self) -> None:
+        """
+        Update the status log file with the current status of the ensemble.
+
+        Returns
+        -------
+        None
+        """
+        with open(f"{self.output_dir}/status.log", "a") as ofile:
+            ofile.write("##############################################\n")
+            for var in vars(self):
+                ofile.write(f"{var}: {getattr(self, var)} \n")
 
 
 class Simulation():
     """Class to store information about a single SOMD simulation."""
-    
+
     def __init__(self, lam: float, run_no: int, input_dir: str = "./input",
-                    output_dir: str = "./output") -> None:
+                 output_dir: str = "./output") -> None:
         """
         Initialise a Simulation object.
 
@@ -129,7 +243,7 @@ class Simulation():
         self.job_id: _Optional[int] = None
         self.running: bool = False
         self.output_subdir: str = output_dir + "/lambda_" + f"{lam:.3f}" + "/run_" + str(run_no).zfill(2)
-        self.tot_simtime: float = 0 # ns
+        self.tot_simtime: float = 0  # ns
         # Now read useful parameters from the simulation file options
         self._add_attributes_from_simfile()
 
@@ -137,7 +251,6 @@ class Simulation():
         _subprocess.call(["mkdir", "-p", self.output_subdir])
         # Create a soft link to the input dir to simplify running simulations
         _subprocess.call(["cp", "-r", self.input_dir, self.output_subdir + "/input"])
-
 
     @property
     def running(self) -> bool:
@@ -151,9 +264,9 @@ class Simulation():
             True if the simulation is still running, False otherwise.
         """
         # Get job ids of currently running jobs
-        cmd = "squeue -h -u $USER | awk '{print $1}' | paste -s -d, -"        
-        process = _subprocess.Popen(cmd, shell=True, stdin = _subprocess.PIPE,
-                                    stdout = _subprocess.PIPE, stderr = _subprocess.STDOUT,
+        cmd = "squeue -h -u $USER | awk '{print $1}' | paste -s -d, -"
+        process = _subprocess.Popen(cmd, shell=True, stdin=_subprocess.PIPE,
+                                    stdout=_subprocess.PIPE, stderr=_subprocess.STDOUT,
                                     close_fds=True)
         output = process.communicate()[0]
         job_ids = [int(job_id) for job_id in output.decode('utf-8').strip().split(",") if job_id != ""]
@@ -171,8 +284,7 @@ class Simulation():
     @running.setter
     def running(self, value: bool) -> None:
         self._running = value
-    
-    
+
     def _validate_input(self) -> None:
         """ Check that the required input files are present. """
 
@@ -186,21 +298,20 @@ class Simulation():
             if not _os.path.isfile(self.input_dir + "/" + file):
                 raise FileNotFoundError("Required input file " + file + " not found.")
 
-
     def _add_attributes_from_simfile(self) -> None:
         """
         Read the SOMD simulation option file and
         add useful attributes to the Simulation object.
-        
+
         Returns
         -------
         time_per_cycle : int
             Time per cycle, in ns.
         """
-        
-        timestep = None # ns
-        nmoves = None # number of moves per cycle
-        nrg_freq = None # number of timesteps between energy calculations
+
+        timestep = None  # ns
+        nmoves = None  # number of moves per cycle
+        nrg_freq = None  # number of timesteps between energy calculations
         with open(self.input_dir + "/sim.cfg", "r") as ifile:
             lines = ifile.readlines()
             for line in lines:
@@ -214,10 +325,9 @@ class Simulation():
         if timestep is None or nmoves is None or nrg_freq is None:
             raise ValueError("Could not find timestep or nmoves in sim.cfg.")
 
-        self.timestep = timestep / 1_000_000 # fs to ns
+        self.timestep = timestep / 1_000_000  # fs to ns
         self.nrg_freq = nrg_freq
-        self.time_per_cycle = timestep * nmoves / 1_000_000 # fs to ns
-
+        self.time_per_cycle = timestep * nmoves / 1_000_000  # fs to ns
 
     def run(self, duration: float = 2.5) -> None:
         """
@@ -238,16 +348,15 @@ class Simulation():
 
         # Run SOMD
         cmd = f"~/Documents/research/scripts/abfe/rbatch.sh --chdir {self.output_subdir} {self.output_subdir}/input/run_somd.sh {self.lam}"
-        process = _subprocess.Popen(cmd, shell=True, stdin = _subprocess.PIPE,
-                                    stdout = _subprocess.PIPE, stderr = _subprocess.STDOUT,
+        process = _subprocess.Popen(cmd, shell=True, stdin=_subprocess.PIPE,
+                                    stdout=_subprocess.PIPE, stderr=_subprocess.STDOUT,
                                     close_fds=True)
-        
+
         process_output = process.stdout.read()
         job_id = int((process_output.split()[-1]))
         self.running = True
         self.tot_simtime += duration
         self.job_id = job_id
-
 
     def _set_n_cycles(self, n_cycles: int) -> None:
         """
@@ -275,7 +384,6 @@ class Simulation():
             for line in lines:
                 ofile.write(line)
 
-    
     def read_gradients(self) -> _Tuple[_np.ndarray, _np.ndarray]:
         """
         Read the gradients from the output file.
@@ -302,15 +410,14 @@ class Simulation():
                 steps.append(step)
                 grads.append(grad)
 
-        times = [x * self.timestep / 1_000_000 for x in steps] # Convert steps to time in ns
+        times = [x * self.timestep / 1_000_000 for x in steps]  # Convert steps to time in ns
 
         times_arr = _np.array(times)
         grads_arr = _np.array(grads)
 
         return times_arr, grads_arr
 
-
-    def _update_log(self)-> None:
+    def _update_log(self) -> None:
         """ Write the status of the simulation to a log file. """
 
         with open(f"{self.output_subdir}/status.log", "a") as ofile:
@@ -323,8 +430,8 @@ class LamWindow():
     """A class to hold and manipulate a set of SOMD simulations at a given lambda value."""
 
     def __init__(self, lam: float, block_size: float = 1,
-                ensemble_size: int = 5, input_dir: str = "./input",
-                output_dir: str = "./output") -> None:
+                 ensemble_size: int = 5, input_dir: str = "./input",
+                 output_dir: str = "./output") -> None:
         """
         Initialise a LamWindow object.
 
@@ -354,13 +461,12 @@ class LamWindow():
         self.equilibrated: bool = False
         self.equil_time: _Optional[float] = None
         self.running: bool = False
-        self.tot_simtime: float = 0 # ns
+        self.tot_simtime: float = 0  # ns
         # Create the required simulations for this lambda value
         self.sims = []
         for i in range(1, ensemble_size + 1):
             sim = Simulation(lam, i, input_dir, output_dir)
             self.sims.append(sim)
-
 
     def run(self, duration: float = 2.5) -> None:
         """
@@ -382,7 +488,6 @@ class LamWindow():
 
         self._running = True
 
-
     @property
     def running(self) -> bool:
         """
@@ -403,11 +508,9 @@ class LamWindow():
 
         return self._running
 
-
     @running.setter
     def running(self, value: bool) -> None:
         self._running = value
-
 
     @property
     def equilibrated(self) -> bool:
@@ -424,12 +527,10 @@ class LamWindow():
         self.equilibrated, self.equil_time = self.check_equil()
         return self._equilibrated
 
-        
     @equilibrated.setter
     def equilibrated(self, value: bool) -> None:
         self._equilibrated = value
 
-    
     def check_equil(self) -> _Tuple[bool, _Optional[float]]:
         """
         Check if the ensemble of simulations at the lambda window is
@@ -455,7 +556,7 @@ class LamWindow():
         equil_time = None
 
         for sim in self.sims:
-            _, dh_dl = sim.read_gradients() # Times should be the same for all sims
+            _, dh_dl = sim.read_gradients()  # Times should be the same for all sims
             # Create array of nan so that d_dh_dl has the same length as times irrespective of
             # the block size
             d_dh_dl = _np.full(len(dh_dl), _np.nan)
@@ -465,7 +566,8 @@ class LamWindow():
                 else:
                     later_block_av = _np.mean(dh_dl[i - idx_block_size: i])
                     earlier_block_av = _np.mean(dh_dl[i - 2 * idx_block_size: i - idx_block_size])
-                    d_dh_dl[i] = (later_block_av - earlier_block_av) / self.block_size # Gradient of dh/dl in kcal mol-1 ns-1
+                    d_dh_dl[i] = (later_block_av - earlier_block_av) / \
+                        self.block_size  # Gradient of dh/dl in kcal mol-1 ns-1
             d_dh_dls.append(d_dh_dl)
 
         # Calculate the mean gradient
@@ -481,12 +583,11 @@ class LamWindow():
             last_grad = grad
 
         if equil_time:
-            equilibrated = True 
+            equilibrated = True
 
         return equilibrated, equil_time
 
-
-    def _update_log(self)-> None:
+    def _update_log(self) -> None:
         """ Write the status of the lambda window to a log file. """
 
         with open(f"{self.output_dir}/lambda_{self.lam:.3f}/status.log", "a") as ofile:
@@ -496,34 +597,6 @@ class LamWindow():
 
         for sim in self.sims:
             sim._update_log()
-
-
-def get_lam_vals(input_dir: str = "./input") -> _List[float]:
-    """
-    Create required output directories.
-
-    Parameters
-    ----------
-    input_dir : str
-        Path to the input directory.
-
-    Returns
-    -------
-    lam_vals : List[float]
-        List of lambda values for the simulations.
-    """
-
-    # Read number of lambda windows from input file
-    lam_vals_str = []
-    with open(input_dir + "/sim.cfg", "r") as ifile:
-        lines = ifile.readlines()
-        for line in lines:
-            if line.startswith("lambda array ="):
-                lam_vals_str = line.split("=")[1].split(",")
-                break
-    lam_vals = [float(lam) for lam in lam_vals_str]
-
-    return lam_vals
 
 
 if __name__ == "__main__":

@@ -2,7 +2,5 @@
 
 # Add imports here
 from .run import *
-from . analyse import *
-
 
 from ._version import __version__
