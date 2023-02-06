@@ -3,10 +3,10 @@
 
 import subprocess as _subprocess
 import os as _os
+import threading as _threading
 import numpy as _np
 from time import sleep as _sleep
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
-
 
 class Ensemble():
     """
@@ -39,7 +39,7 @@ class Ensemble():
         self.input_dir = input_dir
         self.output_dir = output_dir
         self._running: bool = False
-        self._active_slurm_jobs: _List[int] = []
+        self.run_thread: _Optional[_threading.Thread] = None
         self.lam_vals: _List[float] = self._get_lam_vals()
         self.lam_windows: _List[LamWindow] = []
         self.running_wins: _List[LamWindow] = []
@@ -51,8 +51,30 @@ class Ensemble():
                                     output_dir))
 
     def run(self) -> None:
-        """ Run the ensemble of simulations with adaptive equilibration detection,
+        """Run the ensemble of simulations with adaptive equilibration detection,
         and perform analysis once finished."""
+        # Run in the background with threading so that user can continuously check 
+        # the status of the Ensemble object
+        self.run_thread = _threading.Thread(target=self._run_without_threading, name="Ensemble")
+        self.run_thread.start()
+        self.running = True
+
+    @property
+    def running(self) -> bool:
+        """Return True if the ensemble is currently running."""
+        self._running = self.run_thread.is_alive() 
+        return self._running
+
+    @running.setter
+    def running(self, value: bool) -> None:
+        """Set the running attribute."""
+        self._running = value
+
+    def _run_without_threading(self) -> None:
+        """ Run the ensemble of simulations with adaptive equilibration detection,
+        and perform analysis once finished. This function is called by run() with threading,
+        so that the function can be run in the background and the user can continuously
+        check the status of the Ensemble object."""
 
         # Run initial SOMD simulations
         for win in self.lam_windows:
@@ -130,8 +152,8 @@ class Ensemble():
             with open(f"{self.output_dir}/freenrg-MBAR-run_{run}.dat", "w") as ofile:
                 _subprocess.run(["/home/finlayclark/sire.app/bin/analyse_freenrg",
                                 "mbar", "-i", f"{output_dir}/lambda*/run_0{run}/simfile.dat",
-                                 "-p", "100", "--overlap", "--temperature",
-                                 "298.0"], stdout=ofile)
+                                "-p", "100", "--overlap", "--temperature",
+                                "298.0"], stdout=ofile)
 
         # TODO: Make convergence plots (which should be flat)
 
