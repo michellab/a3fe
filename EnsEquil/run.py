@@ -7,8 +7,6 @@ import numpy as _np
 from time import sleep as _sleep
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
-from .analyse import analyse
-
 
 def canvas(with_attribution=True):
     """
