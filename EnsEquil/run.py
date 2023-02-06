@@ -8,29 +8,6 @@ from time import sleep as _sleep
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
 
-def canvas(with_attribution=True):
-    """
-    Placeholder function to show example docstring (NumPy format).
-
-    Replace this function and doc string for your own project.
-
-    Parameters
-    ----------
-    with_attribution : bool, Optional, default: True
-        Set whether or not to display who the quote is from.
-
-    Returns
-    -------
-    quote : str
-        Compiled string including quote and optional attribution.
-    """
-
-    quote = "The code is but a canvas to our imagination."
-    if with_attribution:
-        quote += "\n\t- Adapted from Henry David Thoreau"
-    return quote
-
-
 class Ensemble():
     """
     Class to hold and manipulate an ensemble of SOMD simulations.
@@ -153,8 +130,8 @@ class Ensemble():
             with open(f"{self.output_dir}/freenrg-MBAR-run_{run}.dat", "w") as ofile:
                 _subprocess.run(["/home/finlayclark/sire.app/bin/analyse_freenrg",
                                 "mbar", "-i", f"{output_dir}/lambda*/run_0{run}/simfile.dat",
-                                "-p", "100", "--overlap", "--temperature",
-                                "298.0"], stdout=ofile)
+                                 "-p", "100", "--overlap", "--temperature",
+                                 "298.0"], stdout=ofile)
 
         # TODO: Make convergence plots (which should be flat)
 
@@ -595,8 +572,3 @@ class LamWindow():
 
         for sim in self.sims:
             sim._update_log()
-
-
-if __name__ == "__main__":
-    # Do something if this file is invoked on its own
-    print(canvas())
