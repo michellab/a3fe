@@ -7,6 +7,8 @@ import numpy as _np
 from time import sleep as _sleep
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
+from .analyse import analyse
+
 def canvas(with_attribution=True):
     """
     Placeholder function to show example docstring (NumPy format).
@@ -71,24 +73,27 @@ def run_calc(block_size: float = 1, ensemble_size: int = 5, input_dir: str = "./
 
     # Periodically check the simulations and analyse/ resubmit as necessary
     running_wins = lam_windows
-    while running_wins:
-        _sleep(20 * 1) # Check every minute
-        for win in running_wins:
-            # Check if the window has now finished - calling win.running updates the win._running attribute
-            if not win.running:
-                # Check if the simulation has equilibrated and if not, resubmit
-                if win.equilibrated:
-                    file.write(f"Lambda: {win.lam:.3f} has equilibrated at {win.equil_time:.3f} ns \n")
-                else:
-                    win.run(block_size) 
+    with open(f"{output_dir}/status.log", "w") as file:
+        file.write("Starting equilibration detection \n")
+        while running_wins:
+            _sleep(20 * 1) # Check every minute
+            for win in running_wins:
+                # Check if the window has now finished - calling win.running updates the win._running attribute
+                if not win.running:
+                    # Check if the simulation has equilibrated and if not, resubmit
+                    if win.equilibrated:
+                        file.write(f"Lambda: {win.lam:.3f} has equilibrated at {win.equil_time:.3f} ns \n")
+                    else:
+                        win.run(block_size) 
 
-                # Write status after checking for running and equilibration, as this updates the 
-                # _running and _equilibrated attributes
-                win._update_log()
+                    # Write status after checking for running and equilibration, as this updates the 
+                    # _running and _equilibrated attributes
+                    win._update_log()
 
-        running_wins = [win for win in running_wins if win.running]
+            running_wins = [win for win in running_wins if win.running]
 
-    # All simulations are now fini
+    # All simulations are now finished, so perform final analysis
+    analyse(lam_windows)
 
     # Save data and perform final analysis
 
@@ -145,16 +150,21 @@ class Simulation():
         self._running : bool
             True if the simulation is still running, False otherwise.
         """
-        # Check if the job is still running
-        cmd = f"squeue -j -h {self.job_id}"
+        # Get job ids of currently running jobs
+        cmd = "squeue -h -u $USER | awk '{print $1}' | paste -s -d, -"        
         process = _subprocess.Popen(cmd, shell=True, stdin = _subprocess.PIPE,
                                     stdout = _subprocess.PIPE, stderr = _subprocess.STDOUT,
                                     close_fds=True)
-        process_output = process.stdout.read()
-        if len(process_output) > 0:
+        output = process.communicate()[0]
+        job_ids = [int(job_id) for job_id in output.decode('utf-8').strip().split(",") if job_id != ""]
+
+        if self.job_id in job_ids:
             self._running = True
+            print(f"Simulation {self.lam} {self.run_no} is still running.")
+
         else:
             self._running = False
+            print(f"Simulation {self.lam} {self.run_no} is finished.")
 
         return self._running
 
@@ -440,7 +450,7 @@ class LamWindow():
         # Read dh/dl data from all simulations and calculate the gradient of the
         # gradient, d_dh_dl
         d_dh_dls = []
-        times, _ = self.sims[0].read_gradients()[0]
+        times, _ = self.sims[0].read_gradients()
         equilibrated = False
         equil_time = None
 
