@@ -156,6 +156,12 @@ class Ensemble():
         """ Analyse the results of the ensemble of simulations. Requires that 
         all lambda windows have equilibrated.  """
 
+        # Check that all simulations have equilibrated
+        for win in self.lam_windows:
+            # Avoid checking win.equilibrated as this causes expensive equilibration detection to be run
+            if not win._equilibrated:
+                raise RuntimeError(f"Not all lambda windows have equilibrated. Analysis cannot be performed.")
+                
         # Remove unequilibrated data from the equilibrated output directory
         for win in self.lam_windows:
             equil_time = win.equil_time
