@@ -3,6 +3,7 @@
 
 from cProfile import label
 import subprocess as _subprocess
+from decimal import Decimal as _Decimal
 import os as _os
 import threading as _threading
 from matplotlib import pyplot as _plt
@@ -608,8 +609,9 @@ class Simulation():
         """
         # Need to make sure that duration is a multiple of the time per cycle
         # otherwise actual time could be quite different from requested duration
-        if round(duration % self.time_per_cycle, 4) != 0:
-            raise ValueError("Duration must be a multiple of the time per cycle.")
+        if _Decimal(str(duration)) % _Decimal(str(self.time_per_cycle)) != 0:
+            raise ValueError(f"Duration must be a multiple of the time per cycle. \
+                    Duration is {duration} ns, and time per cycle is {self.time_per_cycle} ns.")
         # Need to modify the config file to set the correction n_cycles
         n_cycles = int(duration / self.time_per_cycle)
         self._set_n_cycles(n_cycles)
