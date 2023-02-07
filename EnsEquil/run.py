@@ -384,13 +384,13 @@ class LamWindow():
             # Create array of nan so that d_dh_dl has the same length as times irrespective of
             # the block size
             d_dh_dl = _np.full(len(dh_dl), _np.nan)
+            # Compute rolling average with the block size
+            rolling_av_dh_dl = self._get_rolling_average(dh_dl, idx_block_size)
             for i in range(len(dh_dl)):
                 if i < 2 * idx_block_size:
                     continue
                 else:
-                    later_block_av = _np.mean(dh_dl[i - idx_block_size: i])
-                    earlier_block_av = _np.mean(dh_dl[i - 2 * idx_block_size: i - idx_block_size])
-                    d_dh_dl[i] = (later_block_av - earlier_block_av) / \
+                    d_dh_dl[i] = (rolling_av_dh_dl[i] - rolling_av_dh_dl[i - idx_block_size]) / \
                         self.block_size  # Gradient of dh/dl in kcal mol-1 ns-1
             d_dh_dls.append(d_dh_dl)
 
@@ -412,25 +412,52 @@ class LamWindow():
 
         # Save plots of dh/dl and d_dh/dl
         plot(x_vals = times,
-             y_vals= _np.array(dh_dls),
+             y_vals= _np.array([self._get_rolling_average(dh_dl, idx_block_size) for dh_dl in dh_dls]),
              x_label= "Simulation Time per Window per Run / ns",
              y_label= r"$\frac{\mathrm{d}h}{\mathrm{d}\lambda}$ / kcal mol$^{-1}$", 
              outfile= f"{self.output_dir}/lambda_{self.lam:.3f}/dhdl",
-             vline_val= equil_time)
-
-        # Shift the equilibration time by 2 * block size to account for the
-        # delay in the gradient calculation.
-        shifted_equil_time = equil_time + 2 * self.block_size if equil_time else None
+            # Shift the equilibration time by 2 * block size to account for the
+            # delay in the block average calculation.
+             vline_val= equil_time + 1 * self.block_size if equil_time else None)
 
         plot(x_vals = times,
              y_vals= _np.array(d_dh_dls),
              x_label= "Simulation Time per Window per Run / ns",
              y_label= r"$\frac{\partial}{\partial t}\frac{\partial H}{\partial \lambda}$ / kcal mol$^{-1}$ ns$^{-1}$", 
              outfile= f"{self.output_dir}/lambda_{self.lam:.3f}/ddhdl",
-             vline_val= shifted_equil_time,
+             vline_val= equil_time + 2 * self.block_size if equil_time else None,
              hline_val=0)
 
         return equilibrated, equil_time
+
+    def _get_rolling_average(self, data: _np.ndarray, idx_block_size: int) -> _np.ndarray:
+        """
+        Calculate the rolling average of a 1D array.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            1D array of data to be block averaged.
+        idx_block_size : int
+            Index size of the blocks to be used in the block average.
+
+        Returns
+        -------
+        block_av : np.ndarray
+            1D array of block averages of the same length as data.
+            Initial values (before there is sufficient data to calculate 
+            a block average) are set to nan.
+        """
+        rolling_av = _np.full(len(data), _np.nan)
+
+        for i in range(len(data)):
+            if i < idx_block_size:
+                continue
+            else:
+                block_av = _np.mean(data[i - idx_block_size: i])
+                rolling_av[i] = block_av
+
+        return rolling_av
 
     def _update_log(self) -> None:
         """ Write the status of the lambda window to a log file. """
