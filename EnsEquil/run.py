@@ -344,7 +344,7 @@ class LamWindow():
         self._equilibrated : bool
             True if the simulation is equilibrated, False otherwise.
         """
-        self.equilibrated, self.equil_time = self.check_equil()
+        self._equilibrated, self.equil_time = self.check_equil()
         return self._equilibrated
 
     @equilibrated.setter
