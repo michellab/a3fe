@@ -8,6 +8,7 @@ import numpy as _np
 from time import sleep as _sleep
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
+
 class Ensemble():
     """
     Class to hold and manipulate an ensemble of SOMD simulations.
@@ -53,7 +54,7 @@ class Ensemble():
     def run(self) -> None:
         """Run the ensemble of simulations with adaptive equilibration detection,
         and perform analysis once finished."""
-        # Run in the background with threading so that user can continuously check 
+        # Run in the background with threading so that user can continuously check
         # the status of the Ensemble object
         self.run_thread = _threading.Thread(target=self._run_without_threading, name="Ensemble")
         self.run_thread.start()
@@ -62,7 +63,10 @@ class Ensemble():
     @property
     def running(self) -> bool:
         """Return True if the ensemble is currently running."""
-        self._running = self.run_thread.is_alive() 
+        if self.run_thread is not None:
+            self._running = self.run_thread.is_alive()
+        else:
+            self._running = False
         return self._running
 
     @running.setter
@@ -152,8 +156,8 @@ class Ensemble():
             with open(f"{self.output_dir}/freenrg-MBAR-run_{run}.dat", "w") as ofile:
                 _subprocess.run(["/home/finlayclark/sire.app/bin/analyse_freenrg",
                                 "mbar", "-i", f"{output_dir}/lambda*/run_0{run}/simfile.dat",
-                                "-p", "100", "--overlap", "--temperature",
-                                "298.0"], stdout=ofile)
+                                 "-p", "100", "--overlap", "--temperature",
+                                 "298.0"], stdout=ofile)
 
         # TODO: Make convergence plots (which should be flat)
 
@@ -209,220 +213,6 @@ class Ensemble():
                 ofile.write(f"{var}: {getattr(self, var)} \n")
 
 
-class Simulation():
-    """Class to store information about a single SOMD simulation."""
-
-    def __init__(self, lam: float, run_no: int, input_dir: str = "./input",
-                 output_dir: str = "./output") -> None:
-        """
-        Initialise a Simulation object.
-
-        Parameters
-        ----------
-        lam : float
-            Lambda value for the simulation.
-        run_no : int
-            Index of repeat for the simulation.
-        output_dir : str
-            Path to the output directory.
-
-        Returns
-        -------
-        None
-        """
-
-        self.lam = lam
-        self.run_no = run_no
-        self.input_dir = _os.path.abspath(input_dir)
-        # Check that the input directory contains the required files
-        self._validate_input()
-        self.output_dir = _os.path.abspath(output_dir)
-        self.job_id: _Optional[int] = None
-        self.running: bool = False
-        self.output_subdir: str = output_dir + "/lambda_" + f"{lam:.3f}" + "/run_" + str(run_no).zfill(2)
-        self.tot_simtime: float = 0  # ns
-        # Now read useful parameters from the simulation file options
-        self._add_attributes_from_simfile()
-
-        # Create the output subdirectory
-        _subprocess.call(["mkdir", "-p", self.output_subdir])
-        # Create a soft link to the input dir to simplify running simulations
-        _subprocess.call(["cp", "-r", self.input_dir, self.output_subdir + "/input"])
-
-    @property
-    def running(self) -> bool:
-        """
-        Check if the simulation is still running,
-        and update the running attribute accordingly.
-
-        Returns
-        -------
-        self._running : bool
-            True if the simulation is still running, False otherwise.
-        """
-        # Get job ids of currently running jobs
-        cmd = "squeue -h -u $USER | awk '{print $1}' | paste -s -d, -"
-        process = _subprocess.Popen(cmd, shell=True, stdin=_subprocess.PIPE,
-                                    stdout=_subprocess.PIPE, stderr=_subprocess.STDOUT,
-                                    close_fds=True)
-        output = process.communicate()[0]
-        job_ids = [int(job_id) for job_id in output.decode('utf-8').strip().split(",") if job_id != ""]
-
-        if self.job_id in job_ids:
-            self._running = True
-            print(f"Simulation {self.lam} {self.run_no} is still running.")
-
-        else:
-            self._running = False
-            print(f"Simulation {self.lam} {self.run_no} is finished.")
-
-        return self._running
-
-    @running.setter
-    def running(self, value: bool) -> None:
-        self._running = value
-
-    def _validate_input(self) -> None:
-        """ Check that the required input files are present. """
-
-        # Check that the input directory exists
-        if not _os.path.isdir(self.input_dir):
-            raise FileNotFoundError("Input directory does not exist.")
-
-        # Check that the required input files are present
-        required_files = ["run_somd.sh", "sim.cfg", "system.top", "system.crd", "morph.pert"]
-        for file in required_files:
-            if not _os.path.isfile(self.input_dir + "/" + file):
-                raise FileNotFoundError("Required input file " + file + " not found.")
-
-    def _add_attributes_from_simfile(self) -> None:
-        """
-        Read the SOMD simulation option file and
-        add useful attributes to the Simulation object.
-
-        Returns
-        -------
-        time_per_cycle : int
-            Time per cycle, in ns.
-        """
-
-        timestep = None  # ns
-        nmoves = None  # number of moves per cycle
-        nrg_freq = None  # number of timesteps between energy calculations
-        with open(self.input_dir + "/sim.cfg", "r") as ifile:
-            lines = ifile.readlines()
-            for line in lines:
-                if line.startswith("timestep ="):
-                    timestep = float(line.split("=")[1].split()[0])
-                if line.startswith("nmoves ="):
-                    nmoves = float(line.split("=")[1])
-                if line.startswith("energy frequency ="):
-                    nrg_freq = float(line.split("=")[1])
-
-        if timestep is None or nmoves is None or nrg_freq is None:
-            raise ValueError("Could not find timestep or nmoves in sim.cfg.")
-
-        self.timestep = timestep / 1_000_000  # fs to ns
-        self.nrg_freq = nrg_freq
-        self.time_per_cycle = timestep * nmoves / 1_000_000  # fs to ns
-
-    def run(self, duration: float = 2.5) -> None:
-        """
-        Run a SOMD simulation.
-
-        Parameters
-        ----------
-        duration : float, Optional, default: 2.5
-            Duration of simulation, in ns.
-
-        Returns
-        -------
-        None
-        """
-        # Need to modify the config file to set the correction n_cycles
-        n_cycles = int(duration / self.time_per_cycle)
-        self._set_n_cycles(n_cycles)
-
-        # Run SOMD
-        cmd = f"~/Documents/research/scripts/abfe/rbatch.sh --chdir {self.output_subdir} {self.output_subdir}/input/run_somd.sh {self.lam}"
-        process = _subprocess.Popen(cmd, shell=True, stdin=_subprocess.PIPE,
-                                    stdout=_subprocess.PIPE, stderr=_subprocess.STDOUT,
-                                    close_fds=True)
-
-        process_output = process.stdout.read()
-        job_id = int((process_output.split()[-1]))
-        self.running = True
-        self.tot_simtime += duration
-        self.job_id = job_id
-
-    def _set_n_cycles(self, n_cycles: int) -> None:
-        """
-        Set the number of cycles in the SOMD config file.
-
-        Parameters
-        ----------
-        n_cycles : int
-            Number of cycles to set in the config file.
-
-        Returns
-        -------
-        None
-        """
-        # Find the line with n_cycles and replace
-        with open(self.output_subdir + "/input/sim.cfg", "r") as ifile:
-            lines = ifile.readlines()
-            for i, line in enumerate(lines):
-                if line.startswith("ncycles ="):
-                    lines[i] = "ncycles = " + str(n_cycles) + "\n"
-                    break
-
-        # Now write the new file
-        with open(self.output_subdir + "/input/sim.cfg", "w+") as ofile:
-            for line in lines:
-                ofile.write(line)
-
-    def read_gradients(self) -> _Tuple[_np.ndarray, _np.ndarray]:
-        """
-        Read the gradients from the output file.
-
-        Returns
-        -------
-        times : np.ndarray
-            Array of times, in ns.
-        grads : np.ndarray
-            Array of gradients, in kcal/mol.
-        """
-        # Read the output file
-        with open(self.output_subdir + "/simfile.dat", "r") as ifile:
-            lines = ifile.readlines()
-
-        steps = []
-        grads = []
-
-        for line in lines:
-            vals = line.split()
-            if not line.startswith("#"):
-                step = int(vals[0].strip())
-                grad = float(vals[2].strip())
-                steps.append(step)
-                grads.append(grad)
-
-        times = [x * self.timestep / 1_000_000 for x in steps]  # Convert steps to time in ns
-
-        times_arr = _np.array(times)
-        grads_arr = _np.array(grads)
-
-        return times_arr, grads_arr
-
-    def _update_log(self) -> None:
-        """ Write the status of the simulation to a log file. """
-
-        with open(f"{self.output_subdir}/status.log", "a") as ofile:
-            ofile.write("##############################################\n")
-            for var in vars(self):
-                ofile.write(f"{var}: {getattr(self, var)} \n")
-
-
 class LamWindow():
     """A class to hold and manipulate a set of SOMD simulations at a given lambda value."""
 
@@ -455,9 +245,9 @@ class LamWindow():
         self.ensemble_size = ensemble_size
         self.input_dir = input_dir
         self.output_dir = output_dir
-        self.equilibrated: bool = False
+        self._equilibrated: bool = False
         self.equil_time: _Optional[float] = None
-        self.running: bool = False
+        self._running: bool = False
         self.tot_simtime: float = 0  # ns
         # Create the required simulations for this lambda value
         self.sims = []
@@ -594,3 +384,218 @@ class LamWindow():
 
         for sim in self.sims:
             sim._update_log()
+
+
+class Simulation():
+    """Class to store information about a single SOMD simulation."""
+
+    def __init__(self, lam: float, run_no: int, input_dir: str = "./input",
+                 output_dir: str = "./output") -> None:
+        """
+        Initialise a Simulation object.
+
+        Parameters
+        ----------
+        lam : float
+            Lambda value for the simulation.
+        run_no : int
+            Index of repeat for the simulation.
+        output_dir : str
+            Path to the output directory.
+
+        Returns
+        -------
+        None
+        """
+
+        self.lam = lam
+        self.run_no = run_no
+        self.input_dir = _os.path.abspath(input_dir)
+        # Check that the input directory contains the required files
+        self._validate_input()
+        self.output_dir = _os.path.abspath(output_dir)
+        self.job_id: _Optional[int] = None
+        self._running: bool = False
+        self.output_subdir: str = output_dir + "/lambda_" + f"{lam:.3f}" + "/run_" + str(run_no).zfill(2)
+        self.tot_simtime: float = 0  # ns
+        # Now read useful parameters from the simulation file options
+        self._add_attributes_from_simfile()
+
+        # Create the output subdirectory
+        _subprocess.call(["mkdir", "-p", self.output_subdir])
+        # Create a soft link to the input dir to simplify running simulations
+        _subprocess.call(["cp", "-r", self.input_dir, self.output_subdir + "/input"])
+
+    @property
+    def running(self) -> bool:
+        """
+        Check if the simulation is still running,
+        and update the running attribute accordingly.
+
+        Returns
+        -------
+        self._running : bool
+            True if the simulation is still running, False otherwise.
+        """
+        # Get job ids of currently running jobs
+        cmd = "squeue -h -u $USER | awk '{print $1}' | paste -s -d, -"
+        process = _subprocess.Popen(cmd, shell=True, stdin=_subprocess.PIPE,
+                                    stdout=_subprocess.PIPE, stderr=_subprocess.STDOUT,
+                                    close_fds=True)
+        output = process.communicate()[0]
+        job_ids = [int(job_id) for job_id in output.decode('utf-8').strip().split(",") if job_id != ""]
+
+        if self.job_id in job_ids:
+            self._running = True
+            print(f"Simulation {self.lam} {self.run_no} is still running.")
+
+        else:
+            self._running = False
+            print(f"Simulation {self.lam} {self.run_no} is finished.")
+
+        return self._running
+
+    @running.setter
+    def running(self, value: bool) -> None:
+        self._running = value
+
+    def _validate_input(self) -> None:
+        """ Check that the required input files are present. """
+
+        # Check that the input directory exists
+        if not _os.path.isdir(self.input_dir):
+            raise FileNotFoundError("Input directory does not exist.")
+
+        # Check that the required input files are present
+        required_files = ["run_somd.sh", "sim.cfg", "system.top", "system.crd", "morph.pert"]
+        for file in required_files:
+            if not _os.path.isfile(self.input_dir + "/" + file):
+                raise FileNotFoundError("Required input file " + file + " not found.")
+
+    def _add_attributes_from_simfile(self) -> None:
+        """
+        Read the SOMD simulation option file and
+        add useful attributes to the Simulation object.
+
+        Returns
+        -------
+        time_per_cycle : int
+            Time per cycle, in ns.
+        """
+
+        timestep = None  # ns
+        nmoves = None  # number of moves per cycle
+        nrg_freq = None  # number of timesteps between energy calculations
+        with open(self.input_dir + "/sim.cfg", "r") as ifile:
+            lines = ifile.readlines()
+            for line in lines:
+                if line.startswith("timestep ="):
+                    timestep = float(line.split("=")[1].split()[0])
+                if line.startswith("nmoves ="):
+                    nmoves = float(line.split("=")[1])
+                if line.startswith("energy frequency ="):
+                    nrg_freq = float(line.split("=")[1])
+
+        if timestep is None or nmoves is None or nrg_freq is None:
+            raise ValueError("Could not find timestep or nmoves in sim.cfg.")
+
+        self.timestep = timestep / 1_000_000  # fs to ns
+        self.nrg_freq = nrg_freq
+        self.time_per_cycle = timestep * nmoves / 1_000_000  # fs to ns
+
+    def run(self, duration: float = 2.5) -> None:
+        """
+        Run a SOMD simulation.
+
+        Parameters
+        ----------
+        duration : float, Optional, default: 2.5
+            Duration of simulation, in ns.
+
+        Returns
+        -------
+        None
+        """
+        # Need to modify the config file to set the correction n_cycles
+        n_cycles = int(duration / self.time_per_cycle)
+        self._set_n_cycles(n_cycles)
+
+        # Run SOMD
+        cmd = f"~/Documents/research/scripts/abfe/rbatch.sh --chdir {self.output_subdir} {self.output_subdir}/input/run_somd.sh {self.lam}"
+        process = _subprocess.Popen(cmd, shell=True, stdin=_subprocess.PIPE,
+                                    stdout=_subprocess.PIPE, stderr=_subprocess.STDOUT,
+                                    close_fds=True)
+        if process.stdout is None:
+            raise ValueError("Could not get stdout from process.")
+        process_output = process.stdout.read()
+        job_id = int((process_output.split()[-1]))
+        self.running = True
+        self.tot_simtime += duration
+        self.job_id = job_id
+
+    def _set_n_cycles(self, n_cycles: int) -> None:
+        """
+        Set the number of cycles in the SOMD config file.
+
+        Parameters
+        ----------
+        n_cycles : int
+            Number of cycles to set in the config file.
+
+        Returns
+        -------
+        None
+        """
+        # Find the line with n_cycles and replace
+        with open(self.output_subdir + "/input/sim.cfg", "r") as ifile:
+            lines = ifile.readlines()
+            for i, line in enumerate(lines):
+                if line.startswith("ncycles ="):
+                    lines[i] = "ncycles = " + str(n_cycles) + "\n"
+                    break
+
+        # Now write the new file
+        with open(self.output_subdir + "/input/sim.cfg", "w+") as ofile:
+            for line in lines:
+                ofile.write(line)
+
+    def read_gradients(self) -> _Tuple[_np.ndarray, _np.ndarray]:
+        """
+        Read the gradients from the output file.
+
+        Returns
+        -------
+        times : np.ndarray
+            Array of times, in ns.
+        grads : np.ndarray
+            Array of gradients, in kcal/mol.
+        """
+        # Read the output file
+        with open(self.output_subdir + "/simfile.dat", "r") as ifile:
+            lines = ifile.readlines()
+
+        steps = []
+        grads = []
+
+        for line in lines:
+            vals = line.split()
+            if not line.startswith("#"):
+                step = int(vals[0].strip())
+                grad = float(vals[2].strip())
+                steps.append(step)
+                grads.append(grad)
+
+        times = [x * self.timestep / 1_000_000 for x in steps]  # Convert steps to time in ns
+
+        times_arr = _np.array(times)
+        grads_arr = _np.array(grads)
+
+        return times_arr, grads_arr
+
+    def _update_log(self) -> None:
+        """ Write the status of the simulation to a log file. """
+
+        with open(f"{self.output_subdir}/status.log", "a") as ofile:
+            ofile.write("##############################################\n")
+            for var in vars(self):
+                ofile.write(f"{var}: {getattr(self, var)} \n")
