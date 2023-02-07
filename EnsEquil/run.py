@@ -181,9 +181,9 @@ class Ensemble():
         ensemble_size = self.ensemble_size
         # This is nasty - assumes naming always the same
         for run in range(1, ensemble_size + 1):
-            with open(f"{self.output_dir}/freenrg-MBAR-run_{run}.dat", "w") as ofile:
+            with open(f"{self.output_dir}/freenrg-MBAR-run_{str(run).zfill(2)}.dat", "w") as ofile:
                 _subprocess.run(["/home/finlayclark/sire.app/bin/analyse_freenrg",
-                                "mbar", "-i", f"{output_dir}/lambda*/run_0{run}/simfile.dat",
+                                "mbar", "-i", f"{output_dir}/lambda*/run_{str(run).zfill(2)}/simfile_equilibrated.dat",
                                  "-p", "100", "--overlap", "--temperature",
                                  "298.0"], stdout=ofile)
 
@@ -224,6 +224,10 @@ class Ensemble():
 
         # Overwrite the original file with one containing only the equilibrated data
         with open(out_simfile, "w") as ofile:
+            # First, write the header
+            for line in lines[:non_data_lines]:
+                ofile.write(line)
+            # Now write the data, skipping the non-equilibrated portion
             for line in lines[equil_index + non_data_lines:]:
                 ofile.write(line)
 
