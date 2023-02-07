@@ -5,6 +5,7 @@ import subprocess as _subprocess
 import os as _os
 import threading as _threading
 import numpy as _np
+import pickle as _pkl
 from time import sleep as _sleep
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
@@ -18,7 +19,9 @@ class Ensemble():
                  input_dir: str = "./input",
                  output_dir: str = "./output") -> None:
         """ 
-        Initialise an ensemble of SOMD simulations.
+        Initialise an ensemble of SOMD simulations. If ensemble.pkl exists in the
+        output directory, the ensemble will be loaded from this file and any arguments
+        supplied will be overwritten.
 
         Parameters
         ----------
@@ -35,21 +38,33 @@ class Ensemble():
         -------
         None
         """
-        self.block_size = block_size
-        self.ensemble_size = ensemble_size
-        self.input_dir = input_dir
-        self.output_dir = output_dir
-        self._running: bool = False
-        self.run_thread: _Optional[_threading.Thread] = None
-        self.lam_vals: _List[float] = self._get_lam_vals()
-        self.lam_windows: _List[LamWindow] = []
-        self.running_wins: _List[LamWindow] = []
+        # Check if we are starting from a previous simulation
+        if _os.path.isfile(f"{output_dir}/ensemble.pkl"):
+            print("Loading previous ensemble. Any arguments will be overwritten...")
+            with open(f"{output_dir}/ensemble.pkl", "rb") as file:
+                self.__dict__ = _pkl.load(file).__dict__
+            # TODO: Check if the simulations are still running and continue if so. Ensure that the
+            # total simulation times are correct by checking the sim files.
 
-        # Creating lambda window objects sets up required input directories
-        for lam in self.lam_vals:
-            self.lam_windows.append(LamWindow(lam, self.block_size,
-                                    self.ensemble_size, self.input_dir,
-                                    output_dir))
+        else: # No pkl file to resume from
+            print("Creating new ensemble...")
+
+            self.block_size = block_size
+            self.ensemble_size = ensemble_size
+            self.input_dir = input_dir
+            self.output_dir = output_dir
+            self._running: bool = False
+            self.run_thread: _Optional[_threading.Thread] = None
+            self.lam_vals: _List[float] = self._get_lam_vals()
+            self.lam_windows: _List[LamWindow] = []
+            self.running_wins: _List[LamWindow] = []
+
+            # Creating lambda window objects sets up required input directories
+            for lam in self.lam_vals:
+                self.lam_windows.append(LamWindow(lam, self.block_size,
+                                        self.ensemble_size, self.input_dir,
+                                        output_dir))
+            self._dump()
 
     def run(self) -> None:
         """Run the ensemble of simulations with adaptive equilibration detection,
@@ -85,6 +100,7 @@ class Ensemble():
             # Add buffer to give chance for the equilibration to be detected.
             win.run(2 * self.block_size + 0.5 * self.block_size)
             win._update_log()
+            self._dump()
 
         # Periodically check the simulations and analyse/ resubmit as necessary
         self.running_wins = self.lam_windows
@@ -104,6 +120,7 @@ class Ensemble():
                         # Write status after checking for running and equilibration, as this updates the
                         # _running and _equilibrated attributes
                         win._update_log()
+                        self._dump()
 
                 self.running_wins = [win for win in self.running_wins if win.running]
 
@@ -211,6 +228,11 @@ class Ensemble():
             ofile.write("##############################################\n")
             for var in vars(self):
                 ofile.write(f"{var}: {getattr(self, var)} \n")
+
+    def _dump(self) -> None:
+        """ Dump the current state of the ensemble to a pickle file.  """
+        with open(f"{self.output_dir}/ensemble.pkl", "wb") as ofile:
+            _pkl.dump(self, ofile)
 
 
 class LamWindow():
