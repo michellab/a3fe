@@ -42,7 +42,7 @@ class Ensemble():
         if _os.path.isfile(f"{output_dir}/ensemble.pkl"):
             print("Loading previous ensemble. Any arguments will be overwritten...")
             with open(f"{output_dir}/ensemble.pkl", "rb") as file:
-                self.__dict__ = _pkl.load(file).__dict__
+                self.__dict__ = _pkl.load(file)
             # TODO: Check if the simulations are still running and continue if so. Ensure that the
             # total simulation times are correct by checking the sim files.
 
@@ -104,6 +104,7 @@ class Ensemble():
 
         # Periodically check the simulations and analyse/ resubmit as necessary
         self.running_wins = self.lam_windows
+        self._dump()
         with open(f"{self.output_dir}/status.log", "w") as file:
             file.write("Starting equilibration detection \n")
             while self.running_wins:
@@ -236,9 +237,13 @@ class Ensemble():
                 ofile.write(f"{var}: {getattr(self, var)} \n")
 
     def _dump(self) -> None:
-        """ Dump the current state of the ensemble to a pickle file.  """
+        """ Dump the current state of the ensemble to a pickle file. Specifically,
+         pickle self.__dict__ with self.run_thread = None, as _thread_lock objects
+         can't be pickled.   """
+        temp_dict = {key:val for key,val in self.__dict__.items() if key != "run_thread"}
+        temp_dict["run_thread"] = None
         with open(f"{self.output_dir}/ensemble.pkl", "wb") as ofile:
-            _pkl.dump(self, ofile)
+            _pkl.dump(temp_dict, ofile)
 
 
 class LamWindow():
