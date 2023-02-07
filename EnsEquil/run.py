@@ -169,7 +169,8 @@ class Ensemble():
         # Remove unequilibrated data from the equilibrated output directory
         for win in self.lam_windows:
             equil_time = win.equil_time
-            equil_index = int(equil_time / (win.sims[0].timestep * win.sims[0].nrg_freq))
+            # Minus 1 because first energy is only written after the first nrg_freq steps
+            equil_index = int(equil_time / (win.sims[0].timestep * win.sims[0].nrg_freq)) - 1
             for sim in win.sims:
                 in_simfile = sim.output_subdir + "/simfile.dat"
                 out_simfile = sim.output_subdir + "/simfile_equilibrated.dat"
