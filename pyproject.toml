@@ -26,7 +26,8 @@ dependencies = [
      "pytest>=6.1.2",
      "pytest-runner",
      "matplotlib",
-     "scipy"
+     "scipy",
+     "ipython",
 ]
 
 # Update the urls once the hosting is set up.
