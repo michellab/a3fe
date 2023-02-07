@@ -1,11 +1,14 @@
 """Functions for running free energy calculations with SOMD with automated
  equilibration detection based on an ensemble of simulations."""
 
+from cProfile import label
 import subprocess as _subprocess
 import os as _os
 import threading as _threading
+from matplotlib import pyplot as _plt
 import numpy as _np
 import pickle as _pkl
+import scipy.stats as _stats
 from time import sleep as _sleep
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
@@ -97,8 +100,8 @@ class Ensemble():
 
         # Run initial SOMD simulations
         for win in self.lam_windows:
-            # Add buffer to give chance for the equilibration to be detected.
-            win.run(2 * self.block_size + 0.5 * self.block_size)
+            # Add buffer of 1 block_size to give chance for the equilibration to be detected.
+            win.run(3 * self.block_size)
             win._update_log()
             self._dump()
 
@@ -363,20 +366,21 @@ class LamWindow():
         equil_time : float
             Time taken to equilibrate, in ns.
         """
-        # Conversion between time and gradient indices. Minus one because no energies are recorded until
-        # after the first nrg_freq steps
-        time_to_ind = 1 / (self.sims[0].timestep * self.sims[0].nrg_freq) - 1
+        # Conversion between time and gradient indices.
+        time_to_ind = 1 / (self.sims[0].timestep * self.sims[0].nrg_freq)
         idx_block_size = int(self.block_size * time_to_ind)
 
         # Read dh/dl data from all simulations and calculate the gradient of the
         # gradient, d_dh_dl
         d_dh_dls = []
+        dh_dls = []
         times, _ = self.sims[0].read_gradients()
         equilibrated = False
         equil_time = None
 
         for sim in self.sims:
             _, dh_dl = sim.read_gradients()  # Times should be the same for all sims
+            dh_dls.append(dh_dl)
             # Create array of nan so that d_dh_dl has the same length as times irrespective of
             # the block size
             d_dh_dl = _np.full(len(dh_dl), _np.nan)
@@ -393,9 +397,10 @@ class LamWindow():
         # Calculate the mean gradient
         mean_d_dh_dl = _np.mean(d_dh_dls, axis=0)
 
-        # Check if the mean gradient has been 0 at any point
-        last_grad = mean_d_dh_dl[0]
-        for i, grad in enumerate(mean_d_dh_dl):
+        # Check if the mean gradient has been 0 at any point, making
+        # sure to exclude the initial nans
+        last_grad = mean_d_dh_dl[2*idx_block_size]
+        for i, grad in enumerate(mean_d_dh_dl[2*idx_block_size:]):
             # Check if gradient has passed through 0
             if _np.sign(last_grad) != _np.sign(grad):
                 equil_time = times[i]
@@ -404,6 +409,26 @@ class LamWindow():
 
         if equil_time:
             equilibrated = True
+
+        # Save plots of dh/dl and d_dh/dl
+        plot(x_vals = times,
+             y_vals= _np.array(dh_dls),
+             x_label= "Simulation Time per Window per Run / ns",
+             y_label= r"$\frac{\mathrm{d}h}{\mathrm{d}\lambda}$ / kcal mol$^{-1}$", 
+             outfile= f"{self.output_dir}/lambda_{self.lam:.3f}/dhdl",
+             vline_val= equil_time)
+
+        # Shift the equilibration time by 2 * block size to account for the
+        # delay in the gradient calculation.
+        shifted_equil_time = equil_time + 2 * self.block_size if equil_time else None
+
+        plot(x_vals = times,
+             y_vals= _np.array(d_dh_dls),
+             x_label= "Simulation Time per Window per Run / ns",
+             y_label= r"$\frac{\partial}{\partial t}\frac{\partial H}{\partial \lambda}$ / kcal mol$^{-1}$ ns$^{-1}$", 
+             outfile= f"{self.output_dir}/lambda_{self.lam:.3f}/ddhdl",
+             vline_val= shifted_equil_time,
+             hline_val=0)
 
         return equilibrated, equil_time
 
@@ -549,6 +574,10 @@ class Simulation():
         -------
         None
         """
+        # Need to make sure that duration is a multiple of the time per cycle
+        # otherwise actual time could be quite different from requested duration
+        if round(duration % self.time_per_cycle, 4) != 0:
+            raise ValueError("Duration must be a multiple of the time per cycle.")
         # Need to modify the config file to set the correction n_cycles
         n_cycles = int(duration / self.time_per_cycle)
         self._set_n_cycles(n_cycles)
@@ -618,7 +647,7 @@ class Simulation():
                 steps.append(step)
                 grads.append(grad)
 
-        times = [x * self.timestep / 1_000_000 for x in steps]  # Convert steps to time in ns
+        times = [x * self.timestep for x in steps]  # Timestep already in ns
 
         times_arr = _np.array(times)
         grads_arr = _np.array(grads)
@@ -632,3 +661,50 @@ class Simulation():
             ofile.write("##############################################\n")
             for var in vars(self):
                 ofile.write(f"{var}: {getattr(self, var)} \n")
+
+
+def plot(x_vals: _np.ndarray, y_vals: _np.ndarray, x_label: str, y_label: str, 
+         outfile: str, vline_val: _Optional[float] = None, 
+         hline_val: _Optional[float] = None) -> None:
+    """ 
+    Plot several sets of y_vals against one set of x vals, and show confidence
+    intervals based on inter-y-set deviations (assuming normality).
+
+    Parameters
+    ----------
+    x_vals : np.ndarray
+        1D array of x values.
+    y_vals : np.ndarray
+        1 or 2D array of y values, with shape (n_sets, n_vals). Assumes that
+        the sets of data are passed in the same order as the runs.
+    x_label : str
+        Label for the x axis.
+    y_label : str
+        Label for the y axis.
+    outfile : str
+        Name of the output file.
+    vline_val : float, Optional
+        x value to draw a vertical line at, for example the time taken for
+        equilibration.
+    hline_val : float, Optional
+        y value to draw a horizontal line at.
+    """
+    y_avg = _np.mean(y_vals, axis=0)
+    conf_int = _stats.t.interval(0.95, len(y_vals[:,0])-1, loc=y_avg, scale=_stats.sem(y_vals,axis=0)) # 95 % C.I.
+
+    fig, ax = _plt.subplots(figsize=(8,6))
+    ax.plot(x_vals, y_avg, label="Mean", linewidth=2)
+    for i, entry in enumerate(y_vals):
+        ax.plot(x_vals, entry, alpha=0.5, label=f"run {i+1}")
+    if vline_val is not None:
+        ax.axvline(x=vline_val, color='red', linestyle='dashed')
+    if hline_val is not None:
+        ax.axhline(y=hline_val, color='black', linestyle='dashed')
+    # Add confidence intervals
+    ax.fill_between(x_vals, conf_int[0], conf_int[1], alpha=0.5, facecolor='#ffa500')
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+    ax.legend()
+
+    fig.savefig(outfile, dpi=300, bbox_inches='tight')
+    

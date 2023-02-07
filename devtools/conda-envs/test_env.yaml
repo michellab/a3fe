@@ -9,6 +9,8 @@ dependencies:
   - python
   - pip
   - numpy
+  - matplotlib
+  - scipy
 
     # Testing
   - pytest
