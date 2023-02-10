@@ -74,14 +74,15 @@ class Ensemble():
                                         output_dir, stream_log_level))
             # Set up logging
             self._logger = _logging.getLogger(str(self))
-            self._logger.setLevel(stream_log_level)
+            # For the file handler, we want to log everything
+            self._logger.setLevel(_logging.DEBUG)
             file_handler = _logging.FileHandler(f"{output_dir}/ensemble.log")
             file_handler.setFormatter(_logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
-            file_handler.setLevel(_logging.DEBUG)
             self._logger.addHandler(file_handler)
-            # For the stream handler, we only want to print the messages
+            # For the stream handler, we want to log at the user-specified level
             stream_handler = _logging.StreamHandler()
-            stream_handler.setFormatter(_logging.Formatter("%(message)s"))
+            stream_handler.setFormatter(_logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
+            stream_handler.setLevel(stream_log_level)
             self._logger.addHandler(stream_handler)
 
             # Save state
@@ -120,6 +121,7 @@ class Ensemble():
         check the status of the Ensemble object."""
 
         # Run initial SOMD simulations
+        self._logger.info("Starting ensemble of simulations...")
         for win in self.lam_windows:
             # Add buffer of 1 block_size to give chance for the equilibration to be detected.
             win.run(3 * self.block_size)
@@ -129,16 +131,17 @@ class Ensemble():
         # Periodically check the simulations and analyse/ resubmit as necessary
         self.running_wins = self.lam_windows
         self._dump()
-        self._logger.info("Starting ensemble of simulations... \n")
         while self.running_wins:
             _sleep(20 * 1)  # Check 20 seconds
             for win in self.running_wins:
                 # Check if the window has now finished - calling win.running updates the win._running attribute
                 if not win.running:
+                    self._logger.info(f"{win} has finished at {win.tot_simtime:.3f} ns")
                     # Check if the simulation has equilibrated and if not, resubmit
                     if win.equilibrated:
-                        self._logger.info(f"Lambda: {win.lam:.3f} has equilibrated at {win.equil_time:.3f} ns \n")
+                        self._logger.info(f"{win} has equilibrated at {win.equil_time:.3f} ns")
                     else:
+                        self._logger.info(f"{win} has not equilibrated. Resubmitting for {self.block_size:.3f} ns")
                         win.run(self.block_size)
 
                     # Write status after checking for running and equilibration, as this updates the
@@ -251,10 +254,10 @@ class Ensemble():
 
     def _update_log(self) -> None:
         """ Update the status log file with the current status of the ensemble. """
-        self._logger.debug("##############################################\n")
+        self._logger.debug("##############################################")
         for var in vars(self):
-            self._logger.debug(f"{var}: {getattr(self, var)} \n")
-        self._logger.debug("##############################################\n")
+            self._logger.debug(f"{var}: {getattr(self, var)}")
+        self._logger.debug("##############################################")
 
     def _dump(self) -> None:
         """ Dump the current state of the ensemble to a pickle file. Specifically,
@@ -315,18 +318,19 @@ class LamWindow():
             
         # Set up logging
         self._logger = _logging.getLogger(str(self))
-        self._logger.setLevel(stream_log_level)
+        # For the file handler, we want to log everything
+        self._logger.setLevel(_logging.DEBUG)
         file_handler = _logging.FileHandler(f"{self.output_dir}/lambda_{self.lam:.3f}/window.log")
         file_handler.setFormatter(_logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
-        file_handler.setLevel(_logging.DEBUG)
         self._logger.addHandler(file_handler)
-        # For the stream handler, we only want to print the messages
+        # For the stream handler, we only want to log at the user-specified level
         stream_handler = _logging.StreamHandler()
-        stream_handler.setFormatter(_logging.Formatter("%(message)s"))
+        stream_handler.setFormatter(_logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
+        stream_handler.setLevel(stream_log_level)
         self._logger.addHandler(stream_handler)
 
     def __str__(self) -> str:
-        return f"LamWindow (lam={self.lam})"
+        return f"LamWindow (lam={self.lam:.3f})"
 
     def run(self, duration: float = 2.5) -> None:
         """
@@ -347,6 +351,7 @@ class LamWindow():
             self.tot_simtime += duration
 
         self._running = True
+        self._logger.info(f"Running simulations for {duration:.3f} ns")
 
     @property
     def running(self) -> bool:
@@ -499,10 +504,10 @@ class LamWindow():
 
     def _update_log(self) -> None:
         """Write the status of the lambda window and all simulations to their log files."""
-        self._logger.debug("##############################################\n")
+        self._logger.debug("##############################################")
         for var in vars(self):
-            self._logger.debug(f"{var}: {getattr(self, var)} \n")
-        self._logger.debug("##############################################\n")
+            self._logger.debug(f"{var}: {getattr(self, var)}")
+        self._logger.debug("##############################################")
 
         for sim in self.sims:
             sim._update_log()
@@ -553,14 +558,15 @@ class Simulation():
 
         # Set up logging
         self._logger = _logging.getLogger(str(self))
-        self._logger.setLevel(stream_log_level)
+        # For the file handler, we want to log everything
+        self._logger.setLevel(_logging.DEBUG)
         file_handler = _logging.FileHandler(f"{self.output_subdir}/simulation.log")
         file_handler.setFormatter(_logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
-        file_handler.setLevel(_logging.DEBUG)
         self._logger.addHandler(file_handler)
-        # For the stream handler, we only want to print the messages
+        # For the stream handler, we want the user-specified level
         stream_handler = _logging.StreamHandler()
-        stream_handler.setFormatter(_logging.Formatter("%(message)s"))
+        stream_handler.setFormatter(_logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
+        stream_handler.setLevel(stream_log_level)
         self._logger.addHandler(stream_handler)
 
     def __str__(self) -> str:
@@ -587,11 +593,11 @@ class Simulation():
 
         if self.job_id in job_ids:
             self._running = True
-            self._logger.info(f"Simulation {self.lam} {self.run_no} is still running.")
+            self._logger.info(f"Still running")
 
         else:
             self._running = False
-            self._logger.info(f"Simulation {self.lam} {self.run_no} is finished.")
+            self._logger.info(f"Finished")
 
         return self._running
 
@@ -678,6 +684,7 @@ class Simulation():
         self.running = True
         self.tot_simtime += duration
         self.job_id = job_id
+        self._logger.info(f"Submitted with job id {job_id}")
 
     def _set_n_cycles(self, n_cycles: int) -> None:
         """
@@ -741,10 +748,10 @@ class Simulation():
     def _update_log(self) -> None:
         """ Write the status of the simulation to a log file. """
 
-        self._logger.debug("##############################################\n")
+        self._logger.debug("##############################################")
         for var in vars(self):
-            self._logger.debug(f"{var}: {getattr(self, var)} \n")
-        self._logger.debug("##############################################\n")
+            self._logger.debug(f"{var}: {getattr(self, var)} ")
+        self._logger.debug("##############################################")
 
 
 def plot(x_vals: _np.ndarray, y_vals: _np.ndarray, x_label: str, y_label: str, 
