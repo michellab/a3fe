@@ -578,7 +578,7 @@ class Simulation():
             True if the simulation is still running, False otherwise.
         """
         # Get job ids of currently running jobs
-        cmd = "squeue -h -u $USER | awk '{print $1}' | paste -s -d, -"
+        cmd = r"squeue -h -u $USER | awk '{print $1}' | grep -v '\[' | paste -s -d, -"
         process = _subprocess.Popen(cmd, shell=True, stdin=_subprocess.PIPE,
                                     stdout=_subprocess.PIPE, stderr=_subprocess.STDOUT,
                                     close_fds=True)
