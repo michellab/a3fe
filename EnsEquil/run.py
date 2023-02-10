@@ -12,7 +12,8 @@ import pickle as _pkl
 from time import sleep as _sleep
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
-from ._utils import plot as _plot
+from ._utils import plot as _plot, Job as _Job, VirtualQueue as _VirtualQueue
+
 
 class Ensemble():
     """
@@ -54,7 +55,7 @@ class Ensemble():
             # TODO: Check if the simulations are still running and continue if so. Ensure that the
             # total simulation times are correct by checking the sim files.
 
-        else: # No pkl file to resume from
+        else:  # No pkl file to resume from
             print("Creating new ensemble...")
 
             self.block_size = block_size
@@ -68,12 +69,17 @@ class Ensemble():
             self.lam_vals: _List[float] = self._get_lam_vals()
             self.lam_windows: _List[LamWindow] = []
             self.running_wins: _List[LamWindow] = []
-            
+            # Would be created by lam windows anyway, but is needed for queue log
+            _os.mkdir(output_dir)
+            self.virtual_queue = _VirtualQueue(log_dir=output_dir)
+
             # Creating lambda window objects sets up required input directories
             for lam in self.lam_vals:
-                self.lam_windows.append(LamWindow(lam, self.block_size,
-                                        self.ensemble_size, self.input_dir,
-                                        output_dir, stream_log_level))
+                self.lam_windows.append(LamWindow(lam, self.virtual_queue,
+                                                  self.block_size,
+                                                  self.ensemble_size, self.input_dir,
+                                                  output_dir, stream_log_level,
+                                                  ))
             # Set up logging
             self._logger = _logging.getLogger(str(self))
             # For the file handler, we want to log everything
@@ -147,11 +153,13 @@ class Ensemble():
         self.running_wins = self.lam_windows
         self._dump()
         while self.running_wins:
-            _sleep(20 * 1)  # Check 20 seconds
+            _sleep(20 * 1)  # Check every 20 seconds
             # Check if we've requested to kill the thread
             if self.kill_thread:
                 self._logger.info(f"Kill thread requested: exiting run loop")
                 return
+            # Update the queue before checking the simulations
+            self.virtual_queue.update()
             for win in self.running_wins:
                 # Check if the window has now finished - calling win.running updates the win._running attribute
                 if not win.running:
@@ -205,7 +213,7 @@ class Ensemble():
             # Avoid checking win.equilibrated as this causes expensive equilibration detection to be run
             if not win._equilibrated:
                 raise RuntimeError(f"Not all lambda windows have equilibrated. Analysis cannot be performed.")
-                
+
         # Remove unequilibrated data from the equilibrated output directory
         for win in self.lam_windows:
             equil_time = win.equil_time
@@ -282,7 +290,7 @@ class Ensemble():
         """ Dump the current state of the ensemble to a pickle file. Specifically,
          pickle self.__dict__ with self.run_thread = None, as _thread_lock objects
          can't be pickled.   """
-        temp_dict = {key:val for key,val in self.__dict__.items() if key != "run_thread"}
+        temp_dict = {key: val for key, val in self.__dict__.items() if key != "run_thread"}
         temp_dict["run_thread"] = None
         with open(f"{self.output_dir}/ensemble.pkl", "wb") as ofile:
             _pkl.dump(temp_dict, ofile)
@@ -291,7 +299,8 @@ class Ensemble():
 class LamWindow():
     """A class to hold and manipulate a set of SOMD simulations at a given lambda value."""
 
-    def __init__(self, lam: float, block_size: float = 1,
+    def __init__(self, lam: float, virtual_queue: _VirtualQueue,
+                 block_size: float = 1,
                  ensemble_size: int = 5, input_dir: str = "./input",
                  output_dir: str = "./output",
                  stream_log_level: int = _logging.INFO) -> None:
@@ -302,6 +311,8 @@ class LamWindow():
         ----------
         lam : float
             Lambda value for the simulation.
+        virtual_queue : VirtualQueue
+            VirtualQueue object to use for submitting jobs.
         block_size : float, Optional, default: 1
             Size of the blocks to use for equilibration detection,
             in ns.
@@ -320,6 +331,7 @@ class LamWindow():
         None
         """
         self.lam = lam
+        self.virtual_queue = virtual_queue
         self.block_size = block_size
         self.ensemble_size = ensemble_size
         self.input_dir = input_dir
@@ -328,13 +340,13 @@ class LamWindow():
         self.equil_time: _Optional[float] = None
         self._running: bool = False
         self.tot_simtime: float = 0  # ns
-        
+
         # Create the required simulations for this lambda value
         self.sims = []
         for i in range(1, ensemble_size + 1):
-            sim = Simulation(lam, i, input_dir, output_dir, stream_log_level)
+            sim = Simulation(lam, i, self.virtual_queue, input_dir, output_dir, stream_log_level)
             self.sims.append(sim)
-            
+
         # Set up logging
         self._logger = _logging.getLogger(str(self))
         # For the file handler, we want to log everything
@@ -365,12 +377,12 @@ class LamWindow():
         None
         """
         # Run the simulations
+        self._logger.info(f"Running simulations for {duration:.3f} ns")
         for sim in self.sims:
             sim.run(duration)
             self.tot_simtime += duration
 
         self._running = True
-        self._logger.info(f"Running simulations for {duration:.3f} ns")
 
     def kill(self) -> None:
         """ Kill all simulations at the lambda value. """
@@ -479,22 +491,22 @@ class LamWindow():
             equilibrated = True
 
         # Save plots of dh/dl and d_dh/dl
-        _plot(x_vals = times,
-             y_vals= _np.array([self._get_rolling_average(dh_dl, idx_block_size) for dh_dl in dh_dls]),
-             x_label= "Simulation Time per Window per Run / ns",
-             y_label= r"$\frac{\mathrm{d}h}{\mathrm{d}\lambda}$ / kcal mol$^{-1}$", 
-             outfile= f"{self.output_dir}/lambda_{self.lam:.3f}/dhdl",
-            # Shift the equilibration time by 2 * block size to account for the
-            # delay in the block average calculation.
-             vline_val= equil_time + 1 * self.block_size if equil_time else None)
+        _plot(x_vals=times,
+              y_vals=_np.array([self._get_rolling_average(dh_dl, idx_block_size) for dh_dl in dh_dls]),
+              x_label="Simulation Time per Window per Run / ns",
+              y_label=r"$\frac{\mathrm{d}h}{\mathrm{d}\lambda}$ / kcal mol$^{-1}$",
+              outfile=f"{self.output_dir}/lambda_{self.lam:.3f}/dhdl",
+              # Shift the equilibration time by 2 * block size to account for the
+              # delay in the block average calculation.
+              vline_val=equil_time + 1 * self.block_size if equil_time else None)
 
-        _plot(x_vals = times,
-             y_vals= _np.array(d_dh_dls),
-             x_label= "Simulation Time per Window per Run / ns",
-             y_label= r"$\frac{\partial}{\partial t}\frac{\partial H}{\partial \lambda}$ / kcal mol$^{-1}$ ns$^{-1}$", 
-             outfile= f"{self.output_dir}/lambda_{self.lam:.3f}/ddhdl",
-             vline_val= equil_time + 2 * self.block_size if equil_time else None,
-             hline_val=0)
+        _plot(x_vals=times,
+              y_vals=_np.array(d_dh_dls),
+              x_label="Simulation Time per Window per Run / ns",
+              y_label=r"$\frac{\partial}{\partial t}\frac{\partial H}{\partial \lambda}$ / kcal mol$^{-1}$ ns$^{-1}$",
+              outfile=f"{self.output_dir}/lambda_{self.lam:.3f}/ddhdl",
+              vline_val=equil_time + 2 * self.block_size if equil_time else None,
+              hline_val=0)
 
         return equilibrated, equil_time
 
@@ -527,7 +539,6 @@ class LamWindow():
 
         return rolling_av
 
-
     def _update_log(self) -> None:
         """Write the status of the lambda window and all simulations to their log files."""
         self._logger.debug("##############################################")
@@ -542,7 +553,9 @@ class LamWindow():
 class Simulation():
     """Class to store information about a single SOMD simulation."""
 
-    def __init__(self, lam: float, run_no: int, input_dir: str = "./input",
+    def __init__(self, lam: float, run_no: int, 
+                 virtual_queue: _VirtualQueue,
+                 input_dir: str = "./input",
                  output_dir: str = "./output",
                  stream_log_level: int = _logging.INFO) -> None:
         """
@@ -554,6 +567,8 @@ class Simulation():
             Lambda value for the simulation.
         run_no : int
             Index of repeat for the simulation.
+        virtual_queue : VirtualQueue
+            Virtual queue object to use for the simulation.
         output_dir : str
             Path to the output directory.
         stream_log_level : int, Optional, default: logging.INFO
@@ -565,12 +580,13 @@ class Simulation():
         None
         """
         self.lam = lam
+        self.virtual_queue = virtual_queue
         self.run_no = run_no
         self.input_dir = _os.path.abspath(input_dir)
         # Check that the input directory contains the required files
         self._validate_input()
         self.output_dir = _os.path.abspath(output_dir)
-        self.job_id: _Optional[int] = None
+        self.job: _Optional[_Job] = None
         self._running: bool = False
         self.output_subdir: str = output_dir + "/lambda_" + f"{lam:.3f}" + "/run_" + str(run_no).zfill(2)
         self.tot_simtime: float = 0  # ns
@@ -609,18 +625,11 @@ class Simulation():
         self._running : bool
             True if the simulation is still running, False otherwise.
         """
-        # Get job ids of currently running jobs
-        cmd = r"squeue -h -u $USER | awk '{print $1}' | grep -v '\[' | paste -s -d, -"
-        process = _subprocess.Popen(cmd, shell=True, stdin=_subprocess.PIPE,
-                                    stdout=_subprocess.PIPE, stderr=_subprocess.STDOUT,
-                                    close_fds=True)
-        output = process.communicate()[0]
-        job_ids = [int(job_id) for job_id in output.decode('utf-8').strip().split(",") if job_id != ""]
-
-        if self.job_id in job_ids:
+        # Get job ids of currently running jobs - but note that the queue is updated at the
+        # Ensemble level
+        if self.job in self.virtual_queue.queue:
             self._running = True
             self._logger.info(f"Still running")
-
         else:
             self._running = False
             self._logger.info(f"Finished")
@@ -690,7 +699,7 @@ class Simulation():
         """
         # Need to make sure that duration is a multiple of the time per cycle
         # otherwise actual time could be quite different from requested duration
-        remainder =  _Decimal(str(duration)) % _Decimal(str(self.time_per_cycle))
+        remainder = _Decimal(str(duration)) % _Decimal(str(self.time_per_cycle))
         if round(float(remainder), 4) != 0:
             raise ValueError(("Duration must be a multiple of the time per cycle. "
                               f"Duration is {duration} ns, and time per cycle is {self.time_per_cycle} ns."))
@@ -698,26 +707,19 @@ class Simulation():
         n_cycles = int(duration / self.time_per_cycle)
         self._set_n_cycles(n_cycles)
 
-        # Run SOMD
-        cmd = f"~/Documents/research/scripts/abfe/rbatch.sh --chdir {self.output_subdir} {self.output_subdir}/input/run_somd.sh {self.lam}"
-        process = _subprocess.Popen(cmd, shell=True, stdin=_subprocess.PIPE,
-                                    stdout=_subprocess.PIPE, stderr=_subprocess.STDOUT,
-                                    close_fds=True)
-        if process.stdout is None:
-            raise ValueError("Could not get stdout from process.")
-        process_output = process.stdout.read()
-        job_id = int((process_output.split()[-1]))
+        # Run SOMD - note that command excludes sbatch as this is added by the virtual queue
+        cmd = f"--chdir {self.output_subdir} {self.output_subdir}/input/run_somd.sh {self.lam}"
+        self.job = self.virtual_queue.submit(cmd)
         self.running = True
         self.tot_simtime += duration
-        self.job_id = job_id
-        self._logger.info(f"Submitted with job id {job_id}")
+        self._logger.info(f"Submitted with job {self.job}")
 
     def kill(self) -> None:
-        """Kill the slurm job."""
-        if not self.job_id:
-            raise ValueError("No job id found. Cannot kill job.")
-        self._logger.info(f"Killing job with id {self.job_id}")
-        _subprocess.run(["scancel", str(self.job_id)])
+        """Kill the job."""
+        if not self.job:
+            raise ValueError("No job found. Cannot kill job.")
+        self._logger.info(f"Killing job {self.job}")
+        self.virtual_queue.kill(self.job)
         self.running = False
 
     def _set_n_cycles(self, n_cycles: int) -> None:
