@@ -1,11 +1,11 @@
 """Functions for running free energy calculations with SOMD with automated
  equilibration detection based on an ensemble of simulations."""
 
-from cProfile import label
 import subprocess as _subprocess
 from decimal import Decimal as _Decimal
 import os as _os
 import threading as _threading
+import logging as _logging
 from matplotlib import pyplot as _plt
 import numpy as _np
 import pickle as _pkl
@@ -21,7 +21,8 @@ class Ensemble():
 
     def __init__(self, block_size: float = 1, ensemble_size: int = 5,
                  input_dir: str = "./input",
-                 output_dir: str = "./output") -> None:
+                 output_dir: str = "./output",
+                 stream_log_level: int = _logging.INFO) -> None:
         """ 
         Initialise an ensemble of SOMD simulations. If ensemble.pkl exists in the
         output directory, the ensemble will be loaded from this file and any arguments
@@ -37,6 +38,9 @@ class Ensemble():
             Path to directory containing input files for the simulations.
         output_dir : str, Optional, default: "./output"
             Path to directory to store output files from the simulations.
+        stream_log_level : int, Optional, default: logging.INFO
+            Logging level to use for the steam file handlers for the 
+            Ensemble object and its child objects.
 
         Returns
         -------
@@ -62,13 +66,29 @@ class Ensemble():
             self.lam_vals: _List[float] = self._get_lam_vals()
             self.lam_windows: _List[LamWindow] = []
             self.running_wins: _List[LamWindow] = []
-
+            
             # Creating lambda window objects sets up required input directories
             for lam in self.lam_vals:
                 self.lam_windows.append(LamWindow(lam, self.block_size,
                                         self.ensemble_size, self.input_dir,
-                                        output_dir))
+                                        output_dir, stream_log_level))
+            # Set up logging
+            self._logger = _logging.getLogger(str(self))
+            self._logger.setLevel(stream_log_level)
+            file_handler = _logging.FileHandler(f"{output_dir}/ensemble.log")
+            file_handler.setFormatter(_logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+            file_handler.setLevel(_logging.DEBUG)
+            self._logger.addHandler(file_handler)
+            # For the stream handler, we only want to print the messages
+            stream_handler = _logging.StreamHandler()
+            stream_handler.setFormatter(_logging.Formatter("%(message)s"))
+            self._logger.addHandler(stream_handler)
+
+            # Save state
             self._dump()
+
+    def __str__(self) -> str:
+        return f"Ensemble (repeats = {self.ensemble_size}, no windows = {len(self.lam_vals)})"
 
     def run(self) -> None:
         """Run the ensemble of simulations with adaptive equilibration detection,
@@ -109,30 +129,27 @@ class Ensemble():
         # Periodically check the simulations and analyse/ resubmit as necessary
         self.running_wins = self.lam_windows
         self._dump()
-        with open(f"{self.output_dir}/status.log", "w") as file:
-            file.write("Starting equilibration detection \n")
-            while self.running_wins:
-                _sleep(20 * 1)  # Check 20 seconds
-                for win in self.running_wins:
-                    # Check if the window has now finished - calling win.running updates the win._running attribute
-                    if not win.running:
-                        # Check if the simulation has equilibrated and if not, resubmit
-                        if win.equilibrated:
-                            file.write(f"Lambda: {win.lam:.3f} has equilibrated at {win.equil_time:.3f} ns \n")
-                        else:
-                            win.run(self.block_size)
+        self._logger.info("Starting ensemble of simulations... \n")
+        while self.running_wins:
+            _sleep(20 * 1)  # Check 20 seconds
+            for win in self.running_wins:
+                # Check if the window has now finished - calling win.running updates the win._running attribute
+                if not win.running:
+                    # Check if the simulation has equilibrated and if not, resubmit
+                    if win.equilibrated:
+                        self._logger.info(f"Lambda: {win.lam:.3f} has equilibrated at {win.equil_time:.3f} ns \n")
+                    else:
+                        win.run(self.block_size)
 
-                        # Write status after checking for running and equilibration, as this updates the
-                        # _running and _equilibrated attributes
-                        win._update_log()
-                        self._dump()
+                    # Write status after checking for running and equilibration, as this updates the
+                    # _running and _equilibrated attributes
+                    win._update_log()
+                    self._dump()
 
-                self.running_wins = [win for win in self.running_wins if win.running]
+            self.running_wins = [win for win in self.running_wins if win.running]
 
         # All simulations are now finished, so perform final analysis
         self.analyse()
-
-        # Save data and perform final analysis
 
     def _get_lam_vals(self) -> _List[float]:
         """
@@ -233,17 +250,11 @@ class Ensemble():
                 ofile.write(line)
 
     def _update_log(self) -> None:
-        """
-        Update the status log file with the current status of the ensemble.
-
-        Returns
-        -------
-        None
-        """
-        with open(f"{self.output_dir}/status.log", "a") as ofile:
-            ofile.write("##############################################\n")
-            for var in vars(self):
-                ofile.write(f"{var}: {getattr(self, var)} \n")
+        """ Update the status log file with the current status of the ensemble. """
+        self._logger.debug("##############################################\n")
+        for var in vars(self):
+            self._logger.debug(f"{var}: {getattr(self, var)} \n")
+        self._logger.debug("##############################################\n")
 
     def _dump(self) -> None:
         """ Dump the current state of the ensemble to a pickle file. Specifically,
@@ -260,7 +271,8 @@ class LamWindow():
 
     def __init__(self, lam: float, block_size: float = 1,
                  ensemble_size: int = 5, input_dir: str = "./input",
-                 output_dir: str = "./output") -> None:
+                 output_dir: str = "./output",
+                 stream_log_level: int = _logging.INFO) -> None:
         """
         Initialise a LamWindow object.
 
@@ -277,6 +289,9 @@ class LamWindow():
             Path to the input directory.
         output_dir : str
             Path to the output directory.
+        stream_log_level : int, Optional, default: logging.INFO
+            Logging level to use for the steam file handlers for the 
+            Ensemble object and its child objects.
 
         Returns
         -------
@@ -291,11 +306,27 @@ class LamWindow():
         self.equil_time: _Optional[float] = None
         self._running: bool = False
         self.tot_simtime: float = 0  # ns
+        
         # Create the required simulations for this lambda value
         self.sims = []
         for i in range(1, ensemble_size + 1):
-            sim = Simulation(lam, i, input_dir, output_dir)
+            sim = Simulation(lam, i, input_dir, output_dir, stream_log_level)
             self.sims.append(sim)
+            
+        # Set up logging
+        self._logger = _logging.getLogger(str(self))
+        self._logger.setLevel(stream_log_level)
+        file_handler = _logging.FileHandler(f"{self.output_dir}/lambda_{self.lam:.3f}/window.log")
+        file_handler.setFormatter(_logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+        file_handler.setLevel(_logging.DEBUG)
+        self._logger.addHandler(file_handler)
+        # For the stream handler, we only want to print the messages
+        stream_handler = _logging.StreamHandler()
+        stream_handler.setFormatter(_logging.Formatter("%(message)s"))
+        self._logger.addHandler(stream_handler)
+
+    def __str__(self) -> str:
+        return f"LamWindow (lam={self.lam})"
 
     def run(self, duration: float = 2.5) -> None:
         """
@@ -465,13 +496,13 @@ class LamWindow():
 
         return rolling_av
 
-    def _update_log(self) -> None:
-        """ Write the status of the lambda window to a log file. """
 
-        with open(f"{self.output_dir}/lambda_{self.lam:.3f}/status.log", "a") as ofile:
-            ofile.write("##############################################\n")
-            for var in vars(self):
-                ofile.write(f"{var}: {getattr(self, var)} \n")
+    def _update_log(self) -> None:
+        """Write the status of the lambda window and all simulations to their log files."""
+        self._logger.debug("##############################################\n")
+        for var in vars(self):
+            self._logger.debug(f"{var}: {getattr(self, var)} \n")
+        self._logger.debug("##############################################\n")
 
         for sim in self.sims:
             sim._update_log()
@@ -481,7 +512,8 @@ class Simulation():
     """Class to store information about a single SOMD simulation."""
 
     def __init__(self, lam: float, run_no: int, input_dir: str = "./input",
-                 output_dir: str = "./output") -> None:
+                 output_dir: str = "./output",
+                 stream_log_level: int = _logging.INFO) -> None:
         """
         Initialise a Simulation object.
 
@@ -493,12 +525,14 @@ class Simulation():
             Index of repeat for the simulation.
         output_dir : str
             Path to the output directory.
+        stream_log_level : int, Optional, default: logging.INFO
+            Logging level to use for the steam file handlers for the 
+            Ensemble object and its child objects.
 
         Returns
         -------
         None
         """
-
         self.lam = lam
         self.run_no = run_no
         self.input_dir = _os.path.abspath(input_dir)
@@ -516,6 +550,21 @@ class Simulation():
         _subprocess.call(["mkdir", "-p", self.output_subdir])
         # Create a soft link to the input dir to simplify running simulations
         _subprocess.call(["cp", "-r", self.input_dir, self.output_subdir + "/input"])
+
+        # Set up logging
+        self._logger = _logging.getLogger(str(self))
+        self._logger.setLevel(stream_log_level)
+        file_handler = _logging.FileHandler(f"{self.output_subdir}/simulation.log")
+        file_handler.setFormatter(_logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+        file_handler.setLevel(_logging.DEBUG)
+        self._logger.addHandler(file_handler)
+        # For the stream handler, we only want to print the messages
+        stream_handler = _logging.StreamHandler()
+        stream_handler.setFormatter(_logging.Formatter("%(message)s"))
+        self._logger.addHandler(stream_handler)
+
+    def __str__(self) -> str:
+        return f"Simulation (lam={self.lam}, run_no={self.run_no})"
 
     @property
     def running(self) -> bool:
@@ -538,11 +587,11 @@ class Simulation():
 
         if self.job_id in job_ids:
             self._running = True
-            print(f"Simulation {self.lam} {self.run_no} is still running.")
+            self._logger.info(f"Simulation {self.lam} {self.run_no} is still running.")
 
         else:
             self._running = False
-            print(f"Simulation {self.lam} {self.run_no} is finished.")
+            self._logger.info(f"Simulation {self.lam} {self.run_no} is finished.")
 
         return self._running
 
@@ -609,9 +658,10 @@ class Simulation():
         """
         # Need to make sure that duration is a multiple of the time per cycle
         # otherwise actual time could be quite different from requested duration
-        if _Decimal(str(duration)) % _Decimal(str(self.time_per_cycle)) != 0:
-            raise ValueError(f"Duration must be a multiple of the time per cycle. \
-                    Duration is {duration} ns, and time per cycle is {self.time_per_cycle} ns.")
+        remainder =  _Decimal(str(duration)) % _Decimal(str(self.time_per_cycle))
+        if round(float(remainder), 4) != 0:
+            raise ValueError(("Duration must be a multiple of the time per cycle. "
+                              f"Duration is {duration} ns, and time per cycle is {self.time_per_cycle} ns."))
         # Need to modify the config file to set the correction n_cycles
         n_cycles = int(duration / self.time_per_cycle)
         self._set_n_cycles(n_cycles)
@@ -691,10 +741,10 @@ class Simulation():
     def _update_log(self) -> None:
         """ Write the status of the simulation to a log file. """
 
-        with open(f"{self.output_subdir}/status.log", "a") as ofile:
-            ofile.write("##############################################\n")
-            for var in vars(self):
-                ofile.write(f"{var}: {getattr(self, var)} \n")
+        self._logger.debug("##############################################\n")
+        for var in vars(self):
+            self._logger.debug(f"{var}: {getattr(self, var)} \n")
+        self._logger.debug("##############################################\n")
 
 
 def plot(x_vals: _np.ndarray, y_vals: _np.ndarray, x_label: str, y_label: str, 
