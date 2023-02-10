@@ -63,6 +63,8 @@ class Ensemble():
             self.output_dir = output_dir
             self._running: bool = False
             self.run_thread: _Optional[_threading.Thread] = None
+            # Set boolean to allow us to kill the thread
+            self.kill_thread: bool = False
             self.lam_vals: _List[float] = self._get_lam_vals()
             self.lam_windows: _List[LamWindow] = []
             self.running_wins: _List[LamWindow] = []
@@ -100,6 +102,16 @@ class Ensemble():
         self.run_thread.start()
         self.running = True
 
+    def kill(self) -> None:
+        """Kill all running simulations."""
+        # Stop the run loop
+        self.kill_thread = True
+
+        self._logger.info("Killing all lambda windows")
+        for win in self.lam_windows:
+            win.kill()
+        self.running = False
+
     @property
     def running(self) -> bool:
         """Return True if the ensemble is currently running."""
@@ -120,6 +132,9 @@ class Ensemble():
         so that the function can be run in the background and the user can continuously
         check the status of the Ensemble object."""
 
+        # Reset self.kill_thread so we can restart after killing
+        self.kill_thread = False
+
         # Run initial SOMD simulations
         self._logger.info("Starting ensemble of simulations...")
         for win in self.lam_windows:
@@ -133,6 +148,10 @@ class Ensemble():
         self._dump()
         while self.running_wins:
             _sleep(20 * 1)  # Check 20 seconds
+            # Check if we've requested to kill the thread
+            if self.kill_thread:
+                self._logger.info(f"Kill thread requested: exiting run loop")
+                return
             for win in self.running_wins:
                 # Check if the window has now finished - calling win.running updates the win._running attribute
                 if not win.running:
@@ -352,6 +371,13 @@ class LamWindow():
 
         self._running = True
         self._logger.info(f"Running simulations for {duration:.3f} ns")
+
+    def kill(self) -> None:
+        """ Kill all simulations at the lambda value. """
+        self._logger.info("Killing all simulations")
+        for sim in self.sims:
+            sim.kill()
+        self.running = False
 
     @property
     def running(self) -> bool:
@@ -685,6 +711,14 @@ class Simulation():
         self.tot_simtime += duration
         self.job_id = job_id
         self._logger.info(f"Submitted with job id {job_id}")
+
+    def kill(self) -> None:
+        """Kill the slurm job."""
+        if not self.job_id:
+            raise ValueError("No job id found. Cannot kill job.")
+        self._logger.info(f"Killing job with id {self.job_id}")
+        _subprocess.run(["scancel", str(self.job_id)])
+        self.running = False
 
     def _set_n_cycles(self, n_cycles: int) -> None:
         """
