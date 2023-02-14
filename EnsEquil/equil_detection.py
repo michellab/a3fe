@@ -99,7 +99,9 @@ def check_equil_chodera(lam_win:"LamWindow") -> _Tuple[bool, _Optional[float]]:
     """
     Check if the ensemble of simulations at the lambda window is
     equilibrated based Chodera's method of maximising the number
-    of uncorrelated samples.
+    of uncorrelated samples. This returns equilibrated = False and
+    equil_time = None if the number of uncorrelated samples is
+    less than 50.
 
     Parameters
     ----------
@@ -141,10 +143,6 @@ def check_equil_chodera(lam_win:"LamWindow") -> _Tuple[bool, _Optional[float]]:
         ofile.write(f"Number of uncorrelated samples: {Neff_max}\n")
         ofile.write(f"Staistical inefficiency: {g}\n")
 
-    # Note that this method will always give an equilibration time
-    if equil_time:
-        equilibrated = True
-
     # Save plots of dh/dl and d_dh/dl
     # Use rolling average to smooth out the data
     rolling_av_time = 0.0005 # ns
@@ -157,5 +155,10 @@ def check_equil_chodera(lam_win:"LamWindow") -> _Tuple[bool, _Optional[float]]:
           # Shift the equilibration time by block size to account for the
           # delay in the rolling average calculation.
           vline_val=equil_time + rolling_av_time)
+
+    # Note that this method will always give an equilibration time
+    if Neff_max < 50:
+        equilibrated = False
+        equil_time = None
 
     return equilibrated, equil_time

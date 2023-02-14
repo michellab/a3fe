@@ -12,6 +12,7 @@ from time import sleep as _sleep
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
 from .equil_detection import check_equil_block_gradient as _check_equil_block_gradient
+from .equil_detection import check_equil_chodera as _check_equil_chodera
 from ._utils import Job as _Job, VirtualQueue as _VirtualQueue
 
 
@@ -39,6 +40,7 @@ class Ensemble():
         equil_detection : str, Optional, default: "block_gradient"
             Method to use for equilibration detection. Options are:
             - "block_gradient": Use the gradient of the block averages to detect equilibration.
+            - "chodera": Use Chodera's method to detect equilibration.
         ensemble_size : int, Optional, default: 5
             Number of simulations to run in the ensemble.
         input_dir : str, Optional, default: "./input"
@@ -306,7 +308,8 @@ class Ensemble():
 class LamWindow():
     """A class to hold and manipulate a set of SOMD simulations at a given lambda value."""
 
-    equil_detection_methods = {"block_gradient": _check_equil_block_gradient}
+    equil_detection_methods = {"block_gradient": _check_equil_block_gradient,
+                               "chodera": _check_equil_chodera}
 
     def __init__(self, lam: float, 
                  virtual_queue: _VirtualQueue,
@@ -328,8 +331,9 @@ class LamWindow():
             Size of the blocks to use for equilibration detection,
             in ns.
         equil_detection : str, Optional, default: "block_gradient"
-            Method to use for equilibration detection.  Currently
-            only "block_gradient" is supported.
+            Method to use for equilibration detection. Options are:
+            - "block_gradient": Use the gradient of the block averages to detect equilibration.
+            - "chodera": Use Chodera's method to detect equilibration.
         ensemble_size : int, Optional, default: 5
             Number of simulations to run at this lambda value.
         input_dir : str, Optional, default: "./input"
