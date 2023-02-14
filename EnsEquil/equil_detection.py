@@ -103,6 +103,9 @@ def check_equil_chodera(lam_win:"LamWindow") -> _Tuple[bool, _Optional[float]]:
     equil_time = None if the number of uncorrelated samples is
     less than 50.
 
+    Please see the following paper for more details:
+    J. Chem. Theory Comput. 2016, 12, 4, 1799–1805
+
     Parameters
     ----------
     lam_win : LamWindow
