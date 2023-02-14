@@ -28,6 +28,7 @@ dependencies = [
      "matplotlib",
      "scipy",
      "ipython",
+     "pymbar<4"
 ]
 
 # Update the urls once the hosting is set up.

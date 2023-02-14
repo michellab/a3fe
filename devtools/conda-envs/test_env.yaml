@@ -12,6 +12,7 @@ dependencies:
   - matplotlib
   - scipy
   - ipython
+  - pymbar<4
 
     # Testing
   - pytest
