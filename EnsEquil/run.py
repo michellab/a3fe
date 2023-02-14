@@ -6,13 +6,13 @@ from decimal import Decimal as _Decimal
 import os as _os
 import threading as _threading
 import logging as _logging
-from matplotlib import pyplot as _plt
 import numpy as _np
 import pickle as _pkl
 from time import sleep as _sleep
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
-from ._utils import plot as _plot, Job as _Job, VirtualQueue as _VirtualQueue
+from .equil_detection import check_equil_block_gradient as _check_equil_block_gradient
+from ._utils import Job as _Job, VirtualQueue as _VirtualQueue
 
 
 class Ensemble():
@@ -20,7 +20,10 @@ class Ensemble():
     Class to hold and manipulate an ensemble of SOMD simulations.
     """
 
-    def __init__(self, block_size: float = 1, ensemble_size: int = 5,
+
+    def __init__(self, block_size: float = 1, 
+                 equil_detection: str = "block_gradient",
+                 ensemble_size: int = 5,
                  input_dir: str = "./input",
                  output_dir: str = "./output",
                  stream_log_level: int = _logging.INFO) -> None:
@@ -33,6 +36,9 @@ class Ensemble():
         ----------
         block_size : float, Optional, default: 1
             Size of blocks to use for equilibration detection, in ns.
+        equil_detection : str, Optional, default: "block_gradient"
+            Method to use for equilibration detection. Options are:
+            - "block_gradient": Use the gradient of the block averages to detect equilibration.
         ensemble_size : int, Optional, default: 5
             Number of simulations to run in the ensemble.
         input_dir : str, Optional, default: "./input"
@@ -77,6 +83,7 @@ class Ensemble():
             for lam in self.lam_vals:
                 self.lam_windows.append(LamWindow(lam, self.virtual_queue,
                                                   self.block_size,
+                                                  equil_detection,
                                                   self.ensemble_size, self.input_dir,
                                                   output_dir, stream_log_level,
                                                   ))
@@ -299,8 +306,12 @@ class Ensemble():
 class LamWindow():
     """A class to hold and manipulate a set of SOMD simulations at a given lambda value."""
 
-    def __init__(self, lam: float, virtual_queue: _VirtualQueue,
+    equil_detection_methods = {"block_gradient": _check_equil_block_gradient}
+
+    def __init__(self, lam: float, 
+                 virtual_queue: _VirtualQueue,
                  block_size: float = 1,
+                 equil_detection: str = "block_gradient",
                  ensemble_size: int = 5, input_dir: str = "./input",
                  output_dir: str = "./output",
                  stream_log_level: int = _logging.INFO) -> None:
@@ -316,6 +327,9 @@ class LamWindow():
         block_size : float, Optional, default: 1
             Size of the blocks to use for equilibration detection,
             in ns.
+        equil_detection : str, Optional, default: "block_gradient"
+            Method to use for equilibration detection.  Currently
+            only "block_gradient" is supported.
         ensemble_size : int, Optional, default: 5
             Number of simulations to run at this lambda value.
         input_dir : str, Optional, default: "./input"
@@ -334,6 +348,10 @@ class LamWindow():
         self.virtual_queue = virtual_queue
         self.block_size = block_size
         self.ensemble_size = ensemble_size
+        if equil_detection not in self.equil_detection_methods:
+            raise ValueError(f"Equilibration detection method {equil_detection} not recognised.")
+        # Need to pass self object to equilibration detection function
+        self.check_equil = self.equil_detection_methods[equil_detection]
         self.input_dir = input_dir
         self.output_dir = output_dir
         self._equilibrated: bool = False
@@ -427,88 +445,12 @@ class LamWindow():
         self._equilibrated : bool
             True if the simulation is equilibrated, False otherwise.
         """
-        self._equilibrated, self.equil_time = self.check_equil()
+        self._equilibrated, self.equil_time = self.check_equil(self)
         return self._equilibrated
 
     @equilibrated.setter
     def equilibrated(self, value: bool) -> None:
         self._equilibrated = value
-
-    def check_equil(self) -> _Tuple[bool, _Optional[float]]:
-        """
-        Check if the ensemble of simulations at the lambda window is
-        equilibrated.
-
-        Returns
-        -------
-        equilibrated : bool
-            True if the simulation is equilibrated, False otherwise.
-        equil_time : float
-            Time taken to equilibrate, in ns.
-        """
-        # Conversion between time and gradient indices.
-        time_to_ind = 1 / (self.sims[0].timestep * self.sims[0].nrg_freq)
-        idx_block_size = int(self.block_size * time_to_ind)
-
-        # Read dh/dl data from all simulations and calculate the gradient of the
-        # gradient, d_dh_dl
-        d_dh_dls = []
-        dh_dls = []
-        times, _ = self.sims[0].read_gradients()
-        equilibrated = False
-        equil_time = None
-
-        for sim in self.sims:
-            _, dh_dl = sim.read_gradients()  # Times should be the same for all sims
-            dh_dls.append(dh_dl)
-            # Create array of nan so that d_dh_dl has the same length as times irrespective of
-            # the block size
-            d_dh_dl = _np.full(len(dh_dl), _np.nan)
-            # Compute rolling average with the block size
-            rolling_av_dh_dl = self._get_rolling_average(dh_dl, idx_block_size)
-            for i in range(len(dh_dl)):
-                if i < 2 * idx_block_size:
-                    continue
-                else:
-                    d_dh_dl[i] = (rolling_av_dh_dl[i] - rolling_av_dh_dl[i - idx_block_size]) / \
-                        self.block_size  # Gradient of dh/dl in kcal mol-1 ns-1
-            d_dh_dls.append(d_dh_dl)
-
-        # Calculate the mean gradient
-        mean_d_dh_dl = _np.mean(d_dh_dls, axis=0)
-
-        # Check if the mean gradient has been 0 at any point, making
-        # sure to exclude the initial nans
-        last_grad = mean_d_dh_dl[2*idx_block_size]
-        for i, grad in enumerate(mean_d_dh_dl[2*idx_block_size:]):
-            # Check if gradient has passed through 0
-            if _np.sign(last_grad) != _np.sign(grad):
-                equil_time = times[i]
-                break
-            last_grad = grad
-
-        if equil_time:
-            equilibrated = True
-
-        # Save plots of dh/dl and d_dh/dl
-        _plot(x_vals=times,
-              y_vals=_np.array([self._get_rolling_average(dh_dl, idx_block_size) for dh_dl in dh_dls]),
-              x_label="Simulation Time per Window per Run / ns",
-              y_label=r"$\frac{\mathrm{d}h}{\mathrm{d}\lambda}$ / kcal mol$^{-1}$",
-              outfile=f"{self.output_dir}/lambda_{self.lam:.3f}/dhdl",
-              # Shift the equilibration time by 2 * block size to account for the
-              # delay in the block average calculation.
-              vline_val=equil_time + 1 * self.block_size if equil_time else None)
-
-        _plot(x_vals=times,
-              y_vals=_np.array(d_dh_dls),
-              x_label="Simulation Time per Window per Run / ns",
-              y_label=r"$\frac{\partial}{\partial t}\frac{\partial H}{\partial \lambda}$ / kcal mol$^{-1}$ ns$^{-1}$",
-              outfile=f"{self.output_dir}/lambda_{self.lam:.3f}/ddhdl",
-              vline_val=equil_time + 2 * self.block_size if equil_time else None,
-              hline_val=0)
-
-        return equilibrated, equil_time
 
     def _get_rolling_average(self, data: _np.ndarray, idx_block_size: int) -> _np.ndarray:
         """
