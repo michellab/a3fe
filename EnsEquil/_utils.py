@@ -51,7 +51,7 @@ def plot(x_vals: _np.ndarray, y_vals: _np.ndarray, x_label: str, y_label: str,
     ax.set_ylabel(y_label)
     ax.legend()
 
-    fig.savefig(outfile, dpi=300, bbox_inches='tight')
+    fig.savefig(outfile, dpi=300, bbox_inches='tight', facecolor='white', transparent=False)
     
 @_dataclass
 class Job():
