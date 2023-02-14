@@ -85,8 +85,8 @@ class VirtualQueue():
         -------
         None
         """
-        self._slurm_queue = []
-        self._pre_queue = []
+        self._slurm_queue: _List[Job] = []
+        self._pre_queue: _List[Job] = []
         self._available_virt_job_id = 0
         self.queue_len_lim = que_len_lim
 
