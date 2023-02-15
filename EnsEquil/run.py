@@ -9,12 +9,13 @@ import logging as _logging
 import matplotlib.pyplot as _plt
 import numpy as _np
 import pickle as _pkl
+import scipy.stats as _stats
 from time import sleep as _sleep
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
 from .equil_detection import check_equil_block_gradient as _check_equil_block_gradient
 from .equil_detection import check_equil_chodera as _check_equil_chodera
-from ._utils import Job as _Job, VirtualQueue as _VirtualQueue
+from ._utils import Job as _Job, VirtualQueue as _VirtualQueue, read_mbar_outfile as _read_mbar_outfile
 
 
 class Ensemble():
@@ -22,14 +23,13 @@ class Ensemble():
     Class to hold and manipulate an ensemble of SOMD simulations.
     """
 
-
-    def __init__(self, block_size: float = 1, 
+    def __init__(self, block_size: float = 1,
                  equil_detection: str = "block_gradient",
                  ensemble_size: int = 5,
                  input_dir: str = "./input",
                  output_dir: str = "./output",
                  stream_log_level: int = _logging.INFO) -> None:
-        """ 
+        """
         Initialise an ensemble of SOMD simulations. If ensemble.pkl exists in the
         output directory, the ensemble will be loaded from this file and any arguments
         supplied will be overwritten.
@@ -49,7 +49,7 @@ class Ensemble():
         output_dir : str, Optional, default: "./output"
             Path to directory to store output files from the simulations.
         stream_log_level : int, Optional, default: logging.INFO
-            Logging level to use for the steam file handlers for the 
+            Logging level to use for the steam file handlers for the
             Ensemble object and its child objects.
 
         Returns
@@ -215,7 +215,7 @@ class Ensemble():
         return lam_vals
 
     def analyse(self) -> None:
-        """ Analyse the results of the ensemble of simulations. Requires that 
+        """ Analyse the results of the ensemble of simulations. Requires that
         all lambda windows have equilibrated.  """
 
         # Check that all simulations have equilibrated
@@ -225,7 +225,6 @@ class Ensemble():
                 raise RuntimeError("Not all lambda windows have equilibrated. Analysis cannot be performed.")
             if not win.equil_time:
                 raise RuntimeError("Despite equilibration being detected, no equilibration time was found.")
-
 
         # Remove unequilibrated data from the equilibrated output directory
         for win in self.lam_windows:
@@ -241,22 +240,31 @@ class Ensemble():
         output_dir = self.output_dir
         ensemble_size = self.ensemble_size
         # This is nasty - assumes naming always the same
+        mbar_out_files = []
         for run in range(1, ensemble_size + 1):
-            with open(f"{self.output_dir}/freenrg-MBAR-run_{str(run).zfill(2)}.dat", "w") as ofile:
+            outfile = f"{self.output_dir}/freenrg-MBAR-run_{str(run).zfill(2)}.dat"
+            mbar_out_files.append(outfile)
+            with open(outfile, "w") as ofile:
                 _subprocess.run(["/home/finlayclark/sire.app/bin/analyse_freenrg",
                                 "mbar", "-i", f"{output_dir}/lambda*/run_{str(run).zfill(2)}/simfile_equilibrated.dat",
                                  "-p", "100", "--overlap", "--temperature",
                                  "298.0"], stdout=ofile)
 
         # Compute overall uncertainty
-
+        free_energies = _np.array([_read_mbar_outfile(ofile)[0] for ofile in mbar_out_files])  # Ignore MBAR error
+        mean_free_energy = _np.mean(free_energies)
+        # Gaussian 95 % C.I.
+        conf_int = _stats.t.interval(0.95,
+                                     len(free_energies)-1,
+                                    mean_free_energy,
+                                    scale=_stats.sem(free_energies))[1] - mean_free_energy  # 95 % C.I.
 
         # Make plots of equilibration time
-        fig, ax = _plt.subplots(figsize=(8,6))
-        # Plot the total time simulated per simulation, so we can see how efficient 
+        fig, ax=_plt.subplots(figsize=(8, 6))
+        # Plot the total time simulated per simulation, so we can see how efficient
         # the protocol is
         ax.bar([win.lam for win in self.lam_windows],
-                [win.sims[0].tot_simtime for win in self.lam_windows], # All sims at given lam run for same time
+                [win.sims[0].tot_simtime for win in self.lam_windows],  # All sims at given lam run for same time
                 width=0.02, edgecolor='black', label="Total time simulated per simulation")
         # Now plot the equilibration time
         ax.bar([win.lam for win in self.lam_windows],
@@ -265,7 +273,20 @@ class Ensemble():
         ax.set_xlabel(r"$\lambda$")
         ax.set_ylabel("Time (ns)")
         fig.legend()
-        fig.savefig("equil_times", dpi=300, bbox_inches='tight', facecolor='white', transparent=False)
+        fig.savefig(f"{self.output_dir}/equil_times", dpi=300,
+                    bbox_inches='tight', facecolor='white', transparent=False)
+
+        # Write out stats
+        with open(f"{self.output_dir}/overall_stats.dat", "w") as ofile:
+            ofile.write("###################################### Free Energies ########################################\n")
+            ofile.write(f"Mean free energy: {mean_free_energy: .3f} + /- {conf_int:.3f} kcal/mol\n")
+            for i in range(5):
+                ofile.write(f"Free energy from run {i+1}: {free_energies[i]: .3f} kcal/mol\n")
+            ofile.write("Errors are 95 % C.I.s based on the assumption of a Gaussian distribution of free energies\n")
+            ofile.write("###################################### Equilibration Stats ##################################\n")
+            for win in self.lam_windows:
+                ofile.write(f"Equilibration time for lambda = {win.lam}: {win.equil_time:.3f} ns per simulation\n")
+                ofile.write(f"Total time simulated for lambda = {win.lam}: {win.sims[0].tot_simtime:.3f} ns per simulation\n")
 
 
         # TODO: Make convergence plots (which should be flat)
@@ -285,7 +306,7 @@ class Ensemble():
             Path to new simulation file, containing only the equilibrated data
             from the original file.
         equil_index : int
-            Index of the first equilibrated frame, given by 
+            Index of the first equilibrated frame, given by
             equil_time / (timestep * nrg_freq)
 
         Returns
@@ -293,10 +314,10 @@ class Ensemble():
         None
         """
         with open(in_simfile, "r") as ifile:
-            lines = ifile.readlines()
+            lines=ifile.readlines()
 
         # Figure out how many lines come before the data
-        non_data_lines = 0
+        non_data_lines=0
         for line in lines:
             if line.startswith("#"):
                 non_data_lines += 1
@@ -323,8 +344,8 @@ class Ensemble():
         """ Dump the current state of the ensemble to a pickle file. Specifically,
          pickle self.__dict__ with self.run_thread = None, as _thread_lock objects
          can't be pickled.   """
-        temp_dict = {key: val for key, val in self.__dict__.items() if key != "run_thread"}
-        temp_dict["run_thread"] = None
+        temp_dict={key: val for key, val in self.__dict__.items() if key != "run_thread"}
+        temp_dict["run_thread"]=None
         with open(f"{self.output_dir}/ensemble.pkl", "wb") as ofile:
             _pkl.dump(temp_dict, ofile)
 
@@ -332,16 +353,16 @@ class Ensemble():
 class LamWindow():
     """A class to hold and manipulate a set of SOMD simulations at a given lambda value."""
 
-    equil_detection_methods = {"block_gradient": _check_equil_block_gradient,
+    equil_detection_methods={"block_gradient": _check_equil_block_gradient,
                                "chodera": _check_equil_chodera}
 
-    def __init__(self, lam: float, 
+    def __init__(self, lam: float,
                  virtual_queue: _VirtualQueue,
-                 block_size: float = 1,
-                 equil_detection: str = "block_gradient",
-                 ensemble_size: int = 5, input_dir: str = "./input",
-                 output_dir: str = "./output",
-                 stream_log_level: int = _logging.INFO) -> None:
+                 block_size: float=1,
+                 equil_detection: str="block_gradient",
+                 ensemble_size: int=5, input_dir: str="./input",
+                 output_dir: str="./output",
+                 stream_log_level: int=_logging.INFO) -> None:
         """
         Initialise a LamWindow object.
 
@@ -365,43 +386,43 @@ class LamWindow():
         output_dir : str
             Path to the output directory.
         stream_log_level : int, Optional, default: logging.INFO
-            Logging level to use for the steam file handlers for the 
+            Logging level to use for the steam file handlers for the
             Ensemble object and its child objects.
 
         Returns
         -------
         None
         """
-        self.lam = lam
-        self.virtual_queue = virtual_queue
-        self.block_size = block_size
-        self.ensemble_size = ensemble_size
+        self.lam=lam
+        self.virtual_queue=virtual_queue
+        self.block_size=block_size
+        self.ensemble_size=ensemble_size
         if equil_detection not in self.equil_detection_methods:
             raise ValueError(f"Equilibration detection method {equil_detection} not recognised.")
         # Need to pass self object to equilibration detection function
-        self.check_equil = self.equil_detection_methods[equil_detection]
-        self.input_dir = input_dir
-        self.output_dir = output_dir
-        self._equilibrated: bool = False
-        self.equil_time: _Optional[float] = None
-        self._running: bool = False
-        self.tot_simtime: float = 0  # ns
+        self.check_equil=self.equil_detection_methods[equil_detection]
+        self.input_dir=input_dir
+        self.output_dir=output_dir
+        self._equilibrated: bool=False
+        self.equil_time: _Optional[float]=None
+        self._running: bool=False
+        self.tot_simtime: float=0  # ns
 
         # Create the required simulations for this lambda value
-        self.sims = []
+        self.sims=[]
         for i in range(1, ensemble_size + 1):
-            sim = Simulation(lam, i, self.virtual_queue, input_dir, output_dir, stream_log_level)
+            sim=Simulation(lam, i, self.virtual_queue, input_dir, output_dir, stream_log_level)
             self.sims.append(sim)
 
         # Set up logging
-        self._logger = _logging.getLogger(str(self))
+        self._logger=_logging.getLogger(str(self))
         # For the file handler, we want to log everything
         self._logger.setLevel(_logging.DEBUG)
-        file_handler = _logging.FileHandler(f"{self.output_dir}/lambda_{self.lam:.3f}/window.log")
+        file_handler=_logging.FileHandler(f"{self.output_dir}/lambda_{self.lam:.3f}/window.log")
         file_handler.setFormatter(_logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
         self._logger.addHandler(file_handler)
         # For the stream handler, we only want to log at the user-specified level
-        stream_handler = _logging.StreamHandler()
+        stream_handler=_logging.StreamHandler()
         stream_handler.setFormatter(_logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
         stream_handler.setLevel(stream_log_level)
         self._logger.addHandler(stream_handler)
@@ -409,7 +430,7 @@ class LamWindow():
     def __str__(self) -> str:
         return f"LamWindow (lam={self.lam:.3f})"
 
-    def run(self, duration: float = 2.5) -> None:
+    def run(self, duration: float=2.5) -> None:
         """
         Run all simulations at the lambda value.
 
@@ -428,16 +449,16 @@ class LamWindow():
             sim.run(duration)
             self.tot_simtime += duration
 
-        self._running = True
+        self._running=True
 
     def kill(self) -> None:
         """ Kill all simulations at the lambda value. """
         self._logger.info("Killing all simulations")
         for sim in self.sims:
             sim.kill()
-        self.running = False
+        self.running=False
 
-    @property
+    @ property
     def running(self) -> bool:
         """
         Check if all the simulations at the lambda window are still running
@@ -448,20 +469,20 @@ class LamWindow():
         self._running : bool
             True if the simulation is still running, False otherwise.
         """
-        all_finished = True
+        all_finished=True
         for sim in self.sims:
             if sim.running:
-                all_finished = False
+                all_finished=False
                 break
-        self._running = not all_finished
+        self._running=not all_finished
 
         return self._running
 
-    @running.setter
+    @ running.setter
     def running(self, value: bool) -> None:
-        self._running = value
+        self._running=value
 
-    @property
+    @ property
     def equilibrated(self) -> bool:
         """
         Check if the ensemble of simulations at the lambda window is
@@ -473,12 +494,12 @@ class LamWindow():
         self._equilibrated : bool
             True if the simulation is equilibrated, False otherwise.
         """
-        self._equilibrated, self.equil_time = self.check_equil(self)
+        self._equilibrated, self.equil_time=self.check_equil(self)
         return self._equilibrated
 
-    @equilibrated.setter
+    @ equilibrated.setter
     def equilibrated(self, value: bool) -> None:
-        self._equilibrated = value
+        self._equilibrated=value
 
     def _get_rolling_average(self, data: _np.ndarray, idx_block_size: int) -> _np.ndarray:
         """
@@ -495,17 +516,17 @@ class LamWindow():
         -------
         block_av : np.ndarray
             1D array of block averages of the same length as data.
-            Initial values (before there is sufficient data to calculate 
+            Initial values (before there is sufficient data to calculate
             a block average) are set to nan.
         """
-        rolling_av = _np.full(len(data), _np.nan)
+        rolling_av=_np.full(len(data), _np.nan)
 
         for i in range(len(data)):
             if i < idx_block_size:
                 continue
             else:
-                block_av = _np.mean(data[i - idx_block_size: i])
-                rolling_av[i] = block_av
+                block_av=_np.mean(data[i - idx_block_size: i])
+                rolling_av[i]=block_av
 
         return rolling_av
 
@@ -523,11 +544,11 @@ class LamWindow():
 class Simulation():
     """Class to store information about a single SOMD simulation."""
 
-    def __init__(self, lam: float, run_no: int, 
+    def __init__(self, lam: float, run_no: int,
                  virtual_queue: _VirtualQueue,
-                 input_dir: str = "./input",
-                 output_dir: str = "./output",
-                 stream_log_level: int = _logging.INFO) -> None:
+                 input_dir: str="./input",
+                 output_dir: str="./output",
+                 stream_log_level: int=_logging.INFO) -> None:
         """
         Initialise a Simulation object.
 
@@ -542,24 +563,24 @@ class Simulation():
         output_dir : str
             Path to the output directory.
         stream_log_level : int, Optional, default: logging.INFO
-            Logging level to use for the steam file handlers for the 
+            Logging level to use for the steam file handlers for the
             Ensemble object and its child objects.
 
         Returns
         -------
         None
         """
-        self.lam = lam
-        self.virtual_queue = virtual_queue
-        self.run_no = run_no
-        self.input_dir = _os.path.abspath(input_dir)
+        self.lam=lam
+        self.virtual_queue=virtual_queue
+        self.run_no=run_no
+        self.input_dir=_os.path.abspath(input_dir)
         # Check that the input directory contains the required files
         self._validate_input()
-        self.output_dir = _os.path.abspath(output_dir)
-        self.job: _Optional[_Job] = None
-        self._running: bool = False
-        self.output_subdir: str = output_dir + "/lambda_" + f"{lam:.3f}" + "/run_" + str(run_no).zfill(2)
-        self.tot_simtime: float = 0  # ns
+        self.output_dir=_os.path.abspath(output_dir)
+        self.job: _Optional[_Job]=None
+        self._running: bool=False
+        self.output_subdir: str=output_dir + "/lambda_" + f"{lam:.3f}" + "/run_" + str(run_no).zfill(2)
+        self.tot_simtime: float=0  # ns
         # Now read useful parameters from the simulation file options
         self._add_attributes_from_simfile()
 
@@ -569,14 +590,14 @@ class Simulation():
         _subprocess.call(["cp", "-r", self.input_dir, self.output_subdir + "/input"])
 
         # Set up logging
-        self._logger = _logging.getLogger(str(self))
+        self._logger=_logging.getLogger(str(self))
         # For the file handler, we want to log everything
         self._logger.setLevel(_logging.DEBUG)
-        file_handler = _logging.FileHandler(f"{self.output_subdir}/simulation.log")
+        file_handler=_logging.FileHandler(f"{self.output_subdir}/simulation.log")
         file_handler.setFormatter(_logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
         self._logger.addHandler(file_handler)
         # For the stream handler, we want the user-specified level
-        stream_handler = _logging.StreamHandler()
+        stream_handler=_logging.StreamHandler()
         stream_handler.setFormatter(_logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
         stream_handler.setLevel(stream_log_level)
         self._logger.addHandler(stream_handler)
@@ -584,7 +605,7 @@ class Simulation():
     def __str__(self) -> str:
         return f"Simulation (lam={self.lam}, run_no={self.run_no})"
 
-    @property
+    @ property
     def running(self) -> bool:
         """
         Check if the simulation is still running,
@@ -598,17 +619,17 @@ class Simulation():
         # Get job ids of currently running jobs - but note that the queue is updated at the
         # Ensemble level
         if self.job in self.virtual_queue.queue:
-            self._running = True
+            self._running=True
             self._logger.info(f"Still running")
         else:
-            self._running = False
+            self._running=False
             self._logger.info(f"Finished")
 
         return self._running
 
-    @running.setter
+    @ running.setter
     def running(self, value: bool) -> None:
-        self._running = value
+        self._running=value
 
     def _validate_input(self) -> None:
         """ Check that the required input files are present. """
@@ -618,7 +639,7 @@ class Simulation():
             raise FileNotFoundError("Input directory does not exist.")
 
         # Check that the required input files are present
-        required_files = ["run_somd.sh", "sim.cfg", "system.top", "system.crd", "morph.pert"]
+        required_files=["run_somd.sh", "sim.cfg", "system.top", "system.crd", "morph.pert"]
         for file in required_files:
             if not _os.path.isfile(self.input_dir + "/" + file):
                 raise FileNotFoundError("Required input file " + file + " not found.")
@@ -634,27 +655,27 @@ class Simulation():
             Time per cycle, in ns.
         """
 
-        timestep = None  # ns
-        nmoves = None  # number of moves per cycle
-        nrg_freq = None  # number of timesteps between energy calculations
+        timestep=None  # ns
+        nmoves=None  # number of moves per cycle
+        nrg_freq=None  # number of timesteps between energy calculations
         with open(self.input_dir + "/sim.cfg", "r") as ifile:
-            lines = ifile.readlines()
+            lines=ifile.readlines()
             for line in lines:
                 if line.startswith("timestep ="):
-                    timestep = float(line.split("=")[1].split()[0])
+                    timestep=float(line.split("=")[1].split()[0])
                 if line.startswith("nmoves ="):
-                    nmoves = float(line.split("=")[1])
+                    nmoves=float(line.split("=")[1])
                 if line.startswith("energy frequency ="):
-                    nrg_freq = float(line.split("=")[1])
+                    nrg_freq=float(line.split("=")[1])
 
         if timestep is None or nmoves is None or nrg_freq is None:
             raise ValueError("Could not find timestep or nmoves in sim.cfg.")
 
-        self.timestep = timestep / 1_000_000  # fs to ns
-        self.nrg_freq = nrg_freq
-        self.time_per_cycle = timestep * nmoves / 1_000_000  # fs to ns
+        self.timestep=timestep / 1_000_000  # fs to ns
+        self.nrg_freq=nrg_freq
+        self.time_per_cycle=timestep * nmoves / 1_000_000  # fs to ns
 
-    def run(self, duration: float = 2.5) -> None:
+    def run(self, duration: float=2.5) -> None:
         """
         Run a SOMD simulation.
 
@@ -669,18 +690,18 @@ class Simulation():
         """
         # Need to make sure that duration is a multiple of the time per cycle
         # otherwise actual time could be quite different from requested duration
-        remainder = _Decimal(str(duration)) % _Decimal(str(self.time_per_cycle))
+        remainder=_Decimal(str(duration)) % _Decimal(str(self.time_per_cycle))
         if round(float(remainder), 4) != 0:
             raise ValueError(("Duration must be a multiple of the time per cycle. "
                               f"Duration is {duration} ns, and time per cycle is {self.time_per_cycle} ns."))
         # Need to modify the config file to set the correction n_cycles
-        n_cycles = int(duration / self.time_per_cycle)
+        n_cycles=int(duration / self.time_per_cycle)
         self._set_n_cycles(n_cycles)
 
         # Run SOMD - note that command excludes sbatch as this is added by the virtual queue
-        cmd = f"--chdir {self.output_subdir} {self.output_subdir}/input/run_somd.sh {self.lam}"
-        self.job = self.virtual_queue.submit(cmd)
-        self.running = True
+        cmd=f"--chdir {self.output_subdir} {self.output_subdir}/input/run_somd.sh {self.lam}"
+        self.job=self.virtual_queue.submit(cmd)
+        self.running=True
         self.tot_simtime += duration
         self._logger.info(f"Submitted with job {self.job}")
 
@@ -690,7 +711,7 @@ class Simulation():
             raise ValueError("No job found. Cannot kill job.")
         self._logger.info(f"Killing job {self.job}")
         self.virtual_queue.kill(self.job)
-        self.running = False
+        self.running=False
 
     def _set_n_cycles(self, n_cycles: int) -> None:
         """
@@ -707,10 +728,10 @@ class Simulation():
         """
         # Find the line with n_cycles and replace
         with open(self.output_subdir + "/input/sim.cfg", "r") as ifile:
-            lines = ifile.readlines()
+            lines=ifile.readlines()
             for i, line in enumerate(lines):
                 if line.startswith("ncycles ="):
-                    lines[i] = "ncycles = " + str(n_cycles) + "\n"
+                    lines[i]="ncycles = " + str(n_cycles) + "\n"
                     break
 
         # Now write the new file
@@ -731,23 +752,23 @@ class Simulation():
         """
         # Read the output file
         with open(self.output_subdir + "/simfile.dat", "r") as ifile:
-            lines = ifile.readlines()
+            lines=ifile.readlines()
 
-        steps = []
-        grads = []
+        steps=[]
+        grads=[]
 
         for line in lines:
-            vals = line.split()
+            vals=line.split()
             if not line.startswith("#"):
-                step = int(vals[0].strip())
-                grad = float(vals[2].strip())
+                step=int(vals[0].strip())
+                grad=float(vals[2].strip())
                 steps.append(step)
                 grads.append(grad)
 
-        times = [x * self.timestep for x in steps]  # Timestep already in ns
+        times=[x * self.timestep for x in steps]  # Timestep already in ns
 
-        times_arr = _np.array(times)
-        grads_arr = _np.array(grads)
+        times_arr=_np.array(times)
+        grads_arr=_np.array(grads)
 
         return times_arr, grads_arr
 
