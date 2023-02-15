@@ -8,8 +8,9 @@ import scipy.stats as _stats
 import subprocess as _subprocess
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
-def plot(x_vals: _np.ndarray, y_vals: _np.ndarray, x_label: str, y_label: str, 
-         outfile: str, vline_val: _Optional[float] = None, 
+
+def plot(x_vals: _np.ndarray, y_vals: _np.ndarray, x_label: str, y_label: str,
+         outfile: str, vline_val: _Optional[float] = None,
          hline_val: _Optional[float] = None) -> None:
     """ 
     Plot several sets of y_vals against one set of x vals, and show confidence
@@ -35,9 +36,9 @@ def plot(x_vals: _np.ndarray, y_vals: _np.ndarray, x_label: str, y_label: str,
         y value to draw a horizontal line at.
     """
     y_avg = _np.mean(y_vals, axis=0)
-    conf_int = _stats.t.interval(0.95, len(y_vals[:,0])-1, loc=y_avg, scale=_stats.sem(y_vals,axis=0)) # 95 % C.I.
+    conf_int = _stats.t.interval(0.95, len(y_vals[:, 0])-1, loc=y_avg, scale=_stats.sem(y_vals, axis=0))  # 95 % C.I.
 
-    fig, ax = _plt.subplots(figsize=(8,6))
+    fig, ax = _plt.subplots(figsize=(8, 6))
     ax.plot(x_vals, y_avg, label="Mean", linewidth=2)
     for i, entry in enumerate(y_vals):
         ax.plot(x_vals, entry, alpha=0.5, label=f"run {i+1}")
@@ -52,7 +53,33 @@ def plot(x_vals: _np.ndarray, y_vals: _np.ndarray, x_label: str, y_label: str,
     ax.legend()
 
     fig.savefig(outfile, dpi=300, bbox_inches='tight', facecolor='white', transparent=False)
-    
+
+
+def read_mbar_outfile(outfile: str) -> _Tuple[float, float]:
+    """ 
+    Read the output file from MBAR, and return the free energy and error.
+
+    Parameters
+    ----------
+    outfile : str
+        The name of the output file.
+
+    Returns
+    -------
+    free_energy : float
+        The free energy in kcal/mol.
+    free_energy_err : float
+        The error on the free energy in kcal/mol.
+    """
+    with open(outfile, 'r') as f:
+        lines = f.readlines()
+    # The free energy is the 5th last line of the file
+    free_energy = float(lines[-4].split(",")[0])
+    free_energy_err = float(lines[-4].split(",")[1].split()[0])
+
+    return free_energy, free_energy_err
+
+
 @_dataclass
 class Job():
     """Class to hold information about a job"""
@@ -64,23 +91,24 @@ class Job():
         # Avoid printing the command, which may be long
         return f"Job (virtual_job_id = {self.virtual_job_id}, slurm_job_id= {self.slurm_job_id})"
 
+
 class VirtualQueue():
     """A virtual slurm queue which has no limit on the number
     of queued jobs, which submits slurm jobs to the real queue
     when there are few enough jobs queued. This gets round slurm
     queue limits."""
 
-    def __init__(self, que_len_lim: int =  2500, log_dir: str = "./output") -> None:
+    def __init__(self, que_len_lim: int = 2500, log_dir: str = "./output") -> None:
         """ 
         Initialise the virtual queue.
-        
+
         Parameters
         ----------
         queue_len_lim : int, Optional, default: 2500
             The maximum number of jobs to queue in the real queue.
         log_dir : str, Optional, default: "./output"
             The directory to write the log to.
-        
+
         Returns
         -------
         None
@@ -109,12 +137,12 @@ class VirtualQueue():
     def submit(self, command: str) -> Job:
         """ 
         Submit a job to the virtual queue.
-        
+
         Parameters
         ----------
         command : str
             The command to be run by sbatch.
-        
+
         Returns
         -------
         job : Job
@@ -128,7 +156,7 @@ class VirtualQueue():
         # Now update - the job will be moved to the real queue if there is space
         self.update()
         return job
-    
+
     def kill(self, job: Job) -> None:
         """Kill and remove a job from the real and virtual queues."""
         # All jobs are in the joint queue, so remove it from there
@@ -137,7 +165,7 @@ class VirtualQueue():
         if job in self._slurm_queue:
             self._slurm_queue.remove(job)
             _subprocess.run(["scancel", str(job.slurm_job_id)])
-        else: # Job is in the pre-queue
+        else:  # Job is in the pre-queue
             self._pre_queue.remove(job)
 
     def update(self) -> None:
