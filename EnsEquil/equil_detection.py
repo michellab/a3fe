@@ -148,7 +148,7 @@ def check_equil_chodera(lam_win:"LamWindow") -> _Tuple[bool, _Optional[float]]:
 
     # Save plots of dh/dl and d_dh/dl
     # Use rolling average to smooth out the data
-    rolling_av_time = 0.0005 # ns
+    rolling_av_time = 0.05 # ns
     rolling_av_block_size=int(rolling_av_time * time_to_ind) # ns
     _plot(x_vals=times,
           y_vals=_np.array([lam_win._get_rolling_average(dh_dl, rolling_av_block_size) for dh_dl in dh_dls]),
@@ -163,5 +163,7 @@ def check_equil_chodera(lam_win:"LamWindow") -> _Tuple[bool, _Optional[float]]:
     if Neff_max < 50:
         equilibrated = False
         equil_time = None
+    else:
+        equilibrated = True
 
     return equilibrated, equil_time
