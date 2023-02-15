@@ -6,6 +6,7 @@ from decimal import Decimal as _Decimal
 import os as _os
 import threading as _threading
 import logging as _logging
+import matplotlib.pyplot as _plt
 import numpy as _np
 import pickle as _pkl
 from time import sleep as _sleep
@@ -221,7 +222,10 @@ class Ensemble():
         for win in self.lam_windows:
             # Avoid checking win.equilibrated as this causes expensive equilibration detection to be run
             if not win._equilibrated:
-                raise RuntimeError(f"Not all lambda windows have equilibrated. Analysis cannot be performed.")
+                raise RuntimeError("Not all lambda windows have equilibrated. Analysis cannot be performed.")
+            if not win.equil_time:
+                raise RuntimeError("Despite equilibration being detected, no equilibration time was found.")
+
 
         # Remove unequilibrated data from the equilibrated output directory
         for win in self.lam_windows:
@@ -243,6 +247,26 @@ class Ensemble():
                                 "mbar", "-i", f"{output_dir}/lambda*/run_{str(run).zfill(2)}/simfile_equilibrated.dat",
                                  "-p", "100", "--overlap", "--temperature",
                                  "298.0"], stdout=ofile)
+
+        # Compute overall uncertainty
+
+
+        # Make plots of equilibration time
+        fig, ax = _plt.subplots(figsize=(8,6))
+        # Plot the total time simulated per simulation, so we can see how efficient 
+        # the protocol is
+        ax.bar([win.lam for win in self.lam_windows],
+                [win.sims[0].tot_simtime for win in self.lam_windows], # All sims at given lam run for same time
+                width=0.02, edgecolor='black', label="Total time simulated per simulation")
+        # Now plot the equilibration time
+        ax.bar([win.lam for win in self.lam_windows],
+               [win.equil_time for win in self.lam_windows],
+               width=0.02, edgecolor='black', label="Equilibration time per simulation")
+        ax.set_xlabel(r"$\lambda$")
+        ax.set_ylabel("Time (ns)")
+        fig.legend()
+        fig.savefig("equil_times", dpi=300, bbox_inches='tight', facecolor='white', transparent=False)
+
 
         # TODO: Make convergence plots (which should be flat)
 
