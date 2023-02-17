@@ -53,6 +53,8 @@ def plot(x_vals: _np.ndarray, y_vals: _np.ndarray, x_label: str, y_label: str,
     ax.legend()
 
     fig.savefig(outfile, dpi=300, bbox_inches='tight', facecolor='white', transparent=False)
+    # Close the figure to avoid memory leaks
+    _plt.close(fig)
 
 
 def read_mbar_outfile(outfile: str) -> _Tuple[float, float]:
