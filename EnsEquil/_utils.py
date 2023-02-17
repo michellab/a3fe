@@ -100,7 +100,7 @@ class VirtualQueue():
     when there are few enough jobs queued. This gets round slurm
     queue limits."""
 
-    def __init__(self, que_len_lim: int = 2500, log_dir: str = "./output") -> None:
+    def __init__(self, queue_len_lim: int = 2500, log_dir: str = "./output") -> None:
         """ 
         Initialise the virtual queue.
 
@@ -118,7 +118,7 @@ class VirtualQueue():
         self._slurm_queue: _List[Job] = []
         self._pre_queue: _List[Job] = []
         self._available_virt_job_id = 0
-        self.queue_len_lim = que_len_lim
+        self.queue_len_lim = queue_len_lim
 
         # Set up logging
         self._logger = _logging.getLogger(str(self))
