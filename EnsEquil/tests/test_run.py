@@ -1,5 +1,5 @@
 """
-Unit and regression test for the EnsEquil package.
+Unit and regression test for the run module.
 """
 
 # Import package, test suite, and other packages as needed
@@ -18,6 +18,8 @@ def test_EnsEquil_imported():
 def test_dirs_created():
     """Check that all expected directories are created"""
     with TemporaryDirectory() as dirname:
+        # Store current working directory to change back to later
+        cwd = os.getcwd()
         subprocess.run(["cp", "-r", "EnsEquil/data/example_input", f"{dirname}/input"])
         os.chdir(dirname)
         # This should create output directories
@@ -29,3 +31,6 @@ def test_dirs_created():
         for lam_dir in lam_dir_names:
             for run in run_names:
                 assert os.path.isdir(os.path.join(dirname, "output", lam_dir, run))
+
+        # Change back to original working directory
+        os.chdir(cwd)
