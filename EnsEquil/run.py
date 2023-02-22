@@ -223,7 +223,7 @@ class Ensemble():
             # Avoid checking win.equilibrated as this causes expensive equilibration detection to be run
             if not win._equilibrated:
                 raise RuntimeError("Not all lambda windows have equilibrated. Analysis cannot be performed.")
-            if not win.equil_time:
+            if win.equil_time is None:
                 raise RuntimeError("Despite equilibration being detected, no equilibration time was found.")
 
         # Remove unequilibrated data from the equilibrated output directory
