@@ -214,9 +214,20 @@ class Ensemble():
 
         return lam_vals
 
-    def analyse(self) -> None:
+    def analyse(self, get_frnrg:bool = True) -> None:
         """ Analyse the results of the ensemble of simulations. Requires that
-        all lambda windows have equilibrated.  """
+        all lambda windows have equilibrated.
+          
+        Parameters
+        ----------
+        get_frnrg : bool, optional, default=True
+            If True, the free energy will be calculated with MBAR, otherwise
+            this will be skipped.
+        
+        Returns
+        -------
+        None
+        """
 
         # Check that all simulations have equilibrated
         for win in self.lam_windows:
@@ -226,38 +237,68 @@ class Ensemble():
             if win.equil_time is None:
                 raise RuntimeError("Despite equilibration being detected, no equilibration time was found.")
 
-        # Remove unequilibrated data from the equilibrated output directory
-        for win in self.lam_windows:
-            equil_time = win.equil_time
-            # Minus 1 because first energy is only written after the first nrg_freq steps
-            equil_index = int(equil_time / (win.sims[0].timestep * win.sims[0].nrg_freq)) - 1
-            for sim in win.sims:
-                in_simfile = sim.output_subdir + "/simfile.dat"
-                out_simfile = sim.output_subdir + "/simfile_equilibrated.dat"
-                self._write_equilibrated_data(in_simfile, out_simfile, equil_index)
+        if get_frnrg:
+            # Remove unequilibrated data from the equilibrated output directory
+            for win in self.lam_windows:
+                equil_time = win.equil_time
+                # Minus 1 because first energy is only written after the first nrg_freq steps
+                equil_index = int(equil_time / (win.sims[0].timestep * win.sims[0].nrg_freq)) - 1
+                for sim in win.sims:
+                    in_simfile = sim.output_subdir + "/simfile.dat"
+                    out_simfile = sim.output_subdir + "/simfile_equilibrated.dat"
+                    self._write_equilibrated_data(in_simfile, out_simfile, equil_index)
 
-        # Analyse data with MBAR and compute uncertainties
-        output_dir = self.output_dir
-        ensemble_size = self.ensemble_size
-        # This is nasty - assumes naming always the same
-        mbar_out_files = []
-        for run in range(1, ensemble_size + 1):
-            outfile = f"{self.output_dir}/freenrg-MBAR-run_{str(run).zfill(2)}.dat"
-            mbar_out_files.append(outfile)
-            with open(outfile, "w") as ofile:
-                _subprocess.run(["/home/finlayclark/sire.app/bin/analyse_freenrg",
-                                "mbar", "-i", f"{output_dir}/lambda*/run_{str(run).zfill(2)}/simfile_equilibrated.dat",
-                                 "-p", "100", "--overlap", "--temperature",
-                                 "298.0"], stdout=ofile)
+            # Analyse data with MBAR and compute uncertainties
+            output_dir = self.output_dir
+            ensemble_size = self.ensemble_size
+            # This is nasty - assumes naming always the same
+            mbar_out_files = []
+            for run in range(1, ensemble_size + 1):
+                outfile = f"{self.output_dir}/freenrg-MBAR-run_{str(run).zfill(2)}.dat"
+                mbar_out_files.append(outfile)
+                with open(outfile, "w") as ofile:
+                    _subprocess.run(["/home/finlayclark/sire.app/bin/analyse_freenrg",
+                                    "mbar", "-i", f"{output_dir}/lambda*/run_{str(run).zfill(2)}/simfile_equilibrated.dat",
+                                    "-p", "100", "--overlap", "--temperature",
+                                    "298.0"], stdout=ofile)
 
-        # Compute overall uncertainty
-        free_energies = _np.array([_read_mbar_outfile(ofile)[0] for ofile in mbar_out_files])  # Ignore MBAR error
-        mean_free_energy = _np.mean(free_energies)
-        # Gaussian 95 % C.I.
-        conf_int = _stats.t.interval(0.95,
-                                     len(free_energies)-1,
-                                    mean_free_energy,
-                                    scale=_stats.sem(free_energies))[1] - mean_free_energy  # 95 % C.I.
+            # Compute overall uncertainty
+            free_energies = _np.array([_read_mbar_outfile(ofile)[0] for ofile in mbar_out_files])  # Ignore MBAR error
+            mean_free_energy = _np.mean(free_energies)
+            # Gaussian 95 % C.I.
+            conf_int = _stats.t.interval(0.95,
+                                        len(free_energies)-1,
+                                        mean_free_energy,
+                                        scale=_stats.sem(free_energies))[1] - mean_free_energy  # 95 % C.I.
+
+        # Plot free variance of gradients for all data
+        def _plot_variance(equilibrated:bool) -> None:
+            """ Plot the variance of the gradients for all lambda windows.
+            If equilibrated is True, only data after equilibration is used. """
+
+            # Get variance of gradients
+            variances_all_winds = []
+            for lam in self.lam_windows:
+                variances_wind = []
+                for sim in lam.sims:
+                    variances_wind.append(sim.read_gradients(equilibrated_only=equilibrated))
+                mean_grads = _np.mean(variances_wind, axis=0)
+                variances_all_winds.append(_np.var(mean_grads))
+
+            # Make plots of variance of gradients
+            fig, ax=_plt.subplots(figsize=(8, 6))
+            ax.bar([win.lam for win in self.lam_windows],
+                variances_all_winds,
+                width=0.02, edgecolor='black')
+            ax.set_xlabel(r"$\lambda$")
+            ax.set_ylabel(r"Var($\frac{\mathrm{d}h}{\mathrm{d}\lambda}$) / kcal$^{2}$ mol$^{-2}$"),
+            fig.legend()
+            fig.savefig(f"{self.output_dir}/gradient_var{'_equilibrated' if equilibrated else ''}", dpi=300,
+                        bbox_inches='tight', facecolor='white', transparent=False)
+
+        # Make plots with all data and equilibrated only
+        _plot_variance(equilibrated=False)
+        _plot_variance(equilibrated=True)
 
         # Make plots of equilibration time
         fig, ax=_plt.subplots(figsize=(8, 6))
@@ -278,11 +319,12 @@ class Ensemble():
 
         # Write out stats
         with open(f"{self.output_dir}/overall_stats.dat", "w") as ofile:
-            ofile.write("###################################### Free Energies ########################################\n")
-            ofile.write(f"Mean free energy: {mean_free_energy: .3f} + /- {conf_int:.3f} kcal/mol\n")
-            for i in range(5):
-                ofile.write(f"Free energy from run {i+1}: {free_energies[i]: .3f} kcal/mol\n")
-            ofile.write("Errors are 95 % C.I.s based on the assumption of a Gaussian distribution of free energies\n")
+            if get_frnrg:
+                ofile.write("###################################### Free Energies ########################################\n")
+                ofile.write(f"Mean free energy: {mean_free_energy: .3f} + /- {conf_int:.3f} kcal/mol\n")
+                for i in range(5):
+                    ofile.write(f"Free energy from run {i+1}: {free_energies[i]: .3f} kcal/mol\n")
+                ofile.write("Errors are 95 % C.I.s based on the assumption of a Gaussian distribution of free energies\n")
             ofile.write("###################################### Equilibration Stats ##################################\n")
             for win in self.lam_windows:
                 ofile.write(f"Equilibration time for lambda = {win.lam}: {win.equil_time:.3f} ns per simulation\n")
@@ -739,9 +781,15 @@ class Simulation():
             for line in lines:
                 ofile.write(line)
 
-    def read_gradients(self) -> _Tuple[_np.ndarray, _np.ndarray]:
+    def read_gradients(self, equilibrated_only:bool = False) -> _Tuple[_np.ndarray, _np.ndarray]:
         """
         Read the gradients from the output file.
+
+        Parameters
+        ----------
+        equilibrated_only : bool, Optional, default: False
+            Whether to read the gradients from the equilibrated region of the simulation (True)
+            or the whole simulation (False).
 
         Returns
         -------
@@ -751,8 +799,12 @@ class Simulation():
             Array of gradients, in kcal/mol.
         """
         # Read the output file
-        with open(self.output_subdir + "/simfile.dat", "r") as ifile:
-            lines=ifile.readlines()
+        if equilibrated_only:
+            with open(self.output_subdir + "/simfile_equilibrated.dat", "r") as ifile:
+                lines=ifile.readlines()
+        else:
+            with open(self.output_subdir + "/simfile.dat", "r") as ifile:
+                lines=ifile.readlines()
 
         steps=[]
         grads=[]
