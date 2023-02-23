@@ -16,6 +16,7 @@ from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, O
 from .equil_detection import check_equil_block_gradient as _check_equil_block_gradient
 from .equil_detection import check_equil_chodera as _check_equil_chodera
 from ._utils import Job as _Job, VirtualQueue as _VirtualQueue, read_mbar_outfile as _read_mbar_outfile
+from .plot import plot_lam_gradient as _plot_lam_gradient
 
 
 class Ensemble():
@@ -271,34 +272,26 @@ class Ensemble():
                                         mean_free_energy,
                                         scale=_stats.sem(free_energies))[1] - mean_free_energy  # 95 % C.I.
 
+            # Write overall MBAR stats to file
+            with open(f"{self.output_dir}/overall_stats.dat", "a") as ofile:
+                if get_frnrg:
+                    ofile.write("###################################### Free Energies ########################################\n")
+                    ofile.write(f"Mean free energy: {mean_free_energy: .3f} + /- {conf_int:.3f} kcal/mol\n")
+                    for i in range(5):
+                        ofile.write(f"Free energy from run {i+1}: {free_energies[i]: .3f} kcal/mol\n")
+                    ofile.write("Errors are 95 % C.I.s based on the assumption of a Gaussian distribution of free energies\n")
+
         # Plot free variance of gradients for all data
-        def _plot_variance(equilibrated:bool) -> None:
-            """ Plot the variance of the gradients for all lambda windows.
-            If equilibrated is True, only data after equilibration is used. """
-
-            # Get variance of gradients
-            variances_all_winds = []
-            for lam in self.lam_windows:
-                variances_wind = []
-                for sim in lam.sims:
-                    variances_wind.append(sim.read_gradients(equilibrated_only=equilibrated))
-                mean_grads = _np.mean(variances_wind, axis=0)
-                variances_all_winds.append(_np.var(mean_grads))
-
-            # Make plots of variance of gradients
-            fig, ax=_plt.subplots(figsize=(8, 6))
-            ax.bar([win.lam for win in self.lam_windows],
-                variances_all_winds,
-                width=0.02, edgecolor='black')
-            ax.set_xlabel(r"$\lambda$")
-            ax.set_ylabel(r"Var($\frac{\mathrm{d}h}{\mathrm{d}\lambda}$) / kcal$^{2}$ mol$^{-2}$"),
-            fig.legend()
-            fig.savefig(f"{self.output_dir}/gradient_var{'_equilibrated' if equilibrated else ''}", dpi=300,
-                        bbox_inches='tight', facecolor='white', transparent=False)
-
         # Make plots with all data and equilibrated only
-        _plot_variance(equilibrated=False)
-        _plot_variance(equilibrated=True)
+        _plot_lam_gradient(lams=self.lam_windows, outdir=self.output_dir, plot_mean=True, plot_variance=False, equilibrated=False, inter_var=False, intra_var=True)
+        _plot_lam_gradient(lams=self.lam_windows, outdir=self.output_dir, plot_mean=True, plot_variance=True, equilibrated=False, inter_var=False, intra_var=True, ymax=2500)
+        _plot_lam_gradient(lams=self.lam_windows, outdir=self.output_dir, plot_mean=True, plot_variance=True, equilibrated=False, inter_var=False, intra_var=True)
+        _plot_lam_gradient(lams=self.lam_windows, outdir=self.output_dir, plot_mean=False, plot_variance=True, equilibrated=False)
+        _plot_lam_gradient(lams=self.lam_windows, outdir=self.output_dir, plot_mean=False, plot_variance=True, equilibrated=False, inter_var=False, intra_var=True, ymax=2500)
+        _plot_lam_gradient(lams=self.lam_windows, outdir=self.output_dir, plot_mean=False, plot_variance=True, equilibrated=False, inter_var=True, intra_var=False)
+        _plot_lam_gradient(lams=self.lam_windows, outdir=self.output_dir, plot_mean=False, plot_variance=True, equilibrated=True)
+        _plot_lam_gradient(lams=self.lam_windows, outdir=self.output_dir, plot_mean=False, plot_variance=True, equilibrated=True, inter_var=False, intra_var=True, ymax=2500)
+        _plot_lam_gradient(lams=self.lam_windows, outdir=self.output_dir, plot_mean=False, plot_variance=True, equilibrated=True, inter_var=True, intra_var=False)
 
         # Make plots of equilibration time
         fig, ax=_plt.subplots(figsize=(8, 6))
@@ -318,14 +311,7 @@ class Ensemble():
                     bbox_inches='tight', facecolor='white', transparent=False)
 
         # Write out stats
-        with open(f"{self.output_dir}/overall_stats.dat", "w") as ofile:
-            if get_frnrg:
-                ofile.write("###################################### Free Energies ########################################\n")
-                ofile.write(f"Mean free energy: {mean_free_energy: .3f} + /- {conf_int:.3f} kcal/mol\n")
-                for i in range(5):
-                    ofile.write(f"Free energy from run {i+1}: {free_energies[i]: .3f} kcal/mol\n")
-                ofile.write("Errors are 95 % C.I.s based on the assumption of a Gaussian distribution of free energies\n")
-            ofile.write("###################################### Equilibration Stats ##################################\n")
+        with open(f"{self.output_dir}/overall_stats.dat", "a") as ofile:
             for win in self.lam_windows:
                 ofile.write(f"Equilibration time for lambda = {win.lam}: {win.equil_time:.3f} ns per simulation\n")
                 ofile.write(f"Total time simulated for lambda = {win.lam}: {win.sims[0].tot_simtime:.3f} ns per simulation\n")
