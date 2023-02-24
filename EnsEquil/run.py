@@ -16,7 +16,7 @@ from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, O
 from .equil_detection import check_equil_block_gradient as _check_equil_block_gradient
 from .equil_detection import check_equil_chodera as _check_equil_chodera
 from ._utils import Job as _Job, VirtualQueue as _VirtualQueue, read_mbar_outfile as _read_mbar_outfile
-from .plot import plot_lam_gradient as _plot_lam_gradient
+from .plot import plot_lam_gradient as _plot_lam_gradient, plot_lam_gradient_hists as _plot_lam_gradient_hists
 
 
 class Ensemble():
@@ -282,16 +282,16 @@ class Ensemble():
                     ofile.write("Errors are 95 % C.I.s based on the assumption of a Gaussian distribution of free energies\n")
 
         # Plot free variance of gradients for all data
-        # Make plots with all data and equilibrated only
-        _plot_lam_gradient(lams=self.lam_windows, outdir=self.output_dir, plot_mean=True, plot_variance=False, equilibrated=False, inter_var=False, intra_var=True)
-        _plot_lam_gradient(lams=self.lam_windows, outdir=self.output_dir, plot_mean=True, plot_variance=True, equilibrated=False, inter_var=False, intra_var=True, ymax=2500)
-        _plot_lam_gradient(lams=self.lam_windows, outdir=self.output_dir, plot_mean=True, plot_variance=True, equilibrated=False, inter_var=False, intra_var=True)
-        _plot_lam_gradient(lams=self.lam_windows, outdir=self.output_dir, plot_mean=False, plot_variance=True, equilibrated=False)
-        _plot_lam_gradient(lams=self.lam_windows, outdir=self.output_dir, plot_mean=False, plot_variance=True, equilibrated=False, inter_var=False, intra_var=True, ymax=2500)
+        # Plot mean
+        _plot_lam_gradient(lams=self.lam_windows, outdir=self.output_dir, plot_mean=True, plot_variance=False, equilibrated=False, inter_var=True, intra_var=True)
+        # Plot variance - intra
+        _plot_lam_gradient(lams=self.lam_windows, outdir=self.output_dir, plot_mean=False, plot_variance=True, equilibrated=False, inter_var=False, intra_var=True)
+        # Plot variance - inter
         _plot_lam_gradient(lams=self.lam_windows, outdir=self.output_dir, plot_mean=False, plot_variance=True, equilibrated=False, inter_var=True, intra_var=False)
-        _plot_lam_gradient(lams=self.lam_windows, outdir=self.output_dir, plot_mean=False, plot_variance=True, equilibrated=True)
-        _plot_lam_gradient(lams=self.lam_windows, outdir=self.output_dir, plot_mean=False, plot_variance=True, equilibrated=True, inter_var=False, intra_var=True, ymax=2500)
-        _plot_lam_gradient(lams=self.lam_windows, outdir=self.output_dir, plot_mean=False, plot_variance=True, equilibrated=True, inter_var=True, intra_var=False)
+        # Plot variance - total
+        _plot_lam_gradient(lams=self.lam_windows, outdir=self.output_dir, plot_mean=False, plot_variance=True, equilibrated=False, inter_var=True, intra_var=True)
+        # Plot histograms
+        _plot_lam_gradient_hists(lams=self.lam_windows, outdir=self.output_dir, equilibrated=True)
 
         # Make plots of equilibration time
         fig, ax=_plt.subplots(figsize=(8, 6))
@@ -767,15 +767,20 @@ class Simulation():
             for line in lines:
                 ofile.write(line)
 
-    def read_gradients(self, equilibrated_only:bool = False) -> _Tuple[_np.ndarray, _np.ndarray]:
+    def read_gradients(self, equilibrated_only:bool = False, endstate: bool = False) -> _Tuple[_np.ndarray, _np.ndarray]:
         """
-        Read the gradients from the output file.
+        Read the gradients from the output file. These can be either the infiniesimal gradients
+        at the given value of lambda, or the differences in energy between the end state 
+        Hamiltonians.
 
         Parameters
         ----------
         equilibrated_only : bool, Optional, default: False
             Whether to read the gradients from the equilibrated region of the simulation (True)
             or the whole simulation (False).
+        endstate : bool, Optional, default: False
+            Whether to return the difference in energy between the end state Hamiltonians (True)
+            or the infiniesimal gradients at the given value of lambda (False).
 
         Returns
         -------
@@ -799,7 +804,12 @@ class Simulation():
             vals=line.split()
             if not line.startswith("#"):
                 step=int(vals[0].strip())
-                grad=float(vals[2].strip())
+                if not endstate: #  Return the infinitesimal gradients
+                    grad=float(vals[2].strip())
+                else: # Return the difference in energy between the end state Hamiltonians
+                    energy_start = float(vals[5].strip())
+                    energy_end = float(vals[-1].strip())
+                    grad=energy_end - energy_start
                 steps.append(step)
                 grads.append(grad)
 
