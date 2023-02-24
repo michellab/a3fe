@@ -4,7 +4,7 @@ import numpy as _np
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 from pymbar import timeseries as _timeseries
 
-from ._utils import plot as _plot
+from .plot import general_plot as _general_plot
 
 
 def check_equil_block_gradient(lam_win:"LamWindow") -> _Tuple[bool, _Optional[float]]:
