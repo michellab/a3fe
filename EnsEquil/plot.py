@@ -60,7 +60,7 @@ def get_gradient_data(lams: _List["LamWindow"],
                       equilibrated: bool, 
                       inter_var: bool = True,
                       intra_var: bool = True, 
-                    ) -> _Tuple[_np.ndarray, _np.ndarray, _np.ndarray]:
+                    ) -> _Tuple[_List[_np.ndarray], _List[_np.ndarray],_List[ _np.ndarray]]:
     """ 
     Return the gradients, means, and variances of the gradients for each lambda
     window of a list of LamWindows.
@@ -78,11 +78,11 @@ def get_gradient_data(lams: _List["LamWindow"],
 
     Returns
     -------
-    gradients_all_winds : np.ndarray
+    gradients_all_winds : _List[_np.ndarray]
         Array of the gradients for each lambda window.
-    means_all_winds : np.ndarray
+    means_all_winds : _List[_np.ndarray]
         Array of the means of the gradients for each lambda window.
-    variances_all_winds : np.ndarray
+    variances_all_winds : _List[_np.ndarray]
         Array of the variances of the gradients for each lambda window.
     """
     # Get mean and variance of gradients, including both intra-run and inter-run components if specified
@@ -116,8 +116,8 @@ def get_gradient_data(lams: _List["LamWindow"],
         means_all_winds.append(_np.array(mean_overall))
         gradients_all_winds.append(_np.array(gradients_wind))
 
-    # Convert all to arrays for consistency
-    return _np.array(gradients_all_winds), _np.array(means_all_winds), _np.array(variances_all_winds)
+    # Return lists of numpy arrays
+    return gradients_all_winds, means_all_winds, variances_all_winds
 
 
 def plot_lam_gradient(lams: _List["LamWindow"], outdir: str, 
