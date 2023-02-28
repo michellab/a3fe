@@ -30,7 +30,7 @@ class GradientData():
         sems_intra_all_winds = []
         sems_inter_all_winds = []
         vars_intra_all_winds = []
-        n_uncorr_samples_all_winds = []
+        stat_ineffs_all_winds = []
 
         for lam in lam_winds:
             # Record the lambda value
@@ -70,7 +70,7 @@ class GradientData():
             sems_intra_all_winds.append(sem_intra)
             sems_inter_all_winds.append(sem_inter)
             vars_intra_all_winds.append(vars_intra.mean())
-            n_uncorr_samples_all_winds.append(n_uncorr_samples.mean())
+            stat_ineffs_all_winds.append(_np.mean(stat_ineffs_wind))
 
         # Save the calculated attributes
         self.lam_vals = lam_vals
@@ -80,4 +80,4 @@ class GradientData():
         self.sems_intra = sems_intra_all_winds
         self.sems_inter = sems_inter_all_winds
         self.vars_intra = vars_intra_all_winds
-        self.n_uncorr_samples =  n_uncorr_samples_all_winds
+        self.stat_ineffs = stat_ineffs_all_winds

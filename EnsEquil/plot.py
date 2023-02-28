@@ -79,8 +79,8 @@ def plot_gradient_stats(gradients_data: GradientData, output_dir: str, plot_type
     """
     # Check plot_type is valid
     plot_type = plot_type.lower()
-    if not plot_type in ["mean", "intra_run_variance", "sem"]:
-        raise ValueError(f"plot_type must be 'mean', 'intra_run_variance', or 'sem', not {plot_type}")
+    if not plot_type in ["mean", "intra_run_variance", "sem", "stat_ineff"]:
+        raise ValueError(f"plot_type must be 'mean', 'intra_run_variance', 'sem', or 'stat_ineff', not {plot_type}")
     
     # Make plots of variance of gradients
     fig, ax = _plt.subplots(figsize=(8, 6))
@@ -108,6 +108,12 @@ def plot_gradient_stats(gradients_data: GradientData, output_dir: str, plot_type
                width=0.02, edgecolor='black', label="Inter-Run")
         ax.set_ylabel(r"SEM($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $) / kcal mol$^{-1}$"),
         ax.legend()
+
+    elif plot_type == "stat_ineff":
+        ax.bar(gradients_data.lam_vals,
+               gradients_data.stat_ineffs,
+               width=0.02, edgecolor='black')
+        ax.set_ylabel(r"Statistical Inefficiency")
 
     ax.set_xlabel(r"$\lambda$")
     
