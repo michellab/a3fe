@@ -1,5 +1,7 @@
 """Plotting functions"""
 
+from cProfile import label
+from tkinter import W
 import matplotlib.pyplot as _plt
 from math import ceil as _ceil
 import numpy as _np
@@ -7,7 +9,7 @@ import os as _os
 import scipy.stats as _stats
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
-from .process_grads import get_gradient_data as _get_gradient_data
+from .process_grads import GradientData
 
 def general_plot(x_vals: _np.ndarray, y_vals: _np.ndarray, x_label: str, y_label: str,
                  outfile: str, vline_val: _Optional[float] = None,
@@ -57,104 +59,75 @@ def general_plot(x_vals: _np.ndarray, y_vals: _np.ndarray, x_label: str, y_label
     _plt.close(fig)
 
 
-def plot_lam_gradient(lams: _List["LamWindow"], outdir: str, 
-                       plot_mean: bool, plot_variance: bool,
-                       equilibrated: bool, inter_var: bool = True,
-                       intra_var: bool = True, log: bool = False,
-                       ymax: _Optional[float] = None) -> None:
+def plot_gradient_stats(gradients_data: GradientData, output_dir: str, plot_type: str) -> None:
     """ 
     Plot the variance of the gradients for a list of lambda windows.
     If equilibrated is True, only data after equilibration is used.
 
     Parameters
     ----------
-    lams : List[LamWindow]
-        List of lambda windows.
-    outdir : str
+    gradients_data : GradientData
+        GradientData object containing the gradient data.
+    output_dir : str
         Directory to save the plot to.
-    plot_mean : bool
-        If True, the mean of the gradients is plotted.
-    plot_variance : bool
-        If True, the variance of the gradients is plotted.
-    equilibrated : bool
-        If True, only equilibrated data is used.
-    inter_var : bool, optional, default=True
-        If True, the inter-run variance is included.
-    intra_var : bool, optional, default=True
-        If True, the intra-run variance is included.
-    log : bool, optional, default=False
-        If True, the y-axis is plotted on a log scale.
-    ymax : None or float, optional, default=None
-        If not None, the y-axis is limited to this value.
+    plot_type : str
+        Type of plot to make. Can be "mean", "variance", or "sem".
 
     Returns
     -------
     None
     """
-    if not plot_mean and not plot_variance:
-        raise ValueError("Must plot either the mean or variance of the gradients, or both.")
+    # Check plot_type is valid
+    plot_type = plot_type.lower()
+    if not plot_type in ["mean", "intra_run_variance", "sem"]:
+        raise ValueError(f"plot_type must be 'mean', 'intra_run_variance', or 'sem', not {plot_type}")
     
-    _, means_all_winds, variances_all_winds = _get_gradient_data(lams, equilibrated, inter_var, intra_var)
-
     # Make plots of variance of gradients
     fig, ax = _plt.subplots(figsize=(8, 6))
 
-    if plot_mean and not plot_variance:
-        ax.bar([win.lam for win in lams],
-               means_all_winds,
+    if plot_type == "mean":
+        ax.bar(gradients_data.lam_vals,
+               gradients_data.means,
                width=0.02, edgecolor='black',
-               yerr=_np.sqrt(variances_all_winds))
+               yerr=gradients_data.sems_overall)
         ax.set_ylabel(r"$\langle \frac{\mathrm{d}h}{\mathrm{d}\lambda}\rangle _{\lambda} $ / kcal mol$^{-1}$"),
 
-    elif plot_variance and not plot_mean:
-        ax.bar([win.lam for win in lams],
-               variances_all_winds,
-               width=0.02, edgecolor='black')
-        ax.set_ylabel(r"Var($\langle \frac{\mathrm{d}h}{\mathrm{d}\lambda}\rangle _{\lambda} $) / kcal$^{2}$ mol$^{-2}$"),
+    elif plot_type == "intra_run_variance":
+        ax.bar(gradients_data.lam_vals,
+               gradients_data.vars_intra,
+               width=0.02, edgecolor='black' )
+        ax.set_ylabel(r"Mean Intra-Run Var($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $) / kcal$^{2}$ mol$^{-2}$"),
 
-    elif plot_mean and plot_variance:
-        ax.bar([win.lam for win in lams],
-               variances_all_winds,
-               width=0.02, edgecolor="black", label="Variance")
-        ax.bar([win.lam for win in lams[1:-1]],
-               [abs(mean) for mean in means_all_winds],
-               width=0.02, edgecolor='black', label="|Mean|", alpha=0.5)
-        ax.set_ylabel(r"$\langle \frac{\mathrm{d}h}{\mathrm{d}\lambda}\rangle _{\lambda} $ / kcal mol$^{-1}$"),
+    elif plot_type == "sem":
+        ax.bar(gradients_data.lam_vals,
+               gradients_data.sems_intra,
+               width=0.02, edgecolor='black', label="Intra-Run")
+        ax.bar(gradients_data.lam_vals,
+               gradients_data.sems_inter,
+               bottom=gradients_data.sems_intra,
+               width=0.02, edgecolor='black', label="Inter-Run")
+        ax.set_ylabel(r"SEM($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $) / kcal mol$^{-1}$"),
         ax.legend()
 
     ax.set_xlabel(r"$\lambda$")
-    if log:
-        ax.set_yscale("log")
-    if ymax is not None:
-        ax.set_ylim(0, ymax)
-
-    # Name uniquely based on options
-    name = f"{outdir}/gradient"
-    append_dict = {"_mean": plot_mean,
-                   "_variance": plot_variance,
-                   "_equilibrated": equilibrated,
-                   "_inter": inter_var,
-                   "_intra": intra_var,
-                   "_ymax": bool(ymax),
-                   "_log": log}
-    for addition, use in append_dict.items():
-        if use:
-            name += addition
-
+    
+    name = f"{output_dir}/gradient_{plot_type}"
+    if gradients_data.equilibrated:
+        name += "_equilibrated"
     fig.savefig(name, dpi=300, bbox_inches='tight', facecolor='white', transparent=False)
     _plt.close(fig)
 
 
-def plot_lam_gradient_hists(lams: _List["LamWindow"], outdir: str, equilibrated: bool,) -> None:
+def plot_gradient_hists(gradients_data: GradientData, output_dir: str) -> None:
     """ 
     Plot histograms of the gradients for a list of lambda windows.
     If equilibrated is True, only data after equilibration is used.
 
     Parameters
     ----------
-    lams : List[LamWindow]
-        List of lambda windows.
-    outdir : str
+    gradients_data : GradientData
+        GradientData object containing the gradient data.
+    output_dir : str
         Directory to save the plot to.
     equilibrated : bool
         If True, only equilibrated data is used.
@@ -163,26 +136,55 @@ def plot_lam_gradient_hists(lams: _List["LamWindow"], outdir: str, equilibrated:
     -------
     None
     """
-    gradients_all_winds, _, _ = _get_gradient_data(lams, equilibrated, inter_var=False, intra_var=False)
-
     # Plot mixed gradients for each window
-    n_lams = len(lams)
+    n_lams = len(gradients_data.lam_vals)
     fig, axs = _plt.subplots(nrows=_ceil(n_lams/8), ncols=8, figsize=(40, 5*(n_lams/8)))
     for i, ax in enumerate(axs.flatten()):
         if i < n_lams:
             # One histogram for each simulation
-            for j, gradients in enumerate(gradients_all_winds[i]):
+            for j, gradients in enumerate(gradients_data.gradients[i]):
                 ax.hist(gradients, bins=50, density=True, alpha=0.5, label=f"Run {j+1}")
             ax.legend()
-            ax.set_title(f"$\lambda$ = {lams[i].lam}")
+            ax.set_title(f"$\lambda$ = {gradients_data.lam_vals[i]}")
             ax.set_xlabel(r"$\frac{\mathrm{d}h}{\mathrm{d}\lambda}$ / kcal mol$^{-1}$")
             ax.set_ylabel("Probability density")
-            ax.text(0.05, 0.95, f"Std. dev. = {_np.std(gradients_all_winds[i]):.2f}" + r" kcal mol$^{-1}$", transform=ax.transAxes)
-            ax.text(0.05, 0.9, f"Mean = {_np.mean(gradients_all_winds[i]):.2f}" + r" kcal mol$^{-1}$", transform=ax.transAxes)
+            ax.text(0.05, 0.95, f"Std. dev. = {_np.std(gradients_data.gradients[i]):.2f}" + r" kcal mol$^{-1}$", transform=ax.transAxes)
+            ax.text(0.05, 0.9, f"Mean = {_np.mean(gradients_data.gradients[i]):.2f}" + r" kcal mol$^{-1}$", transform=ax.transAxes)
     
     fig.tight_layout()
-    name = f"{outdir}/gradient_hists"
-    if equilibrated:
+    name = f"{output_dir}/gradient_hists"
+    if gradients_data.equilibrated:
         name += "_equilibrated"
     fig.savefig(name, dpi=300, bbox_inches='tight', facecolor='white', transparent=False)
     _plt.close(fig)
+
+def plot_equilibration_time(lam_windows: _List["LamWindows"], output_dir:str)->None:
+    """
+    Plot the equilibration time for each lambda window.
+
+    Parameters
+    ----------
+    lam_windows : List[LamWindows]
+        List of LamWindows objects.
+    output_dir : str
+        Directory to save the plot to.
+
+    Returns
+    -------
+    None
+    """
+    fig, ax=_plt.subplots(figsize=(8, 6))
+    # Plot the total time simulated per simulation, so we can see how efficient
+    # the protocol is
+    ax.bar([win.lam for win in lam_windows],
+            [win.sims[0].tot_simtime for win in lam_windows],  # All sims at given lam run for same time
+            width=0.02, edgecolor='black', label="Total time simulated per simulation")
+    # Now plot the equilibration time
+    ax.bar([win.lam for win in lam_windows],
+            [win.equil_time for win in lam_windows],
+            width=0.02, edgecolor='black', label="Equilibration time per simulation")
+    ax.set_xlabel(r"$\lambda$")
+    ax.set_ylabel("Time (ns)")
+    fig.legend()
+    fig.savefig(f"{output_dir}/equil_times", dpi=300,
+                bbox_inches='tight', facecolor='white', transparent=False)

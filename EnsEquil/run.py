@@ -15,7 +15,12 @@ from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, O
 
 from .detect_equil import check_equil_block_gradient as _check_equil_block_gradient, check_equil_chodera as _check_equil_chodera
 from ._utils import Job as _Job, VirtualQueue as _VirtualQueue, read_mbar_outfile as _read_mbar_outfile
-from .plot import plot_lam_gradient as _plot_lam_gradient, plot_lam_gradient_hists as _plot_lam_gradient_hists
+from .plot import (
+    plot_gradient_stats as _plot_gradient_stats, 
+    plot_gradient_hists as _plot_gradient_hists, 
+    plot_equilibration_time as _plot_equilibration_time
+)
+from .process_grads import GradientData as _GradientData
 
 
 class Ensemble():
@@ -288,34 +293,15 @@ class Ensemble():
                         ofile.write(f"Free energy from run {i+1}: {free_energies[i]: .3f} kcal/mol\n")
                     ofile.write("Errors are 95 % C.I.s based on the assumption of a Gaussian distribution of free energies\n")
 
-        # Plot free variance of gradients for all data
-        # Plot mean
-        _plot_lam_gradient(lams=self.lam_windows, outdir=self.output_dir, plot_mean=True, plot_variance=False, equilibrated=False, inter_var=True, intra_var=True)
-        # Plot variance - intra
-        _plot_lam_gradient(lams=self.lam_windows, outdir=self.output_dir, plot_mean=False, plot_variance=True, equilibrated=False, inter_var=False, intra_var=True)
-        # Plot variance - inter
-        _plot_lam_gradient(lams=self.lam_windows, outdir=self.output_dir, plot_mean=False, plot_variance=True, equilibrated=False, inter_var=True, intra_var=False)
-        # Plot variance - total
-        _plot_lam_gradient(lams=self.lam_windows, outdir=self.output_dir, plot_mean=False, plot_variance=True, equilibrated=False, inter_var=True, intra_var=True)
-        # Plot histograms
-        _plot_lam_gradient_hists(lams=self.lam_windows, outdir=self.output_dir, equilibrated=True)
+        # Analyse the gradient data and make plots
+        unequilibrated_gradient_data = _GradientData(lam_winds=self.lam_windows, equilibrated=False)
+        _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="mean")
+        _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="intra_run_variance")
+        _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="sem")
+        _plot_gradient_hists(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir)
 
         # Make plots of equilibration time
-        fig, ax=_plt.subplots(figsize=(8, 6))
-        # Plot the total time simulated per simulation, so we can see how efficient
-        # the protocol is
-        ax.bar([win.lam for win in self.lam_windows],
-                [win.sims[0].tot_simtime for win in self.lam_windows],  # All sims at given lam run for same time
-                width=0.02, edgecolor='black', label="Total time simulated per simulation")
-        # Now plot the equilibration time
-        ax.bar([win.lam for win in self.lam_windows],
-               [win.equil_time for win in self.lam_windows],
-               width=0.02, edgecolor='black', label="Equilibration time per simulation")
-        ax.set_xlabel(r"$\lambda$")
-        ax.set_ylabel("Time (ns)")
-        fig.legend()
-        fig.savefig(f"{self.output_dir}/equil_times", dpi=300,
-                    bbox_inches='tight', facecolor='white', transparent=False)
+        _plot_equilibration_time(lam_windows=self.lam_windows, output_dir=self.output_dir)
 
         # Write out stats
         with open(f"{self.output_dir}/overall_stats.dat", "a") as ofile:
