@@ -24,6 +24,9 @@ def check_equil_block_gradient(lam_win:"LamWindow") -> _Tuple[bool, _Optional[fl
     equil_time : float
         Time taken to equilibrate, in ns.
     """
+    # Get the gradient threshold and complain if it does not exist
+    gradient_threshold = lam_win.gradient_threshold
+
     # Conversion between time and gradient indices.
     time_to_ind = 1 / (lam_win.sims[0].timestep * lam_win.sims[0].nrg_freq)
     idx_block_size = int(lam_win.block_size * time_to_ind)
@@ -55,17 +58,23 @@ def check_equil_block_gradient(lam_win:"LamWindow") -> _Tuple[bool, _Optional[fl
     # Calculate the mean gradient
     mean_d_dh_dl = _np.mean(d_dh_dls, axis=0)
 
-    # Check if the mean gradient has been 0 at any point, making
+    # Check if the mean gradient has been below the threshold at any point, making
     # sure to exclude the initial nans
     last_grad = mean_d_dh_dl[2*idx_block_size]
     for i, grad in enumerate(mean_d_dh_dl[2*idx_block_size:]):
+        if gradient_threshold:
+            if _np.abs(grad) < gradient_threshold:
+                equil_time = times[i]
+                break
         # Check if gradient has passed through 0
+        # If no gradient threshold is set, this is 
+        # the only criterion for equilibration
         if _np.sign(last_grad) != _np.sign(grad):
             equil_time = times[i]
             break
         last_grad = grad
 
-    if equil_time:
+    if equil_time is not None:
         equilibrated = True
 
     # Write out data
@@ -74,22 +83,25 @@ def check_equil_block_gradient(lam_win:"LamWindow") -> _Tuple[bool, _Optional[fl
         ofile.write(f"Equilibration time: {equil_time} ns\n")
         ofile.write(f"Block size: {lam_win.block_size} ns\n")
 
+    # Change name of plots depending on whether a gradient threshold is set
+    append_to_name = "_threshold" if gradient_threshold else ""
+
     # Save plots of dh/dl and d_dh/dl
     _general_plot(x_vals=times,
             y_vals=_np.array([lam_win._get_rolling_average(dh_dl, idx_block_size) for dh_dl in dh_dls]),
             x_label="Simulation Time per Window per Run / ns",
             y_label=r"$\frac{\mathrm{d}h}{\mathrm{d}\lambda}$ / kcal mol$^{-1}$",
-            outfile=f"{lam_win.output_dir}/lambda_{lam_win.lam:.3f}/dhdl_block_gradient",
+            outfile=f"{lam_win.output_dir}/lambda_{lam_win.lam:.3f}/dhdl_block_gradient" + append_to_name,
             # Shift the equilibration time by 2 * block size to account for the
             # delay in the block average calculation.
-            vline_val=equil_time + 1 * lam_win.block_size if equil_time else None)
+            vline_val=equil_time + 1 * lam_win.block_size if equil_time is not None else None)
 
     _general_plot(x_vals=times,
             y_vals=_np.array(d_dh_dls),
             x_label="Simulation Time per Window per Run / ns",
             y_label=r"$\frac{\partial}{\partial t}\frac{\partial H}{\partial \lambda}$ / kcal mol$^{-1}$ ns$^{-1}$",
-            outfile=f"{lam_win.output_dir}/lambda_{lam_win.lam:.3f}/ddhdl_block_gradient",
-            vline_val=equil_time + 2 * lam_win.block_size if equil_time else None,
+            outfile=f"{lam_win.output_dir}/lambda_{lam_win.lam:.3f}/ddhdl_block_gradient" + append_to_name,
+            vline_val=equil_time + 2 * lam_win.block_size if equil_time is not None else None,
             hline_val=0)
 
     return equilibrated, equil_time

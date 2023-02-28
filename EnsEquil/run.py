@@ -24,8 +24,10 @@ class Ensemble():
     Class to hold and manipulate an ensemble of SOMD simulations.
     """
 
-    def __init__(self, block_size: float = 1,
+    def __init__(self, 
+                 block_size: float = 1,
                  equil_detection: str = "block_gradient",
+                 gradient_threshold: _Optional[float] = None,
                  ensemble_size: int = 5,
                  input_dir: str = "./input",
                  output_dir: str = "./output",
@@ -43,6 +45,11 @@ class Ensemble():
             Method to use for equilibration detection. Options are:
             - "block_gradient": Use the gradient of the block averages to detect equilibration.
             - "chodera": Use Chodera's method to detect equilibration.
+        gradient_threshold : float, Optional, default: None
+            The threshold for the absolute value of the gradient, in kcal mol-1 ns-1,
+            below which the simulation is considered equilibrated. If None, no theshold is
+            set and the simulation is equilibrated when the gradient passes through 0. A 
+            sensible value appears to be 0.5 kcal mol-1 ns-1.
         ensemble_size : int, Optional, default: 5
             Number of simulations to run in the ensemble.
         input_dir : str, Optional, default: "./input"
@@ -88,6 +95,7 @@ class Ensemble():
                 self.lam_windows.append(LamWindow(lam, self.virtual_queue,
                                                   self.block_size,
                                                   equil_detection,
+                                                  gradient_threshold,
                                                   self.ensemble_size, self.input_dir,
                                                   output_dir, stream_log_level,
                                                   ))
@@ -388,6 +396,7 @@ class LamWindow():
                  virtual_queue: _VirtualQueue,
                  block_size: float=1,
                  equil_detection: str="block_gradient",
+                 gradient_threshold: _Optional[float]=None,
                  ensemble_size: int=5, input_dir: str="./input",
                  output_dir: str="./output",
                  stream_log_level: int=_logging.INFO) -> None:
@@ -407,6 +416,11 @@ class LamWindow():
             Method to use for equilibration detection. Options are:
             - "block_gradient": Use the gradient of the block averages to detect equilibration.
             - "chodera": Use Chodera's method to detect equilibration.
+        gradient_threshold : float, Optional, default: None
+            The threshold for the absolute value of the gradient, in kcal mol-1 ns-1,
+            below which the simulation is considered equilibrated. If None, no theshold is
+            set and the simulation is equilibrated when the gradient passes through 0. A 
+            sensible value appears to be 0.5 kcal mol-1 ns-1.
         ensemble_size : int, Optional, default: 5
             Number of simulations to run at this lambda value.
         input_dir : str, Optional, default: "./input"
@@ -429,6 +443,11 @@ class LamWindow():
             raise ValueError(f"Equilibration detection method {equil_detection} not recognised.")
         # Need to pass self object to equilibration detection function
         self.check_equil=self.equil_detection_methods[equil_detection]
+        # Ensure that we do not try to use a gradient threshold with a method that does not use it
+        if equil_detection != "block_gradient" and gradient_threshold is not None:
+            raise ValueError("Gradient threshold can only be set for block gradient method.")
+        self.gradient_threshold=gradient_threshold
+        self.gradient_threshold=gradient_threshold
         self.input_dir=input_dir
         self.output_dir=output_dir
         self._equilibrated: bool=False
