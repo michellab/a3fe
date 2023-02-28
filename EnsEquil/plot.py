@@ -7,6 +7,7 @@ import os as _os
 import scipy.stats as _stats
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
+from .process_grads import get_gradient_data as _get_gradient_data
 
 def general_plot(x_vals: _np.ndarray, y_vals: _np.ndarray, x_label: str, y_label: str,
                  outfile: str, vline_val: _Optional[float] = None,
@@ -56,70 +57,6 @@ def general_plot(x_vals: _np.ndarray, y_vals: _np.ndarray, x_label: str, y_label
     _plt.close(fig)
 
 
-def get_gradient_data(lams: _List["LamWindow"], 
-                      equilibrated: bool, 
-                      inter_var: bool = True,
-                      intra_var: bool = True, 
-                    ) -> _Tuple[_List[_np.ndarray], _List[_np.ndarray],_List[ _np.ndarray]]:
-    """ 
-    Return the gradients, means, and variances of the gradients for each lambda
-    window of a list of LamWindows.
-
-    Parameters
-    ----------
-    lams : List[LamWindow]
-        List of lambda windows.
-    equilibrated : bool
-        If True, only equilibrated data is used.
-    inter_var : bool, optional, default=True
-        If True, the inter-run variance is included.
-    intra_var : bool, optional, default=True
-        If True, the intra-run variance is included.
-
-    Returns
-    -------
-    gradients_all_winds : _List[_np.ndarray]
-        Array of the gradients for each lambda window.
-    means_all_winds : _List[_np.ndarray]
-        Array of the means of the gradients for each lambda window.
-    variances_all_winds : _List[_np.ndarray]
-        Array of the variances of the gradients for each lambda window.
-    """
-    # Get mean and variance of gradients, including both intra-run and inter-run components if specified
-    variances_all_winds = []
-    means_all_winds = []
-    gradients_all_winds = []
-    for lam in lams:
-
-        # Get all gradients
-        gradients_wind = []
-        for sim in lam.sims:
-            gradients_wind.append(sim.read_gradients(equilibrated_only=equilibrated)[1])
-
-        # Get intra-run quantities
-        vars_intra = _np.var(gradients_wind, axis=1)
-        var_intra = _np.mean(vars_intra)  # Mean of the variances - no need for roots as not SD
-        means_intra = _np.mean(gradients_wind, axis=1)
-
-        # Get inter-run quantities
-        mean_overall = _np.mean(means_intra)
-        var_inter = _np.var(means_intra)
-
-        # Store the final results
-        tot_var = 0
-        if inter_var:
-            tot_var += var_inter
-        if intra_var:
-            tot_var += var_intra
-        # Convert to arrays for consistency
-        variances_all_winds.append(_np.array(tot_var))
-        means_all_winds.append(_np.array(mean_overall))
-        gradients_all_winds.append(_np.array(gradients_wind))
-
-    # Return lists of numpy arrays
-    return gradients_all_winds, means_all_winds, variances_all_winds
-
-
 def plot_lam_gradient(lams: _List["LamWindow"], outdir: str, 
                        plot_mean: bool, plot_variance: bool,
                        equilibrated: bool, inter_var: bool = True,
@@ -157,7 +94,7 @@ def plot_lam_gradient(lams: _List["LamWindow"], outdir: str,
     if not plot_mean and not plot_variance:
         raise ValueError("Must plot either the mean or variance of the gradients, or both.")
     
-    _, means_all_winds, variances_all_winds = get_gradient_data(lams, equilibrated, inter_var, intra_var)
+    _, means_all_winds, variances_all_winds = _get_gradient_data(lams, equilibrated, inter_var, intra_var)
 
     # Make plots of variance of gradients
     fig, ax = _plt.subplots(figsize=(8, 6))
@@ -226,7 +163,7 @@ def plot_lam_gradient_hists(lams: _List["LamWindow"], outdir: str, equilibrated:
     -------
     None
     """
-    gradients_all_winds, _, _ = get_gradient_data(lams, equilibrated, inter_var=False, intra_var=False)
+    gradients_all_winds, _, _ = _get_gradient_data(lams, equilibrated, inter_var=False, intra_var=False)
 
     # Plot mixed gradients for each window
     n_lams = len(lams)
