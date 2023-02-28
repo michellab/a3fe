@@ -75,7 +75,7 @@ def check_equil_block_gradient(lam_win:"LamWindow") -> _Tuple[bool, _Optional[fl
         ofile.write(f"Block size: {lam_win.block_size} ns\n")
 
     # Save plots of dh/dl and d_dh/dl
-    _plot(x_vals=times,
+    _general_plot(x_vals=times,
             y_vals=_np.array([lam_win._get_rolling_average(dh_dl, idx_block_size) for dh_dl in dh_dls]),
             x_label="Simulation Time per Window per Run / ns",
             y_label=r"$\frac{\mathrm{d}h}{\mathrm{d}\lambda}$ / kcal mol$^{-1}$",
@@ -84,7 +84,7 @@ def check_equil_block_gradient(lam_win:"LamWindow") -> _Tuple[bool, _Optional[fl
             # delay in the block average calculation.
             vline_val=equil_time + 1 * lam_win.block_size if equil_time else None)
 
-    _plot(x_vals=times,
+    _general_plot(x_vals=times,
             y_vals=_np.array(d_dh_dls),
             x_label="Simulation Time per Window per Run / ns",
             y_label=r"$\frac{\partial}{\partial t}\frac{\partial H}{\partial \lambda}$ / kcal mol$^{-1}$ ns$^{-1}$",
@@ -139,6 +139,13 @@ def check_equil_chodera(lam_win:"LamWindow") -> _Tuple[bool, _Optional[float]]:
     t0, g, Neff_max = _timeseries.detectEquilibration(mean_dh_dl)
     equil_time = times[t0]
 
+    # Note that this method will always give an equilibration time
+    if Neff_max < 50:
+        equilibrated = False
+        equil_time = None
+    else:
+        equilibrated = True
+
     # Write out data
     with open(f"{lam_win.output_dir}/lambda_{lam_win.lam:.3f}/equilibration_chodera.txt", "w") as ofile:
         ofile.write(f"Equilibrated: {equilibrated}\n")
@@ -150,7 +157,7 @@ def check_equil_chodera(lam_win:"LamWindow") -> _Tuple[bool, _Optional[float]]:
     # Use rolling average to smooth out the data
     rolling_av_time = 0.05 # ns
     rolling_av_block_size=int(rolling_av_time * time_to_ind) # ns
-    _plot(x_vals=times,
+    _general_plot(x_vals=times,
           y_vals=_np.array([lam_win._get_rolling_average(dh_dl, rolling_av_block_size) for dh_dl in dh_dls]),
           x_label="Simulation Time per Window per Run / ns",
           y_label=r"$\frac{\mathrm{d}h}{\mathrm{d}\lambda}$ / kcal mol$^{-1}$",
@@ -159,11 +166,6 @@ def check_equil_chodera(lam_win:"LamWindow") -> _Tuple[bool, _Optional[float]]:
           # delay in the rolling average calculation.
           vline_val=equil_time + rolling_av_time)
 
-    # Note that this method will always give an equilibration time
-    if Neff_max < 50:
-        equilibrated = False
-        equil_time = None
-    else:
-        equilibrated = True
+
 
     return equilibrated, equil_time
