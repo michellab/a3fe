@@ -166,6 +166,4 @@ def check_equil_chodera(lam_win:"LamWindow") -> _Tuple[bool, _Optional[float]]:
           # delay in the rolling average calculation.
           vline_val=equil_time + rolling_av_time)
 
-
-
     return equilibrated, equil_time
