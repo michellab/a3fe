@@ -169,6 +169,7 @@ def check_equil_chodera(lam_win:"LamWindow") -> _Tuple[bool, _Optional[float]]:
     # Use rolling average to smooth out the data
     rolling_av_time = 0.05 # ns
     rolling_av_block_size=int(rolling_av_time * time_to_ind) # ns
+    v_line_x = None if equil_time is None else equil_time + rolling_av_time
     _general_plot(x_vals=times,
           y_vals=_np.array([lam_win._get_rolling_average(dh_dl, rolling_av_block_size) for dh_dl in dh_dls]),
           x_label="Simulation Time per Window per Run / ns",
@@ -176,6 +177,6 @@ def check_equil_chodera(lam_win:"LamWindow") -> _Tuple[bool, _Optional[float]]:
           outfile=f"{lam_win.output_dir}/lambda_{lam_win.lam:.3f}/dhdl_chodera",
           # Shift the equilibration time by block size to account for the
           # delay in the rolling average calculation.
-          vline_val=equil_time + rolling_av_time)
+          vline_val= v_line_x)
 
     return equilibrated, equil_time

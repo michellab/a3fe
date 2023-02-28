@@ -13,8 +13,7 @@ import scipy.stats as _stats
 from time import sleep as _sleep
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
-from .equil_detection import check_equil_block_gradient as _check_equil_block_gradient
-from .equil_detection import check_equil_chodera as _check_equil_chodera
+from .detect_equil import check_equil_block_gradient as _check_equil_block_gradient, check_equil_chodera as _check_equil_chodera
 from ._utils import Job as _Job, VirtualQueue as _VirtualQueue, read_mbar_outfile as _read_mbar_outfile
 from .plot import plot_lam_gradient as _plot_lam_gradient, plot_lam_gradient_hists as _plot_lam_gradient_hists
 
