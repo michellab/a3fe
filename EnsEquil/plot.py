@@ -71,7 +71,7 @@ def plot_gradient_stats(gradients_data: GradientData, output_dir: str, plot_type
     output_dir : str
         Directory to save the plot to.
     plot_type : str
-        Type of plot to make. Can be "mean", "variance", or "sem".
+        Type of plot to make. Can be "mean", "variance", "sem", "stat_ineff", or "integrated_sem".
 
     Returns
     -------
@@ -79,8 +79,9 @@ def plot_gradient_stats(gradients_data: GradientData, output_dir: str, plot_type
     """
     # Check plot_type is valid
     plot_type = plot_type.lower()
-    if not plot_type in ["mean", "intra_run_variance", "sem", "stat_ineff"]:
-        raise ValueError(f"plot_type must be 'mean', 'intra_run_variance', 'sem', or 'stat_ineff', not {plot_type}")
+    plot_types = ["mean", "intra_run_variance", "sem", "stat_ineff", "integrated_sem"]
+    if not plot_type in plot_types:
+        raise ValueError(f"'plot_type' must be one of {plot_types}, not {plot_type}")
     
     # Make plots of variance of gradients
     fig, ax = _plt.subplots(figsize=(8, 6))
@@ -114,6 +115,11 @@ def plot_gradient_stats(gradients_data: GradientData, output_dir: str, plot_type
                gradients_data.stat_ineffs,
                width=0.02, edgecolor='black')
         ax.set_ylabel(r"Statistical Inefficiency")
+
+    elif plot_type == "integrated_sem":
+        ax.plot(gradients_data.lam_vals,
+               gradients_data.integrated_sems)
+        ax.set_ylabel(r"Integrated SEM($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $) / kcal mol$^{-1}$"),
 
     ax.set_xlabel(r"$\lambda$")
     

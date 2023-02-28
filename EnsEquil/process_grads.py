@@ -81,3 +81,41 @@ class GradientData():
         self.sems_inter = sems_inter_all_winds
         self.vars_intra = vars_intra_all_winds
         self.stat_ineffs = stat_ineffs_all_winds
+
+    @property
+    def smoothened_sems(self)-> _np.ndarray:
+        """Calculate the standard error of the mean of the gradients, using a block
+        average over 3 points to smooth the data."""
+        smoothened_sems = []
+        max_ind = len(self.sems_overall) - 1
+        for i, sem in enumerate(self.sems_overall):
+            # Calculate the block average for each point
+            if i == 0:
+                sem_smooth = (sem + self.sems_overall[i+1]) /2
+            elif i == max_ind:
+                sem_smooth = (sem + self.sems_overall[i-1]) /2
+            else:
+                sem_smooth = (sem + self.sems_overall[i+1] + self.sems_overall[i-1]) / 3 
+            smoothened_sems.append(sem_smooth)
+            
+        smoothened_sems = _np.array(smoothened_sems)
+        self._smoothened_sems = smoothened_sems
+        return smoothened_sems
+
+    @property
+    def integrated_sems(self)-> _np.ndarray:
+        """Calculate the integrated standard error of the mean of the gradients
+        as a function of lambda."""
+
+        integrated_sems = []
+        for i, sem in enumerate(self.smoothened_sems):
+            # Calculate the block average for each point
+            if i == 0:
+                integrated_sem = sem
+            else:
+                integrated_sem = integrated_sems[i-1] + sem
+            integrated_sems.append(integrated_sem)
+
+        integrated_sems = _np.array(integrated_sems)
+        self._integrated_sems = integrated_sems
+        return integrated_sems
