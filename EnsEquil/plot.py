@@ -114,7 +114,7 @@ def plot_gradient_stats(gradients_data: GradientData, output_dir: str, plot_type
         ax.bar(gradients_data.lam_vals,
                gradients_data.stat_ineffs,
                width=0.02, edgecolor='black')
-        ax.set_ylabel(r"Statistical Inefficiency")
+        ax.set_ylabel(r"Statistical Inefficiency / ns")
 
     elif plot_type == "integrated_sem":
         handle1, *_ = ax.bar(gradients_data.lam_vals,

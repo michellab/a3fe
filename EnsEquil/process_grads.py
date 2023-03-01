@@ -38,27 +38,38 @@ class GradientData():
 
             # Get all gradients and statistical inefficiencies
             gradients_wind = []
+            means_intra = []
             stat_ineffs_wind = []
+            gradients_subsampled_wind = []
+            vars_intra = []
+            squared_sems_intra = []
+            # Get intra-run quantities
             for sim in lam.sims:
+                # Get the gradients, mean, and statistical inefficiencies
                 _, gradients = sim.read_gradients(equilibrated_only=equilibrated)
                 stat_ineff = _get_statistical_inefficiency(gradients)
+                mean = _np.mean(gradients)
+                # Subsample the gradients to remove autocorrelation
+                subsampled_grads = gradients[::int(stat_ineff)]
+                # Get the variance and squared SEM of the gradients
+                var = _np.var(subsampled_grads)
+                squared_sem = var / len(subsampled_grads)
+                # Store the results
                 gradients_wind.append(gradients)
+                means_intra.append(mean)
                 stat_ineffs_wind.append(stat_ineff)
+                gradients_subsampled_wind.append(gradients[::int(stat_ineff)])
+                vars_intra.append(var)
+                squared_sems_intra.append(squared_sem)
 
-            # Get intra-run quantities
-            vars_intra = _np.var(gradients_wind, axis=1)
-            means_intra = _np.mean(gradients_wind, axis=1)
-            # Convert variances to squared standard errors using the number
-            # of uncorrelated samples
-            n_uncorr_samples = _np.array([len(gradients) / stat_ineff for gradients, stat_ineff in zip(gradients_wind, stat_ineffs_wind)])
-            squared_sems_intra = vars_intra / n_uncorr_samples
+            # Get overall intra-run quantities
+            var_intra = _np.mean(vars_intra)
             squared_sem_intra = _np.mean(squared_sems_intra) / len(lam.sims) 
+            stat_ineff = _np.mean(stat_ineffs_wind)
 
             # Get inter-run quantities
+            squared_sem_inter = _np.var(means_intra) / len(lam.sims)
             mean_overall = _np.mean(means_intra)
-            var_inter = _np.var(means_intra)
-            # Assume that each run is uncorrelated to generate the standard error
-            squared_sem_inter = var_inter / len(lam.sims)
 
             # Store the final results, converting to arrays for consistency.
             tot_sem = _np.sqrt(squared_sem_inter + squared_sem_intra)
@@ -69,8 +80,11 @@ class GradientData():
             sems_tot_all_winds.append(tot_sem)
             sems_intra_all_winds.append(sem_intra)
             sems_inter_all_winds.append(sem_inter)
-            vars_intra_all_winds.append(vars_intra.mean())
-            stat_ineffs_all_winds.append(_np.mean(stat_ineffs_wind))
+            vars_intra_all_winds.append(var_intra)
+            stat_ineffs_all_winds.append(stat_ineff)
+
+        # Get the statistical inefficiencies in units of simulation time
+        stat_ineffs_all_winds = _np.array(stat_ineffs_all_winds) * lam_winds[0].sims[0].timestep # Timestep should be same for all sims
 
         # Save the calculated attributes
         self.lam_vals = lam_vals
