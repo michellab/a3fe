@@ -23,9 +23,10 @@ from .plot import (
 from .process_grads import GradientData as _GradientData
 
 
-class Ensemble():
+class Stage():
     """
-    Class to hold and manipulate an ensemble of SOMD simulations.
+    Class to hold and manipulate an ensemble of SOMD simulations for a
+    single stage of a calculation.
     """
 
     def __init__(self, 
