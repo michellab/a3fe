@@ -105,17 +105,19 @@ class GradientData():
     @property
     def integrated_sems(self)-> _np.ndarray:
         """Calculate the integrated standard error of the mean of the gradients
-        as a function of lambda."""
+        as a function of lambda, using the trapezoidal rule."""
 
         integrated_sems = []
-        for i, sem in enumerate(self.smoothened_sems):
-            # Calculate the block average for each point
-            if i == 0:
-                integrated_sem = sem
-            else:
-                integrated_sem = integrated_sems[i-1] + sem
-            integrated_sems.append(integrated_sem)
+        x_vals = self.lam_vals
+        #y_vals = self.smoothened_sems
+        y_vals = self.sems_overall
+        n_vals = len(x_vals)
 
+        for i in range(n_vals):
+            # No need to worry about indexing off the end of the array with numpy
+            # Note that _np.trapz(y_vals[:1], x_vals[:1]) gives 0, as required
+            integrated_sems.append(_np.trapz(y_vals[:i+1], x_vals[:i+1]))
+        
         integrated_sems = _np.array(integrated_sems)
         self._integrated_sems = integrated_sems
         return integrated_sems

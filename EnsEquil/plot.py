@@ -117,9 +117,19 @@ def plot_gradient_stats(gradients_data: GradientData, output_dir: str, plot_type
         ax.set_ylabel(r"Statistical Inefficiency")
 
     elif plot_type == "integrated_sem":
-        ax.plot(gradients_data.lam_vals,
-               gradients_data.integrated_sems)
-        ax.set_ylabel(r"Integrated SEM($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $) / kcal mol$^{-1}$"),
+        handle1, *_ = ax.bar(gradients_data.lam_vals,
+               gradients_data.vars_intra,
+               label = "SEMs",
+               width=0.02, edgecolor='black')
+        ax.set_ylabel(r"SEM($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $) / kcal mol$^{-1}$"),
+        ax.legend()
+        # Get second y axis so we can plot on different scales
+        ax2= ax.twinx()
+        handle2, = ax2.plot(gradients_data.lam_vals,
+               gradients_data.integrated_sems,
+               label = "Integrated SEM", color='red', linewidth=2)
+        ax2.set_ylabel(r"Integrated SEM($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $) / kcal mol$^{-1}$"),
+        ax2.legend()
 
     ax.set_xlabel(r"$\lambda$")
     
