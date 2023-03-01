@@ -118,7 +118,7 @@ def plot_gradient_stats(gradients_data: GradientData, output_dir: str, plot_type
 
     elif plot_type == "integrated_sem":
         handle1, *_ = ax.bar(gradients_data.lam_vals,
-               gradients_data.vars_intra,
+               gradients_data.sems_overall,
                label = "SEMs",
                width=0.02, edgecolor='black')
         ax.set_ylabel(r"SEM($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $) / kcal mol$^{-1}$"),
@@ -128,6 +128,18 @@ def plot_gradient_stats(gradients_data: GradientData, output_dir: str, plot_type
         handle2, = ax2.plot(gradients_data.lam_vals,
                gradients_data.integrated_sems,
                label = "Integrated SEM", color='red', linewidth=2)
+        # Add vertical lines to show optimal lambda windows
+        delta_sem = 0.1
+        integrated_sems = gradients_data.integrated_sems
+        total_sem = integrated_sems[-1]
+        sem_vals = _np.linspace(0, total_sem, int(total_sem/delta_sem) + 1)
+        optimal_lam_vals = gradients_data.calculate_optimal_lam_vals(delta_sem = 0.1)
+        # Add horizontal lines at sem vals
+        for sem_val in sem_vals:
+            ax2.axhline(y=sem_val, color='black', linestyle='dashed', linewidth=0.5)
+        # Add vertical lines at optimal lambda vals
+        for lam_val in optimal_lam_vals:
+            ax2.axvline(x=lam_val, color='black', linestyle='dashed', linewidth=0.5)
         ax2.set_ylabel(r"Integrated SEM($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $) / kcal mol$^{-1}$"),
         ax2.legend()
 

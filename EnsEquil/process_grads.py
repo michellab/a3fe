@@ -109,7 +109,8 @@ class GradientData():
 
         integrated_sems = []
         x_vals = self.lam_vals
-        #y_vals = self.smoothened_sems
+        # No need to use smoothened SEMs as the trapezoidal rule results in some smoothing
+        # between neighbours
         y_vals = self.sems_overall
         n_vals = len(x_vals)
 
@@ -121,3 +122,54 @@ class GradientData():
         integrated_sems = _np.array(integrated_sems)
         self._integrated_sems = integrated_sems
         return integrated_sems
+    
+    def calculate_optimal_lam_vals(self, delta_sem: _Optional[float] = None, 
+                                   n_lam_vals: _Optional[int] = None)-> _np.ndarray:
+        """
+        Calculate the optimal lambda values for a given number of lambda values
+        to sample, using the integrated standard error of the mean of the gradients
+        as a function of lambda, using the trapezoidal rule.
+
+        Parameters
+        ----------
+        delta_sem : float, optional
+            The desired integrated standard error of the mean of the gradients
+            between each lambda value, in kcal mol-1. If not provided, the number of lambda
+            windows must be provided with n_lam_vals.
+        n_lam_vals : int, optional
+            The number of lambda values to sample. If not provided, the desired
+            integrated standard error of the mean of the gradients between each
+            lambda value must be provided with delta_sem.
+
+        Returns
+        -------
+        optimal_lam_vals : np.ndarray
+            The optimal lambda values to sample.
+        """
+        if delta_sem is None and n_lam_vals is None:
+            raise ValueError("Either delta_sem or n_lam_vals must be provided.")
+        elif delta_sem is not None and n_lam_vals is not None:
+            raise ValueError("Only one of delta_sem or n_lam_vals can be provided.")
+
+        # Calculate the integrated standard error of the mean of the gradients
+        # as a function of lambda, using the trapezoidal rule.
+        integrated_sems = self.integrated_sems
+        total_sem = integrated_sems[-1]
+
+        # If the number of lambda values is not provided, calculate it from the
+        # desired integrated standard error of the mean between lam vals
+        if n_lam_vals is None:
+            n_lam_vals = int(total_sem / delta_sem) + 1
+
+        # Convert the number of lambda values to an array of SEM values
+        requested_sem_vals = _np.linspace(0, total_sem, n_lam_vals)
+
+        # For each desired SEM value, map it to a lambda value
+        optimal_lam_vals = []
+        for requested_sem in requested_sem_vals:
+            optimal_lam_val = _np.interp(requested_sem, integrated_sems, self.lam_vals)
+            optimal_lam_vals.append(optimal_lam_val)
+
+        optimal_lam_vals = _np.array(optimal_lam_vals)
+        self._optimal_lam_vals = optimal_lam_vals
+        return optimal_lam_vals
