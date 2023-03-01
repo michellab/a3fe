@@ -23,7 +23,7 @@ def test_dirs_created():
         subprocess.run(["cp", "-r", "EnsEquil/data/example_input", f"{dirname}/input"])
         os.chdir(dirname)
         # This should create output directories
-        EnsEquil.Ensemble()
+        EnsEquil.Stage()
 
         lam_dir_names = ["lambda_0.000", "lambda_0.250", "lambda_1.000"]
         run_names = [f"run_0{i}" for i in range(1, 6)]
