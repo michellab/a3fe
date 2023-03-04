@@ -16,7 +16,7 @@ class Simulation():
                           "somd.cfg",
                           "somd.prm7",
                           "somd.rst7",
-                          "morph.pert"]
+                          "somd.pert"]
 
     def __init__(self, lam: float, run_no: int,
                  virtual_queue: _VirtualQueue,

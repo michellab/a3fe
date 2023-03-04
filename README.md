@@ -51,7 +51,7 @@ Finally, download EnsEquil, install, and test:
  
 ### Examples
 
-Create a run directory and copy `EnsEquil/EnsEquil/data/example_input` to <your run directory>/input. Replace the `system.*` and `morph.pert` files as you would for a standard SOMD simulation (these can be generated using [BioSimSpace](https://biosimspace.openbiosim.org/)), modify `somd.cfg` to change the simulation settings, and change the SLURM options in `run_somd.sh` to fit your SLURM installation. EnsEquil can then be run through ipython:
+Create a run directory and copy `EnsEquil/EnsEquil/data/example_input` to <your run directory>/input. Replace the `system.*` and `somd.pert` files as you would for a standard SOMD simulation (these can be generated using [BioSimSpace](https://biosimspace.openbiosim.org/)), modify `somd.cfg` to change the simulation settings, and change the SLURM options in `run_somd.sh` to fit your SLURM installation. EnsEquil can then be run through ipython:
 
 ```
 ipython
