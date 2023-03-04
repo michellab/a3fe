@@ -10,4 +10,4 @@ echo "lambda is: " $lam
 
 #sleep 15
 
-srun /home/finlayclark/sire.app/bin/somd-freenrg -C ./input/sim.cfg -l $lam -p CUDA
+srun /home/finlayclark/sire.app/bin/somd-freenrg -C ./input/sim.somd -l $lam -p CUDA

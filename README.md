@@ -10,10 +10,33 @@ A package for running free energy calculations with SOMD with automated equilibr
 
 ### Installation
 
-Assuming that you already have SLURM installed, install [BioSimSpace](https://biosimspace.openbiosim.org/) using mamba (or conda). SOMD, which is used to run the simulations, is contained within Sire, which will be installed as a dependency:
+Assuming that you already have SLURM installed, we first need to install the [BioSimSpace](https://biosimspace.openbiosim.org/) dependencies using mamba (or conda). SOMD, which is used to run the simulations, is contained within Sire, which will be installed as a dependency of BioSimSpace.
+```bash
+mamba create -n ensequil -c conda-forge -c openbiosim/label/dev biosimspace --only-deps
+mamba activate ensequil
+mamba install -c conda-forge ambertools pytest
+```
+Now download BioSimSpace, install, and test:
+```bash
+git clone https://github.com/fjclark/BioSimSpace.git
+cd biosimspace/python
+git checkout feature_abfe_somd
+BSS_SKIP_DEPDENCIES=1 python setup.py develop
+cd ..
+pytest test
+cd ..
+```
+Finally, download EnsEquil, install, and test:
+ ```bash
+ git clone https://github.com/fjclark/EnsEquil.git
+ cd EnsEquil
+ pip install .
+ pytest EnsEquil
+ ```
+
 
 ```bash
- mamba create -n ensequil "python<3.10"
+ mamba create -n ensequil "python<3.10" -c conda-forge ambertools
  mamba activate ensequil
  mamba install -c openbiosim biosimspace
  ```
@@ -28,7 +51,7 @@ Assuming that you already have SLURM installed, install [BioSimSpace](https://bi
  
 ### Examples
 
-Create a run directory and copy `EnsEquil/EnsEquil/data/example_input` to <your run directory>/input. Replace the `system.*` and `morph.pert` files as you would for a standard SOMD simulation (these can be generated using [BioSimSpace](https://biosimspace.openbiosim.org/)), modify `sim.cfg` to change the simulation settings, and change the SLURM options in `run_somd.sh` to fit your SLURM installation. EnsEquil can then be run through ipython:
+Create a run directory and copy `EnsEquil/EnsEquil/data/example_input` to <your run directory>/input. Replace the `system.*` and `morph.pert` files as you would for a standard SOMD simulation (these can be generated using [BioSimSpace](https://biosimspace.openbiosim.org/)), modify `somd.cfg` to change the simulation settings, and change the SLURM options in `run_somd.sh` to fit your SLURM installation. EnsEquil can then be run through ipython:
 
 ```
 ipython

@@ -1,20 +1,20 @@
 """Functions for running free energy calculations with SOMD with automated
  equilibration detection based on an ensemble of simulations."""
 
-import subprocess as _subprocess
-from decimal import Decimal as _Decimal
+from enum import Enum as _Enum
 import os as _os
 import threading as _threading
 import logging as _logging
-import matplotlib.pyplot as _plt
 import numpy as _np
+import pathlib as _pathlib
 import pickle as _pkl
+import subprocess as _subprocess
 import scipy.stats as _stats
 from time import sleep as _sleep
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
-from .detect_equil import check_equil_block_gradient as _check_equil_block_gradient, check_equil_chodera as _check_equil_chodera
 from ._utils import Job as _Job, VirtualQueue as _VirtualQueue, read_mbar_outfile as _read_mbar_outfile
+from .lambda_window import LamWindow as _LamWindow
 from .plot import (
     plot_gradient_stats as _plot_gradient_stats, 
     plot_gradient_hists as _plot_gradient_hists, 
@@ -22,6 +22,24 @@ from .plot import (
 )
 from .process_grads import GradientData as _GradientData
 
+class StageType(_Enum):
+    """Enumeration of the types of stage."""
+    RESTRAIN = 1
+    DISCHARGE = 2
+    VANISH = 3
+
+    @property
+    def bss_perturbation_type(self) -> str:
+        """Return the corresponding BSS perturbation type."""
+        if self == StageType.RESTRAIN:
+            return "restraint"
+        elif self == StageType.DISCHARGE:
+            return "discharge_soft"
+        elif self == StageType.VANISH:
+            return "vanish_soft"
+        else:
+            raise ValueError("Unknown stage type.")
+        
 
 class Stage():
     """
@@ -30,12 +48,14 @@ class Stage():
     """
 
     def __init__(self, 
+                 stage_type: StageType,
                  block_size: float = 1,
                  equil_detection: str = "block_gradient",
                  gradient_threshold: _Optional[float] = None,
                  ensemble_size: int = 5,
-                 input_dir: str = "./input",
-                 output_dir: str = "./output",
+                 lambda_values: _Optional[_List[float]] = None,
+                 input_dir: _Optional[str] = None,
+                 output_dir: _Optional[str] = None,
                  stream_log_level: int = _logging.INFO) -> None:
         """
         Initialise an ensemble of SOMD simulations. If ensemble.pkl exists in the
@@ -44,6 +64,8 @@ class Stage():
 
         Parameters
         ----------
+        stage_type : StageType
+            The type of stage.
         block_size : float, Optional, default: 1
             Size of blocks to use for equilibration detection, in ns.
         equil_detection : str, Optional, default: "block_gradient"
@@ -57,10 +79,15 @@ class Stage():
             sensible value appears to be 0.5 kcal mol-1 ns-1.
         ensemble_size : int, Optional, default: 5
             Number of simulations to run in the ensemble.
-        input_dir : str, Optional, default: "./input"
-            Path to directory containing input files for the simulations.
-        output_dir : str, Optional, default: "./output"
-            Path to directory to store output files from the simulations.
+        lambda_values : List[float], Optional, default: None
+            List of lambda values to use for the simulations. If None, the lambda values
+            will be read from the simfile.
+        input_dir : str, Optional, default: None
+            Path to directory containing input files for the simulations. If None, this
+            will be set to "current_working_directory/input".
+        output_dir : str, Optional, default: None
+            Path to directory to store output files from the simulations. If None, this
+            will be set to "current_working_directory/output".
         stream_log_level : int, Optional, default: logging.INFO
             Logging level to use for the steam file handlers for the
             Ensemble object and its child objects.
@@ -80,35 +107,49 @@ class Stage():
         else:  # No pkl file to resume from
             print("Creating new ensemble...")
 
+            self.stage_type = stage_type
             self.block_size = block_size
+            self.equil_detection = equil_detection
+            self.gradient_threshold = gradient_threshold
             self.ensemble_size = ensemble_size
+            if input_dir is None:
+                input_dir = _os.path.join(_os.getcwd(), "input")
             self.input_dir = input_dir
+            if output_dir is None:
+                output_dir = _os.path.join(_os.getcwd(), "output")
             self.output_dir = output_dir
+            if lambda_values is not None:
+                self.lam_vals = lambda_values
+            else:
+                self.lam_vals = self._get_lam_vals()
             self._running: bool = False
             self.run_thread: _Optional[_threading.Thread] = None
             # Set boolean to allow us to kill the thread
             self.kill_thread: bool = False
-            self.lam_vals: _List[float] = self._get_lam_vals()
-            self.lam_windows: _List[LamWindow] = []
-            self.running_wins: _List[LamWindow] = []
+            self.lam_windows: _List[_LamWindow] = []
+            self.running_wins: _List[_LamWindow] = []
             # Would be created by lam windows anyway, but is needed for queue log
             _os.mkdir(output_dir)
             self.virtual_queue = _VirtualQueue(log_dir=output_dir)
 
             # Creating lambda window objects sets up required input directories
             for lam in self.lam_vals:
-                self.lam_windows.append(LamWindow(lam, self.virtual_queue,
+                self.lam_windows.append(_LamWindow(lam, 
+                                                  self.virtual_queue,
                                                   self.block_size,
-                                                  equil_detection,
-                                                  gradient_threshold,
-                                                  self.ensemble_size, self.input_dir,
+                                                  self.equil_detection,
+                                                  self.gradient_threshold,
+                                                  self.ensemble_size, 
+                                                  self.input_dir,
                                                   output_dir, stream_log_level,
-                                                  ))
+                                                  )
+                                       )
             # Set up logging
+            self.stream_log_level = stream_log_level
             self._logger = _logging.getLogger(str(self))
             # For the file handler, we want to log everything
             self._logger.setLevel(_logging.DEBUG)
-            file_handler = _logging.FileHandler(f"{output_dir}/ensemble.log")
+            file_handler = _logging.FileHandler(f"{output_dir}/stage.log")
             file_handler.setFormatter(_logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
             self._logger.addHandler(file_handler)
             # For the stream handler, we want to log at the user-specified level
@@ -121,14 +162,33 @@ class Stage():
             self._dump()
 
     def __str__(self) -> str:
-        return f"Ensemble (repeats = {self.ensemble_size}, no windows = {len(self.lam_vals)})"
+        return f"Stage (repeats = {self.ensemble_size}, no windows = {len(self.lam_vals)})"
 
-    def run(self) -> None:
-        """Run the ensemble of simulations with adaptive equilibration detection,
-        and perform analysis once finished."""
+    def run(self, adaptive:bool=True, runtime:_Optional[float]=None) -> None:
+        """ Run the ensemble of simulations constituting the stage (optionally with adaptive 
+        equilibration detection), and, if using adaptive equilibration detection, perform 
+        analysis once finished. 
+
+        Parameters
+        ----------
+        adaptive : bool, Optional, default: True
+            If True, the stage will run until the simulations are equilibrated and perform analysis afterwards.
+            If False, the stage will run for the specified runtime and analysis will not be performed.
+        runtime : float, Optional, default: None
+            If adaptive is False, runtime must be supplied and stage will run for this number of nanoseconds. 
+
+        Returns
+        -------
+        None
+        """
+        if not adaptive and runtime is None:
+            raise ValueError("If adaptive equilibration detection is disabled, a runtime must be supplied.")
+        if adaptive and runtime is not None:
+            raise ValueError("If adaptive equilibration detection is enabled, a runtime cannot be supplied.")
+
         # Run in the background with threading so that user can continuously check
-        # the status of the Ensemble object
-        self.run_thread = _threading.Thread(target=self._run_without_threading, name="Ensemble")
+        # the status of the Stage object
+        self.run_thread = _threading.Thread(target=self._run_without_threading, args=(adaptive, runtime), name=str(self))
         self.run_thread.start()
         self.running = True
 
@@ -144,7 +204,7 @@ class Stage():
 
     @property
     def running(self) -> bool:
-        """Return True if the ensemble is currently running."""
+        """Return True if the Stage is currently running."""
         if self.run_thread is not None:
             self._running = self.run_thread.is_alive()
         else:
@@ -156,20 +216,52 @@ class Stage():
         """Set the running attribute."""
         self._running = value
 
-    def _run_without_threading(self) -> None:
-        """ Run the ensemble of simulations with adaptive equilibration detection,
-        and perform analysis once finished. This function is called by run() with threading,
-        so that the function can be run in the background and the user can continuously
-        check the status of the Ensemble object."""
+    def wait(self) -> None:
+        """Wait for the Stage to finish running."""
+        while self.running:
+            _sleep(60) # Check every minute
 
+    def _run_without_threading(self, adaptive:bool=True, runtime:_Optional[float]=None) -> None:
+        """ Run the ensemble of simulations constituting the stage (optionally with adaptive 
+        equilibration detection), and, if using adaptive equilibration detection, perform 
+        analysis once finished.  This function is called by run() with threading, so that
+        the function can be run in the background and the user can continuously check 
+        the status of the Stage object.
+        
+        Parameters
+        ----------
+        adaptive : bool, Optional, default: True
+            If True, the stage will run until the simulations are equilibrated and perform analysis afterwards.
+            If False, the stage will run for the specified runtime and analysis will not be performed.
+        runtime : float, Optional, default: None
+            If adaptive is False, runtime must be supplied and stage will run for this number of nanoseconds. 
+
+        Returns
+        -------
+        None
+        """
         # Reset self.kill_thread so we can restart after killing
         self.kill_thread = False
 
+        if not adaptive and runtime is None:
+            raise ValueError("If adaptive equilibration detection is disabled, a runtime must be supplied.")
+        if adaptive and runtime is not None:
+            raise ValueError("If adaptive equilibration detection is enabled, a runtime cannot be supplied.")
+
+        if not adaptive and runtime is not None:
+            for win in self.lam_windows:
+                # Add buffer of 1 block_size to give chance for the equilibration to be detected.
+                win.run(runtime)
+                win._update_log()
+                self._dump()
+
         # Run initial SOMD simulations
-        self._logger.info("Starting ensemble of simulations...")
+        self._logger.info(f"Starting {self}. Adaptive equilibration = {adaptive}...")
+        if runtime is None:
+            runtime = 3 * self.block_size
         for win in self.lam_windows:
             # Add buffer of 1 block_size to give chance for the equilibration to be detected.
-            win.run(3 * self.block_size)
+            win.run(runtime)
             win._update_log()
             self._dump()
 
@@ -188,12 +280,13 @@ class Stage():
                 # Check if the window has now finished - calling win.running updates the win._running attribute
                 if not win.running:
                     self._logger.info(f"{win} has finished at {win.tot_simtime:.3f} ns")
-                    # Check if the simulation has equilibrated and if not, resubmit
-                    if win.equilibrated:
-                        self._logger.info(f"{win} has equilibrated at {win.equil_time:.3f} ns")
-                    else:
-                        self._logger.info(f"{win} has not equilibrated. Resubmitting for {self.block_size:.3f} ns")
-                        win.run(self.block_size)
+                    # If we are in adaptive mode, check if the simulation has equilibrated and if not, resubmit
+                    if adaptive:
+                        if win.equilibrated:
+                            self._logger.info(f"{win} has equilibrated at {win.equil_time:.3f} ns")
+                        else:
+                            self._logger.info(f"{win} has not equilibrated. Resubmitting for {self.block_size:.3f} ns")
+                            win.run(self.block_size)
 
                     # Write status after checking for running and equilibration, as this updates the
                     # _running and _equilibrated attributes
@@ -203,7 +296,26 @@ class Stage():
             self.running_wins = [win for win in self.running_wins if win.running]
 
         # All simulations are now finished, so perform final analysis
-        self.analyse()
+        if adaptive:
+            self._logger.info(f"All simulations in {self} have finished. Performing analysis...")
+            self.analyse()
+
+        else:
+            self._logger.info(f"All simulations in {self} have finished.")
+
+    def get_optimal_lambda_values(self) -> _np.ndarray:
+        """
+        Get the optimal lambda values for the stage,
+        based on the integrated SEM
+        
+        Returns
+        -------
+        optimal_lam_vals : np.ndarray
+            List of optimal lambda values for the stage.
+        """
+        unequilibrated_gradient_data = _GradientData(lam_winds=self.lam_windows, equilibrated=False)
+        return unequilibrated_gradient_data.calculate_optimal_lam_vals()
+
 
     def _get_lam_vals(self) -> _List[float]:
         """
@@ -215,10 +327,9 @@ class Stage():
         lam_vals : List[float]
             List of lambda values for the simulations.
         """
-
         # Read number of lambda windows from input file
         lam_vals_str = []
-        with open(self.input_dir + "/sim.cfg", "r") as ifile:
+        with open(self.input_dir + "/somd.cfg", "r") as ifile:
             lines = ifile.readlines()
             for line in lines:
                 if line.startswith("lambda array ="):
@@ -357,6 +468,47 @@ class Stage():
             for line in lines[equil_index + non_data_lines:]:
                 ofile.write(line)
 
+    def mv_output(self, name: str) -> None:
+        """
+        Move the output directory to a new location, without
+        changing self.output_dir.
+
+        Parameters
+        ----------
+        name : str
+            The new name of the output directory.
+        """
+        self._logger.info(f"Moving contents of output directory to {name}")
+        base_dir = _pathlib.Path(self.output_dir).parent.resolve()
+        _os.rename(self.output_dir, _os.path.join(base_dir, name))
+
+    def update(self) -> None:
+        """
+        Delete the current set of lamda windows and simulations, and
+        create a new set of simulations based on the current state of
+        the stage. This is useful if you want to change the number of
+        simulations per lambda window, or the number of lambda windows.
+        """
+        if self.running:
+            raise RuntimeError("Can't update while ensemble is running")
+        if _os.path.isdir(self.output_dir):
+            self.mv_output("output_saved")
+        self._logger.info("Deleting old lamda windows...")
+        del(self.lam_windows)
+        self._logger.info("Creating lamda windows...")
+        self.lam_windows = []
+        for lam in self.lam_vals:
+            self.lam_windows.append(_LamWindow(lam, self.virtual_queue,
+                                                self.block_size,
+                                                self.equil_detection,
+                                                self.gradient_threshold,
+                                                self.ensemble_size, 
+                                                self.input_dir,
+                                                self.output_dir, 
+                                                self.stream_log_level,
+                                                ))
+        
+
     def _update_log(self) -> None:
         """ Update the status log file with the current status of the ensemble. """
         self._logger.debug("##############################################")
@@ -372,465 +524,3 @@ class Stage():
         temp_dict["run_thread"]=None
         with open(f"{self.output_dir}/ensemble.pkl", "wb") as ofile:
             _pkl.dump(temp_dict, ofile)
-
-
-class LamWindow():
-    """A class to hold and manipulate a set of SOMD simulations at a given lambda value."""
-
-    equil_detection_methods={"block_gradient": _check_equil_block_gradient,
-                               "chodera": _check_equil_chodera}
-
-    def __init__(self, lam: float,
-                 virtual_queue: _VirtualQueue,
-                 block_size: float=1,
-                 equil_detection: str="block_gradient",
-                 gradient_threshold: _Optional[float]=None,
-                 ensemble_size: int=5, input_dir: str="./input",
-                 output_dir: str="./output",
-                 stream_log_level: int=_logging.INFO) -> None:
-        """
-        Initialise a LamWindow object.
-
-        Parameters
-        ----------
-        lam : float
-            Lambda value for the simulation.
-        virtual_queue : VirtualQueue
-            VirtualQueue object to use for submitting jobs.
-        block_size : float, Optional, default: 1
-            Size of the blocks to use for equilibration detection,
-            in ns.
-        equil_detection : str, Optional, default: "block_gradient"
-            Method to use for equilibration detection. Options are:
-            - "block_gradient": Use the gradient of the block averages to detect equilibration.
-            - "chodera": Use Chodera's method to detect equilibration.
-        gradient_threshold : float, Optional, default: None
-            The threshold for the absolute value of the gradient, in kcal mol-1 ns-1,
-            below which the simulation is considered equilibrated. If None, no theshold is
-            set and the simulation is equilibrated when the gradient passes through 0. A 
-            sensible value appears to be 0.5 kcal mol-1 ns-1.
-        ensemble_size : int, Optional, default: 5
-            Number of simulations to run at this lambda value.
-        input_dir : str, Optional, default: "./input"
-            Path to the input directory.
-        output_dir : str
-            Path to the output directory.
-        stream_log_level : int, Optional, default: logging.INFO
-            Logging level to use for the steam file handlers for the
-            Ensemble object and its child objects.
-
-        Returns
-        -------
-        None
-        """
-        self.lam=lam
-        self.virtual_queue=virtual_queue
-        self.block_size=block_size
-        self.ensemble_size=ensemble_size
-        if equil_detection not in self.equil_detection_methods:
-            raise ValueError(f"Equilibration detection method {equil_detection} not recognised.")
-        # Need to pass self object to equilibration detection function
-        self.check_equil=self.equil_detection_methods[equil_detection]
-        # Ensure that we do not try to use a gradient threshold with a method that does not use it
-        if equil_detection != "block_gradient" and gradient_threshold is not None:
-            raise ValueError("Gradient threshold can only be set for block gradient method.")
-        self.gradient_threshold=gradient_threshold
-        self.gradient_threshold=gradient_threshold
-        self.input_dir=input_dir
-        self.output_dir=output_dir
-        self._equilibrated: bool=False
-        self.equil_time: _Optional[float]=None
-        self._running: bool=False
-        self.tot_simtime: float=0  # ns
-
-        # Create the required simulations for this lambda value
-        self.sims=[]
-        for i in range(1, ensemble_size + 1):
-            sim=Simulation(lam, i, self.virtual_queue, input_dir, output_dir, stream_log_level)
-            self.sims.append(sim)
-
-        # Set up logging
-        self._logger=_logging.getLogger(str(self))
-        # For the file handler, we want to log everything
-        self._logger.setLevel(_logging.DEBUG)
-        file_handler=_logging.FileHandler(f"{self.output_dir}/lambda_{self.lam:.3f}/window.log")
-        file_handler.setFormatter(_logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
-        self._logger.addHandler(file_handler)
-        # For the stream handler, we only want to log at the user-specified level
-        stream_handler=_logging.StreamHandler()
-        stream_handler.setFormatter(_logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
-        stream_handler.setLevel(stream_log_level)
-        self._logger.addHandler(stream_handler)
-
-    def __str__(self) -> str:
-        return f"LamWindow (lam={self.lam:.3f})"
-
-    def run(self, duration: float=2.5) -> None:
-        """
-        Run all simulations at the lambda value.
-
-        Parameters
-        ----------
-        duration : float, Optional, default: 2.5
-            Duration of simulation, in ns.
-
-        Returns
-        -------
-        None
-        """
-        # Run the simulations
-        self._logger.info(f"Running simulations for {duration:.3f} ns")
-        for sim in self.sims:
-            sim.run(duration)
-            self.tot_simtime += duration
-
-        self._running=True
-
-    def kill(self) -> None:
-        """ Kill all simulations at the lambda value. """
-        self._logger.info("Killing all simulations")
-        for sim in self.sims:
-            sim.kill()
-        self.running=False
-
-    @ property
-    def running(self) -> bool:
-        """
-        Check if all the simulations at the lambda window are still running
-        and update the running attribute accordingly.
-
-        Returns
-        -------
-        self._running : bool
-            True if the simulation is still running, False otherwise.
-        """
-        all_finished=True
-        for sim in self.sims:
-            if sim.running:
-                all_finished=False
-                break
-        self._running=not all_finished
-
-        return self._running
-
-    @ running.setter
-    def running(self, value: bool) -> None:
-        self._running=value
-
-    @ property
-    def equilibrated(self) -> bool:
-        """
-        Check if the ensemble of simulations at the lambda window is
-        equilibrated, and update the equilibration time and status if
-        so.
-
-        Returns
-        -------
-        self._equilibrated : bool
-            True if the simulation is equilibrated, False otherwise.
-        """
-        self._equilibrated, self.equil_time=self.check_equil(self)
-        return self._equilibrated
-
-    @ equilibrated.setter
-    def equilibrated(self, value: bool) -> None:
-        self._equilibrated=value
-
-    def _get_rolling_average(self, data: _np.ndarray, idx_block_size: int) -> _np.ndarray:
-        """
-        Calculate the rolling average of a 1D array.
-
-        Parameters
-        ----------
-        data : np.ndarray
-            1D array of data to be block averaged.
-        idx_block_size : int
-            Index size of the blocks to be used in the block average.
-
-        Returns
-        -------
-        block_av : np.ndarray
-            1D array of block averages of the same length as data.
-            Initial values (before there is sufficient data to calculate
-            a block average) are set to nan.
-        """
-        rolling_av=_np.full(len(data), _np.nan)
-
-        for i in range(len(data)):
-            if i < idx_block_size:
-                continue
-            else:
-                block_av=_np.mean(data[i - idx_block_size: i])
-                rolling_av[i]=block_av
-
-        return rolling_av
-
-    def _update_log(self) -> None:
-        """Write the status of the lambda window and all simulations to their log files."""
-        self._logger.debug("##############################################")
-        for var in vars(self):
-            self._logger.debug(f"{var}: {getattr(self, var)}")
-        self._logger.debug("##############################################")
-
-        for sim in self.sims:
-            sim._update_log()
-
-
-class Simulation():
-    """Class to store information about a single SOMD simulation."""
-
-    def __init__(self, lam: float, run_no: int,
-                 virtual_queue: _VirtualQueue,
-                 input_dir: str="./input",
-                 output_dir: str="./output",
-                 stream_log_level: int=_logging.INFO) -> None:
-        """
-        Initialise a Simulation object.
-
-        Parameters
-        ----------
-        lam : float
-            Lambda value for the simulation.
-        run_no : int
-            Index of repeat for the simulation.
-        virtual_queue : VirtualQueue
-            Virtual queue object to use for the simulation.
-        output_dir : str
-            Path to the output directory.
-        stream_log_level : int, Optional, default: logging.INFO
-            Logging level to use for the steam file handlers for the
-            Ensemble object and its child objects.
-
-        Returns
-        -------
-        None
-        """
-        self.lam=lam
-        self.virtual_queue=virtual_queue
-        self.run_no=run_no
-        self.input_dir=_os.path.abspath(input_dir)
-        # Check that the input directory contains the required files
-        self._validate_input()
-        self.output_dir=_os.path.abspath(output_dir)
-        self.job: _Optional[_Job]=None
-        self._running: bool=False
-        self.output_subdir: str=output_dir + "/lambda_" + f"{lam:.3f}" + "/run_" + str(run_no).zfill(2)
-        self.tot_simtime: float=0  # ns
-        # Now read useful parameters from the simulation file options
-        self._add_attributes_from_simfile()
-
-        # Create the output subdirectory
-        _subprocess.call(["mkdir", "-p", self.output_subdir])
-        # Create a soft link to the input dir to simplify running simulations
-        _subprocess.call(["cp", "-r", self.input_dir, self.output_subdir + "/input"])
-
-        # Set up logging
-        self._logger=_logging.getLogger(str(self))
-        # For the file handler, we want to log everything
-        self._logger.setLevel(_logging.DEBUG)
-        file_handler=_logging.FileHandler(f"{self.output_subdir}/simulation.log")
-        file_handler.setFormatter(_logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
-        self._logger.addHandler(file_handler)
-        # For the stream handler, we want the user-specified level
-        stream_handler=_logging.StreamHandler()
-        stream_handler.setFormatter(_logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
-        stream_handler.setLevel(stream_log_level)
-        self._logger.addHandler(stream_handler)
-
-    def __str__(self) -> str:
-        return f"Simulation (lam={self.lam}, run_no={self.run_no})"
-
-    @ property
-    def running(self) -> bool:
-        """
-        Check if the simulation is still running,
-        and update the running attribute accordingly.
-
-        Returns
-        -------
-        self._running : bool
-            True if the simulation is still running, False otherwise.
-        """
-        # Get job ids of currently running jobs - but note that the queue is updated at the
-        # Ensemble level
-        if self.job in self.virtual_queue.queue:
-            self._running=True
-            self._logger.info(f"Still running")
-        else:
-            self._running=False
-            self._logger.info(f"Finished")
-
-        return self._running
-
-    @ running.setter
-    def running(self, value: bool) -> None:
-        self._running=value
-
-    def _validate_input(self) -> None:
-        """ Check that the required input files are present. """
-
-        # Check that the input directory exists
-        if not _os.path.isdir(self.input_dir):
-            raise FileNotFoundError("Input directory does not exist.")
-
-        # Check that the required input files are present
-        required_files=["run_somd.sh", "sim.cfg", "system.top", "system.crd", "morph.pert"]
-        for file in required_files:
-            if not _os.path.isfile(self.input_dir + "/" + file):
-                raise FileNotFoundError("Required input file " + file + " not found.")
-
-    def _add_attributes_from_simfile(self) -> None:
-        """
-        Read the SOMD simulation option file and
-        add useful attributes to the Simulation object.
-
-        Returns
-        -------
-        time_per_cycle : int
-            Time per cycle, in ns.
-        """
-
-        timestep=None  # ns
-        nmoves=None  # number of moves per cycle
-        nrg_freq=None  # number of timesteps between energy calculations
-        with open(self.input_dir + "/sim.cfg", "r") as ifile:
-            lines=ifile.readlines()
-            for line in lines:
-                if line.startswith("timestep ="):
-                    timestep=float(line.split("=")[1].split()[0])
-                if line.startswith("nmoves ="):
-                    nmoves=float(line.split("=")[1])
-                if line.startswith("energy frequency ="):
-                    nrg_freq=float(line.split("=")[1])
-
-        if timestep is None or nmoves is None or nrg_freq is None:
-            raise ValueError("Could not find timestep or nmoves in sim.cfg.")
-
-        self.timestep=timestep / 1_000_000  # fs to ns
-        self.nrg_freq=nrg_freq
-        self.time_per_cycle=timestep * nmoves / 1_000_000  # fs to ns
-
-    def run(self, duration: float=2.5) -> None:
-        """
-        Run a SOMD simulation.
-
-        Parameters
-        ----------
-        duration : float, Optional, default: 2.5
-            Duration of simulation, in ns.
-
-        Returns
-        -------
-        None
-        """
-        # Need to make sure that duration is a multiple of the time per cycle
-        # otherwise actual time could be quite different from requested duration
-        remainder=_Decimal(str(duration)) % _Decimal(str(self.time_per_cycle))
-        if round(float(remainder), 4) != 0:
-            raise ValueError(("Duration must be a multiple of the time per cycle. "
-                              f"Duration is {duration} ns, and time per cycle is {self.time_per_cycle} ns."))
-        # Need to modify the config file to set the correction n_cycles
-        n_cycles=int(duration / self.time_per_cycle)
-        self._set_n_cycles(n_cycles)
-
-        # Run SOMD - note that command excludes sbatch as this is added by the virtual queue
-        cmd=f"--chdir {self.output_subdir} {self.output_subdir}/input/run_somd.sh {self.lam}"
-        self.job=self.virtual_queue.submit(cmd)
-        self.running=True
-        self.tot_simtime += duration
-        self._logger.info(f"Submitted with job {self.job}")
-
-    def kill(self) -> None:
-        """Kill the job."""
-        if not self.job:
-            raise ValueError("No job found. Cannot kill job.")
-        self._logger.info(f"Killing job {self.job}")
-        self.virtual_queue.kill(self.job)
-        self.running=False
-
-    def _set_n_cycles(self, n_cycles: int) -> None:
-        """
-        Set the number of cycles in the SOMD config file.
-
-        Parameters
-        ----------
-        n_cycles : int
-            Number of cycles to set in the config file.
-
-        Returns
-        -------
-        None
-        """
-        # Find the line with n_cycles and replace
-        with open(self.output_subdir + "/input/sim.cfg", "r") as ifile:
-            lines=ifile.readlines()
-            for i, line in enumerate(lines):
-                if line.startswith("ncycles ="):
-                    lines[i]="ncycles = " + str(n_cycles) + "\n"
-                    break
-
-        # Now write the new file
-        with open(self.output_subdir + "/input/sim.cfg", "w+") as ofile:
-            for line in lines:
-                ofile.write(line)
-
-    def read_gradients(self, equilibrated_only:bool = False, endstate: bool = False) -> _Tuple[_np.ndarray, _np.ndarray]:
-        """
-        Read the gradients from the output file. These can be either the infiniesimal gradients
-        at the given value of lambda, or the differences in energy between the end state 
-        Hamiltonians.
-
-        Parameters
-        ----------
-        equilibrated_only : bool, Optional, default: False
-            Whether to read the gradients from the equilibrated region of the simulation (True)
-            or the whole simulation (False).
-        endstate : bool, Optional, default: False
-            Whether to return the difference in energy between the end state Hamiltonians (True)
-            or the infiniesimal gradients at the given value of lambda (False).
-
-        Returns
-        -------
-        times : np.ndarray
-            Array of times, in ns.
-        grads : np.ndarray
-            Array of gradients, in kcal/mol.
-        """
-        # Read the output file
-        if equilibrated_only:
-            with open(self.output_subdir + "/simfile_equilibrated.dat", "r") as ifile:
-                lines=ifile.readlines()
-        else:
-            with open(self.output_subdir + "/simfile.dat", "r") as ifile:
-                lines=ifile.readlines()
-
-        steps=[]
-        grads=[]
-
-        for line in lines:
-            vals=line.split()
-            if not line.startswith("#"):
-                step=int(vals[0].strip())
-                if not endstate: #  Return the infinitesimal gradients
-                    grad=float(vals[2].strip())
-                else: # Return the difference in energy between the end state Hamiltonians
-                    energy_start = float(vals[5].strip())
-                    energy_end = float(vals[-1].strip())
-                    grad=energy_end - energy_start
-                steps.append(step)
-                grads.append(grad)
-
-        times=[x * self.timestep for x in steps]  # Timestep already in ns
-
-        times_arr=_np.array(times)
-        grads_arr=_np.array(grads)
-
-        return times_arr, grads_arr
-
-    def _update_log(self) -> None:
-        """ Write the status of the simulation to a log file. """
-
-        self._logger.debug("##############################################")
-        for var in vars(self):
-            self._logger.debug(f"{var}: {getattr(self, var)} ")
-        self._logger.debug("##############################################")
