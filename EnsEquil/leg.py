@@ -213,6 +213,11 @@ class Leg():
             system = self.minimise_input(system)
         if self.prep_stage == PreparationStage.MINIMISED:
             system = self.heat_and_preequil_input(system)
+        
+        # Mark the ligand to be decoupled in the absolute binding free energy calculation
+        lig = _BSS.Align.decouple(system[0], intramol=True)
+        self._logger.info(f"Selecting ligand {lig} for decoupling")
+        system.updateMolecule(0,lig)
 
         # If this is the bound leg, extract the restraints from 5 ns simulations
         if self.leg_type == LegType.BOUND:
@@ -565,14 +570,8 @@ class Leg():
         -------
         None
         """
-        # Temporary hack
-        old_system = pre_equilibrated_system.copy()
-
         RESTRAINT_SEARCH_TIME = 0.01 # ns
         # Mark the ligand to be decoupled
-        lig = _BSS.Align.decouple(pre_equilibrated_system[0], intramol=True)
-        self._logger.info(f"Selecting ligand {lig} for decoupling in restraint search simulations")
-        pre_equilibrated_system.updateMolecule(0,lig)
         protocol = _BSS.Protocol.Production(timestep=2*_BSS.Units.Time.femtosecond, # 2 fs timestep as 4 fs seems to cause instability even with HMR
                                              runtime=RESTRAINT_SEARCH_TIME*_BSS.Units.Time.nanosecond)
 
@@ -593,7 +592,7 @@ class Leg():
             # Temporarily ignore issue with extracting the final system
             self._logger.info(f"Saving somd_{i+1}.rst7 and restraint_{i+1}.txt to {self.base_dir}/restraint_search")
             #_BSS.IO.saveMolecules(f"{self.base_dir}/restraint_search/somd_{i+1}", final_system, fileformat=["RST7"])
-            _BSS.IO.saveMolecules(f"{self.base_dir}/restraint_search/somd_{i+1}", old_system, fileformat=["rst7"])
+            _BSS.IO.saveMolecules(f"{self.base_dir}/restraint_search/somd_{i+1}", pre_equilibrated_system, fileformat=["rst7"])
 
             # Save the restraints to a text file and store within the Leg object
             with open(f"{self.base_dir}/restraint_search/restraint_{i+1}.txt", "w") as f:
