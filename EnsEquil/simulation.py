@@ -7,9 +7,10 @@ import numpy as _np
 import subprocess as _subprocess
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
+from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._utils import Job as _Job, VirtualQueue as _VirtualQueue
 
-class Simulation():
+class Simulation(_SimulationRunner):
     """Class to store information about a single SOMD simulation."""
 
     required_input_files=["run_somd.sh",
@@ -18,8 +19,11 @@ class Simulation():
                           "somd.rst7",
                           "somd.pert"]
 
-    def __init__(self, lam: float, run_no: int,
+    def __init__(self, 
+                 lam: float, 
+                 run_no: int,
                  virtual_queue: _VirtualQueue,
+                 base_dir: _Optional[str] = None,
                  input_dir: _Optional[str] = None,
                  output_dir: _Optional[str] = None,
                  stream_log_level: int=_logging.INFO) -> None:
@@ -34,6 +38,9 @@ class Simulation():
             Index of repeat for the simulation.
         virtual_queue : VirtualQueue
             Virtual queue object to use for the simulation.
+        base_dir : str, Optional, default: None
+            Path to the base directory. If None,
+            this is set to the current working directory.
         input_dir : str, Optional, default: None
             Path to directory containing input files for the simulation. If None, this
             will be set to "current_working_directory/input".
@@ -48,42 +55,29 @@ class Simulation():
         -------
         None
         """
+        # Set the lambda value and run number first, as these are 
+        # required for __str__, and therefore the super().__init__ call
         self.lam=lam
-        self.virtual_queue=virtual_queue
         self.run_no=run_no
-        if input_dir is None:
-            input_dir = _os.path.join(_os.getcwd(), "input")
-        self.input_dir = input_dir
-        if output_dir is None:
-            output_dir = _os.path.join(_os.getcwd(), "output")
-        self.output_dir = output_dir
-        # Check that the input directory contains the required files
-        self._validate_input()
-        self.output_dir=_os.path.abspath(output_dir)
-        self.job: _Optional[_Job]=None
-        self._running: bool=False
-        self.output_subdir: str=output_dir + "/lambda_" + f"{lam:.3f}" + "/run_" + str(run_no).zfill(2)
-        self.tot_simtime: float=0  # ns
-        # Now read useful parameters from the simulation file options
-        self._add_attributes_from_simfile()
 
-        # Create the output subdirectory
-        _subprocess.call(["mkdir", "-p", self.output_subdir])
-        # Create a soft link to the input dir to simplify running simulations
-        _subprocess.call(["cp", "-r", self.input_dir, self.output_subdir + "/input"])
+        super().__init__(base_dir=base_dir,
+                         input_dir=input_dir,
+                         output_dir=None,
+                         stream_log_level=stream_log_level)
 
-        # Set up logging
-        self._logger=_logging.getLogger(str(self))
-        # For the file handler, we want to log everything
-        self._logger.setLevel(_logging.DEBUG)
-        file_handler=_logging.FileHandler(f"{self.output_subdir}/simulation.log")
-        file_handler.setFormatter(_logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
-        self._logger.addHandler(file_handler)
-        # For the stream handler, we want the user-specified level
-        stream_handler=_logging.StreamHandler()
-        stream_handler.setFormatter(_logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
-        stream_handler.setLevel(stream_log_level)
-        self._logger.addHandler(stream_handler)
+        if not self.loaded_from_pickle:
+            self.virtual_queue=virtual_queue
+            # Check that the input directory contains the required files
+            self._validate_input()
+            self.job: _Optional[_Job]=None
+            self._running: bool=False
+            self.tot_simtime: float=0  # ns
+            # Now read useful parameters from the simulation file options
+            self._add_attributes_from_simfile()
+
+            # Save state and update log
+            self._dump()
+            self._update_log()
 
     def __str__(self) -> str:
         return f"Simulation (lam={self.lam}, run_no={self.run_no})"
@@ -123,7 +117,7 @@ class Simulation():
 
         # Check that the required input files are present
         for file in Simulation.required_input_files:
-            if not _os.path.isfile(self.input_dir + "/" + file):
+            if not _os.path.isfile(_os.path.join(self.input_dir, file)):
                 raise FileNotFoundError("Required input file " + file + " not found.")
 
     def _add_attributes_from_simfile(self) -> None:
@@ -181,7 +175,7 @@ class Simulation():
         self._set_n_cycles(n_cycles)
 
         # Run SOMD - note that command excludes sbatch as this is added by the virtual queue
-        cmd=f"--chdir {self.output_subdir} {self.output_subdir}/input/run_somd.sh {self.lam}"
+        cmd=f"--chdir {self.output_dir} run_somd.sh {self.lam}"
         self.job=self.virtual_queue.submit(cmd)
         self.running=True
         self.tot_simtime += duration
@@ -209,7 +203,7 @@ class Simulation():
         None
         """
         # Find the line with n_cycles and replace
-        with open(self.output_subdir + "/input/somd.cfg", "r") as ifile:
+        with open(_os.path.join(self.input_dir, "somd.cfg"), "r") as ifile:
             lines=ifile.readlines()
             for i, line in enumerate(lines):
                 if line.startswith("ncycles ="):
@@ -217,7 +211,7 @@ class Simulation():
                     break
 
         # Now write the new file
-        with open(self.output_subdir + "/input/somd.cfg", "w+") as ofile:
+        with open(_os.path.join(self.input_dir, "somd.cfg"), "w+") as ofile:
             for line in lines:
                 ofile.write(line)
 
@@ -245,10 +239,10 @@ class Simulation():
         """
         # Read the output file
         if equilibrated_only:
-            with open(self.output_subdir + "/simfile_equilibrated.dat", "r") as ifile:
+            with open(_os.path.join(self.output_dir, "simfile_equilibrated.dat"), "r") as ifile:
                 lines=ifile.readlines()
         else:
-            with open(self.output_subdir + "/simfile.dat", "r") as ifile:
+            with open(_os.path.join(self.output_dir, "/simfile.dat"), "r") as ifile:
                 lines=ifile.readlines()
 
         steps=[]
@@ -273,11 +267,3 @@ class Simulation():
         grads_arr=_np.array(grads)
 
         return times_arr, grads_arr
-
-    def _update_log(self) -> None:
-        """ Write the status of the simulation to a log file. """
-
-        self._logger.debug("##############################################")
-        for var in vars(self):
-            self._logger.debug(f"{var}: {getattr(self, var)} ")
-        self._logger.debug("##############################################")

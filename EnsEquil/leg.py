@@ -14,6 +14,7 @@ import subprocess as _subprocess
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
 from .stage import Stage as _Stage, StageType as _StageType
+from ._simulation_runner import SimulationRunner as _SimulationRunner
 
 class LegType(_Enum):
     """The type of leg in the calculation."""
@@ -54,7 +55,7 @@ class PreparationStage(_Enum):
         else:
             return [f"{leg_type.name.lower()}{self.file_suffix}.{file_type}" for file_type in ["prm7", "rst7"]]
 
-class Leg():
+class Leg(_SimulationRunner):
     """
     Class set up and run the stages of a leg of the calculation.
     """
@@ -74,8 +75,8 @@ class Leg():
                  equil_detection: str = "block_gradient",
                  gradient_threshold: _Optional[float] = None,
                  ensemble_size: int = 5,
-                 input_dir: _Optional[str] = None,
                  base_dir: _Optional[str] = None,
+                 input_dir: _Optional[str] = None,
                  stream_log_level: int = _logging.INFO) -> None:
         """
         Instantiate a calculation based on files in the input dir. If leg.pkl exists in the
@@ -97,12 +98,12 @@ class Leg():
             sensible value appears to be 0.5 kcal mol-1 ns-1.
         ensemble_size : int, Optional, default: 5
             Number of simulations to run in the ensemble.
-        input_dir : str, Optional, default: None
-            Path to directory containing input files for the simulations. If None, this
-            is set to `current_working_directory/input`.
         base_dir : str, Optional, default: None
             Path to the base directory in which to set up the stages. If None,
             this is set to the current working directory.
+        input_dir : str, Optional, default: None
+            Path to directory containing input files for the simulations. If None, this
+            is set to `current_working_directory/input`.
         stream_log_level : int, Optional, default: logging.INFO
             Logging level to use for the steam file handlers for the
             calculation object and its child objects.
@@ -111,58 +112,33 @@ class Leg():
         -------
         None
         """
-        # Check if we are starting from a previous simulation
-        if _os.path.isfile(f"{base_dir}/leg.pkl"):
-            print("Loading previous leg. Any arguments will be overwritten...")
-            with open(f"{base_dir}/leg.pkl", "rb") as file:
-                self.__dict__ = _pkl.load(file)
+        # Set the leg type, as this is needed in the superclass constructor
+        self.leg_type = leg_type
 
-        else:  # No pkl file to resume from
-            print("Creating new leg...")
+        super().__init__(base_dir=base_dir,
+                         input_dir=input_dir,
+                         stream_log_level=stream_log_level)
 
-            # Set up the calculation
-            self.leg_type = leg_type
+        if not self.loaded_from_pickle:
             self.stage_types = Leg.required_stages[leg_type]
             self.block_size = block_size
             self.equil_detection = equil_detection
             self.gradient_threshold = gradient_threshold
             self.ensemble_size = ensemble_size
-            if input_dir is None:
-                input_dir = _os.path.join(_os.getcwd(), "input")
-            self.input_dir = input_dir
-            if base_dir is None:
-                base_dir = _os.path.join(_os.getcwd(), f"{leg_type.name.lower()}")
-            _pathlib.Path(base_dir).mkdir(parents=True, exist_ok=True)
-            self.base_dir = base_dir
             self._running: bool = False
-            self.running_stages: _List[_Stage] = []
-            if base_dir is None:
-                self.base_dir = f"./{leg_type.name.lower()}"
-            else:
-                self.base_dir = base_dir
 
-            # Set up logging
-            self.stream_log_level = stream_log_level
-            self._logger = _logging.getLogger(str(self))
-            # For the file handler, we want to log everything
-            file_handler = _logging.FileHandler(f"{self.base_dir}/{self.leg_type.name.lower()}.log")
-            file_handler.setFormatter(_logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
-            file_handler.setLevel(_logging.DEBUG)
-            self._logger.addHandler(file_handler)
-            # For the stream handler, we want to log at the user-specified level
-            stream_handler = _logging.StreamHandler()
-            stream_handler.setFormatter(_logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
-            stream_handler.setLevel(stream_log_level)
-            self._logger.addHandler(stream_handler)
+            # Call superclass constructor, possibly overwriting attributes
+            # if a pickle file exists in the base directory
 
             # Validate the input
             self._validate_input()
 
-            # Save state
+            # Save the state and update log
+            self._update_log()
             self._dump()
 
     def __str__(self) -> str:
-        return f"Leg (type = {self.leg_type.name}, repeats = {self.ensemble_size}))"
+        return f"Leg (type = {self.leg_type.name})"
 
     def _validate_input(self) -> None:
         """Check that the required files are provided for the leg type and set the preparation stage
@@ -234,6 +210,7 @@ class Leg():
                                       equil_detection=self.equil_detection,
                                       gradient_threshold=self.gradient_threshold,
                                       ensemble_size=self.ensemble_size,
+                                      base_dir=self.stage_input_dirs[stage_type].replace("/input", ""),
                                       input_dir=self.stage_input_dirs[stage_type],
                                       output_dir=self.stage_input_dirs[stage_type].replace("input", "output"),
                                       stream_log_level=self.stream_log_level))
@@ -614,7 +591,6 @@ class Leg():
 
         for stage_type, stage_input_dir in self.stage_input_dirs.items():
             self._logger.info(f"Writing input files for {self.leg_type.name} leg {stage_type.name} stage")
-            self._logger.info(f"Writing input files for {self.leg_type.name} leg {stage_type.name} stage")
             restraint = self.restraints[0] if self.leg_type == LegType.BOUND else None
             protocol = _BSS.Protocol.FreeEnergy(runtime=DUMMY_RUNTIME*_BSS.Units.Time.nanosecond, 
                                                 lam_vals=DUMMY_LAM_VALS, 
@@ -629,7 +605,8 @@ class Leg():
             # Copy input written by BSS to the stage input directory
             for file in _glob.glob(f"{stage_input_dir}/lambda_0.0000/*"):
                 _shutil.copy(file, stage_input_dir)
-            _subprocess.run(["rm", "-rf", f"{stage_input_dir}/lambda_*"], check=True)
+            for file in _glob.glob(f"{stage_input_dir}/lambda_*"):
+                _subprocess.run(["rm", "-rf", file], check=True)
 
             # Copy the run_somd.sh script to the stage input directory
             _shutil.copy(f"{self.input_dir}/run_somd.sh", stage_input_dir)
@@ -660,15 +637,3 @@ class Leg():
 
     def analyse(self) -> None:
         pass
-
-    def _update_log(self) -> None:
-        """ Update the status log file with the current status of the ensemble. """
-        self._logger.debug("##############################################")
-        for var in vars(self):
-            self._logger.debug(f"{var}: {getattr(self, var)}")
-        self._logger.debug("##############################################")
-
-    def _dump(self) -> None:
-        """ Dump the current state of the ensemble to a pickle file."""
-        with open(f"{self.base_dir}/leg.pkl", "wb") as ofile:
-            _pkl.dump(self.__dict__, ofile)

@@ -21,6 +21,7 @@ from .plot import (
     plot_equilibration_time as _plot_equilibration_time
 )
 from .process_grads import GradientData as _GradientData
+from ._simulation_runner import SimulationRunner as _SimulationRunner
 
 class StageType(_Enum):
     """Enumeration of the types of stage."""
@@ -41,7 +42,7 @@ class StageType(_Enum):
             raise ValueError("Unknown stage type.")
         
 
-class Stage():
+class Stage(_SimulationRunner):
     """
     Class to hold and manipulate an ensemble of SOMD simulations for a
     single stage of a calculation.
@@ -54,6 +55,7 @@ class Stage():
                  gradient_threshold: _Optional[float] = None,
                  ensemble_size: int = 5,
                  lambda_values: _Optional[_List[float]] = None,
+                 base_dir: _Optional[str] = None,
                  input_dir: _Optional[str] = None,
                  output_dir: _Optional[str] = None,
                  stream_log_level: int = _logging.INFO) -> None:
@@ -82,6 +84,9 @@ class Stage():
         lambda_values : List[float], Optional, default: None
             List of lambda values to use for the simulations. If None, the lambda values
             will be read from the simfile.
+        base_dir : str, Optional, default: None
+            Path to the base directory. If None,
+            this is set to the current working directory.
         input_dir : str, Optional, default: None
             Path to directory containing input files for the simulations. If None, this
             will be set to "current_working_directory/input".
@@ -96,73 +101,52 @@ class Stage():
         -------
         None
         """
-        # Check if we are starting from a previous simulation
-        if _os.path.isfile(f"{output_dir}/ensemble.pkl"):
-            print("Loading previous ensemble. Any arguments will be overwritten...")
-            with open(f"{output_dir}/ensemble.pkl", "rb") as file:
-                self.__dict__ = _pkl.load(file)
-            # TODO: Check if the simulations are still running and continue if so. Ensure that the
-            # total simulation times are correct by checking the sim files.
+        # Set the stage type first, as this is required for __str__,
+        # and threrefore the super().__init__ call
+        self.stage_type = stage_type
 
-        else:  # No pkl file to resume from
-            print("Creating new ensemble...")
+        super().__init__(base_dir=base_dir,
+                         input_dir=input_dir,
+                         output_dir=output_dir,
+                         stream_log_level=stream_log_level)
 
-            self.stage_type = stage_type
-            self.block_size = block_size
-            self.equil_detection = equil_detection
-            self.gradient_threshold = gradient_threshold
-            self.ensemble_size = ensemble_size
-            if input_dir is None:
-                input_dir = _os.path.join(_os.getcwd(), "input")
-            self.input_dir = input_dir
-            if output_dir is None:
-                output_dir = _os.path.join(_os.getcwd(), "output")
-            self.output_dir = output_dir
+        if not self.loaded_from_pickle:
             if lambda_values is not None:
                 self.lam_vals = lambda_values
             else:
                 self.lam_vals = self._get_lam_vals()
+            self.block_size = block_size
+            self.equil_detection = equil_detection
+            self.gradient_threshold = gradient_threshold
+            self.ensemble_size = ensemble_size
             self._running: bool = False
             self.run_thread: _Optional[_threading.Thread] = None
             # Set boolean to allow us to kill the thread
             self.kill_thread: bool = False
             self.lam_windows: _List[_LamWindow] = []
             self.running_wins: _List[_LamWindow] = []
-            # Would be created by lam windows anyway, but is needed for queue log
-            _os.mkdir(output_dir)
-            self.virtual_queue = _VirtualQueue(log_dir=output_dir)
-
+            self.virtual_queue = _VirtualQueue(log_dir=self.base_dir)
             # Creating lambda window objects sets up required input directories
-            for lam in self.lam_vals:
-                self.lam_windows.append(_LamWindow(lam, 
-                                                  self.virtual_queue,
-                                                  self.block_size,
-                                                  self.equil_detection,
-                                                  self.gradient_threshold,
-                                                  self.ensemble_size, 
-                                                  self.input_dir,
-                                                  output_dir, stream_log_level,
+            for lam_val in self.lam_vals:
+                lam_base_dir = _os.path.join(self.base_dir, f"lambda_{lam_val:.3f}")
+                self.lam_windows.append(_LamWindow(lam=lam_val, 
+                                                   virtual_queue=self.virtual_queue,
+                                                    block_size=self.block_size,
+                                                    equil_detection=self.equil_detection,
+                                                    gradient_threshold=self.gradient_threshold,
+                                                    ensemble_size=self.ensemble_size,
+                                                    base_dir=lam_base_dir,
+                                                    input_dir=self.input_dir,
+                                                    stream_log_level=self.stream_log_level
                                                   )
                                        )
-            # Set up logging
-            self.stream_log_level = stream_log_level
-            self._logger = _logging.getLogger(str(self))
-            # For the file handler, we want to log everything
-            self._logger.setLevel(_logging.DEBUG)
-            file_handler = _logging.FileHandler(f"{output_dir}/stage.log")
-            file_handler.setFormatter(_logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
-            self._logger.addHandler(file_handler)
-            # For the stream handler, we want to log at the user-specified level
-            stream_handler = _logging.StreamHandler()
-            stream_handler.setFormatter(_logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
-            stream_handler.setLevel(stream_log_level)
-            self._logger.addHandler(stream_handler)
 
-            # Save state
+            # Save the state and update log
+            self._update_log()
             self._dump()
 
     def __str__(self) -> str:
-        return f"Stage (repeats = {self.ensemble_size}, no windows = {len(self.lam_vals)})"
+        return f"Stage (type = {self.stage_type.name.lower()})"
 
     def run(self, adaptive:bool=True, runtime:_Optional[float]=None) -> None:
         """ Run the ensemble of simulations constituting the stage (optionally with adaptive 
@@ -497,30 +481,17 @@ class Stage():
         del(self.lam_windows)
         self._logger.info("Creating lamda windows...")
         self.lam_windows = []
-        for lam in self.lam_vals:
-            self.lam_windows.append(_LamWindow(lam, self.virtual_queue,
-                                                self.block_size,
-                                                self.equil_detection,
-                                                self.gradient_threshold,
-                                                self.ensemble_size, 
-                                                self.input_dir,
-                                                self.output_dir, 
-                                                self.stream_log_level,
+        for lam_val in self.lam_vals:
+            self.lam_windows.append(_LamWindow( lam=lam_val,
+                                                virtual_queue=self.virtual_queue,
+                                                block_size=self.block_size,
+                                                equil_detection=self.equil_detection,
+                                                gradient_threshold=self.gradient_threshold,
+                                                ensemble_size=self.ensemble_size,
+                                                base_dir=self.base_dir,
+                                                input_dir=self.input_dir,
+                                                output_dir=self.output_dir,
+                                                stream_log_level=self.stream_log_level,
                                                 ))
+                
         
-
-    def _update_log(self) -> None:
-        """ Update the status log file with the current status of the ensemble. """
-        self._logger.debug("##############################################")
-        for var in vars(self):
-            self._logger.debug(f"{var}: {getattr(self, var)}")
-        self._logger.debug("##############################################")
-
-    def _dump(self) -> None:
-        """ Dump the current state of the ensemble to a pickle file. Specifically,
-         pickle self.__dict__ with self.run_thread = None, as _thread_lock objects
-         can't be pickled.   """
-        temp_dict={key: val for key, val in self.__dict__.items() if key != "run_thread"}
-        temp_dict["run_thread"]=None
-        with open(f"{self.output_dir}/ensemble.pkl", "wb") as ofile:
-            _pkl.dump(temp_dict, ofile)

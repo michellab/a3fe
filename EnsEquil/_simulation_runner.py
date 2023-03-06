@@ -1,11 +1,12 @@
 """Abstract base class for simulation runners."""
 
 from abc import ABC, abstractmethod
-import logging as _logging
 import pathlib as _pathlib
 import pickle as _pkl
+from typing import Optional as _Optional
+import logging as _logging
 
-def SimulationRunner(ABC):
+class SimulationRunner(ABC):
     """An abstract base class for simulation runners."""
     
     def __init__(self,
@@ -29,40 +30,52 @@ def SimulationRunner(ABC):
             Logging level to use for the steam file handlers for the
             calculation object and its child objects.
         """
+        self.loaded_from_pickle = False
+
         # Check if we are starting from a previous simulation runner
-        if _pathlib.Path(base_dir, f"{self.__class__.__name__}.pkl").is_file():
+        if _pathlib.Path(f"{base_dir}/{self.__class__.__name__}.pkl").is_file():
             print("Loading previous calculation. Any arguments will be overwritten...")
             with open(f"{base_dir}/{self.__class__.__name__}.pkl", "rb") as file:
                 self.__dict__ = _pkl.load(file)
+            self.loaded_from_pickle = True
 
-        # Set up the base dir, input dir, output dir, and logging
-        if base_dir is None:
-            base_dir = str(_pathlib.Path.cwd())
-        if not _pathlib.Path(base_dir).is_dir():
-            _pathlib.Path(base_dir).mkdir(parents=True)
-        if input_dir is None:
-            input_dir = str(_pathlib.Path(base_dir, "input"))
-        if output_dir is None:
-            output_dir = str(_pathlib.Path(base_dir, "output"))
+        else:
+            # Set up the base dir, input dir, output dir, and logging
+            if base_dir is None:
+                base_dir = str(_pathlib.Path.cwd())
+            if not _pathlib.Path(base_dir).is_dir():
+                _pathlib.Path(base_dir).mkdir(parents=True)
+            if input_dir is None:
+                input_dir = str(_pathlib.Path(base_dir, "input"))
+            if output_dir is None:
+                output_dir = str(_pathlib.Path(base_dir, "output"))
 
-        self.base_dir = base_dir
-        # Only create the input and output directories if they're called, using properties
-        self._input_dir = input_dir
-        self._output_dir = output_dir
+            self.base_dir = base_dir
+            # Only create the input and output directories if they're called, using properties
+            self._input_dir = input_dir
+            self._output_dir = output_dir
 
-        # Set up the logger
-        self.stream_log_level = stream_log_level
-        self._logger = _logging.getLogger(str(self))
-        # For the file handler, we want to log everything
-        self._logger.setLevel(_logging.DEBUG)
-        file_handler = _logging.FileHandler(f"{base_dir}/{self.__class__.__name__}.log")
-        file_handler.setFormatter(_logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
-        self._logger.addHandler(file_handler)
-        # For the stream handler, we want to log at the user-specified level
-        stream_handler = _logging.StreamHandler()
-        stream_handler.setFormatter(_logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
-        stream_handler.setLevel(stream_log_level)
-        self._logger.addHandler(stream_handler)
+            # Set up the logger
+            # TODO: Debug - why is debug output no longer working
+            self.stream_log_level = stream_log_level
+            self._logger = _logging.getLogger(str(self))
+            self._logger.setLevel(_logging.DEBUG)
+            self._logger.propagate = False
+            # For the file handler, we want to log everything
+            file_handler = _logging.FileHandler(f"{base_dir}/{self.__class__.__name__}.log")
+            file_handler.setFormatter(_logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+            file_handler.setLevel(_logging.DEBUG)
+            # For the stream handler, we want to log at the user-specified level
+            stream_handler = _logging.StreamHandler()
+            stream_handler.setFormatter(_logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
+            stream_handler.setLevel(stream_log_level)
+            # Add the handlers to the logger
+            self._logger.addHandler(file_handler)
+            self._logger.addHandler(stream_handler)
+            #Set up the logger
+
+            # Save state
+            self._dump()
 
     @property
     def input_dir(self) -> str:
@@ -88,24 +101,21 @@ def SimulationRunner(ABC):
         """Set the output directory for the simulation runner."""
         self._output_dir = value
 
-    @abstractmethod
     def __str__(self) -> str:
-        """Return a string representation of the simulation runner."""
-        return ""
+        return self.__class__.__name__
 
     @abstractmethod
     def run(self) -> None:
         """Run the simulation runner"""
-        pass
 
     def _update_log(self) -> None:
         """ Update the status log file with the current status of the simulation runner."""
-        self._logger.debug("##############################################")
+        self._logger.info("##############################################")
         for var in vars(self):
-            self._logger.debug(f"{var}: {getattr(self, var)}")
-        self._logger.debug("##############################################")
+            self._logger.info(f"{var}: {getattr(self, var)}")
+        self._logger.info("##############################################")
 
     def _dump(self) -> None:
         """ Dump the current state of the simulation object to a pickle file."""
-        with open(f"{self.output_dir}/{self.__class__.__name__}.pkl", "wb") as ofile:
+        with open(f"{self.base_dir}/{self.__class__.__name__}.pkl", "wb") as ofile:
             _pkl.dump(self.__dict__, ofile)

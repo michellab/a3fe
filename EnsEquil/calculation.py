@@ -8,8 +8,9 @@ import pickle as _pkl
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
 from .leg import Leg as _Leg, LegType as _LegType, PreparationStage as _PreparationStage
+from ._simulation_runner import SimulationRunner as _SimulationRunner
 
-class Calculation():
+class Calculation(_SimulationRunner):
     """
     Class to set up and run an entire ABFE calculation, consisting of two legs
     (bound and unbound) and multiple stages.
@@ -19,7 +20,8 @@ class Calculation():
                             "protein.pdb",
                             "ligand.pdb",] # Waters.pdb is optional
 
-    required_legs = [_LegType.BOUND, _LegType.FREE]
+    #required_legs = [_LegType.BOUND, _LegType.FREE]
+    required_legs = [_LegType.FREE]
 
     def __init__(self, 
                  block_size: float = 1,
@@ -49,12 +51,12 @@ class Calculation():
             sensible value appears to be 0.5 kcal mol-1 ns-1.
         ensemble_size : int, Optional, default: 5
             Number of simulations to run in the ensemble.
-        input_dir : str, Optional, default: None
-            Path to directory containing input files for the simulations. If None, this
-            is set to `current_working_directory/input`.
         base_dir : str, Optional, default: None
             Path to the base directory in which to set up the legs and stages. If None,
             this is set to the current working directory.
+        input_dir : str, Optional, default: None
+            Path to directory containing input files for the simulations. If None, this
+            is set to `current_working_directory/input`.
         stream_log_level : int, Optional, default: logging.INFO
             Logging level to use for the steam file handlers for the
             calculation object and its child objects.
@@ -63,52 +65,24 @@ class Calculation():
         -------
         None
         """
-        # Check if we are starting from a previous simulation
-        if _os.path.isfile(f"{base_dir}/calculation.pkl"):
-            print("Loading previous calculation. Any arguments will be overwritten...")
-            with open(f"{base_dir}/calculation.pkl", "rb") as file:
-                self.__dict__ = _pkl.load(file)
-
-        else:  # No pkl file to resume from
-            print("Creating new calculation...")
-
-            # Set up the calculation
+        super().__init__(base_dir=base_dir,
+                         input_dir=input_dir,
+                         output_dir=None,
+                         stream_log_level=stream_log_level)
+        
+        if not self.loaded_from_pickle:
             self.block_size = block_size
             self.equil_detection = equil_detection
             self.gradient_threshold = gradient_threshold
             self.ensemble_size = ensemble_size
-            if input_dir is None:
-                input_dir = _os.path.join(_os.getcwd(), "input")
-            self.input_dir = input_dir
             self._running: bool = False
-            if base_dir is None:
-                base_dir = _os.getcwd()
-            self.base_dir = base_dir
-            if not _os.path.isdir(base_dir):
-                _os.mkdir(base_dir)
-
-            # Set up logging
-            self.stream_log_level = stream_log_level
-            self._logger = _logging.getLogger(str(self))
-            # For the file handler, we want to log everything
-            self._logger.setLevel(_logging.DEBUG)
-            file_handler = _logging.FileHandler(f"{base_dir}/calculation.log")
-            file_handler.setFormatter(_logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
-            self._logger.addHandler(file_handler)
-            # For the stream handler, we want to log at the user-specified level
-            stream_handler = _logging.StreamHandler()
-            stream_handler.setFormatter(_logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
-            stream_handler.setLevel(stream_log_level)
-            self._logger.addHandler(stream_handler)
-
+            
             # Validate the input
             self._validate_input()
 
-            # Save state
+            # Save the state and update log
+            self._update_log()
             self._dump()
-
-    def __str__(self) -> str:
-        return f"Calculation (repeats = {self.ensemble_size})"
 
     def _validate_input(self) -> None:
         """Check that the required input files are present in the input directory."""
@@ -135,7 +109,7 @@ class Calculation():
 
         # Set up the legs
         self.legs = []
-        for leg_type in Calculation.required_legs:
+        for leg_type in reversed(Calculation.required_legs):
             self._logger.info(f"Setting up {leg_type.name.lower()} leg...")
             leg = _Leg(leg_type=leg_type,
                        block_size = self.block_size,
@@ -143,7 +117,7 @@ class Calculation():
                        gradient_threshold=self.gradient_threshold,
                        ensemble_size=self.ensemble_size,
                        input_dir=self.input_dir,
-                       base_dir=None, # Decided automatically on the basis of leg type
+                       base_dir=_os.path.join(self.base_dir, leg_type.name.lower()),
                        stream_log_level=self.stream_log_level)
             self.legs.append(leg)
             leg.setup()
@@ -199,15 +173,3 @@ class Calculation():
 
     def analyse(self) -> None:
         pass
-
-    def _update_log(self) -> None:
-        """ Update the status log file with the current status of the ensemble. """
-        self._logger.debug("##############################################")
-        for var in vars(self):
-            self._logger.debug(f"{var}: {getattr(self, var)}")
-        self._logger.debug("##############################################")
-
-    def _dump(self) -> None:
-        """ Dump the current state of the ensemble to a pickle file."""
-        with open(f"{self.base_dir}/calculation.pkl", "wb") as ofile:
-            _pkl.dump(self.__dict__, ofile)
