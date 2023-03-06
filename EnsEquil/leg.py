@@ -14,6 +14,7 @@ import subprocess as _subprocess
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
 from .stage import Stage as _Stage, StageType as _StageType
+from .simfile import read_simfile_option as _read_simfile_option, write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 
 class LegType(_Enum):
@@ -64,10 +65,16 @@ class Leg(_SimulationRunner):
     for leg_type in LegType:
         required_input_files[leg_type] = {}
         for prep_stage in PreparationStage:
-            required_input_files[leg_type][prep_stage] = ["run_somd.sh"] + prep_stage.get_simulation_input_files(leg_type)
+            required_input_files[leg_type][prep_stage] = ["run_somd.sh", "template_config.cfg"] + prep_stage.get_simulation_input_files(leg_type)
 
     required_stages = {LegType.BOUND: [_StageType.RESTRAIN, _StageType.DISCHARGE, _StageType.VANISH],
                         LegType.FREE: [_StageType.DISCHARGE, _StageType.VANISH]}
+
+    default_lambda_values = {LegType.BOUND: { _StageType.RESTRAIN: [0.000, 0.125, 0.250, 0.375, 0.500, 1.000],
+                                             _StageType.DISCHARGE: [0.000, 0.143, 0.286, 0.429, 0.571, 0.714, 0.857, 1.000],
+                                             _StageType.VANISH: [0.000, 0.025, 0.050, 0.075, 0.100, 0.125, 0.150, 0.175, 0.200, 0.225, 0.250, 0.275, 0.300, 0.325, 0.350, 0.375, 0.400, 0.425, 0.450, 0.475, 0.500, 0.525, 0.550, 0.575, 0.600, 0.625, 0.650, 0.675, 0.700, 0.725, 0.750, 0.800, 0.850, 0.900, 0.950, 1.000]},
+                            LegType.FREE: { _StageType.DISCHARGE: [0.000, 0.143, 0.286, 0.429, 0.571, 0.714, 0.857, 1.000],
+                                            _StageType.VANISH: [0.000, 0.028, 0.056, 0.111, 0.167, 0.222, 0.278, 0.333, 0.389, 0.444, 0.500, 0.556, 0.611, 0.667, 0.722, 0.778, 0.889, 1.000 ]}}
 
     def __init__(self, 
                  leg_type: LegType,
@@ -619,6 +626,19 @@ class Leg(_SimulationRunner):
                     _shutil.copy(restraint_file, f"{stage_input_dir}/restraint_{i+1}.txt")
                     coordinates_file = f"{self.base_dir}/restraint_search/somd_{i+1}.rst7"
                     _shutil.copy(coordinates_file, f"{stage_input_dir}/somd_{i+1}.rst7")
+
+            # Update the template-config.cfg file with the perturbed residue number generated
+            # by BSS
+            _shutil.copy(f"{self.input_dir}/template_config.cfg", stage_input_dir)
+            perturbed_resnum = _read_simfile_option(f"{stage_input_dir}/somd.cfg", "perturbed residue number")
+            _write_simfile_option(f"{stage_input_dir}/template_config.cfg", "perturbed residue number", perturbed_resnum)
+            # Now overwrite the SOMD generated config file with the template
+            _subprocess.run(["mv", f"{stage_input_dir}/template_config.cfg", f"{stage_input_dir}/somd.cfg"], check=True)
+
+            # Set the default lambda windows based on the leg and stage types
+            lam_vals = Leg.default_lambda_values[self.leg_type][stage_type]
+            lam_vals_str = ", ".join([str(lam_val) for lam_val in lam_vals])
+            _write_simfile_option(f"{stage_input_dir}/somd.cfg", "lambda windows", lam_vals_str)
 
 
     def run(self) -> None:

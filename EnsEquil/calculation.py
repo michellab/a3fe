@@ -18,7 +18,8 @@ class Calculation(_SimulationRunner):
 
     required_input_files = ["run_somd.sh",
                             "protein.pdb",
-                            "ligand.pdb",] # Waters.pdb is optional
+                            "ligand.pdb",
+                            "template_config.cfg"] # Waters.pdb is optional
 
     #required_legs = [_LegType.BOUND, _LegType.FREE]
     required_legs = [_LegType.FREE]

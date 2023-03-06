@@ -74,9 +74,9 @@ class Simulation(_SimulationRunner):
             self.job: _Optional[_Job]=None
             self._running: bool=False
             self.tot_simtime: float=0  # ns
-            self.simfile_path = _os.path.join(self.input_dir, "/somd.cfg")
-            # First, set lambda value in the simfile
-            self._set_simfile_lambda()
+            self.simfile_path = _os.path.join(self.input_dir, "somd.cfg")
+            # First, set lambda value and some paths in the simfile
+            self._update_simfile()
             # Now read useful parameters from the simulation file options
             self._add_attributes_from_simfile()
 
@@ -139,7 +139,7 @@ class Simulation(_SimulationRunner):
         timestep=None  # ns
         nmoves=None  # number of moves per cycle
         nrg_freq=None  # number of timesteps between energy calculations
-        timestep = float(_read_simfile_option(self.simfile_path, "timestep"))
+        timestep = float(_read_simfile_option(self.simfile_path, "timestep").split()[0]) # Need to remove femtoseconds from the end
         nmoves = float(_read_simfile_option(self.simfile_path, "nmoves"))
         nrg_freq = float(_read_simfile_option(self.simfile_path, "energy frequency"))
 
@@ -147,8 +147,9 @@ class Simulation(_SimulationRunner):
         self.nrg_freq=nrg_freq
         self.time_per_cycle=timestep * nmoves / 1_000_000  # fs to ns
 
-    def _set_simfile_lambda(self) -> None:
-        """Set the lambda value in the simulation file.  """
+    def _update_simfile(self) -> None:
+        """Set the lambda value in the simulation file, as well as some
+        paths to input files."""
 
         # Check that the lambda value has been set
         if not hasattr(self, "lam"):
@@ -161,6 +162,15 @@ class Simulation(_SimulationRunner):
         
         # Set the lambda value in the simfile
         _write_simfile_option(self.simfile_path, "lambda_val", str(self.lam))
+        
+        # Set the paths to the input files
+        input_paths = {"morphfile": "somd.pert",
+                       "topfile": "somd.prm7",
+                       "crdfile": "somd.rst7"}
+
+        for option, name in input_paths.items():
+            _write_simfile_option(self.simfile_path, option, _os.path.join(self.input_dir, name))
+        
 
     def run(self, duration: float=2.5) -> None:
         """

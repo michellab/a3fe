@@ -47,7 +47,7 @@ def write_simfile_option(simfile: str, option: str, value: str) -> None:
 
     # If the option is not present, append it to the end of the file
     if option_line_idx is None:
-        lines.append(f"{option} = {value}")
+        lines.append(f"{option} = {value}\n")
     # Otherwise, replace the line with the new value
     else:
         lines[option_line_idx] = f"{option} = {value}\n"
