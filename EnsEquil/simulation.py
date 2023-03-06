@@ -3,10 +3,12 @@
 from decimal import Decimal as _Decimal
 import os as _os
 import logging as _logging
+from unittest.mock import NonCallableMagicMock
 import numpy as _np
 import subprocess as _subprocess
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
+from .simfile import read_simfile_option as _read_simfile_option, write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._utils import Job as _Job, VirtualQueue as _VirtualQueue
 
@@ -62,7 +64,7 @@ class Simulation(_SimulationRunner):
 
         super().__init__(base_dir=base_dir,
                          input_dir=input_dir,
-                         output_dir=None,
+                         output_dir=output_dir,
                          stream_log_level=stream_log_level)
 
         if not self.loaded_from_pickle:
@@ -72,6 +74,9 @@ class Simulation(_SimulationRunner):
             self.job: _Optional[_Job]=None
             self._running: bool=False
             self.tot_simtime: float=0  # ns
+            self.simfile_path = _os.path.join(self.input_dir, "/somd.cfg")
+            # First, set lambda value in the simfile
+            self._set_simfile_lambda()
             # Now read useful parameters from the simulation file options
             self._add_attributes_from_simfile()
 
@@ -134,22 +139,28 @@ class Simulation(_SimulationRunner):
         timestep=None  # ns
         nmoves=None  # number of moves per cycle
         nrg_freq=None  # number of timesteps between energy calculations
-        with open(self.input_dir + "/somd.cfg", "r") as ifile:
-            lines=ifile.readlines()
-            for line in lines:
-                if line.startswith("timestep ="):
-                    timestep=float(line.split("=")[1].split()[0])
-                if line.startswith("nmoves ="):
-                    nmoves=float(line.split("=")[1])
-                if line.startswith("energy frequency ="):
-                    nrg_freq=float(line.split("=")[1])
-
-        if timestep is None or nmoves is None or nrg_freq is None:
-            raise ValueError("Could not find timestep or nmoves in somd.cfg.")
+        timestep = float(_read_simfile_option(self.simfile_path, "timestep"))
+        nmoves = float(_read_simfile_option(self.simfile_path, "nmoves"))
+        nrg_freq = float(_read_simfile_option(self.simfile_path, "energy frequency"))
 
         self.timestep=timestep / 1_000_000  # fs to ns
         self.nrg_freq=nrg_freq
         self.time_per_cycle=timestep * nmoves / 1_000_000  # fs to ns
+
+    def _set_simfile_lambda(self) -> None:
+        """Set the lambda value in the simulation file.  """
+
+        # Check that the lambda value has been set
+        if not hasattr(self, "lam"):
+            raise AttributeError("Lambda value not set for simulation")
+
+        # Check that the set lambda value is in the list of lamvals in the simfile
+        lamvals = [float(lam_val) for lam_val in _read_simfile_option(self.simfile_path, "lambda array").split(",")]
+        if self.lam not in lamvals:
+            raise ValueError(f"Lambda value {self.lam} not in list of lambda values in simfile")
+        
+        # Set the lambda value in the simfile
+        _write_simfile_option(self.simfile_path, "lambda_val", str(self.lam))
 
     def run(self, duration: float=2.5) -> None:
         """

@@ -6,5 +6,6 @@ from .leg import *
 from .stage import *
 from .lambda_window import *
 from .simulation import *
+from .simfile import *
 
 from ._version import __version__

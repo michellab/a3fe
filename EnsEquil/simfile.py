@@ -20,6 +20,7 @@ def read_simfile_option(simfile: str, option: str) -> str:
         if line.startswith(option):
             value = line.split("=")[1].strip()
             return value
+    raise ValueError(f"Option {option} not found in simfile {simfile}")
 
 def write_simfile_option(simfile: str, option: str, value: str) -> None:
     """Write an option to a SOMD simfile.
