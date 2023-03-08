@@ -33,21 +33,6 @@ Finally, download EnsEquil, install, and test:
  pip install .
  pytest EnsEquil
  ```
-
-
-```bash
- mamba create -n ensequil "python<3.10" -c conda-forge ambertools
- mamba activate ensequil
- mamba install -c openbiosim biosimspace
- ```
- 
- Now download EnsEquil, install, and test:
- ```bash
- git clone https://github.com/fjclark/EnsEquil.git
- cd EnsEquil
- pip install .
- pytest EnsEquil
- ```
  
 ### Examples
 
@@ -56,7 +41,7 @@ Create a run directory and copy `EnsEquil/EnsEquil/data/example_input` to <your 
 ```
 ipython
 import EnsEquil as ee
-ens = ee.Ensemble(block_size=1) # Use a block size of 1 ns to detect equilibration
+ens = ee.Stage(block_size=1) # Use a block size of 1 ns to detect equilibration
 ens.run()
 ```
 Creating the `ens` ensemble object will result in the creation of all required output directories. After starting the run with `ens.run()`, the ensemble will run in the background (and will be killed if you exit ipython) and you will be able to query the state of, and interact with, the ensemble object.
