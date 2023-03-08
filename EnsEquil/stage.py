@@ -205,7 +205,7 @@ class Stage(_SimulationRunner):
         while self.running:
             _sleep(60) # Check every minute
 
-    def _run_without_threading(self, adaptive:bool=True, runtime:_Optional[float]=None) -> None:
+    def _run_without_threading(self, adaptive:bool=True, runtime:_Optional[float]=None, analyse:bool = True) -> None:
         """ Run the ensemble of simulations constituting the stage (optionally with adaptive 
         equilibration detection), and, if using adaptive equilibration detection, perform 
         analysis once finished.  This function is called by run() with threading, so that
@@ -219,73 +219,72 @@ class Stage(_SimulationRunner):
             If False, the stage will run for the specified runtime and analysis will not be performed.
         runtime : float, Optional, default: None
             If adaptive is False, runtime must be supplied and stage will run for this number of nanoseconds. 
+        analyse : bool, Optional, default: True
+            If True, the stage will perform analysis once finished.
 
         Returns
         -------
         None
         """
-        # Reset self.kill_thread so we can restart after killing
-        self.kill_thread = False
+        # Use stage context manager to ensure that the stage is killed if an exception is raised
+        with StageContextManager([self]):
+            # Reset self.kill_thread so we can restart after killing
+            self.kill_thread = False
 
-        if not adaptive and runtime is None:
-            raise ValueError("If adaptive equilibration detection is disabled, a runtime must be supplied.")
-        if adaptive and runtime is not None:
-            raise ValueError("If adaptive equilibration detection is enabled, a runtime cannot be supplied.")
+            if not adaptive and runtime is None:
+                raise ValueError("If adaptive equilibration detection is disabled, a runtime must be supplied.")
+            if adaptive and runtime is not None:
+                raise ValueError("If adaptive equilibration detection is enabled, a runtime cannot be supplied.")
 
-        if not adaptive and runtime is not None:
+            if not adaptive:
+                self._logger.info(f"Starting {self}. Adaptive equilibration = {adaptive}...")
+            elif adaptive:
+                self._logger.info(f"Starting {self}. Adaptive equilibration = {adaptive}...")
+                if runtime is None:
+                    runtime = 3 * self.block_size
+
+            # Run initial SOMD simulations
             for win in self.lam_windows:
                 # Add buffer of 1 block_size to give chance for the equilibration to be detected.
-                win.run(runtime)
+                win.run(runtime) # type: ignore
                 win._update_log()
                 self._dump()
 
-        # Run initial SOMD simulations
-        self._logger.info(f"Starting {self}. Adaptive equilibration = {adaptive}...")
-        if runtime is None:
-            runtime = 3 * self.block_size
-        for win in self.lam_windows:
-            # Add buffer of 1 block_size to give chance for the equilibration to be detected.
-            win.run(runtime)
-            win._update_log()
+            # Periodically check the simulations and analyse/ resubmit as necessary
+            self.running_wins = self.lam_windows
             self._dump()
+            while self.running_wins:
+                _sleep(20 * 1)  # Check every 20 seconds
+                # Check if we've requested to kill the thread
+                if self.kill_thread:
+                    self._logger.info(f"Kill thread requested: exiting run loop")
+                    return
+                # Update the queue before checking the simulations
+                self.virtual_queue.update()
+                for win in self.running_wins:
+                    # Check if the window has now finished - calling win.running updates the win._running attribute
+                    if not win.running:
+                        self._logger.info(f"{win} has finished at {win.tot_simtime:.3f} ns")
+                        # If we are in adaptive mode, check if the simulation has equilibrated and if not, resubmit
+                        if adaptive:
+                            if win.equilibrated:
+                                self._logger.info(f"{win} has equilibrated at {win.equil_time:.3f} ns")
+                            else:
+                                self._logger.info(f"{win} has not equilibrated. Resubmitting for {self.block_size:.3f} ns")
+                                win.run(self.block_size)
 
-        # Periodically check the simulations and analyse/ resubmit as necessary
-        self.running_wins = self.lam_windows
-        self._dump()
-        while self.running_wins:
-            _sleep(20 * 1)  # Check every 20 seconds
-            # Check if we've requested to kill the thread
-            if self.kill_thread:
-                self._logger.info(f"Kill thread requested: exiting run loop")
-                return
-            # Update the queue before checking the simulations
-            self.virtual_queue.update()
-            for win in self.running_wins:
-                # Check if the window has now finished - calling win.running updates the win._running attribute
-                if not win.running:
-                    self._logger.info(f"{win} has finished at {win.tot_simtime:.3f} ns")
-                    # If we are in adaptive mode, check if the simulation has equilibrated and if not, resubmit
-                    if adaptive:
-                        if win.equilibrated:
-                            self._logger.info(f"{win} has equilibrated at {win.equil_time:.3f} ns")
-                        else:
-                            self._logger.info(f"{win} has not equilibrated. Resubmitting for {self.block_size:.3f} ns")
-                            win.run(self.block_size)
+                        # Write status after checking for running and equilibration, as this updates the
+                        # _running and _equilibrated attributes
+                        win._update_log()
+                        self._dump()
 
-                    # Write status after checking for running and equilibration, as this updates the
-                    # _running and _equilibrated attributes
-                    win._update_log()
-                    self._dump()
-
-            self.running_wins = [win for win in self.running_wins if win.running]
+                self.running_wins = [win for win in self.running_wins if win.running]
 
         # All simulations are now finished, so perform final analysis
-        if adaptive:
-            self._logger.info(f"All simulations in {self} have finished. Performing analysis...")
+        self._logger.info(f"All simulations in {self} have finished.")
+        if analyse:
+            self._logger.info("Performing analysis")
             self.analyse()
-
-        else:
-            self._logger.info(f"All simulations in {self} have finished.")
 
     def get_optimal_lambda_values(self) -> _np.ndarray:
         """
@@ -493,5 +492,33 @@ class Stage(_SimulationRunner):
                                                 output_dir=self.output_dir,
                                                 stream_log_level=self.stream_log_level,
                                                 ))
+
+    def _dump(self) -> None:
+        """ Dump the current state of the ensemble to a pickle file. Specifically,
+         pickle self.__dict__ with self.run_thread = None, as _thread_lock objects
+         can't be pickled.   """
+        temp_dict={key: val for key, val in self.__dict__.items() if key != "run_thread"}
+        temp_dict["run_thread"]=None
+        with open(f"{self.output_dir}/ensemble.pkl", "wb") as ofile:
+            _pkl.dump(temp_dict, ofile)
                 
+class StageContextManager():
+    """Stage context manager to ensure that all stages are killed when
+    the context is exited."""
+
+    def __init__(self, stages: _List[Stage]):
+        """ 
+        Parameters
+        ----------
+        stages : List[Stage]
+            The stages to kill when the context is exited.
+        """
+        self.stages = stages
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        for stage in self.stages:
+            stage.kill()
         

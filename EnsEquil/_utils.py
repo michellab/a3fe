@@ -144,7 +144,8 @@ class VirtualQueue():
             for job in jobs_to_move:
                 #cmd = f"sbatch {job.command}"
                 # Sketchy hack to get sbatch to work on my system
-                cmd = f"~/Documents/research/scripts/abfe/rbatch.sh {job.command}"
+                #cmd = f"~/Documents/research/scripts/abfe/rbatch.sh {job.command}"
+                cmd = f"sbatch {job.command}"
                 process = _subprocess.Popen(cmd, shell=True, stdin=_subprocess.PIPE,
                                             stdout=_subprocess.PIPE, stderr=_subprocess.STDOUT,
                                             close_fds=True)

@@ -74,7 +74,7 @@ class Simulation(_SimulationRunner):
             self.job: _Optional[_Job]=None
             self._running: bool=False
             self.tot_simtime: float=0  # ns
-            self.simfile_path = _os.path.join(self.input_dir, "somd.cfg")
+            self.simfile_path = _os.path.join(self.base_dir, "somd.cfg")
             # First, set lambda value and some paths in the simfile
             self._update_simfile()
             # Now read useful parameters from the simulation file options
@@ -207,7 +207,10 @@ class Simulation(_SimulationRunner):
         if not self.job:
             raise ValueError("No job found. Cannot kill job.")
         self._logger.info(f"Killing job {self.job}")
-        self.virtual_queue.kill(self.job)
+        try:
+            self.virtual_queue.kill(self.job)
+        except ValueError:
+            self._logger.warning(f"Job {self.job} not found. Cannot kill job.")
         self.running=False
 
     def _set_n_cycles(self, n_cycles: int) -> None:

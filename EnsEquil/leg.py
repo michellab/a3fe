@@ -217,6 +217,7 @@ class Leg(_SimulationRunner):
                                       equil_detection=self.equil_detection,
                                       gradient_threshold=self.gradient_threshold,
                                       ensemble_size=self.ensemble_size,
+                                      lambda_values=Leg.default_lambda_values[self.leg_type][stage_type],
                                       base_dir=self.stage_input_dirs[stage_type].replace("/input", ""),
                                       input_dir=self.stage_input_dirs[stage_type],
                                       output_dir=self.stage_input_dirs[stage_type].replace("input", "output"),
@@ -227,7 +228,7 @@ class Leg(_SimulationRunner):
         self._dump()
 
 
-    def get_optimal_lambda_windows(self, simtime:float = 0.1) -> None:
+    def get_optimal_lam_vals(self, simtime:_Optional[float] = 0.1) -> None:
         """
         Determine the optimal lambda windows for each stage of the leg
         by running short simulations at each lambda value and analysing them.
@@ -235,37 +236,25 @@ class Leg(_SimulationRunner):
         Parameters
         ----------
         simtime : float, Optional, default: 0.1
-            The length of the short simulations to run, in ns.
+            The length of the short simulations to run, in ns. If None is provided,
+            it is assumed that the simulations have already been run and the
+            optimal lambda values are extracted from the output files.
         
         Returns
         -------
         None
         """
         # Check that the leg has been set up
-        if not hasattr(self, "legs"):
-            raise ValueError("The calculation has not been set up yet. Please call setup() first.")
+        if not hasattr(self, "stages"):
+            raise ValueError("The leg has not been set up yet. Please call setup() first.")
 
-        # Run in parallel
-        def get_optimal_lambda_windows_stage(stage: _Stage, simtime:float) -> None:
-            self._logger.info(f"Running simulations to determine optimal lambda windows for {stage}...")
-            # Run the stage for a given amount of time and wait for it to finish
-            stage.run(adaptive=False, runtime=simtime)
-            stage.wait()
-            optimal_lam_vals = stage.get_optimal_lambda_values()
-            # Save the old data, then create new LamWindow objects with the optimal lambda values
-            stage.mv_output(name="lam_val_determination")
-            stage.lam_vals = list(optimal_lam_vals) # This deletes all of the old LamWindow objects and creates a new output dir
-            stage.update() # This deletes all of the old LamWindow objects and creates a new output dir
+        # If simtime is not None, run short simulations
+        if simtime is not None:
+            self.run(analyse=False, adaptive=False, runtime=simtime)
 
-        with _Pool() as pool:
-            pool.starmap(get_optimal_lambda_windows_stage, [(stage, simtime) for stage in self.stages])
-
-        # Run the simulations
+        # Now extract the optimal lambda values
         for stage in self.stages:
-            self._logger.info(f"Running simulations to determine optimal lambda windows for {stage}...")
-            # Run the stage for a given amount of time and wait for it to finish
-            stage.run(adaptive=False, simtime=simtime)
-            stage.wait()
+            self._logger.info(f"Determining optimal lambda windows for {stage}...")
             optimal_lam_vals = stage.get_optimal_lam_vals()
             # Save the old data, then create new LamWindow objects with the optimal lambda values
             stage.mv_output(name="lam_val_determination")
@@ -638,22 +627,64 @@ class Leg(_SimulationRunner):
             # Set the default lambda windows based on the leg and stage types
             lam_vals = Leg.default_lambda_values[self.leg_type][stage_type]
             lam_vals_str = ", ".join([str(lam_val) for lam_val in lam_vals])
-            _write_simfile_option(f"{stage_input_dir}/somd.cfg", "lambda windows", lam_vals_str)
+            _write_simfile_option(f"{stage_input_dir}/somd.cfg", "lambda array", lam_vals_str)
 
 
-    def run(self) -> None:
-        """Run all stages and perform analysis once finished."""
-        self._logger.info("Running all stages")
+    def run(self, analyse:bool = True, adaptive:bool=True, runtime:_Optional[float]=None) -> None:
+        """
+        Run all stages in parallel and perform analysis once finished.
 
-        def run_stage(stage: _Stage) -> None:
-            self._logger.info(f"Starting {stage}...")
-            stage.run()
+        Parameters
+        ----------
+        analyse : bool, Optional, default: True
+            If True, the analysis will be performed after the simulations are finished, and each stage will
+            also be analysed individually.
+        adaptive : bool, Optional, default: True
+            If True, the stages will run until the simulations are equilibrated and perform analysis afterwards.
+            If False, the stages will run for the specified runtime and analysis will not be performed.
+        runtime : float, Optional, default: None
+            If adaptive is False, runtime must be supplied and stage will run for this number of nanoseconds. 
 
-        # Run in parallel
+        Returns
+        -------
+        None
+        """
+        # Run in parallel, using stage context manager behind the scenes
+        # to ensure that stages are killed if the calculation is killed e.g. by
+        # a KeyboardInterrupt
+        self._logger.info(f"Running {len(self.stages)} stages in parallel...")
         with _Pool() as pool:
-            pool.map(run_stage, self.stages)
+            pool.starmap(self._run_stage, [(stage, analyse, adaptive, runtime) for stage in self.stages])
 
-        self.analyse()
+        if analyse:
+            self.analyse()
+
+    def _run_stage(self, stage: _Stage, analyse:bool=True, adaptive:bool = True, runtime:_Optional[float]=None) -> None:
+        """
+        Run a stage of the calculation.
+
+        Parameters
+        ----------
+        stage : _Stage
+            The stage to run.
+        analyse : bool, Optional, default: True
+            If True, each stage will perform analysis after the simulations are finished.
+        adaptive : bool, default: True
+            If True, the stage will run until the simulations are equilibrated and perform analysis afterwards.
+            If False, the stage will run for the specified runtime and analysis will not be performed.
+        runtime : float, Optional, default: None
+            If adaptive is False, runtime must be supplied and stage will run for this number of nanoseconds. 
+
+        Returns
+        -------
+        None
+        """
+        # Check that the stage is not already running
+        if stage.running:
+            raise ValueError(f"Stage {stage} is already running.")
+        # Run the stage
+        self._logger.info(f"Running stage {stage.stage_type.name.lower()}, adaptive={adaptive}, runtime={runtime}...")
+        stage._run_without_threading(analyse=analyse, adaptive=adaptive, runtime=runtime)
 
     def analyse(self) -> None:
         pass

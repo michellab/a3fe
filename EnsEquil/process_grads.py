@@ -8,7 +8,7 @@ from .calc_corr import get_statistical_inefficiency as _get_statistical_ineffici
 class GradientData():
     """A class to store and process gradient data."""
 
-    def __init__(self, lam_winds: _List["LamWindow"], equilibrated: bool, )-> None:
+    def __init__(self, lam_winds: _List["LamWindow"], equilibrated: bool, )-> None: # type: ignore
         """ 
         Calculate the gradients, means, and variances of the gradients for each lambda
         window of a list of LamWindows.

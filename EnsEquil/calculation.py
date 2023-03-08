@@ -8,6 +8,7 @@ import pickle as _pkl
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
 from .leg import Leg as _Leg, LegType as _LegType, PreparationStage as _PreparationStage
+from .stage import Stage as _Stage, StageContextManager as _StageContextManager
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 
 class Calculation(_SimulationRunner):
@@ -76,7 +77,7 @@ class Calculation(_SimulationRunner):
             self.equil_detection = equil_detection
             self.gradient_threshold = gradient_threshold
             self.ensemble_size = ensemble_size
-            self._running: bool = False
+            self.setup_complete: bool = False
             
             # Validate the input
             self._validate_input()
@@ -108,6 +109,10 @@ class Calculation(_SimulationRunner):
     def setup(self) -> None:
         """ Set up the calculation."""
 
+        if self.setup_complete:
+            self._logger.info("Setup already complete. Skipping...")
+            return
+
         # Set up the legs
         self.legs = []
         for leg_type in reversed(Calculation.required_legs):
@@ -122,8 +127,9 @@ class Calculation(_SimulationRunner):
                        stream_log_level=self.stream_log_level)
             self.legs.append(leg)
             leg.setup()
-        
+
         # Save the state
+        self.setup_complete = True
         self._dump()
 
     def get_optimal_lambda_windows(self, simtime:float = 0.1) -> None:
@@ -140,37 +146,80 @@ class Calculation(_SimulationRunner):
         -------
         None
         """
-        # Check that the calculation has been set up
-        if not hasattr(self, "legs"):
-            raise ValueError("The calculation has not been set up yet. Please call setup() first.")
+        # First, run all the simulations for a 100 ps
+        self.run(analyse=False, adaptive=False, runtime=simtime)
 
-        # Run in parallel
-        def get_optimal_lambda_windows_leg(leg: _Leg, simtime:float) -> None:
-            self._logger.info(f"Running simulations to determine optimal lambda windows for {leg}...")
-            leg.get_optimal_lambda_windows(simtime=simtime)
-
-        with _Pool() as pool:
-            pool.starmap(get_optimal_lambda_windows_leg, [(leg, simtime) for leg in self.legs])
+        # Then, determine the optimal lambda windows
+        for leg in self.legs:
+            leg.get_optimal_lambda_windows()
 
         # Save state
         self._dump()
 
-    def run(self) -> None:
-        """Run the ensemble of simulations with adaptive equilibration detection,
-        and perform analysis once finished."""
-        # Run in the background with threading so that user can continuously check
-        # the status of the Ensemble object
-        self._logger.info("Starting both legs.")
+    def run(self, analyse:bool = True, adaptive:bool=True, runtime:_Optional[float]=None) -> None:
+        """
+        Run all stages in parallel and perform analysis once finished.
 
-        def run_leg(leg: _Leg) -> None:
-            self._logger.info(f"Starting {leg}...")
-            leg.run()
+        Parameters
+        ----------
+        analyse : bool, Optional, default: True
+            If True, the analysis will be performed after the simulations are finished, and each stage will
+            also be analysed individually.
+        adaptive : bool, Optional, default: True
+            If True, the stages will run until the simulations are equilibrated and perform analysis afterwards.
+            If False, the stages will run for the specified runtime and analysis will not be performed.
+        runtime : float, Optional, default: None
+            If adaptive is False, runtime must be supplied and stage will run for this number of nanoseconds. 
 
-        # Run in parallel
+        Returns
+        -------
+        None
+        """
+        if not self.setup_complete:
+            raise ValueError("The calculation has not been set up yet. Please call setup() first.")
+        # Unforunately, this has to be done at the level of stages rather than legs, because we can't
+        # use pool.starmap at the level of legs as well as at the level of calculation
+        # Get all the stages
+        stages = []
+        for leg in self.legs:
+            stages.extend(leg.stages)
+
+        # Run in parallel, using stage context manager behind the scenes
+        # to ensure that stages are killed if the calculation is killed e.g. by
+        # a KeyboardInterrupt
+        self._logger.info(f"Running {len(stages)} stages in parallel...")
         with _Pool() as pool:
-            pool.map(run_leg, self.legs)
+            pool.starmap(self._run_stage, [(stage, analyse, adaptive, runtime) for stage in stages])
 
-        self.analyse()
+        if analyse:
+            self.analyse()
+
+    def _run_stage(self, stage: _Stage, analyse:bool=True, adaptive:bool = True, runtime:_Optional[float]=None) -> None:
+        """
+        Run a stage of the calculation.
+
+        Parameters
+        ----------
+        stage : _Stage
+            The stage to run.
+        analyse : bool, Optional, default: True
+            If True, each stage will perform analysis after the simulations are finished.
+        adaptive : bool, default: True
+            If True, the stage will run until the simulations are equilibrated and perform analysis afterwards.
+            If False, the stage will run for the specified runtime and analysis will not be performed.
+        runtime : float, Optional, default: None
+            If adaptive is False, runtime must be supplied and stage will run for this number of nanoseconds. 
+
+        Returns
+        -------
+        None
+        """
+        # Check that the stage is not already running
+        if stage.running:
+            raise ValueError(f"Stage {stage} is already running.")
+        # Run the stage
+        self._logger.info(f"Running stage {stage.stage_type.name.lower()}, adaptive={adaptive}, runtime={runtime}...")
+        stage._run_without_threading(analyse=analyse, adaptive=adaptive, runtime=runtime)
 
     def analyse(self) -> None:
         pass

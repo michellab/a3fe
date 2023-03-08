@@ -30,9 +30,18 @@ class SimulationRunner(ABC):
             Logging level to use for the steam file handlers for the
             calculation object and its child objects.
         """
-        self.loaded_from_pickle = False
+        # Set up the directories
+        if base_dir is None:
+            base_dir = str(_pathlib.Path.cwd())
+        if not _pathlib.Path(base_dir).is_dir():
+            _pathlib.Path(base_dir).mkdir(parents=True)
+        if input_dir is None:
+            input_dir = str(_pathlib.Path(base_dir, "input"))
+        if output_dir is None:
+            output_dir = str(_pathlib.Path(base_dir, "output"))
 
         # Check if we are starting from a previous simulation runner
+        self.loaded_from_pickle = False
         if _pathlib.Path(f"{base_dir}/{self.__class__.__name__}.pkl").is_file():
             print("Loading previous calculation. Any arguments will be overwritten...")
             with open(f"{base_dir}/{self.__class__.__name__}.pkl", "rb") as file:
@@ -41,15 +50,6 @@ class SimulationRunner(ABC):
 
         else:
             # Set up the base dir, input dir, output dir, and logging
-            if base_dir is None:
-                base_dir = str(_pathlib.Path.cwd())
-            if not _pathlib.Path(base_dir).is_dir():
-                _pathlib.Path(base_dir).mkdir(parents=True)
-            if input_dir is None:
-                input_dir = str(_pathlib.Path(base_dir, "input"))
-            if output_dir is None:
-                output_dir = str(_pathlib.Path(base_dir, "output"))
-
             self.base_dir = base_dir
             # Only create the input and output directories if they're called, using properties
             self._input_dir = input_dir

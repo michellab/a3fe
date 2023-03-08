@@ -7,7 +7,7 @@ from pymbar import timeseries as _timeseries
 from .plot import general_plot as _general_plot
 
 
-def check_equil_block_gradient(lam_win:"LamWindow") -> _Tuple[bool, _Optional[float]]:
+def check_equil_block_gradient(lam_win:"LamWindow") -> _Tuple[bool, _Optional[float]]: # type: ignore
     """
     Check if the ensemble of simulations at the lambda window is
     equilibrated based on the ensemble gradient between averaged blocks.
@@ -107,7 +107,7 @@ def check_equil_block_gradient(lam_win:"LamWindow") -> _Tuple[bool, _Optional[fl
     return equilibrated, equil_time
 
 
-def check_equil_chodera(lam_win:"LamWindow") -> _Tuple[bool, _Optional[float]]:
+def check_equil_chodera(lam_win:"LamWindow") -> _Tuple[bool, _Optional[float]]: # type: ignore
     """
     Check if the ensemble of simulations at the lambda window is
     equilibrated based Chodera's method of maximising the number
