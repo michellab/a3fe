@@ -620,6 +620,10 @@ class Leg(_SimulationRunner):
             # by BSS
             _shutil.copy(f"{self.input_dir}/template_config.cfg", stage_input_dir)
             perturbed_resnum = _read_simfile_option(f"{stage_input_dir}/somd.cfg", "perturbed residue number")
+            # Temporary fix for BSS bug - perturbed residue number is wrong, but since we always add the 
+            # ligand first to the system, this should always be 1 anyway
+            # TODO: Fix this - raise BSS issue
+            perturbed_resnum = 1
             _write_simfile_option(f"{stage_input_dir}/template_config.cfg", "perturbed residue number", perturbed_resnum)
             # Now overwrite the SOMD generated config file with the template
             _subprocess.run(["mv", f"{stage_input_dir}/template_config.cfg", f"{stage_input_dir}/somd.cfg"], check=True)
