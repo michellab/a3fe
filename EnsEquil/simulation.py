@@ -266,7 +266,7 @@ class Simulation(_SimulationRunner):
             with open(_os.path.join(self.output_dir, "simfile_equilibrated.dat"), "r") as ifile:
                 lines=ifile.readlines()
         else:
-            with open(_os.path.join(self.output_dir, "/simfile.dat"), "r") as ifile:
+            with open(_os.path.join(self.output_dir, "simfile.dat"), "r") as ifile:
                 lines=ifile.readlines()
 
         steps=[]

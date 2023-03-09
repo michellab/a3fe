@@ -152,6 +152,7 @@ class VirtualQueue():
                 if process.stdout is None:
                     raise ValueError("Could not get stdout from process.")
                 process_output = process.stdout.read()
+                process_output = process_output.decode('utf-8').strip()
                 if process_output.startswith("sbatch: error"):
                     raise RuntimeError(f"Error submitting job: {process_output}")
                 job.slurm_job_id = int((process_output.split()[-1]))

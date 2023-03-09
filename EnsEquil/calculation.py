@@ -132,7 +132,7 @@ class Calculation(_SimulationRunner):
         self.setup_complete = True
         self._dump()
 
-    def get_optimal_lambda_windows(self, simtime:float = 0.1) -> None:
+    def get_optimal_lam_vals(self, simtime:float = 0.1) -> None:
         """
         Determine the optimal lambda windows for each stage of the calculation
         by running short simulations at each lambda value and analysing them
@@ -151,7 +151,7 @@ class Calculation(_SimulationRunner):
 
         # Then, determine the optimal lambda windows
         for leg in self.legs:
-            leg.get_optimal_lambda_windows()
+            leg.get_optimal_lam_vals()
 
         # Save state
         self._dump()

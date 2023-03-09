@@ -286,7 +286,7 @@ class Stage(_SimulationRunner):
             self._logger.info("Performing analysis")
             self.analyse()
 
-    def get_optimal_lambda_values(self) -> _np.ndarray:
+    def get_optimal_lam_vals(self) -> _np.ndarray:
         """
         Get the optimal lambda values for the stage,
         based on the integrated SEM
