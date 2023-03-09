@@ -154,7 +154,7 @@ class Calculation(_SimulationRunner):
 
         # Then, determine the optimal lambda windows
         for leg in self.legs:
-            leg.get_optimal_lam_vals(deta_sem=delta_sem)
+            leg.get_optimal_lam_vals(delta_sem=delta_sem)
 
         # Save state
         self._dump()
