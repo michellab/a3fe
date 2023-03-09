@@ -179,12 +179,13 @@ class Stage(_SimulationRunner):
     def kill(self) -> None:
         """Kill all running simulations."""
         # Stop the run loop
-        self.kill_thread = True
+        if not self.running:
+            self.kill_thread = True
 
-        self._logger.info("Killing all lambda windows")
-        for win in self.lam_windows:
-            win.kill()
-        self.running = False
+            self._logger.info("Killing all lambda windows")
+            for win in self.lam_windows:
+                win.kill()
+            self.running = False
 
     @property
     def running(self) -> bool:
