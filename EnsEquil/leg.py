@@ -14,7 +14,7 @@ import subprocess as _subprocess
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
 from .stage import Stage as _Stage, StageType as _StageType
-from .simfile import read_simfile_option as _read_simfile_option, write_simfile_option as _write_simfile_option
+from ._simfile import read_simfile_option as _read_simfile_option, write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 
 class LegType(_Enum):
