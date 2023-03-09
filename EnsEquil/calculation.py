@@ -132,7 +132,7 @@ class Calculation(_SimulationRunner):
         self.setup_complete = True
         self._dump()
 
-    def get_optimal_lam_vals(self, simtime:float = 0.1) -> None:
+    def get_optimal_lam_vals(self, simtime:float = 0.1, delta_sem:float = 0.1) -> None:
         """
         Determine the optimal lambda windows for each stage of the calculation
         by running short simulations at each lambda value and analysing them
@@ -141,6 +141,9 @@ class Calculation(_SimulationRunner):
         ----------
         simtime : float, Optional, default: 0.1
             The length of the short simulations to run, in ns.
+        delta_sem : float, default: 0.1
+            The desired integrated standard error of the mean of the gradients
+            between each lambda value, in kcal mol-1.        
         
         Returns
         -------
@@ -151,7 +154,7 @@ class Calculation(_SimulationRunner):
 
         # Then, determine the optimal lambda windows
         for leg in self.legs:
-            leg.get_optimal_lam_vals()
+            leg.get_optimal_lam_vals(deta_sem=delta_sem)
 
         # Save state
         self._dump()

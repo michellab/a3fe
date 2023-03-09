@@ -51,7 +51,7 @@ class Simulation(_SimulationRunner):
             will be set to "current_working_directory/output".
         stream_log_level : int, Optional, default: logging.INFO
             Logging level to use for the steam file handlers for the
-            Ensemble object and its child objects.
+            simulation object and its child objects.
 
         Returns
         -------
@@ -99,7 +99,7 @@ class Simulation(_SimulationRunner):
             True if the simulation is still running, False otherwise.
         """
         # Get job ids of currently running jobs - but note that the queue is updated at the
-        # Ensemble level
+        # Stage level
         if self.job in self.virtual_queue.queue:
             self._running=True
             self._logger.info(f"Still running")

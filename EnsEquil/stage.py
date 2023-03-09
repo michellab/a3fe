@@ -60,8 +60,8 @@ class Stage(_SimulationRunner):
                  output_dir: _Optional[str] = None,
                  stream_log_level: int = _logging.INFO) -> None:
         """
-        Initialise an ensemble of SOMD simulations. If ensemble.pkl exists in the
-        output directory, the ensemble will be loaded from this file and any arguments
+        Initialise an ensemble of SOMD simulations, constituting the Stage. If Stage.pkl exists in the
+        output directory, the Stage will be loaded from this file and any arguments
         supplied will be overwritten.
 
         Parameters
@@ -128,7 +128,7 @@ class Stage(_SimulationRunner):
             self.virtual_queue = _VirtualQueue(log_dir=self.base_dir)
             # Creating lambda window objects sets up required input directories
             for lam_val in self.lam_vals:
-                lam_base_dir = _os.path.join(self.base_dir, f"lambda_{lam_val:.3f}")
+                lam_base_dir = _os.path.join(self.output_dir, f"lambda_{lam_val:.3f}")
                 self.lam_windows.append(_LamWindow(lam=lam_val, 
                                                    virtual_queue=self.virtual_queue,
                                                     block_size=self.block_size,
@@ -286,18 +286,29 @@ class Stage(_SimulationRunner):
             self._logger.info("Performing analysis")
             self.analyse()
 
-    def get_optimal_lam_vals(self) -> _np.ndarray:
+    def get_optimal_lam_vals(self, delta_sem: float = 0.1) -> _np.ndarray:
         """
-        Get the optimal lambda values for the stage,
-        based on the integrated SEM
-        
+        Get the optimal lambda values for the stage, based on the 
+        integrated SEM, and create plots.
+
+        Parameters
+        ----------
+        delta_sem : float, default: 0.1
+            The desired integrated standard error of the mean of the gradients
+            between each lambda value, in kcal mol-1.        
         Returns
         -------
         optimal_lam_vals : np.ndarray
             List of optimal lambda values for the stage.
         """
         unequilibrated_gradient_data = _GradientData(lam_winds=self.lam_windows, equilibrated=False)
-        return unequilibrated_gradient_data.calculate_optimal_lam_vals()
+        _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="mean")
+        _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="intra_run_variance")
+        _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="sem")
+        _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="stat_ineff")
+        _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="integrated_sem")
+        _plot_gradient_hists(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir)
+        return unequilibrated_gradient_data.calculate_optimal_lam_vals(delta_sem=delta_sem)
 
 
     def _get_lam_vals(self) -> _List[float]:
@@ -494,12 +505,12 @@ class Stage(_SimulationRunner):
                                                 ))
 
     def _dump(self) -> None:
-        """ Dump the current state of the ensemble to a pickle file. Specifically,
+        """ Dump the current state of the Stage to a pickle file. Specifically,
          pickle self.__dict__ with self.run_thread = None, as _thread_lock objects
          can't be pickled.   """
         temp_dict={key: val for key, val in self.__dict__.items() if key != "run_thread"}
         temp_dict["run_thread"]=None
-        with open(f"{self.output_dir}/ensemble.pkl", "wb") as ofile:
+        with open(f"{self.output_dir}/{self.__class__.__name__}.pkl", "wb") as ofile:
             _pkl.dump(temp_dict, ofile)
                 
 class StageContextManager():

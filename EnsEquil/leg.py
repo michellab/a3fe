@@ -228,7 +228,7 @@ class Leg(_SimulationRunner):
         self._dump()
 
 
-    def get_optimal_lam_vals(self, simtime:_Optional[float] = 0.1) -> None:
+    def get_optimal_lam_vals(self, simtime:_Optional[float] = 0.1, delta_sem: float = 0.1) -> None:
         """
         Determine the optimal lambda windows for each stage of the leg
         by running short simulations at each lambda value and analysing them.
@@ -239,6 +239,9 @@ class Leg(_SimulationRunner):
             The length of the short simulations to run, in ns. If None is provided,
             it is assumed that the simulations have already been run and the
             optimal lambda values are extracted from the output files.
+        delta_sem : float, default: 0.1
+            The desired integrated standard error of the mean of the gradients
+            between each lambda value, in kcal mol-1.        
         
         Returns
         -------
@@ -255,7 +258,7 @@ class Leg(_SimulationRunner):
         # Now extract the optimal lambda values
         for stage in self.stages:
             self._logger.info(f"Determining optimal lambda windows for {stage}...")
-            optimal_lam_vals = stage.get_optimal_lam_vals()
+            optimal_lam_vals = stage.get_optimal_lam_vals(delta_sem=delta_sem)
             # Save the old data, then create new LamWindow objects with the optimal lambda values
             stage.mv_output(name="lam_val_determination")
             stage.lam_vals = optimal_lam_vals # This deletes all of the old LamWindow objects and creates a new output dir
