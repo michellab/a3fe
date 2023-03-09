@@ -8,7 +8,7 @@ import numpy as _np
 import subprocess as _subprocess
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
-from .simfile import read_simfile_option as _read_simfile_option, write_simfile_option as _write_simfile_option
+from ._simfile import read_simfile_option as _read_simfile_option, write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._utils import Job as _Job, VirtualQueue as _VirtualQueue
 
@@ -196,7 +196,7 @@ class Simulation(_SimulationRunner):
         self._set_n_cycles(n_cycles)
 
         # Run SOMD - note that command excludes sbatch as this is added by the virtual queue
-        cmd=f"--chdir {self.output_dir} run_somd.sh {self.lam}"
+        cmd=f"--chdir {self.output_dir} {self.input_dir}/run_somd.sh {self.lam}"
         self.job=self.virtual_queue.submit(cmd)
         self.running=True
         self.tot_simtime += duration
