@@ -1,6 +1,7 @@
 """Functionality to run a single SOMD simulation."""
 
 from decimal import Decimal as _Decimal
+import glob as _glob
 import os as _os
 import logging as _logging
 from unittest.mock import NonCallableMagicMock
