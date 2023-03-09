@@ -43,7 +43,7 @@ class SimulationRunner(ABC):
         # Check if we are starting from a previous simulation runner
         self.loaded_from_pickle = False
         if _pathlib.Path(f"{base_dir}/{self.__class__.__name__}.pkl").is_file():
-            print("Loading previous calculation. Any arguments will be overwritten...")
+            print(f"Loading previous {self.__class__.__name__}. Any arguments will be overwritten...")
             with open(f"{base_dir}/{self.__class__.__name__}.pkl", "rb") as file:
                 self.__dict__ = _pkl.load(file)
             self.loaded_from_pickle = True

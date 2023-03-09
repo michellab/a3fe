@@ -1,6 +1,8 @@
 """Utilities for the Ensemble, Window, and Simulation Classes"""
 
 from dataclasses import dataclass as _dataclass
+from enum import Enum as _Enum
+import glob as _glob
 import logging as _logging
 import subprocess as _subprocess
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
@@ -29,6 +31,14 @@ def read_mbar_outfile(outfile: str) -> _Tuple[float, float]:
 
     return free_energy, free_energy_err
 
+class JobStatus(_Enum):
+    """An enumeration of the possible job statuses"""
+    NONE = 0
+    QUEUED = 1
+    FINISHED = 2
+    FAILED = 3
+    KILLED = 4
+
 
 @_dataclass
 class Job():
@@ -36,10 +46,35 @@ class Job():
     virtual_job_id: int
     command: str
     slurm_job_id: _Optional[int] = None
+    status: JobStatus = JobStatus.NONE
+    slurm_file_base: _Optional[str] = None
 
     def __str__(self) -> str:
         # Avoid printing the command, which may be long
-        return f"Job (virtual_job_id = {self.virtual_job_id}, slurm_job_id= {self.slurm_job_id})"
+        return f"Job (virtual_job_id = {self.virtual_job_id}, slurm_job_id= {self.slurm_job_id}), status = {self.status}"
+
+    @property
+    def slurm_outfile(self) -> str:
+        if self.slurm_file_base == None:
+            raise AttributeError(f"{self} has no slurm_outfile")
+        matching_files = _glob.glob(f"{self.slurm_file_base}*")
+        if len(matching_files) == 0:
+            raise FileNotFoundError(f"No files matching {self.slurm_file_base}*")
+        elif len(matching_files) > 1:
+            raise FileNotFoundError(f"Multiple files matching {self.slurm_file_base}*")
+        else:
+            return matching_files[0]
+
+    def has_failed(self) -> bool:
+        """Check whether the job has failed"""
+        with open(self.slurm_outfile, 'r') as f:
+            for line in f.readlines():
+                error_statements = ["NaN or Inf has been generated along the simulation",]
+                for error in error_statements:
+                    if error in line:
+                        return True
+                
+        return False
 
 
 class VirtualQueue():
@@ -84,7 +119,7 @@ class VirtualQueue():
         """The queue of jobs, both real and virtual."""
         return self._slurm_queue + self._pre_queue
 
-    def submit(self, command: str) -> Job:
+    def submit(self, command: str, slurm_file_base: str) -> Job:
         """ 
         Submit a job to the virtual queue.
 
@@ -92,6 +127,9 @@ class VirtualQueue():
         ----------
         command : str
             The command to be run by sbatch.
+        slurm_file_base : str
+            The base name of the slurm file to be written. This allows
+            the slurm file to be checked for errors.
 
         Returns
         -------
@@ -100,7 +138,8 @@ class VirtualQueue():
         virtual_job_id = self._available_virt_job_id
         # Increment this so that it is never used again for this queue
         self._available_virt_job_id += 1
-        job = Job(virtual_job_id, command)
+        job = Job(virtual_job_id, command, slurm_file_base=slurm_file_base)
+        job.status = JobStatus.QUEUED
         self._pre_queue.append(job)
         self._logger.info(f"{job} submitted")
         # Now update - the job will be moved to the real queue if there is space
@@ -117,6 +156,7 @@ class VirtualQueue():
             _subprocess.run(["scancel", str(job.slurm_job_id)])
         else:  # Job is in the pre-queue
             self._pre_queue.remove(job)
+        job.status = JobStatus.KILLED
 
     def update(self) -> None:
         """Remove jobs from the queue if they have finished, then move jobs from
@@ -130,7 +170,15 @@ class VirtualQueue():
         output = process.communicate()[0]
         running_slurm_job_ids = [int(job_id) for job_id in output.decode('utf-8').strip().split(",") if job_id != ""]
         n_running_slurm_jobs = len(running_slurm_job_ids)
-        # Remove completed jobs from the queues
+        # Remove completed jobs from the queues and update their status
+        for job in self._slurm_queue:
+            if job.slurm_job_id not in running_slurm_job_ids:
+                # Check if it has failed
+                if job.has_failed():
+                    job.status = JobStatus.FAILED
+                else:
+                    job.status = JobStatus.FINISHED
+        # Update the slurm queue
         self._slurm_queue = [job for job in self._slurm_queue if job.slurm_job_id in running_slurm_job_ids]
 
         # Submit jobs if possible
@@ -144,8 +192,7 @@ class VirtualQueue():
             for job in jobs_to_move:
                 #cmd = f"sbatch {job.command}"
                 # Sketchy hack to get sbatch to work on my system
-                #cmd = f"~/Documents/research/scripts/abfe/rbatch.sh {job.command}"
-                cmd = f"sbatch {job.command}"
+                cmd = f"~/Documents/research/scripts/abfe/rbatch.sh {job.command}"
                 process = _subprocess.Popen(cmd, shell=True, stdin=_subprocess.PIPE,
                                             stdout=_subprocess.PIPE, stderr=_subprocess.STDOUT,
                                             close_fds=True)
@@ -153,8 +200,8 @@ class VirtualQueue():
                     raise ValueError("Could not get stdout from process.")
                 process_output = process.stdout.read()
                 process_output = process_output.decode('utf-8').strip()
-                if process_output.startswith("sbatch: error"):
-                    raise RuntimeError(f"Error submitting job: {process_output}")
+                #if process_output.startswith("sbatch: error"):
+                    #raise RuntimeError(f"Error submitting job: {process_output}")
                 job.slurm_job_id = int((process_output.split()[-1]))
 
         self._logger.info(f"Queue updated")

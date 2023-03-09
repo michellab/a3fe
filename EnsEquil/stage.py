@@ -21,6 +21,7 @@ from .plot import (
     plot_equilibration_time as _plot_equilibration_time
 )
 from .process_grads import GradientData as _GradientData
+from ._simfile import write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 
 class StageType(_Enum):
@@ -179,13 +180,12 @@ class Stage(_SimulationRunner):
     def kill(self) -> None:
         """Kill all running simulations."""
         # Stop the run loop
-        if not self.running:
-            self.kill_thread = True
+        self.kill_thread = True
 
-            self._logger.info("Killing all lambda windows")
-            for win in self.lam_windows:
-                win.kill()
-            self.running = False
+        self._logger.info("Killing all lambda windows")
+        for win in self.lam_windows:
+            win.kill()
+        self.running = False
 
     @property
     def running(self) -> bool:
@@ -463,47 +463,57 @@ class Stage(_SimulationRunner):
             for line in lines[equil_index + non_data_lines:]:
                 ofile.write(line)
 
-    def mv_output(self, name: str) -> None:
+    def _mv_output(self, save_name: str) -> None:
         """
         Move the output directory to a new location, without
         changing self.output_dir.
 
         Parameters
         ----------
-        name : str
-            The new name of the output directory.
+        save_name : str
+            The new name of the old output directory.
         """
-        self._logger.info(f"Moving contents of output directory to {name}")
+        self._logger.info(f"Moving contents of output directory to {save_name}")
         base_dir = _pathlib.Path(self.output_dir).parent.resolve()
-        _os.rename(self.output_dir, _os.path.join(base_dir, name))
+        _os.rename(self.output_dir, _os.path.join(base_dir, save_name))
 
-    def update(self) -> None:
+    def update(self, save_name: str = "output_saved") -> None:
         """
         Delete the current set of lamda windows and simulations, and
         create a new set of simulations based on the current state of
         the stage. This is useful if you want to change the number of
         simulations per lambda window, or the number of lambda windows.
+
+        Parameters
+        ----------
+        save_name : str, default "output_saved"
+            The name of the directory to save the old output directory to.
         """
         if self.running:
             raise RuntimeError("Can't update while ensemble is running")
         if _os.path.isdir(self.output_dir):
-            self.mv_output("output_saved")
-        self._logger.info("Deleting old lamda windows...")
+            self._mv_output(save_name)
+        # Update the list of lambda windows in the simfile
+        _write_simfile_option(simfile=f"{self.input_dir}/somd.cfg",
+                              option="lambda array", 
+                              value=", ".join([str(lam) for lam in self.lam_vals]))
+        self._logger.info("Deleting old lambda windows...")
         del(self.lam_windows)
-        self._logger.info("Creating lamda windows...")
+        self._logger.info("Creating lambda windows...")
         self.lam_windows = []
         for lam_val in self.lam_vals:
-            self.lam_windows.append(_LamWindow( lam=lam_val,
+            lam_base_dir = _os.path.join(self.output_dir, f"lambda_{lam_val:.3f}")
+            self.lam_windows.append(_LamWindow(lam=lam_val, 
                                                 virtual_queue=self.virtual_queue,
                                                 block_size=self.block_size,
                                                 equil_detection=self.equil_detection,
                                                 gradient_threshold=self.gradient_threshold,
                                                 ensemble_size=self.ensemble_size,
-                                                base_dir=self.base_dir,
+                                                base_dir=lam_base_dir,
                                                 input_dir=self.input_dir,
-                                                output_dir=self.output_dir,
-                                                stream_log_level=self.stream_log_level,
-                                                ))
+                                                stream_log_level=self.stream_log_level
+                                                )
+                                    )
 
     def _dump(self) -> None:
         """ Dump the current state of the Stage to a pickle file. Specifically,

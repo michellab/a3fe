@@ -259,10 +259,9 @@ class Leg(_SimulationRunner):
         for stage in self.stages:
             self._logger.info(f"Determining optimal lambda windows for {stage}...")
             optimal_lam_vals = stage.get_optimal_lam_vals(delta_sem=delta_sem)
-            # Save the old data, then create new LamWindow objects with the optimal lambda values
-            stage.mv_output(name="lam_val_determination")
-            stage.lam_vals = optimal_lam_vals # This deletes all of the old LamWindow objects and creates a new output dir
-            stage.update() # This deletes all of the old LamWindow objects and creates a new output dir
+            # Create new LamWindow objects with the optimal lambda values, then save data
+            stage.lam_vals = optimal_lam_vals 
+            stage.update(save_name="lam_val_determination") # This deletes all of the old LamWindow objects and creates a new output dir
 
         # Save state
         self._dump()
@@ -626,7 +625,7 @@ class Leg(_SimulationRunner):
             # Temporary fix for BSS bug - perturbed residue number is wrong, but since we always add the 
             # ligand first to the system, this should always be 1 anyway
             # TODO: Fix this - raise BSS issue
-            perturbed_resnum = 1
+            perturbed_resnum = "1"
             _write_simfile_option(f"{stage_input_dir}/template_config.cfg", "perturbed residue number", perturbed_resnum)
             # Now overwrite the SOMD generated config file with the template
             _subprocess.run(["mv", f"{stage_input_dir}/template_config.cfg", f"{stage_input_dir}/somd.cfg"], check=True)

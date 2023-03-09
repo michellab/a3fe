@@ -106,6 +106,7 @@ class Calculation(_SimulationRunner):
                           f"any preparation stage. Required files are: {_Leg.required_input_files[_LegType.BOUND]}" \
                             f"and {_Leg.required_input_files[_LegType.FREE]}")
 
+
     def setup(self) -> None:
         """ Set up the calculation."""
 
@@ -154,7 +155,8 @@ class Calculation(_SimulationRunner):
 
         # Then, determine the optimal lambda windows
         for leg in self.legs:
-            leg.get_optimal_lam_vals(delta_sem=delta_sem)
+            # Set simtime = None to avoid running any more simulations
+            leg.get_optimal_lam_vals(simtime=None, delta_sem=delta_sem)
 
         # Save state
         self._dump()

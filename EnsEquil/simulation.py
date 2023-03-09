@@ -10,7 +10,7 @@ from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, O
 
 from ._simfile import read_simfile_option as _read_simfile_option, write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
-from ._utils import Job as _Job, VirtualQueue as _VirtualQueue
+from ._utils import Job as _Job, VirtualQueue as _VirtualQueue, JobStatus as _JobStatus
 
 class Simulation(_SimulationRunner):
     """Class to store information about a single SOMD simulation."""
@@ -79,6 +79,8 @@ class Simulation(_SimulationRunner):
             self._update_simfile()
             # Now read useful parameters from the simulation file options
             self._add_attributes_from_simfile()
+            # Get slurm file base
+            self._get_slurm_file_base()
 
             # Save state and update log
             self._dump()
@@ -92,20 +94,39 @@ class Simulation(_SimulationRunner):
         """
         Check if the simulation is still running,
         and update the running attribute accordingly.
+        Also resubmit job if it has failed.
 
         Returns
         -------
         self._running : bool
             True if the simulation is still running, False otherwise.
         """
+        if self.job is None:
+            self._running=False
+            return self._running
         # Get job ids of currently running jobs - but note that the queue is updated at the
         # Stage level
         if self.job in self.virtual_queue.queue:
             self._running=True
             self._logger.info(f"Still running")
-        else:
+
+        else: # Must have finished
             self._running=False
-            self._logger.info(f"Finished")
+            # Check that job finished successfully
+            if self.job.status == _JobStatus.FINISHED:
+                self._logger.info(f"{self.job} finished successfully")
+            elif self.job.status == "FAILED":
+                old_job = self.job
+                self._logger.info(f"{old_job} failed - resubmitting")
+                # Move log files and s3 files so that the job does not restart
+                _subprocess.run(["mkdir", f"{self.output_dir}/failure"])
+                for s3_file in _glob.glob(f"{self.output_dir}/*.s3"):
+                    _subprocess.run(["mv", f"{self.output_dir}/{s3_file}", f"{self.output_dir}/failure"])
+                _subprocess.run(["mv", old_job.slurm_outfile, f"{self.output_dir}/failure"])
+                # Now resubmit
+                cmd = old_job.command
+                self.job=self.virtual_queue.submit(command = cmd, slurm_file_base = self.slurm_file_base)
+                self._logger.info(f"{old_job} failed and was resubmitted as {self.job}")
 
         return self._running
 
@@ -170,6 +191,25 @@ class Simulation(_SimulationRunner):
 
         for option, name in input_paths.items():
             _write_simfile_option(self.simfile_path, option, _os.path.join(self.input_dir, name))
+
+    def _get_slurm_file_base(self) -> None:
+        """Find out what the slurm output file will be called."""
+        # Find the slurm output file
+        with open(f"{self.input_dir}/run_somd.sh", "r") as f:
+            for line in f:
+                split_line = line.split()
+                if len(split_line) > 0 and split_line[0] == "#SBATCH":
+                    if split_line[1] == "--output" or split_line[1] == "-o":
+                        slurm_pattern = split_line[2]
+                        if "%" in slurm_pattern:
+                            file_base = slurm_pattern.split("%")[0]
+                            self.slurm_file_base = _os.path.join(self.input_dir, file_base)
+                            self._logger.info(f"Found slurm output file basename: {self.slurm_file_base}")
+                            break
+                        else:
+                            self.slurm_file_base = _os.path.join(self.input_dir, slurm_pattern)
+                            self._logger.info(f"Found slurm output file basename: {self.slurm_file_base}")
+                            break
         
 
     def run(self, duration: float=2.5) -> None:
@@ -197,7 +237,7 @@ class Simulation(_SimulationRunner):
 
         # Run SOMD - note that command excludes sbatch as this is added by the virtual queue
         cmd=f"--chdir {self.output_dir} {self.input_dir}/run_somd.sh {self.lam}"
-        self.job=self.virtual_queue.submit(cmd)
+        self.job=self.virtual_queue.submit(command = cmd, slurm_file_base=self.slurm_file_base)
         self.running=True
         self.tot_simtime += duration
         self._logger.info(f"Submitted with job {self.job}")
@@ -205,12 +245,10 @@ class Simulation(_SimulationRunner):
     def kill(self) -> None:
         """Kill the job."""
         if not self.job:
-            raise ValueError("No job found. Cannot kill job.")
+            raise ValueError("Stage has no job object. Cannot kill job.")
+        #if self.job in self.virtual_queue.queue:
         self._logger.info(f"Killing job {self.job}")
-        try:
-            self.virtual_queue.kill(self.job)
-        except ValueError:
-            self._logger.warning(f"Job {self.job} not found. Cannot kill job.")
+        self.virtual_queue.kill(self.job)
         self.running=False
 
     def _set_n_cycles(self, n_cycles: int) -> None:
