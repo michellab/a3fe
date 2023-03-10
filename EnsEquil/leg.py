@@ -3,6 +3,7 @@
 import glob as _glob
 from inspect import Parameter
 import BioSimSpace.Sandpit.Exscientia as _BSS
+#import BioSimSpace as _BSS
 from enum import Enum as _Enum
 import logging as _logging
 from multiprocessing import Pool as _Pool
@@ -393,8 +394,9 @@ class Leg(_SimulationRunner):
 
         # Set the preparation stage
         self.prep_stage = PreparationStage.SOLVATED
+
         # Save the system
-        self._logger.info("Saving solveted system")
+        self._logger.info("Saving solvated system")
         _BSS.IO.saveMolecules(f"{self.base_dir}/input/{self.leg_type.name.lower()}{self.prep_stage.file_suffix}",
                                solvated_system, 
                                fileformat=["prm7", "rst7"])
@@ -440,7 +442,7 @@ class Leg(_SimulationRunner):
         RUNTIME_NPT = 200 # ps
         END_TEMP = 298.15 # K
 
-        self._logger.info(f"PMEMD NVT equilibration for {RUNTIME_SHORT_NVT} ps while restraining all non-solvent atoms")
+        self._logger.info(f"NVT equilibration for {RUNTIME_SHORT_NVT} ps while restraining all non-solvent atoms")
         protocol = _BSS.Protocol.Equilibration(
                                         runtime=RUNTIME_SHORT_NVT*_BSS.Units.Time.picosecond, 
                                         temperature_start=0*_BSS.Units.Temperature.kelvin, 
@@ -451,7 +453,7 @@ class Leg(_SimulationRunner):
 
         # If this is the bound leg, carry out step with backbone restraints
         if self.leg_type == LegType.BOUND:
-            self._logger.info(f"PMEMD NVT equilibration for {RUNTIME_NVT} ps while restraining all backbone atoms")
+            self._logger.info(f"NVT equilibration for {RUNTIME_NVT} ps while restraining all backbone atoms")
             protocol = _BSS.Protocol.Equilibration(
                                             runtime=RUNTIME_NVT*_BSS.Units.Time.picosecond, 
                                             temperature=END_TEMP*_BSS.Units.Temperature.kelvin, 
@@ -462,14 +464,14 @@ class Leg(_SimulationRunner):
         else: # Free leg - skip the backbone restraint step
             equil2 = equil1
 
-        self._logger.info(f"PMEMD NVT equilibration for {RUNTIME_NVT} ps without restraints")
+        self._logger.info(f"NVT equilibration for {RUNTIME_NVT} ps without restraints")
         protocol = _BSS.Protocol.Equilibration(
                                         runtime=RUNTIME_NVT*_BSS.Units.Time.picosecond, 
                                         temperature=END_TEMP*_BSS.Units.Temperature.kelvin,
                                         )
         equil3 = self._run_process(equil2, protocol)
 
-        self._logger.info(f"PMEMD NPT equilibration for {RUNTIME_NPT} ps while restraining non-solvent heavy atoms")
+        self._logger.info(f"NPT equilibration for {RUNTIME_NPT} ps while restraining non-solvent heavy atoms")
         protocol = _BSS.Protocol.Equilibration(
                                         runtime=RUNTIME_NPT*_BSS.Units.Time.picosecond, 
                                         pressure=1*_BSS.Units.Pressure.atm,
@@ -478,7 +480,7 @@ class Leg(_SimulationRunner):
                                         )
         equil4 = self._run_process(equil3, protocol)
 
-        self._logger.info(f"PMEMD NPT equilibration for {RUNTIME_NPT} ps without restraints")
+        self._logger.info(f"NPT equilibration for {RUNTIME_NPT} ps without restraints")
         protocol = _BSS.Protocol.Equilibration(
                                         runtime=RUNTIME_NPT*_BSS.Units.Time.picosecond, 
                                         pressure=1*_BSS.Units.Pressure.atm,
@@ -514,17 +516,23 @@ class Leg(_SimulationRunner):
         process = _BSS.Process.Gromacs(system, protocol)
         process.start()
         process.wait()
+        import time
+        time.sleep(10)
         if process.isError():
             self._logger.error(process.stdout())
             self._logger.error(process.stderr())
             raise _BSS._Exceptions.ThirdPartyError("The process failed.")
-        system = process.getSystem()
+        system = process.getSystem(block=True)
+        if system is None:
+            self._logger.error(process.stdout())
+            self._logger.error(process.stderr())
+            raise _BSS._Exceptions.ThirdPartyError("The process failed.")
         # Save the system if a suffix is supplied
         if prep_stage is not None:
             # Update the leg's preparation stage
             self.prep_stage = prep_stage
             # Save the files
-            file_name = f"{self.leg_type.name.lower()}_{prep_stage.file_suffix}"
+            file_name = f"{self.leg_type.name.lower()}{prep_stage.file_suffix}"
             self._logger.info(f"Saving {file_name} PRM7 and RST7 files to {self.base_dir}/input")
             _BSS.IO.saveMolecules(f"{self.base_dir}/input/{file_name}",
                                 system, fileformat=["prm7", "rst7"])
@@ -559,7 +567,7 @@ class Leg(_SimulationRunner):
             restraint_search.start()
             # After waiting for the restraint search to finish, extract the final system with new coordinates, and the restraints
             restraint_search.wait()
-            final_system = restraint_search._process.getSystem()
+            final_system = restraint_search._process.getSystem(block=True)
             restraint = restraint_search.analyse(method='BSS', block=True)
 
             # Save the final coordinates 

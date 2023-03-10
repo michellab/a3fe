@@ -75,10 +75,7 @@ class GradientData():
             tot_sem = _np.sqrt(squared_sem_inter + squared_sem_intra)
             sem_intra = _np.sqrt(squared_sem_intra)
             sem_inter = _np.sqrt(squared_sem_inter)
-            try:
-                gradients_all_winds.append(_np.array(gradients_wind))
-            except:
-                import pdb; pdb.set_trace()
+            gradients_all_winds.append(_np.array(gradients_wind))
             means_all_winds.append(mean_overall)
             sems_tot_all_winds.append(tot_sem)
             sems_intra_all_winds.append(sem_intra)

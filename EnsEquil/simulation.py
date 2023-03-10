@@ -247,10 +247,10 @@ class Simulation(_SimulationRunner):
         """Kill the job."""
         if not self.job:
             raise ValueError("Stage has no job object. Cannot kill job.")
-        #if self.job in self.virtual_queue.queue:
-        self._logger.info(f"Killing job {self.job}")
-        self.virtual_queue.kill(self.job)
-        self.running=False
+        if self.job in self.virtual_queue.queue:
+            self._logger.info(f"Killing job {self.job}")
+            self.virtual_queue.kill(self.job)
+            self.running=False
 
     def _set_n_cycles(self, n_cycles: int) -> None:
         """
