@@ -571,11 +571,8 @@ class Leg(_SimulationRunner):
             restraint = restraint_search.analyse(method='BSS', block=True)
 
             # Save the final coordinates 
-            # TODO: Fix this
-            # Temporarily ignore issue with extracting the final system
             self._logger.info(f"Saving somd_{i+1}.rst7 and restraint_{i+1}.txt to {self.base_dir}/restraint_search")
-            #_BSS.IO.saveMolecules(f"{self.base_dir}/restraint_search/somd_{i+1}", final_system, fileformat=["RST7"])
-            _BSS.IO.saveMolecules(f"{self.base_dir}/restraint_search/somd_{i+1}", pre_equilibrated_system, fileformat=["rst7"])
+            _BSS.IO.saveMolecules(f"{self.base_dir}/restraint_search/somd_{i+1}", final_system, fileformat=["RST7"])
 
             # Save the restraints to a text file and store within the Leg object
             with open(f"{self.base_dir}/restraint_search/restraint_{i+1}.txt", "w") as f:
