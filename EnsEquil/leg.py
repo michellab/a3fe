@@ -2,6 +2,8 @@
 
 import glob as _glob
 from inspect import Parameter
+from operator import eq
+from platform import platform
 import BioSimSpace.Sandpit.Exscientia as _BSS
 #import BioSimSpace as _BSS
 from enum import Enum as _Enum
@@ -13,6 +15,8 @@ import pickle as _pkl
 import shutil as _shutil
 import subprocess as _subprocess
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
+
+from sklearn import ensemble
 
 from .stage import Stage as _Stage, StageType as _StageType
 from ._simfile import read_simfile_option as _read_simfile_option, write_simfile_option as _write_simfile_option
@@ -203,9 +207,10 @@ class Leg(_SimulationRunner):
         self._logger.info(f"Selecting ligand {lig} for decoupling")
         system.updateMolecule(0,lig)
 
-        # If this is the bound leg, extract the restraints from 5 ns simulations
-        if self.leg_type == LegType.BOUND:
-            self.extract_restraints(system)
+        # Run separate equilibration simulations for each of the repeats and 
+        # extract the final structures to give a diverse ensemble of starting
+        # conformations. For the bound leg, this also extracts the restraints.
+        self.ensemble_equilibration(system)
 
         # Write input files
         self.write_input_files(system)
@@ -526,7 +531,7 @@ class Leg(_SimulationRunner):
         if system is None:
             self._logger.error(process.stdout())
             self._logger.error(process.stderr())
-            raise _BSS._Exceptions.ThirdPartyError("The process failed.")
+            raise _BSS._Exceptions.ThirdPartyError("The final system is None.")
         # Save the system if a suffix is supplied
         if prep_stage is not None:
             # Update the leg's preparation stage
@@ -538,11 +543,13 @@ class Leg(_SimulationRunner):
                                 system, fileformat=["prm7", "rst7"])
         return system
 
-    def extract_restraints(self, pre_equilibrated_system: _BSS._SireWrappers._system.System) -> None:
+    def ensemble_equilibration(self, pre_equilibrated_system: _BSS._SireWrappers._system.System) -> None:
         """
-        Run 5 ns simulations with SOMD for each of the ensemble_size runs and extract the restraints.
-        The simulations will be run in a subdirectory of the stage base directory called restraint_search,
-        and the restraints and final coordinates will be saved here.
+        Run 5 ns simulations with SOMD for each of the ensemble_size runs and extract the final structures
+        to use as diverse starting points for the production runs. If this is the bound leg, the restraints
+        will also be extracted from the simulations and saved to a file. The simulations will be run in a 
+        subdirectory of the stage base directory called ensemble_equilibration, and the restraints and
+        final coordinates will be saved here.
         
         Parameters
         ----------
@@ -553,34 +560,66 @@ class Leg(_SimulationRunner):
         -------
         None
         """
-        RESTRAINT_SEARCH_TIME = 0.01 # ns
-        # Mark the ligand to be decoupled
-        protocol = _BSS.Protocol.Production(timestep=2*_BSS.Units.Time.femtosecond, # 2 fs timestep as 4 fs seems to cause instability even with HMR
-                                             runtime=RESTRAINT_SEARCH_TIME*_BSS.Units.Time.nanosecond)
+        ENSEMBLE_EQUILIBRATION_TIME = 0.1 # ns - temporary
+        protocol = _BSS.Protocol.Equilibration(timestep=2*_BSS.Units.Time.femtosecond, # 2 fs timestep as 4 fs seems to cause instability even with HMR
+                                             runtime=ENSEMBLE_EQUILIBRATION_TIME*_BSS.Units.Time.nanosecond)
+        equil_output_dir = f"{self.base_dir}/ensemble_equilibration"
 
-        self._logger.info(f"Running {self.ensemble_size} SOMD simulations for {RESTRAINT_SEARCH_TIME} ns to extract restraints")
+        self._logger.info(f"Running {self.ensemble_size} SOMD ensemble equilibration simulations for {ENSEMBLE_EQUILIBRATION_TIME} ns")
         # Repeat this for each of the ensemble_size repeats
         for i in range(self.ensemble_size):
-            self._logger.info(f"Running SOMD restraint search simulation {i+1} of {self.ensemble_size}")
-            restraint_search = _BSS.FreeEnergy.RestraintSearch(pre_equilibrated_system, protocol=protocol,
-                                                            engine='SOMD', work_dir=f"{self.base_dir}/restraint_search",)
-            restraint_search.start()
-            # After waiting for the restraint search to finish, extract the final system with new coordinates, and the restraints
-            restraint_search.wait()
-            final_system = restraint_search._process.getSystem(block=True)
-            restraint = restraint_search.analyse(method='BSS', block=True)
+            if self.leg_type == LegType.BOUND:
+                self._logger.info(f"Running SOMD restraint search simulation {i+1} of {self.ensemble_size}")
+                restraint_search = _BSS.FreeEnergy.RestraintSearch(pre_equilibrated_system, protocol=protocol,
+                                                                engine='GROMACS', work_dir=equil_output_dir)
+                restraint_search.start()
+                # After waiting for the restraint search to finish, extract the final system with new coordinates, and the restraints
+                restraint_search.wait()
+                
+                # Check that the process completed successfully and that the final system is not None
+                process = restraint_search._process
+                if process.isError():
+                    self._logger.error(process.stdout())
+                    self._logger.error(process.stderr())
+                    raise _BSS._Exceptions.ThirdPartyError("The process failed.")
+                final_system = process.getSystem(block=True)
+                if final_system is None:
+                    self._logger.error(process.stdout())
+                    self._logger.error(process.stderr())
+                    raise _BSS._Exceptions.ThirdPartyError("The final system is None.")
 
-            # Save the final coordinates 
-            self._logger.info(f"Saving somd_{i+1}.rst7 and restraint_{i+1}.txt to {self.base_dir}/restraint_search")
-            _BSS.IO.saveMolecules(f"{self.base_dir}/restraint_search/somd_{i+1}", final_system, fileformat=["RST7"])
+                restraint = restraint_search.analyse(method='BSS', block=True)
 
-            # Save the restraints to a text file and store within the Leg object
-            with open(f"{self.base_dir}/restraint_search/restraint_{i+1}.txt", "w") as f:
-                f.write(restraint.toString(engine="SOMD"))
-            if not hasattr(self, "restraints"):
-                self.restraints = [restraint]
-            else:
-                self.restraints.append(restraint)
+                # Save the final coordinates 
+                self._logger.info(f"Saving somd_{i+1}.rst7 and restraint_{i+1}.txt to {equil_output_dir}")
+                _BSS.IO.saveMolecules(f"{equil_output_dir}/somd_{i+1}", final_system, fileformat=["rst7", "prm7"])
+
+                # Save the restraints to a text file and store within the Leg object
+                with open(f"{equil_output_dir}/restraint_{i+1}.txt", "w") as f:
+                    f.write(restraint.toString(engine="SOMD"))
+                if not hasattr(self, "restraints"):
+                    self.restraints = [restraint]
+                else:
+                    self.restraints.append(restraint)
+
+            elif self.leg_type == LegType.FREE:
+                self._logger.info(f"Running SOMD ensemble equilibration simulation {i+1} of {self.ensemble_size}")
+                process = _BSS.Process.Gromacs(pre_equilibrated_system, protocol=protocol, work_dir=equil_output_dir)
+                process.start()
+                process.wait()
+                final_system = process.getSystem(block=True)
+                if process.isError():
+                    self._logger.error(process.stdout())
+                    self._logger.error(process.stderr())
+                    raise _BSS._Exceptions.ThirdPartyError("The process failed.")
+                if final_system is None:
+                    self._logger.error(process.stdout())
+                    self._logger.error(process.stderr())
+                    raise _BSS._Exceptions.ThirdPartyError("The final system is None.")
+                # Save the final coordinates 
+                self._logger.info(f"Saving somd_{i+1}.rst7 to {equil_output_dir}")
+                _BSS.IO.saveMolecules(f"{equil_output_dir}/somd_{i+1}", final_system, fileformat=["rst7", "prm7"])
+
 
     def write_input_files(self, pre_equilibrated_system: _BSS._SireWrappers._system.System) -> None:
         """
@@ -614,14 +653,15 @@ class Leg(_SimulationRunner):
             # Copy the run_somd.sh script to the stage input directory
             _shutil.copy(f"{self.input_dir}/run_somd.sh", stage_input_dir)
 
-            # If this is the bound stage, copy the restraints and the final coordinates
-            # after the restraint search to the stage input directory
-            if self.leg_type == LegType.BOUND:
-                for i in range(self.ensemble_size):
-                    restraint_file = f"{self.base_dir}/restraint_search/restraint_{i+1}.txt"
+            # Copy the final coordinates from the ensemble equilibration stage to the stage input directory
+            # and, if this is the bound stage, also copy over the restraints
+            ens_equil_output_dir = f"{self.base_dir}/ensemble_equilibration"
+            for i in range(self.ensemble_size):
+                coordinates_file = f"{ens_equil_output_dir}/somd_{i+1}.rst7"
+                _shutil.copy(coordinates_file, f"{stage_input_dir}/somd_{i+1}.rst7")
+                if self.leg_type == LegType.BOUND:
+                    restraint_file = f"{ens_equil_output_dir}/restraint_{i+1}.txt"
                     _shutil.copy(restraint_file, f"{stage_input_dir}/restraint_{i+1}.txt")
-                    coordinates_file = f"{self.base_dir}/restraint_search/somd_{i+1}.rst7"
-                    _shutil.copy(coordinates_file, f"{stage_input_dir}/somd_{i+1}.rst7")
 
             # Update the template-config.cfg file with the perturbed residue number generated
             # by BSS

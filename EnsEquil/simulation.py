@@ -76,7 +76,10 @@ class Simulation(_SimulationRunner):
             self._running: bool=False
             self.tot_simtime: float=0  # ns
             self.simfile_path = _os.path.join(self.base_dir, "somd.cfg")
-            # First, set lambda value and some paths in the simfile
+            # Select the correct rst7 and, if supplied, restraints
+            self._select_input_files()
+            # Now set lambda value and some paths in the simfile,
+            # as well as the restraints if necessary
             self._update_simfile()
             # Now read useful parameters from the simulation file options
             self._add_attributes_from_simfile()
@@ -169,6 +172,33 @@ class Simulation(_SimulationRunner):
         self.nrg_freq=nrg_freq
         self.time_per_cycle=timestep * nmoves / 1_000_000  # fs to ns
 
+    def _select_input_files(self) -> None:
+        """ Select the correct rst7 and, if supplied, restraints,
+        according to the run number. """
+        # Check if we have multiple rst7 files, or only one
+        rst7_files = _glob.glob(_os.path.join(self.input_dir, "*.rst7"))
+        if len(rst7_files) == 0:
+            raise FileNotFoundError("No rst7 files found in input directory")
+        elif len(rst7_files) > 1:
+            # Rename the rst7 file for this run to somd.rst7 and delete any other
+            # rst7 files
+            self._logger.info("Multiple rst7 files found - renaming")
+            _subprocess.run(["mv", _os.path.join(self.input_dir, f"somd_{self.run_no}.rst7"), _os.path.join(self.input_dir, "somd.rst7")])
+            _subprocess.run(["rm", _os.path.join(self.input_dir, "somd_?.rst7")])
+        else:
+            self._logger.info("Only one rst7 file found - not renaming")
+
+        # Check how may restraints files we have
+        restraint_files = _glob.glob(_os.path.join(self.input_dir, "restraint*.txt"))
+        # If we have many restraints files, rename the correct one to
+        # somd.restraints and delete any others
+        if len(restraint_files) > 1:
+            self._logger.info("Multiple restraint files found - renaming")
+            _subprocess.run(["mv", _os.path.join(self.input_dir, f"restraint_{self.run_no}.txt"), _os.path.join(self.input_dir, "restraint.txt")])
+            _subprocess.run(["rm", _os.path.join(self.input_dir, "restraint_?.txt")])
+
+
+
     def _update_simfile(self) -> None:
         """Set the lambda value in the simulation file, as well as some
         paths to input files."""
@@ -192,6 +222,12 @@ class Simulation(_SimulationRunner):
 
         for option, name in input_paths.items():
             _write_simfile_option(self.simfile_path, option, _os.path.join(self.input_dir, name))
+
+        # Add the restraints file if it exists
+        if _os.path.isfile(_os.path.join(self.input_dir, "restraint.txt")):
+            with open(_os.path.join(self.input_dir, "restraint.txt"), "r") as f:
+                restraint = f.readlines()[0]
+            _write_simfile_option(self.simfile_path, "boresch restraints dictionary", restraint)
 
     def _get_slurm_file_base(self) -> None:
         """Find out what the slurm output file will be called."""
