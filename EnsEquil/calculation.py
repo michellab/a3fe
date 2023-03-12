@@ -258,8 +258,8 @@ class Calculation(_SimulationRunner):
         master_run_somd = _os.path.join(self.input_dir, "run_somd.sh")
         for leg in self.legs:
             for stage in leg.stages:
-                for lambda_window in stage.lambda_windows:
-                    for simulation in lambda_window.simulations:
+                for lambda_window in stage.lam_windows:
+                    for simulation in lambda_window.sims:
                         _shutil.copy(master_run_somd, simulation.input_dir)
 
     def analyse(self) -> None:
