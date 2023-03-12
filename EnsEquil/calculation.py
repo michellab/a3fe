@@ -245,9 +245,9 @@ class Calculation(_SimulationRunner):
             leg.update_paths(old_base_dir, new_base_dir)
             for stage in leg.stages:
                 stage.update_paths(old_base_dir, new_base_dir)
-                for lambda_window in stage.lambda_windows:
+                for lambda_window in stage.lam_windows:
                     lambda_window.update_paths(old_base_dir, new_base_dir)
-                    for simulation in lambda_window.simulations:
+                    for simulation in lambda_window.sims:
                         simulation.update_paths(old_base_dir, new_base_dir)
 
     def update_run_somd(self) -> None:
