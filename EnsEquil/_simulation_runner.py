@@ -120,7 +120,9 @@ class SimulationRunner(ABC):
         new_sub_path : str
             The new sub-path to replace the old sub-path with.
         """
-        for attr in ["base_dir", "input_dir", "output_dir"]:
+        # Use private attributes to avoid triggering the property setters
+        # which might cause issues by creating directories
+        for attr in ["base_dir", "_input_dir", "_output_dir"]:
             setattr(self, attr, getattr(self, attr).replace(old_sub_path, new_sub_path))
 
     def _update_log(self) -> None:
