@@ -4,7 +4,7 @@ consisting of two legs (bound and unbound) and multiple stages."""
 import logging as _logging
 from multiprocessing import Pool as _Pool
 import os as _os
-import pickle as _pkl
+import shutil as _shutil
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
 from .leg import Leg as _Leg, LegType as _LegType, PreparationStage as _PreparationStage
@@ -247,6 +247,18 @@ class Calculation(_SimulationRunner):
                     lambda_window.update_paths(old_base_dir, new_base_dir)
                     for simulation in lambda_window.simulations:
                         simulation.update_paths(old_base_dir, new_base_dir)
+
+    def update_run_somd(self) -> None:
+        """ 
+        Overwrite the run_somd.sh script in all simulation output dirs with 
+        the version currently in the calculation input dir.
+        """
+        master_run_somd = _os.path.join(self.input_dir, "run_somd.sh")
+        for leg in self.legs:
+            for stage in leg.stages:
+                for lambda_window in stage.lambda_windows:
+                    for simulation in lambda_window.simulations:
+                        _shutil.copy(master_run_somd, simulation.input_dir)
 
     def analyse(self) -> None:
         pass
