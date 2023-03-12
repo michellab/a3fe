@@ -258,10 +258,12 @@ class Leg(_SimulationRunner):
             raise ValueError("The leg has not been set up yet. Please call setup() first.")
 
         # If simtime is not None, run short simulations
+        self._logger.info(f"Running short simulations for {simtime} ns to determine optimal lambda windows...")
         if simtime is not None:
             self.run(analyse=False, adaptive=False, runtime=simtime)
 
         # Now extract the optimal lambda values
+        self._logger.info(f"Determining optimal lambda windows for each stage...")
         for stage in self.stages:
             self._logger.info(f"Determining optimal lambda windows for {stage}...")
             optimal_lam_vals = stage.get_optimal_lam_vals(delta_sem=delta_sem)
@@ -444,8 +446,9 @@ class Leg(_SimulationRunner):
         """
         RUNTIME_SHORT_NVT = 5 # ps
         RUNTIME_NVT = 50 # ps 
-        RUNTIME_NPT = 200 # ps
         END_TEMP = 298.15 # K
+        RUNTIME_NPT = 400 # ps
+        RUNTIME_NPT_UNRESTRAINED = 1000 # ps
 
         self._logger.info(f"NVT equilibration for {RUNTIME_SHORT_NVT} ps while restraining all non-solvent atoms")
         protocol = _BSS.Protocol.Equilibration(
@@ -485,9 +488,9 @@ class Leg(_SimulationRunner):
                                         )
         equil4 = self._run_process(equil3, protocol)
 
-        self._logger.info(f"NPT equilibration for {RUNTIME_NPT} ps without restraints")
+        self._logger.info(f"NPT equilibration for {RUNTIME_NPT_UNRESTRAINED} ps without restraints")
         protocol = _BSS.Protocol.Equilibration(
-                                        runtime=RUNTIME_NPT*_BSS.Units.Time.picosecond, 
+                                        runtime=RUNTIME_NPT_UNRESTRAINED*_BSS.Units.Time.picosecond, 
                                         pressure=1*_BSS.Units.Pressure.atm,
                                         temperature=END_TEMP*_BSS.Units.Temperature.kelvin,
                                         )
@@ -539,8 +542,11 @@ class Leg(_SimulationRunner):
             # Save the files
             file_name = f"{self.leg_type.name.lower()}{prep_stage.file_suffix}"
             self._logger.info(f"Saving {file_name} PRM7 and RST7 files to {self.base_dir}/input")
+            # Save, renaming the velocity property to foo so avoid saving velocities. Saving the
+            # velocities sometimes causes issues with the size of the floats overflowing the RST7
+            # format.
             _BSS.IO.saveMolecules(f"{self.base_dir}/input/{file_name}",
-                                system, fileformat=["prm7", "rst7"])
+                                system, fileformat=["prm7", "rst7"], property_map={"velocity" : "foo"})
         return system
 
     def ensemble_equilibration(self, pre_equilibrated_system: _BSS._SireWrappers._system.System) -> None:
@@ -560,8 +566,8 @@ class Leg(_SimulationRunner):
         -------
         None
         """
-        ENSEMBLE_EQUILIBRATION_TIME = 0.1 # ns - temporary
-        protocol = _BSS.Protocol.Equilibration(timestep=2*_BSS.Units.Time.femtosecond, # 2 fs timestep as 4 fs seems to cause instability even with HMR
+        ENSEMBLE_EQUILIBRATION_TIME = 5 # ns
+        protocol = _BSS.Protocol.Production(timestep=2*_BSS.Units.Time.femtosecond, # 2 fs timestep as 4 fs seems to cause instability even with HMR
                                              runtime=ENSEMBLE_EQUILIBRATION_TIME*_BSS.Units.Time.nanosecond)
         equil_output_dir = f"{self.base_dir}/ensemble_equilibration"
 
@@ -571,7 +577,7 @@ class Leg(_SimulationRunner):
             if self.leg_type == LegType.BOUND:
                 self._logger.info(f"Running SOMD restraint search simulation {i+1} of {self.ensemble_size}")
                 restraint_search = _BSS.FreeEnergy.RestraintSearch(pre_equilibrated_system, protocol=protocol,
-                                                                engine='GROMACS', work_dir=equil_output_dir)
+                                                                engine='Gromacs', work_dir=equil_output_dir)
                 restraint_search.start()
                 # After waiting for the restraint search to finish, extract the final system with new coordinates, and the restraints
                 restraint_search.wait()
@@ -592,7 +598,11 @@ class Leg(_SimulationRunner):
 
                 # Save the final coordinates 
                 self._logger.info(f"Saving somd_{i+1}.rst7 and restraint_{i+1}.txt to {equil_output_dir}")
-                _BSS.IO.saveMolecules(f"{equil_output_dir}/somd_{i+1}", final_system, fileformat=["rst7", "prm7"])
+                # Save, renaming the velocity property to foo so avoid saving velocities. Saving the
+                # velocities sometimes causes issues with the size of the floats overflowing the RST7
+                # format.
+                _BSS.IO.saveMolecules(f"{equil_output_dir}/somd_{i+1}", final_system, 
+                                      fileformat=["rst7"], property_map={"velocity" : "foo"})
 
                 # Save the restraints to a text file and store within the Leg object
                 with open(f"{equil_output_dir}/restraint_{i+1}.txt", "w") as f:
@@ -618,7 +628,7 @@ class Leg(_SimulationRunner):
                     raise _BSS._Exceptions.ThirdPartyError("The final system is None.")
                 # Save the final coordinates 
                 self._logger.info(f"Saving somd_{i+1}.rst7 to {equil_output_dir}")
-                _BSS.IO.saveMolecules(f"{equil_output_dir}/somd_{i+1}", final_system, fileformat=["rst7", "prm7"])
+                _BSS.IO.saveMolecules(f"{equil_output_dir}/somd_{i+1}", final_system, fileformat=["rst7"], property_map={"velocity" : "foo"})
 
 
     def write_input_files(self, pre_equilibrated_system: _BSS._SireWrappers._system.System) -> None:
@@ -637,12 +647,15 @@ class Leg(_SimulationRunner):
             protocol = _BSS.Protocol.FreeEnergy(runtime=DUMMY_RUNTIME*_BSS.Units.Time.nanosecond, 
                                                 lam_vals=DUMMY_LAM_VALS, 
                                                 perturbation_type=stage_type.bss_perturbation_type)
+            self._logger.info(f"Perturbation type: {stage_type.bss_perturbation_type}")
+            # Ensure we remove the velocites to avoid RST7 file writing issues, as before
             restrain_fe_calc = _BSS.FreeEnergy.Absolute(pre_equilibrated_system, 
                                                         protocol,
                                                         engine='SOMD', 
                                                         restraint=restraint,
                                                         work_dir=stage_input_dir,
-                                                        setup_only=True) # We will run outside of BSS
+                                                        setup_only=True,
+                                                        property_map={"velocity" : "foo"}) # We will run outside of BSS
 
             # Copy input written by BSS to the stage input directory
             for file in _glob.glob(f"{stage_input_dir}/lambda_0.0000/*"):
@@ -664,15 +677,30 @@ class Leg(_SimulationRunner):
                     _shutil.copy(restraint_file, f"{stage_input_dir}/restraint_{i+1}.txt")
 
             # Update the template-config.cfg file with the perturbed residue number generated
-            # by BSS
+            # by BSS, as well as the restraints options
             _shutil.copy(f"{self.input_dir}/template_config.cfg", stage_input_dir)
+            
+            # Read simfile options
             perturbed_resnum = _read_simfile_option(f"{stage_input_dir}/somd.cfg", "perturbed residue number")
             # Temporary fix for BSS bug - perturbed residue number is wrong, but since we always add the 
             # ligand first to the system, this should always be 1 anyway
             # TODO: Fix this - raise BSS issue
             perturbed_resnum = "1"
+            try:
+                use_boresch_restraints = _read_simfile_option(f"{stage_input_dir}/somd.cfg", "use boresch restraints")
+            except ValueError:
+                use_boresch_restraints = False
+            try:
+                turn_on_receptor_ligand_restraints_mode = _read_simfile_option(f"{stage_input_dir}/somd.cfg", "turn on receptor-ligand restraints mode")
+            except ValueError:
+                turn_on_receptor_ligand_restraints_mode = False
+            
+            # Now write simfile options
             _write_simfile_option(f"{stage_input_dir}/template_config.cfg", "perturbed residue number", perturbed_resnum)
-            # Now overwrite the SOMD generated config file with the template
+            _write_simfile_option(f"{stage_input_dir}/template_config.cfg", "use boresch restraints", str(use_boresch_restraints))
+            _write_simfile_option(f"{stage_input_dir}/template_config.cfg", "turn on receptor-ligand restraints mode", str(turn_on_receptor_ligand_restraints_mode))
+
+            # Now overwrite the SOMD generated config file with the updated template
             _subprocess.run(["mv", f"{stage_input_dir}/template_config.cfg", f"{stage_input_dir}/somd.cfg"], check=True)
 
             # Set the default lambda windows based on the leg and stage types

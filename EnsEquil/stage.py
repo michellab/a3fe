@@ -302,6 +302,7 @@ class Stage(_SimulationRunner):
         optimal_lam_vals : np.ndarray
             List of optimal lambda values for the stage.
         """
+        self._logger.info("Calculating optimal lambda values...")
         unequilibrated_gradient_data = _GradientData(lam_winds=self.lam_windows, equilibrated=False)
         _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="mean")
         _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="intra_run_variance")

@@ -150,9 +150,11 @@ class Calculation(_SimulationRunner):
         None
         """
         # First, run all the simulations for a 100 ps
+        self._logger.info(f"Running simulations for {simtime} ns to determine optimal lambda values...")
         self.run(analyse=False, adaptive=False, runtime=simtime)
 
         # Then, determine the optimal lambda windows
+        self._logger.info(f"Determining optimal lambda values for each leg...")
         for leg in self.legs:
             # Set simtime = None to avoid running any more simulations
             leg.get_optimal_lam_vals(simtime=None, delta_sem=delta_sem)
@@ -224,6 +226,27 @@ class Calculation(_SimulationRunner):
         # Run the stage
         self._logger.info(f"Running stage {stage.stage_type.name.lower()}, adaptive={adaptive}, runtime={runtime}...")
         stage._run_without_threading(analyse=analyse, adaptive=adaptive, runtime=runtime)
+
+    def update_paths(self) -> None:
+        """ 
+        Update the paths of the calculation and its legs. This is useful if the calculation is being
+        moved to a new location (e.g. was set up locally and is now being run on a cluster). This assumes
+        that this command is being run from the new base directory.
+        """
+        old_base_dir = self.base_dir
+        new_base_dir = _os.getcwd()
+        self.base_dir = new_base_dir
+        self.input_dir = self.input_dir.replace(old_base_dir, new_base_dir)
+        self.output_dir = self.output_dir.replace(old_base_dir, new_base_dir)
+
+        for leg in self.legs:
+            leg.update_paths(old_base_dir, new_base_dir)
+            for stage in leg.stages:
+                stage.update_paths(old_base_dir, new_base_dir)
+                for lambda_window in stage.lambda_windows:
+                    lambda_window.update_paths(old_base_dir, new_base_dir)
+                    for simulation in lambda_window.simulations:
+                        simulation.update_paths(old_base_dir, new_base_dir)
 
     def analyse(self) -> None:
         pass

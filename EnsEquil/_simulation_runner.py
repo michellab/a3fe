@@ -108,6 +108,21 @@ class SimulationRunner(ABC):
     def run(self) -> None:
         """Run the simulation runner"""
 
+    def update_paths(self, old_sub_path: str, new_sub_path: str) -> None:
+        """ 
+        Replace the old sub-path with the new sub-path in the base, input, and output directory
+        paths.
+
+        Parameters
+        ----------
+        old_sub_path : str
+            The old sub-path to replace.
+        new_sub_path : str
+            The new sub-path to replace the old sub-path with.
+        """
+        for attr in ["base_dir", "input_dir", "output_dir"]:
+            setattr(self, attr, getattr(self, attr).replace(old_sub_path, new_sub_path))
+
     def _update_log(self) -> None:
         """ Update the status log file with the current status of the simulation runner."""
         self._logger.info("##############################################")

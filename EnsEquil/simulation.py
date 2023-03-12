@@ -2,6 +2,7 @@
 
 from decimal import Decimal as _Decimal
 import glob as _glob
+from inspect import unwrap
 import os as _os
 import logging as _logging
 from unittest.mock import NonCallableMagicMock
@@ -184,7 +185,9 @@ class Simulation(_SimulationRunner):
             # rst7 files
             self._logger.info("Multiple rst7 files found - renaming")
             _subprocess.run(["mv", _os.path.join(self.input_dir, f"somd_{self.run_no}.rst7"), _os.path.join(self.input_dir, "somd.rst7")])
-            _subprocess.run(["rm", _os.path.join(self.input_dir, "somd_?.rst7")])
+            unwanted_rst7_files = _glob.glob(_os.path.join(self.input_dir, "somd_?.rst7"))
+            for file in unwanted_rst7_files:
+                _subprocess.run(["rm", file])
         else:
             self._logger.info("Only one rst7 file found - not renaming")
 
@@ -195,8 +198,9 @@ class Simulation(_SimulationRunner):
         if len(restraint_files) > 1:
             self._logger.info("Multiple restraint files found - renaming")
             _subprocess.run(["mv", _os.path.join(self.input_dir, f"restraint_{self.run_no}.txt"), _os.path.join(self.input_dir, "restraint.txt")])
-            _subprocess.run(["rm", _os.path.join(self.input_dir, "restraint_?.txt")])
-
+            unwanted_rest_files = _glob.glob(_os.path.join(self.input_dir, "restraint_?.txt"))
+            for file in unwanted_rest_files:
+                _subprocess.run(["rm", file])
 
 
     def _update_simfile(self) -> None:
@@ -226,7 +230,7 @@ class Simulation(_SimulationRunner):
         # Add the restraints file if it exists
         if _os.path.isfile(_os.path.join(self.input_dir, "restraint.txt")):
             with open(_os.path.join(self.input_dir, "restraint.txt"), "r") as f:
-                restraint = f.readlines()[0]
+                restraint = f.readlines()[0].split("=")[1]
             _write_simfile_option(self.simfile_path, "boresch restraints dictionary", restraint)
 
     def _get_slurm_file_base(self) -> None:
@@ -366,3 +370,30 @@ class Simulation(_SimulationRunner):
         grads_arr=_np.array(grads)
 
         return times_arr, grads_arr
+
+    def update_paths(self, old_sub_path: str, new_sub_path: str) -> None:
+        """ 
+        Replace the old sub-path with the new sub-path in the base, input, and output directory
+        paths. Also update the slurm file base and the paths in the simfile.
+
+        Parameters
+        ----------
+        old_sub_path : str
+            The old sub-path to replace.
+        new_sub_path : str
+            The new sub-path to replace the old sub-path with.
+        """
+        super().update_paths(old_sub_path, new_sub_path)
+
+        # Also need to update the slurm file base and the paths in the simfile
+        self.simfile_path = _os.path.join(self.base_dir, "somd.cfg")
+        if self.slurm_file_base:
+            self.slurm_file_base = self.slurm_file_base.replace(old_sub_path, new_sub_path)
+
+        # Now we can easily change the paths in the simfile
+        input_paths = {"morphfile": "somd.pert",
+                       "topfile": "somd.prm7",
+                       "crdfile": "somd.rst7"}
+        for option, name in input_paths.items():
+            _write_simfile_option(self.simfile_path, option, _os.path.join(self.input_dir, name))
+        
