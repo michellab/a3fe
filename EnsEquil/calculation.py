@@ -236,8 +236,10 @@ class Calculation(_SimulationRunner):
         old_base_dir = self.base_dir
         new_base_dir = _os.getcwd()
         self.base_dir = new_base_dir
-        self.input_dir = self.input_dir.replace(old_base_dir, new_base_dir)
-        self.output_dir = self.output_dir.replace(old_base_dir, new_base_dir)
+        # Call _output_dir rather than output_dir to avoid creating the directory
+        # if it doesn't exist
+        self._input_dir = self._input_dir.replace(old_base_dir, new_base_dir)
+        self._output_dir = self._output_dir.replace(old_base_dir, new_base_dir)
 
         for leg in self.legs:
             leg.update_paths(old_base_dir, new_base_dir)
