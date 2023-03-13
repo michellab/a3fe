@@ -112,6 +112,13 @@ class VirtualQueue():
 
     def _set_up_logging(self) -> None:
         """Set up logging for the virtual queue """
+        # If logging has already been set up, remove it
+        if hasattr(self, "_logger"):
+            handlers = self._logger.handlers[:]
+            for handler in handlers:
+                self._logger.removeHandler(handler)
+                handler.close()
+            del(self._logger)
         self._logger = _logging.getLogger(str(self))
         # For the file handler, we want to log everything
         self._logger.setLevel(_logging.DEBUG)

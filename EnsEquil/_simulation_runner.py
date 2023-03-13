@@ -1,6 +1,7 @@
 """Abstract base class for simulation runners."""
 
 from abc import ABC, abstractmethod
+from itertools import count as _count
 import pathlib as _pathlib
 import pickle as _pkl
 from typing import Optional as _Optional
@@ -8,6 +9,8 @@ import logging as _logging
 
 class SimulationRunner(ABC):
     """An abstract base class for simulation runners."""
+
+    class_count = _count()
 
     def __init__(self,
                  base_dir: _Optional[str] = None,
@@ -65,7 +68,15 @@ class SimulationRunner(ABC):
     def _set_up_logging(self) -> None:
         """Set up the logging for the simulation runner."""
         # TODO: Debug - why is debug output no longer working
-        self._logger = _logging.getLogger(str(self))
+        # If logger exists, remove it and start again
+        if hasattr(self, "_logger"):
+            handlers = self._logger.handlers[:]
+            for handler in handlers:
+                self._logger.removeHandler(handler)
+                handler.close()
+            del(self._logger)
+        # Name each logger individually to avoid clashes
+        self._logger = _logging.getLogger(f"{str(self)}_{next(self.__class__.class_count)}")
         self._logger.setLevel(_logging.DEBUG)
         self._logger.propagate = False
         # For the file handler, we want to log everything
@@ -134,7 +145,10 @@ class SimulationRunner(ABC):
 
         # Also update the loggers of any virtual queues
         if hasattr(self, "virtual_queue"):
-            self.virtual_queue._set_up_logging() # type: ignore
+            # Virtual queue may have already been updated
+            if new_sub_path not in self.virtual_queue.log_dir: # type: ignore
+                self.virtual_queue.log_dir = self.virtual_queue.log_dir.replace(old_sub_path, new_sub_path) # type: ignore
+                self.virtual_queue._set_up_logging() # type: ignore
 
     def _update_log(self) -> None:
         """ Update the status log file with the current status of the simulation runner."""
