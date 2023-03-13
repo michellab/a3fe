@@ -4,6 +4,7 @@ from dataclasses import dataclass as _dataclass
 from enum import Enum as _Enum
 import glob as _glob
 import logging as _logging
+import os as _os
 import subprocess as _subprocess
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
@@ -60,10 +61,9 @@ class Job():
         matching_files = _glob.glob(f"{self.slurm_file_base}*")
         if len(matching_files) == 0:
             raise FileNotFoundError(f"No files matching {self.slurm_file_base}*")
-        elif len(matching_files) > 1:
-            raise FileNotFoundError(f"Multiple files matching {self.slurm_file_base}*")
-        else:
-            return matching_files[0]
+        # Take the most recent file
+        newest_file = max(matching_files, key=_os.path.getctime)
+        return newest_file
 
     def has_failed(self) -> bool:
         """Check whether the job has failed"""
