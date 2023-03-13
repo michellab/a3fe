@@ -102,17 +102,22 @@ class VirtualQueue():
         self._pre_queue: _List[Job] = []
         self._available_virt_job_id = 0
         self.queue_len_lim = queue_len_lim
+        self.log_dir = log_dir
 
         # Set up logging
-        self._logger = _logging.getLogger(str(self))
-        # For the file handler, we want to log everything
-        self._logger.setLevel(_logging.DEBUG)
-        file_handler = _logging.FileHandler(f"{log_dir}/virtual_queue.log")
-        file_handler.setFormatter(_logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
-        self._logger.addHandler(file_handler)
+        self._set_up_logging()
 
         # Write out initial settings
         self._update_log()
+
+    def _set_up_logging(self) -> None:
+        """Set up logging for the virtual queue """
+        self._logger = _logging.getLogger(str(self))
+        # For the file handler, we want to log everything
+        self._logger.setLevel(_logging.DEBUG)
+        file_handler = _logging.FileHandler(f"{self.log_dir}/virtual_queue.log")
+        file_handler.setFormatter(_logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+        self._logger.addHandler(file_handler)
 
     @property
     def queue(self) -> _List[Job]:

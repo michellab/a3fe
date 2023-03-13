@@ -8,7 +8,7 @@ import logging as _logging
 
 class SimulationRunner(ABC):
     """An abstract base class for simulation runners."""
-    
+
     def __init__(self,
                  base_dir: _Optional[str] = None,
                  input_dir: _Optional[str] = None,
@@ -131,6 +131,10 @@ class SimulationRunner(ABC):
 
         # Now update the loggers, which depend on the paths
         self._set_up_logging()
+
+        # Also update the loggers of any virtual queues
+        if hasattr(self, "virtual_queue"):
+            self.virtual_queue._set_up_logging() # type: ignore
 
     def _update_log(self) -> None:
         """ Update the status log file with the current status of the simulation runner."""
