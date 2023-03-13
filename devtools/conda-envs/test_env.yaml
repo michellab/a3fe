@@ -2,7 +2,7 @@ name: test
 channels:
 
   - conda-forge
-  - openbiosim
+  - michellab
 
   - defaults
 dependencies:
@@ -14,7 +14,7 @@ dependencies:
   - scipy
   - ipython
   - pymbar<4
-  #- ambertools
+  - ambertools
   - biosimspace
 
     # Testing
