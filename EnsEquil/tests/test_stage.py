@@ -21,7 +21,7 @@ def test_dirs_created():
     with TemporaryDirectory() as dirname:
         # Store current working directory to change back to later
         cwd = os.getcwd()
-        subprocess.run(["cp", "-r", "EnsEquil/data/example_input", f"{dirname}/input"])
+        subprocess.run(["cp", "-r", "EnsEquil/data/example_run_dir/free/discharge/input", f"{dirname}/input"])
         # This should create output directories
         EnsEquil.Stage(stage_type=EnsEquil.StageType.DISCHARGE, 
                        input_dir=f"{dirname}/input",
@@ -29,7 +29,7 @@ def test_dirs_created():
                        output_dir=f"{dirname}/output",
                        stream_log_level=logging.WARNING)
 
-        lam_dir_names = ["lambda_0.000", "lambda_0.250", "lambda_1.000"]
+        lam_dir_names = ["lambda_0.000", "lambda_0.252", "lambda_0.593", "lambda_1.000"]
         run_names = [f"run_0{i}" for i in range(1, 6)]
 
         for lam_dir in lam_dir_names:
