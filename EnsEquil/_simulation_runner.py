@@ -54,28 +54,32 @@ class SimulationRunner(ABC):
             # Only create the input and output directories if they're called, using properties
             self._input_dir = input_dir
             self._output_dir = output_dir
-
-            # Set up the logger
-            # TODO: Debug - why is debug output no longer working
+            
+            # Set up logging
             self.stream_log_level = stream_log_level
-            self._logger = _logging.getLogger(str(self))
-            self._logger.setLevel(_logging.DEBUG)
-            self._logger.propagate = False
-            # For the file handler, we want to log everything
-            file_handler = _logging.FileHandler(f"{base_dir}/{self.__class__.__name__}.log")
-            file_handler.setFormatter(_logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
-            file_handler.setLevel(_logging.DEBUG)
-            # For the stream handler, we want to log at the user-specified level
-            stream_handler = _logging.StreamHandler()
-            stream_handler.setFormatter(_logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
-            stream_handler.setLevel(stream_log_level)
-            # Add the handlers to the logger
-            self._logger.addHandler(file_handler)
-            self._logger.addHandler(stream_handler)
-            #Set up the logger
+            self._set_up_logging()
 
             # Save state
             self._dump()
+
+    def _set_up_logging(self) -> None:
+        """Set up the logging for the simulation runner."""
+        # TODO: Debug - why is debug output no longer working
+        self._logger = _logging.getLogger(str(self))
+        self._logger.setLevel(_logging.DEBUG)
+        self._logger.propagate = False
+        # For the file handler, we want to log everything
+        file_handler = _logging.FileHandler(f"{self.base_dir}/{self.__class__.__name__}.log")
+        file_handler.setFormatter(_logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+        file_handler.setLevel(_logging.DEBUG)
+        # For the stream handler, we want to log at the user-specified level
+        stream_handler = _logging.StreamHandler()
+        stream_handler.setFormatter(_logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
+        stream_handler.setLevel(self.stream_log_level)
+        # Add the handlers to the logger
+        self._logger.addHandler(file_handler)
+        self._logger.addHandler(stream_handler)
+
 
     @property
     def input_dir(self) -> str:
@@ -124,6 +128,9 @@ class SimulationRunner(ABC):
         # which might cause issues by creating directories
         for attr in ["base_dir", "_input_dir", "_output_dir"]:
             setattr(self, attr, getattr(self, attr).replace(old_sub_path, new_sub_path))
+
+        # Now update the loggers, which depend on the paths
+        self._set_up_logging()
 
     def _update_log(self) -> None:
         """ Update the status log file with the current status of the simulation runner."""
