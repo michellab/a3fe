@@ -144,13 +144,11 @@ class LamWindow(_SimulationRunner):
 
     def kill(self) -> None:
         """ Kill all simulations at the lambda value. """
-        # TODO: If this is uncommented, interuppting get_optimal_lam_windows does
-        # not kill all slurm jobs. Fix this
-        #if self.running:
-        self._logger.info("Killing all simulations")
-        for sim in self.sims:
-            sim.kill()
-        self._running=False
+        if self.running:
+            self._logger.info("Killing all simulations")
+            for sim in self.sims:
+                sim.kill()
+            self._running=False
 
     @ property
     def running(self) -> bool:

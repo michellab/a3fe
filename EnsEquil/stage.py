@@ -180,20 +180,30 @@ class Stage(_SimulationRunner):
     def kill(self) -> None:
         """Kill all running simulations."""
         # Stop the run loop
-        self.kill_thread = True
-
-        self._logger.info("Killing all lambda windows")
-        for win in self.lam_windows:
-            win.kill()
-        self.running = False
+        if self.running:
+            self._logger.info("Killing all lambda windows")
+            self.kill_thread = True
+            for win in self.lam_windows:
+                win.kill()
+            self.running = False
 
     @property
     def running(self) -> bool:
         """Return True if the Stage is currently running."""
+        self._running = False
+
+        # We could be running this in the background, so check the thread
         if self.run_thread is not None:
             self._running = self.run_thread.is_alive()
+            return self._running
+
+        # We're not running in the background, so check all the lambda windows
         else:
-            self._running = False
+            for win in self.lam_windows:
+                if win.running:
+                    self._running = True
+                    return self._running
+
         return self._running
 
     @running.setter
