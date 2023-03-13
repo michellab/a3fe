@@ -34,5 +34,5 @@ def test_dirs_created():
 
         for lam_dir in lam_dir_names:
             for run in run_names:
-                assert os.path.isdir(os.path.join(dirname, lam_dir, run))
+                assert os.path.isdir(os.path.join(dirname, "output", lam_dir, run))
 
