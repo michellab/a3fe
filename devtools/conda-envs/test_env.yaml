@@ -2,7 +2,7 @@ name: test
 channels:
 
   - conda-forge
-  - michellab
+  - "openbiosim/label/dev"
 
   - defaults
 dependencies:
