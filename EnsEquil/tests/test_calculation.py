@@ -71,12 +71,6 @@ def test_update_paths(calc):
         calc3 = ee.Calculation(base_dir=new_dir, input_dir="EnsEquil/data/example_run_dir/input")
         assert calc3.loaded_from_pickle == True
         current_dir = os.getcwd()
-        os.chdir(new_dir)
-        try:
-            calc3.update_paths()
-        except Exception as e:
-            raise e
-        finally:
-            os.chdir(current_dir)
-        assert calc3.base_dir == new_dir
-        assert calc3._logger.handlers[0].baseFilename == os.path.join(new_dir, "Calculation.log") # type: ignore
+        calc3.update_paths()
+        assert calc3.base_dir == current_dir
+        assert calc3._logger.handlers[0].baseFilename == os.path.join(current_dir, "Calculation.log") # type: ignore
