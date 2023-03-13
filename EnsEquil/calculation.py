@@ -241,6 +241,9 @@ class Calculation(_SimulationRunner):
         self._input_dir = self._input_dir.replace(old_base_dir, new_base_dir)
         self._output_dir = self._output_dir.replace(old_base_dir, new_base_dir)
 
+        # Set up logging with the new paths
+        self._set_up_logging()
+
         for leg in self.legs:
             leg.update_paths(old_base_dir, new_base_dir)
             for stage in leg.stages:
