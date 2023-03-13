@@ -2,19 +2,12 @@
 Unit and regression test for the run module.
 """
 
-# Import package, test suite, and other packages as needed
 import logging
 import os
-import sys
 import subprocess
-
-import EnsEquil
-
 from tempfile import TemporaryDirectory
 
-def test_EnsEquil_imported():
-    """Sample test, will always pass so long as import statement worked."""
-    assert "EnsEquil" in sys.modules
+import EnsEquil as ee
 
 def test_dirs_created():
     """Check that all expected directories are created"""
@@ -23,7 +16,7 @@ def test_dirs_created():
         cwd = os.getcwd()
         subprocess.run(["cp", "-r", "EnsEquil/data/example_run_dir/free/discharge/input", f"{dirname}/input"])
         # This should create output directories
-        EnsEquil.Stage(stage_type=EnsEquil.StageType.DISCHARGE, 
+        ee.Stage(stage_type=ee.StageType.DISCHARGE, 
                        input_dir=f"{dirname}/input",
                        base_dir=dirname,
                        output_dir=f"{dirname}/output",
