@@ -175,7 +175,6 @@ class Stage(_SimulationRunner):
         # the status of the Stage object
         self.run_thread = _threading.Thread(target=self._run_without_threading, args=(adaptive, runtime), name=str(self))
         self.run_thread.start()
-        self.running = True
 
     def kill(self) -> None:
         """Kill all running simulations."""
@@ -262,10 +261,11 @@ class Stage(_SimulationRunner):
                 self._dump()
 
             # Periodically check the simulations and analyse/ resubmit as necessary
-            self.running_wins = self.lam_windows
+            # Copy to ensure that we don't modify self.lam_windows when updating self.running_wins
+            self.running_wins = self.lam_windows.copy() 
             self._dump()
-            while self.running_wins:
-                _sleep(20 * 1)  # Check every 20 seconds
+            while self.running:
+                _sleep(60 * 1)  # Check every minute
                 # Check if we've requested to kill the thread
                 if self.kill_thread:
                     self._logger.info(f"Kill thread requested: exiting run loop")
@@ -275,7 +275,6 @@ class Stage(_SimulationRunner):
                 for win in self.running_wins:
                     # Check if the window has now finished - calling win.running updates the win._running attribute
                     if not win.running:
-                        self._logger.info(f"{win} has finished at {win.tot_simtime:.3f} ns")
                         # If we are in adaptive mode, check if the simulation has equilibrated and if not, resubmit
                         if adaptive:
                             if win.equilibrated:
@@ -283,13 +282,15 @@ class Stage(_SimulationRunner):
                             else:
                                 self._logger.info(f"{win} has not equilibrated. Resubmitting for {self.block_size:.3f} ns")
                                 win.run(self.block_size)
+                        else: # Not in adaptive mode
+                            self._logger.info(f"{win} has finished at {win.tot_simtime:.3f} ns")
 
                         # Write status after checking for running and equilibration, as this updates the
                         # _running and _equilibrated attributes
                         win._update_log()
                         self._dump()
 
-                self.running_wins = [win for win in self.running_wins if win.running]
+                self.running_wins = [win for win in self.running_wins.copy() if win.running]
 
         # All simulations are now finished, so perform final analysis
         self._logger.info(f"All simulations in {self} have finished.")
