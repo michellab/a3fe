@@ -155,7 +155,7 @@ class VirtualQueue():
         job = Job(virtual_job_id, command, slurm_file_base=slurm_file_base)
         job.status = JobStatus.QUEUED
         self._pre_queue.append(job)
-        #self._logger.info(f"{job} submitted")
+        self._logger.info(f"{job} submitted")
         # Now update - the job will be moved to the real queue if there is space
         self.update()
         return job
