@@ -78,7 +78,7 @@ def check_equil_block_gradient(lam_win:"LamWindow") -> _Tuple[bool, _Optional[fl
         equilibrated = True
 
     # Write out data
-    with open(f"{lam_win.output_dir}/lambda_{lam_win.lam:.3f}/equilibration_block_gradient.txt", "w") as ofile:
+    with open(f"{lam_win.output_dir}/equilibration_block_gradient.txt", "w") as ofile:
         ofile.write(f"Equilibrated: {equilibrated}\n")
         ofile.write(f"Equilibration time: {equil_time} ns\n")
         ofile.write(f"Block size: {lam_win.block_size} ns\n")
@@ -91,7 +91,7 @@ def check_equil_block_gradient(lam_win:"LamWindow") -> _Tuple[bool, _Optional[fl
             y_vals=_np.array([lam_win._get_rolling_average(dh_dl, idx_block_size) for dh_dl in dh_dls]),
             x_label="Simulation Time per Window per Run / ns",
             y_label=r"$\frac{\mathrm{d}h}{\mathrm{d}\lambda}$ / kcal mol$^{-1}$",
-            outfile=f"{lam_win.output_dir}/lambda_{lam_win.lam:.3f}/dhdl_block_gradient" + append_to_name,
+            outfile=f"{lam_win.output_dir}/dhdl_block_gradient" + append_to_name,
             # Shift the equilibration time by 2 * block size to account for the
             # delay in the block average calculation.
             vline_val=equil_time + 1 * lam_win.block_size if equil_time is not None else None)
@@ -100,7 +100,7 @@ def check_equil_block_gradient(lam_win:"LamWindow") -> _Tuple[bool, _Optional[fl
             y_vals=_np.array(d_dh_dls),
             x_label="Simulation Time per Window per Run / ns",
             y_label=r"$\frac{\partial}{\partial t}\frac{\partial H}{\partial \lambda}$ / kcal mol$^{-1}$ ns$^{-1}$",
-            outfile=f"{lam_win.output_dir}/lambda_{lam_win.lam:.3f}/ddhdl_block_gradient" + append_to_name,
+            outfile=f"{lam_win.output_dir}/ddhdl_block_gradient" + append_to_name,
             vline_val=equil_time + 2 * lam_win.block_size if equil_time is not None else None,
             hline_val=0)
 
@@ -159,7 +159,7 @@ def check_equil_chodera(lam_win:"LamWindow") -> _Tuple[bool, _Optional[float]]: 
         equilibrated = True
 
     # Write out data
-    with open(f"{lam_win.output_dir}/lambda_{lam_win.lam:.3f}/equilibration_chodera.txt", "w") as ofile:
+    with open(f"{lam_win.output_dir}/equilibration_chodera.txt", "w") as ofile:
         ofile.write(f"Equilibrated: {equilibrated}\n")
         ofile.write(f"Equilibration time: {equil_time} ns\n")
         ofile.write(f"Number of uncorrelated samples: {Neff_max}\n")
@@ -174,7 +174,7 @@ def check_equil_chodera(lam_win:"LamWindow") -> _Tuple[bool, _Optional[float]]: 
           y_vals=_np.array([lam_win._get_rolling_average(dh_dl, rolling_av_block_size) for dh_dl in dh_dls]),
           x_label="Simulation Time per Window per Run / ns",
           y_label=r"$\frac{\mathrm{d}h}{\mathrm{d}\lambda}$ / kcal mol$^{-1}$",
-          outfile=f"{lam_win.output_dir}/lambda_{lam_win.lam:.3f}/dhdl_chodera",
+          outfile=f"{lam_win.output_dir}/dhdl_chodera",
           # Shift the equilibration time by block size to account for the
           # delay in the rolling average calculation.
           vline_val= v_line_x)

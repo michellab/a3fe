@@ -116,6 +116,7 @@ class Simulation(_SimulationRunner):
             self._logger.info(f"Still running")
 
         else: # Must have finished
+            self._logger.info(f"Not running")
             self._running=False
             # Check that job finished successfully
             if self.job.status == _JobStatus.FINISHED:

@@ -264,8 +264,8 @@ class Stage(_SimulationRunner):
             # Copy to ensure that we don't modify self.lam_windows when updating self.running_wins
             self.running_wins = self.lam_windows.copy() 
             self._dump()
-            while self.running:
-                _sleep(60 * 1)  # Check every minute
+            while self.running_wins:
+                _sleep(60 * 1)  # Check every 20 seconds
                 # Check if we've requested to kill the thread
                 if self.kill_thread:
                     self._logger.info(f"Kill thread requested: exiting run loop")
@@ -376,8 +376,8 @@ class Stage(_SimulationRunner):
                 # Minus 1 because first energy is only written after the first nrg_freq steps
                 equil_index = int(equil_time / (win.sims[0].timestep * win.sims[0].nrg_freq)) - 1
                 for sim in win.sims:
-                    in_simfile = sim.output_subdir + "/simfile.dat"
-                    out_simfile = sim.output_subdir + "/simfile_equilibrated.dat"
+                    in_simfile = sim.output_dir + "/simfile.dat"
+                    out_simfile = sim.output_dir + "/simfile_equilibrated.dat"
                     self._write_equilibrated_data(in_simfile, out_simfile, equil_index)
 
             # Analyse data with MBAR and compute uncertainties
@@ -389,7 +389,7 @@ class Stage(_SimulationRunner):
                 outfile = f"{self.output_dir}/freenrg-MBAR-run_{str(run).zfill(2)}.dat"
                 mbar_out_files.append(outfile)
                 with open(outfile, "w") as ofile:
-                    _subprocess.run(["/home/finlayclark/sire.app/bin/analyse_freenrg",
+                    _subprocess.run(["analyse_freenrg",
                                     "mbar", "-i", f"{output_dir}/lambda*/run_{str(run).zfill(2)}/simfile_equilibrated.dat",
                                     "-p", "100", "--overlap", "--temperature",
                                     "298.0"], stdout=ofile)
