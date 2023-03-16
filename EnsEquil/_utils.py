@@ -4,7 +4,6 @@ from dataclasses import dataclass as _dataclass
 from enum import Enum as _Enum
 import glob as _glob
 import logging as _logging
-from numba import njit as _njit
 import os as _os
 import subprocess as _subprocess
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
@@ -128,7 +127,6 @@ class VirtualQueue():
         self._logger.addHandler(file_handler)
 
     @property
-    @_njit
     def queue(self) -> _List[Job]:
         """The queue of jobs, both real and virtual."""
         return self._slurm_queue + self._pre_queue
