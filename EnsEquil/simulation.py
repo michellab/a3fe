@@ -109,6 +109,7 @@ class Simulation(_SimulationRunner):
         if self.job is None:
             self._running=False
             return self._running
+
         # Get job ids of currently running jobs - but note that the queue is updated at the
         # Stage level
         if self.job in self.virtual_queue.queue:
@@ -133,12 +134,9 @@ class Simulation(_SimulationRunner):
                 cmd = old_job.command
                 self.job=self.virtual_queue.submit(command = cmd, slurm_file_base = self.slurm_file_base)
                 self._logger.info(f"{old_job} failed and was resubmitted as {self.job}")
+                self._running=True
 
         return self._running
-
-    @ running.setter
-    def running(self, value: bool) -> None:
-        self._running=value
 
     def _validate_input(self) -> None:
         """ Check that the required input files are present. """
@@ -280,7 +278,6 @@ class Simulation(_SimulationRunner):
         # Run SOMD - note that command excludes sbatch as this is added by the virtual queue
         cmd=f"--chdir {self.output_dir} {self.input_dir}/run_somd.sh {self.lam}"
         self.job=self.virtual_queue.submit(command = cmd, slurm_file_base=self.slurm_file_base)
-        self.running=True
         self.tot_simtime += duration
         self._logger.info(f"Submitted with job {self.job}")
 
@@ -291,7 +288,6 @@ class Simulation(_SimulationRunner):
         if self.job in self.virtual_queue.queue:
             self._logger.info(f"Killing job {self.job}")
             self.virtual_queue.kill(self.job)
-            self.running=False
 
     def _set_n_cycles(self, n_cycles: int) -> None:
         """

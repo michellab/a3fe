@@ -2,10 +2,10 @@
 consisting of two legs (bound and unbound) and multiple stages."""
 
 import logging as _logging
-from multiprocessing import Pool as _Pool
+import multiprocessing as _mp
 import os as _os
 import shutil as _shutil
-from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
+from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional, Callable as _Callable
 
 from .leg import Leg as _Leg, LegType as _LegType, PreparationStage as _PreparationStage
 from .stage import Stage as _Stage, StageContextManager as _StageContextManager
@@ -128,6 +128,9 @@ class Calculation(_SimulationRunner):
             self.legs.append(leg)
             leg.setup()
 
+        # Point _sub_sim_runners to self.legs
+        self._sub_sim_runners = self.legs
+
         # Save the state
         self.setup_complete = True
         self._dump()
@@ -151,7 +154,7 @@ class Calculation(_SimulationRunner):
         """
         # First, run all the simulations for a 100 ps
         self._logger.info(f"Running simulations for {simtime} ns to determine optimal lambda values...")
-        self.run(analyse=False, adaptive=False, runtime=simtime)
+        self.run(adaptive=False, runtime=simtime)
 
         # Then, determine the optimal lambda windows
         self._logger.info(f"Determining optimal lambda values for each leg...")
@@ -162,15 +165,12 @@ class Calculation(_SimulationRunner):
         # Save state
         self._dump()
 
-    def run(self, analyse:bool = True, adaptive:bool=True, runtime:_Optional[float]=None) -> None:
+    def run(self, adaptive:bool=True, runtime:_Optional[float]=None) -> None:
         """
         Run all stages in parallel and perform analysis once finished.
 
         Parameters
         ----------
-        analyse : bool, Optional, default: True
-            If True, the analysis will be performed after the simulations are finished, and each stage will
-            also be analysed individually.
         adaptive : bool, Optional, default: True
             If True, the stages will run until the simulations are equilibrated and perform analysis afterwards.
             If False, the stages will run for the specified runtime and analysis will not be performed.
@@ -183,49 +183,7 @@ class Calculation(_SimulationRunner):
         """
         if not self.setup_complete:
             raise ValueError("The calculation has not been set up yet. Please call setup() first.")
-        # Unforunately, this has to be done at the level of stages rather than legs, because we can't
-        # use pool.starmap at the level of legs as well as at the level of calculation
-        # Get all the stages
-        stages = []
-        for leg in self.legs:
-            stages.extend(leg.stages)
-
-        # Run in parallel, using stage context manager behind the scenes
-        # to ensure that stages are killed if the calculation is killed e.g. by
-        # a KeyboardInterrupt
-        self._logger.info(f"Running {len(stages)} stages in parallel...")
-        with _Pool() as pool:
-            pool.starmap(self._run_stage, [(stage, analyse, adaptive, runtime) for stage in stages])
-
-        if analyse:
-            self.analyse()
-
-    def _run_stage(self, stage: _Stage, analyse:bool=True, adaptive:bool = True, runtime:_Optional[float]=None) -> None:
-        """
-        Run a stage of the calculation.
-
-        Parameters
-        ----------
-        stage : _Stage
-            The stage to run.
-        analyse : bool, Optional, default: True
-            If True, each stage will perform analysis after the simulations are finished.
-        adaptive : bool, default: True
-            If True, the stage will run until the simulations are equilibrated and perform analysis afterwards.
-            If False, the stage will run for the specified runtime and analysis will not be performed.
-        runtime : float, Optional, default: None
-            If adaptive is False, runtime must be supplied and stage will run for this number of nanoseconds. 
-
-        Returns
-        -------
-        None
-        """
-        # Check that the stage is not already running
-        if stage.running:
-            raise ValueError(f"Stage {stage} is already running.")
-        # Run the stage
-        self._logger.info(f"Running stage {stage.stage_type.name.lower()}, adaptive={adaptive}, runtime={runtime}...")
-        stage._run_without_threading(analyse=analyse, adaptive=adaptive, runtime=runtime)
+        super().run(adaptive=adaptive, runtime=runtime)
 
     def update_paths(self) -> None:
         """ 
@@ -235,27 +193,7 @@ class Calculation(_SimulationRunner):
         """
         old_base_dir = self.base_dir
         new_base_dir = _os.getcwd()
-        self.base_dir = new_base_dir
-        # Call _output_dir rather than output_dir to avoid creating the directory
-        # if it doesn't exist
-        self._input_dir = self._input_dir.replace(old_base_dir, new_base_dir)
-        self._output_dir = self._output_dir.replace(old_base_dir, new_base_dir)
-
-        # Set up logging with the new paths
-        self._set_up_logging()
-
-        if hasattr(self, "legs"):
-            for leg in self.legs:
-                leg.update_paths(old_base_dir, new_base_dir)
-                if hasattr(leg, "stages"):
-                    for stage in leg.stages:
-                        stage.update_paths(old_base_dir, new_base_dir)
-                        if hasattr(stage, "lam_windows"):
-                            for lambda_window in stage.lam_windows:
-                                lambda_window.update_paths(old_base_dir, new_base_dir)
-                                if hasattr(lambda_window, "sims"):
-                                    for simulation in lambda_window.sims:
-                                        simulation.update_paths(old_base_dir, new_base_dir)
+        super().update_paths(old_sub_path=old_base_dir, new_sub_path=new_base_dir)
 
     def update_run_somd(self) -> None:
         """ 

@@ -142,6 +142,9 @@ class Stage(_SimulationRunner):
                                                   )
                                        )
 
+            # Point self._sub_sim_runners at the lambda windows
+            self._sub_sim_runners = self.lam_windows
+
             # Save the state and update log
             self._update_log()
             self._dump()
@@ -184,7 +187,6 @@ class Stage(_SimulationRunner):
             self.kill_thread = True
             for win in self.lam_windows:
                 win.kill()
-            self.running = False
 
     @property
     def running(self) -> bool:
@@ -205,17 +207,7 @@ class Stage(_SimulationRunner):
 
         return self._running
 
-    @running.setter
-    def running(self, value: bool) -> None:
-        """Set the running attribute."""
-        self._running = value
-
-    def wait(self) -> None:
-        """Wait for the Stage to finish running."""
-        while self.running:
-            _sleep(60) # Check every minute
-
-    def _run_without_threading(self, adaptive:bool=True, runtime:_Optional[float]=None, analyse:bool = True) -> None:
+    def _run_without_threading(self, adaptive:bool=True, runtime:_Optional[float]=None) -> None:
         """ Run the ensemble of simulations constituting the stage (optionally with adaptive 
         equilibration detection), and, if using adaptive equilibration detection, perform 
         analysis once finished.  This function is called by run() with threading, so that
@@ -229,8 +221,6 @@ class Stage(_SimulationRunner):
             If False, the stage will run for the specified runtime and analysis will not be performed.
         runtime : float, Optional, default: None
             If adaptive is False, runtime must be supplied and stage will run for this number of nanoseconds. 
-        analyse : bool, Optional, default: True
-            If True, the stage will perform analysis once finished.
 
         Returns
         -------
@@ -294,9 +284,6 @@ class Stage(_SimulationRunner):
 
         # All simulations are now finished, so perform final analysis
         self._logger.info(f"All simulations in {self} have finished.")
-        if analyse:
-            self._logger.info("Performing analysis")
-            self.analyse()
 
     def get_optimal_lam_vals(self, delta_sem: float = 0.1) -> _np.ndarray:
         """
@@ -526,6 +513,9 @@ class Stage(_SimulationRunner):
                                                 stream_log_level=self.stream_log_level
                                                 )
                                     )
+
+        # Point self._sub_sim_runners to self.lam_windows
+        self._sub_sim_runners = self.lam_windows
 
     def _dump(self) -> None:
         """ Dump the current state of the Stage to a pickle file. Specifically,

@@ -4,11 +4,15 @@ from abc import ABC, abstractmethod
 from itertools import count as _count
 import pathlib as _pathlib
 import pickle as _pkl
+from time import sleep as _sleep
 from typing import Optional as _Optional
 import logging as _logging
 
 class SimulationRunner(ABC):
-    """An abstract base class for simulation runners."""
+    """An abstract base class for simulation runners. Note that
+    self._sub_sim_runners (a list of SimulationRunner objects controlled
+    by the current SimulationRunner) must be set in order to use methods
+    such as run()"""
 
     class_count = _count()
 
@@ -59,7 +63,7 @@ class SimulationRunner(ABC):
             self._output_dir = output_dir
             
             # Set up logging
-            self.stream_log_level = stream_log_level
+            self._stream_log_level = stream_log_level
             self._set_up_logging()
 
             # Save state
@@ -86,7 +90,7 @@ class SimulationRunner(ABC):
         # For the stream handler, we want to log at the user-specified level
         stream_handler = _logging.StreamHandler()
         stream_handler.setFormatter(_logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
-        stream_handler.setLevel(self.stream_log_level)
+        stream_handler.setLevel(self._stream_log_level)
         # Add the handlers to the logger
         self._logger.addHandler(file_handler)
         self._logger.addHandler(stream_handler)
@@ -101,27 +105,45 @@ class SimulationRunner(ABC):
 
     @input_dir.setter
     def input_dir(self, value: str) -> None:
-        """Set the input directory for the simulation runner."""
+        f"""Set the input directory for the {self.__class__.__name__}."""
         self._input_dir = value
 
     @property
     def output_dir(self) -> str:
-        """The output directory for the simulation runner."""
+        f"""The output directory for the {self.__class__.__name__}."""
         if not _pathlib.Path(self._output_dir).is_dir():
             _pathlib.Path(self._output_dir).mkdir(parents=True)
         return self._output_dir
     
     @output_dir.setter
     def output_dir(self, value: str) -> None:
-        """Set the output directory for the simulation runner."""
+        f"""Set the output directory for the {self.__class__.__name__}."""
         self._output_dir = value
 
     def __str__(self) -> str:
         return self.__class__.__name__
 
-    @abstractmethod
-    def run(self) -> None:
-        """Run the simulation runner"""
+    def run(self, *args, **kwargs) -> None:
+        f"""Run the {self.__class__.__name__}"""
+        self._logger.info(f"Running {self.__class__.__name__}...")
+        for sub_sim_runner in self._sub_sim_runners:
+            sub_sim_runner.run(*args, **kwargs)
+
+    def kill(self) -> None:
+        f"""Kill the {self.__class__.__name__}"""
+        self._logger.info(f"Killing {self.__class__.__name__}...")
+        for sub_sim_runner in self._sub_sim_runners:
+            sub_sim_runner.kill()
+
+    def wait(self) -> None:
+        """Wait for the Stage to finish running."""
+        while self.running:
+            _sleep(60) # Check every minute
+
+    @property
+    def running(self) -> bool:
+        f"""Check if the {self.__class__.__name__} is running."""
+        return any([sub_sim_runner.running for sub_sim_runner in self._sub_sim_runners])
 
     def update_paths(self, old_sub_path: str, new_sub_path: str) -> None:
         """ 
@@ -150,8 +172,26 @@ class SimulationRunner(ABC):
                 self.virtual_queue.log_dir = self.virtual_queue.log_dir.replace(old_sub_path, new_sub_path) # type: ignore
                 self.virtual_queue._set_up_logging() # type: ignore
 
+        # Update the paths of any sub-simulation runners
+        if hasattr(self, "_sub_sim_runners"):
+            for sub_sim_runner in self._sub_sim_runners:
+                sub_sim_runner.update_paths(old_sub_path, new_sub_path)
+
+    @property
+    def stream_log_level(self) -> int:
+        """The log level for the stream handler."""
+        return self._stream_log_level
+    
+    @stream_log_level.setter
+    def stream_log_level(self, value: int) -> None:
+        """Set the log level for the stream handler."""
+        self._stream_log_level = value
+        if hasattr(self, "_sub_sim_runners"):
+            for sub_sim_runner in self._sub_sim_runners:
+                sub_sim_runner.stream_log_level = value
+
     def _update_log(self) -> None:
-        """ Update the status log file with the current status of the simulation runner."""
+        f""" Update the status log file with the current status of the {self.__class__.__name__}."""
         self._logger.info("##############################################")
         for var in vars(self):
             self._logger.info(f"{var}: {getattr(self, var)}")

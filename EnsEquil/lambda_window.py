@@ -114,6 +114,9 @@ class LamWindow(_SimulationRunner):
                                  output_dir=sim_base_dir,
                                  stream_log_level=stream_log_level))
 
+            # Point self._sub_sim_runners to the simulations
+            self._sub_sim_runners=self.sims
+
             # Save the state and update log
             self._update_log()
             self._dump()
@@ -149,26 +152,6 @@ class LamWindow(_SimulationRunner):
             for sim in self.sims:
                 sim.kill()
             self._running=False
-
-    @ property
-    def running(self) -> bool:
-        """
-        Check if all the simulations at the lambda window are still running
-        and update the running attribute accordingly.
-
-        Returns
-        -------
-        self._running : bool
-            True if the simulation is still running, False otherwise.
-        """
-        all_finished=True
-        for sim in self.sims:
-            if sim.running:
-                all_finished=False
-                break
-        self._running=not all_finished
-
-        return self._running
 
     @ property
     def equilibrated(self) -> bool:

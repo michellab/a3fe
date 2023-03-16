@@ -229,6 +229,9 @@ class Leg(_SimulationRunner):
                                       output_dir=self.stage_input_dirs[stage_type].replace("input", "output"),
                                       stream_log_level=self.stream_log_level))
 
+        # Point _sub_sim_runners to self.stages
+        self._sub_sim_runners = self.stages
+
         self._logger.info("Setup complete.")
         # Save state
         self._dump()
@@ -260,7 +263,7 @@ class Leg(_SimulationRunner):
         # If simtime is not None, run short simulations
         self._logger.info(f"Running short simulations for {simtime} ns to determine optimal lambda windows...")
         if simtime is not None:
-            self.run(analyse=False, adaptive=False, runtime=simtime)
+            self.run(adaptive=False, runtime=simtime)
 
         # Now extract the optimal lambda values
         self._logger.info(f"Determining optimal lambda windows for each stage...")
@@ -707,63 +710,6 @@ class Leg(_SimulationRunner):
             lam_vals = Leg.default_lambda_values[self.leg_type][stage_type]
             lam_vals_str = ", ".join([str(lam_val) for lam_val in lam_vals])
             _write_simfile_option(f"{stage_input_dir}/somd.cfg", "lambda array", lam_vals_str)
-
-
-    def run(self, analyse:bool = True, adaptive:bool=True, runtime:_Optional[float]=None) -> None:
-        """
-        Run all stages in parallel and perform analysis once finished.
-
-        Parameters
-        ----------
-        analyse : bool, Optional, default: True
-            If True, the analysis will be performed after the simulations are finished, and each stage will
-            also be analysed individually.
-        adaptive : bool, Optional, default: True
-            If True, the stages will run until the simulations are equilibrated and perform analysis afterwards.
-            If False, the stages will run for the specified runtime and analysis will not be performed.
-        runtime : float, Optional, default: None
-            If adaptive is False, runtime must be supplied and stage will run for this number of nanoseconds. 
-
-        Returns
-        -------
-        None
-        """
-        # Run in parallel, using stage context manager behind the scenes
-        # to ensure that stages are killed if the calculation is killed e.g. by
-        # a KeyboardInterrupt
-        self._logger.info(f"Running {len(self.stages)} stages in parallel...")
-        with _Pool() as pool:
-            pool.starmap(self._run_stage, [(stage, analyse, adaptive, runtime) for stage in self.stages])
-
-        if analyse:
-            self.analyse()
-
-    def _run_stage(self, stage: _Stage, analyse:bool=True, adaptive:bool = True, runtime:_Optional[float]=None) -> None:
-        """
-        Run a stage of the calculation.
-
-        Parameters
-        ----------
-        stage : _Stage
-            The stage to run.
-        analyse : bool, Optional, default: True
-            If True, each stage will perform analysis after the simulations are finished.
-        adaptive : bool, default: True
-            If True, the stage will run until the simulations are equilibrated and perform analysis afterwards.
-            If False, the stage will run for the specified runtime and analysis will not be performed.
-        runtime : float, Optional, default: None
-            If adaptive is False, runtime must be supplied and stage will run for this number of nanoseconds. 
-
-        Returns
-        -------
-        None
-        """
-        # Check that the stage is not already running
-        if stage.running:
-            raise ValueError(f"Stage {stage} is already running.")
-        # Run the stage
-        self._logger.info(f"Running stage {stage.stage_type.name.lower()}, adaptive={adaptive}, runtime={runtime}...")
-        stage._run_without_threading(analyse=analyse, adaptive=adaptive, runtime=runtime)
 
     def analyse(self) -> None:
         pass
