@@ -4,6 +4,7 @@ from dataclasses import dataclass as _dataclass
 from enum import Enum as _Enum
 import glob as _glob
 import logging as _logging
+from numba import njit as _njit
 import os as _os
 import subprocess as _subprocess
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
@@ -127,6 +128,7 @@ class VirtualQueue():
         self._logger.addHandler(file_handler)
 
     @property
+    @_njit
     def queue(self) -> _List[Job]:
         """The queue of jobs, both real and virtual."""
         return self._slurm_queue + self._pre_queue
@@ -153,7 +155,7 @@ class VirtualQueue():
         job = Job(virtual_job_id, command, slurm_file_base=slurm_file_base)
         job.status = JobStatus.QUEUED
         self._pre_queue.append(job)
-        self._logger.info(f"{job} submitted")
+        #self._logger.info(f"{job} submitted")
         # Now update - the job will be moved to the real queue if there is space
         self.update()
         return job
@@ -216,10 +218,10 @@ class VirtualQueue():
                     #raise RuntimeError(f"Error submitting job: {process_output}")
                 job.slurm_job_id = int((process_output.split()[-1]))
 
-        self._logger.info(f"Queue updated")
-        self._logger.info(f"Slurm queue slurm job ids: {[job.slurm_job_id for job in self._slurm_queue]}")
-        self._logger.info(f"Slurm queue virtual job ids: {[job.virtual_job_id for job in self._slurm_queue]}")
-        self._logger.info(f"Pre-queue virtual job ids: {[job.virtual_job_id for job in self._pre_queue]}")
+        #self._logger.info(f"Queue updated")
+        #self._logger.info(f"Slurm queue slurm job ids: {[job.slurm_job_id for job in self._slurm_queue]}")
+        #self._logger.info(f"Slurm queue virtual job ids: {[job.virtual_job_id for job in self._slurm_queue]}")
+        #self._logger.info(f"Pre-queue virtual job ids: {[job.virtual_job_id for job in self._pre_queue]}")
 
     def _update_log(self) -> None:
         """Update the log file with the current status of the queue."""
