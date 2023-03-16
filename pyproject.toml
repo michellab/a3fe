@@ -29,7 +29,6 @@ dependencies = [
      "scipy",
      "ipython",
      "pymbar<4",
-     "numba"
 ]
 
 # Update the urls once the hosting is set up.

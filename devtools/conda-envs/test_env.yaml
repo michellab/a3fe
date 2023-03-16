@@ -16,7 +16,6 @@ dependencies:
   - pymbar<4
   - ambertools
   - biosimspace
-  - numba
 
     # Testing
   - pytest
