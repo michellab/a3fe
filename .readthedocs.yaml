@@ -2,10 +2,15 @@
 
 version: 2
 
+# Set the version of Python and other tools you might need
 build:
-  os: "ubuntu-20.04"
+  os: "ubuntu-22.04"
   tools:
-    python: "mambaforge-4.10"
+    python: "3.8"
+
+# Build documentation in the docs/ directory with Sphinx
+sphinx:
+   configuration: docs/conf.py
 
 conda:
   environment: devtools/conda-envs/test_env.yaml
