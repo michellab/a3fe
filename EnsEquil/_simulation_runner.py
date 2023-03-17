@@ -1,9 +1,11 @@
 """Abstract base class for simulation runners."""
 
-from abc import ABC, abstractmethod
+from abc import ABC
+import glob as _glob
 from itertools import count as _count
 import pathlib as _pathlib
 import pickle as _pkl
+import subprocess as _subprocess
 from time import sleep as _sleep
 from typing import Optional as _Optional
 import logging as _logging
@@ -14,7 +16,11 @@ class SimulationRunner(ABC):
     by the current SimulationRunner) must be set in order to use methods
     such as run()"""
 
+    # Count the number of instances so we can name things uniquely
+    # for each instance
     class_count = _count()
+    # Create list of files to be deleted by self.clean()
+    run_files = ["*.log"]
 
     def __init__(self,
                  base_dir: _Optional[str] = None,
@@ -189,6 +195,31 @@ class SimulationRunner(ABC):
         if hasattr(self, "_sub_sim_runners"):
             for sub_sim_runner in self._sub_sim_runners:
                 sub_sim_runner.stream_log_level = value
+
+    def clean(self) -> None:
+        f"""
+        Clean the {self.__class__.__name__} by deleting all files
+        with extensions matching {self.__class__.run_files} in the 
+        base and output dirs, and resetting the total runtime to 0.
+        """
+        for run_file in self.__class__.run_files:
+            # Delete files in base directory
+            for file in _pathlib.Path(self.base_dir).glob(run_file):
+                self._logger.info(f"Deleting {file}")
+                _subprocess.run(["rm", file])
+
+            # Delete files in output directory
+            for file in _pathlib.Path(self.output_dir).glob(run_file):
+                self._logger.info(f"Deleting {file}")
+                _subprocess.run(["rm", file])
+
+        if hasattr(self, "tot_simtime"):
+            self.tot_simtime = 0
+
+        # Clean any sub-simulation runners
+        if hasattr(self, "_sub_sim_runners"):
+            for sub_sim_runner in self._sub_sim_runners:
+                sub_sim_runner.clean()
 
     def _update_log(self) -> None:
         f""" Update the status log file with the current status of the {self.__class__.__name__}."""

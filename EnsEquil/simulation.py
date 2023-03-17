@@ -23,6 +23,17 @@ class Simulation(_SimulationRunner):
                           "somd.rst7",
                           "somd.pert"]
 
+    # Files to be cleaned by self.clean()
+    run_files=  ["*.log", 
+                 "*.dcd", 
+                 "*.out", 
+                 "moves.dat", 
+                 "simfile.dat",
+                 "*.s3", 
+                 "*.s3.previous",
+                 "latest.pdb", 
+                 "gradients.dat"]
+
     def __init__(self, 
                  lam: float, 
                  run_no: int,
