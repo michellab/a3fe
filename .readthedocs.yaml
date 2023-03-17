@@ -8,4 +8,4 @@ build:
     python: "mambaforge-4.10"
 
 conda:
-  environment: .github/workflows/CI.yaml
+  environment: devtools/conda-envs/test_env.yaml
