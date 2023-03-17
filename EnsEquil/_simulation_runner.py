@@ -192,9 +192,12 @@ class SimulationRunner(ABC):
     def stream_log_level(self, value: int) -> None:
         """Set the log level for the stream handler."""
         self._stream_log_level = value
+        # Ensure the new setting is applied
+        self._set_up_logging()
         if hasattr(self, "_sub_sim_runners"):
             for sub_sim_runner in self._sub_sim_runners:
                 sub_sim_runner.stream_log_level = value
+                sub_sim_runner._set_up_logging()
 
     def clean(self) -> None:
         f"""
