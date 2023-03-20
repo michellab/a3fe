@@ -3,11 +3,12 @@
 from abc import ABC
 import glob as _glob
 from itertools import count as _count
+import numpy as _np
 import pathlib as _pathlib
 import pickle as _pkl
 import subprocess as _subprocess
 from time import sleep as _sleep
-from typing import Optional as _Optional
+from typing import Optional as _Optional, Tuple as _Tuple, Dict as _Dict, Any as _Any
 import logging as _logging
 
 class SimulationRunner(ABC):
@@ -26,7 +27,8 @@ class SimulationRunner(ABC):
                  base_dir: _Optional[str] = None,
                  input_dir: _Optional[str] = None,
                  output_dir: _Optional[str] = None,
-                 stream_log_level: int = _logging.INFO) -> None:
+                 stream_log_level: int = _logging.INFO,
+                 dg_multiplier: int = 1) -> None:
         """
         base_dir : str, Optional, default: None
             Path to the base directory for the simulation runner.
@@ -42,6 +44,10 @@ class SimulationRunner(ABC):
         stream_log_level : int, Optional, default: logging.INFO
             Logging level to use for the steam file handlers for the
             calculation object and its child objects.
+        dg_multiplier : int, Optional, default: 1
+            +1 or -1. Records whether the free energy change should 
+            be multiplied by +1 or -1 when being added to the total
+            free energy change for the super simulation-runner.
         """
         # Set up the directories
         if base_dir is None:
@@ -68,6 +74,14 @@ class SimulationRunner(ABC):
             self._input_dir = input_dir
             self._output_dir = output_dir
             
+            # Initialise sub-simulation runners with an empty list
+            self._sub_sim_runners = []
+
+            # Add the dg_multiplier
+            if dg_multiplier not in [-1, 1]:
+                raise ValueError(f"dg_multiplier must be either +1 or -1, not {dg_multiplier}.")
+            self.dg_multiplier = dg_multiplier
+
             # Set up logging
             self._stream_log_level = stream_log_level
             self._set_up_logging()
@@ -145,6 +159,32 @@ class SimulationRunner(ABC):
         """Wait for the Stage to finish running."""
         while self.running:
             _sleep(60) # Check every minute
+
+    def analyse(self) -> _Tuple[float, float]:
+        f"""
+        Analyse the {self.__class__.__name__} and any
+        sub-simulations, and return the overall free energy
+        change.
+
+        Returns
+        -------
+        float
+            The overall free energy change, in kcal / mol.
+        """
+        self._logger.info(f"Analysing {self.__class__.__name__}...")
+        dg_overall = 0
+        errors = []
+
+        # Analyse the sub-simulation runners
+        for sub_sim_runner in self._sub_sim_runners:
+            dg, er = sub_sim_runner.analyse()
+            dg_overall += dg * sub_sim_runner.dg_multiplier
+            errors.append(er)
+
+        # Add varriances
+        er_overall = _np.sqrt(_np.sum(_np.array(errors)**2))
+
+        return dg_overall, er_overall
 
     @property
     def running(self) -> bool:

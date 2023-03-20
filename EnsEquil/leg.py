@@ -16,8 +16,6 @@ import shutil as _shutil
 import subprocess as _subprocess
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
-from sklearn import ensemble
-
 from .stage import Stage as _Stage, StageType as _StageType
 from ._simfile import read_simfile_option as _read_simfile_option, write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
@@ -139,8 +137,10 @@ class Leg(_SimulationRunner):
             self.ensemble_size = ensemble_size
             self._running: bool = False
 
-            # Call superclass constructor, possibly overwriting attributes
-            # if a pickle file exists in the base directory
+            # Change the sign of the dg contribution to negative
+            # if this is the bound leg
+            if self.leg_type == LegType.BOUND:
+                self.dg_multiplier = -1
 
             # Validate the input
             self._validate_input()
@@ -714,6 +714,3 @@ class Leg(_SimulationRunner):
             lam_vals = Leg.default_lambda_values[self.leg_type][stage_type]
             lam_vals_str = ", ".join([str(lam_val) for lam_val in lam_vals])
             _write_simfile_option(f"{stage_input_dir}/somd.cfg", "lambda array", lam_vals_str)
-
-    def analyse(self) -> None:
-        pass

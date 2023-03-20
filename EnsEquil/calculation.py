@@ -206,6 +206,3 @@ class Calculation(_SimulationRunner):
                 for lambda_window in stage.lam_windows:
                     for simulation in lambda_window.sims:
                         _shutil.copy(master_run_somd, simulation.input_dir)
-
-    def analyse(self) -> None:
-        pass

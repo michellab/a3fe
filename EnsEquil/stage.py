@@ -11,7 +11,7 @@ import pickle as _pkl
 import subprocess as _subprocess
 import scipy.stats as _stats
 from time import sleep as _sleep
-from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
+from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional, Union as _Union
 
 from ._utils import Job as _Job, VirtualQueue as _VirtualQueue, read_mbar_outfile as _read_mbar_outfile
 from .lambda_window import LamWindow as _LamWindow
@@ -333,8 +333,8 @@ class Stage(_SimulationRunner):
 
         return lam_vals
 
-    def analyse(self, get_frnrg:bool = True) -> None:
-        """ Analyse the results of the ensemble of simulations. Requires that
+    def analyse(self, get_frnrg:bool = True) -> _Union[_Tuple[float, float], _Tuple[None, None]]:
+        r""" Analyse the results of the ensemble of simulations. Requires that
         all lambda windows have equilibrated.
           
         Parameters
@@ -345,7 +345,12 @@ class Stage(_SimulationRunner):
         
         Returns
         -------
-        None
+        mean_freenrg : float or None
+            If get_frnrg is True, this is the mean free energy of the stage,
+            in kcal mol-1.  Otherwise, this is None.
+        conf_int : float or None
+            If get_frenrg is True, this is the 95% confidence interval of the 
+            free energy, in kcal mol-1. Otherwise, this is None.
         """
 
         # Check that all simulations have equilibrated
@@ -419,6 +424,11 @@ class Stage(_SimulationRunner):
 
 
         # TODO: Make convergence plots (which should be flat)
+
+        if get_frnrg:
+            return mean_free_energy, conf_int # type: ignore
+        else:
+            return None, None
 
     def _write_equilibrated_data(self, in_simfile: str,
                                  out_simfile: str,
@@ -517,15 +527,6 @@ class Stage(_SimulationRunner):
         # Point self._sub_sim_runners to self.lam_windows
         self._sub_sim_runners = self.lam_windows
 
-    def _dump(self) -> None:
-        """ Dump the current state of the Stage to a pickle file. Specifically,
-         pickle self.__dict__ with self.run_thread = None, as _thread_lock objects
-         can't be pickled.   """
-        temp_dict={key: val for key, val in self.__dict__.items() if key != "run_thread"}
-        temp_dict["run_thread"]=None
-        with open(f"{self.output_dir}/{self.__class__.__name__}.pkl", "wb") as ofile:
-            _pkl.dump(temp_dict, ofile)
-                
 class StageContextManager():
     """Stage context manager to ensure that all stages are killed when
     the context is exited."""

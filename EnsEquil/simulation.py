@@ -404,4 +404,7 @@ class Simulation(_SimulationRunner):
                        "crdfile": "somd.rst7"}
         for option, name in input_paths.items():
             _write_simfile_option(self.simfile_path, option, _os.path.join(self.input_dir, name))
+
+    def analyse(self) -> None:
+        raise NotImplementedError("Analysis cannot be performed for a single simulation")
         

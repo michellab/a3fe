@@ -196,3 +196,6 @@ class LamWindow(_SimulationRunner):
                 rolling_av[i]=block_av
 
         return rolling_av
+
+    def analyse(self) -> None:
+        raise NotImplementedError("Analysis cannot be performed for a single lambda window.")
