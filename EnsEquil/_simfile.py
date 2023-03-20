@@ -17,7 +17,7 @@ def read_simfile_option(simfile: str, option: str) -> str:
     with open(simfile, 'r') as f:
         lines = f.readlines()
     for line in lines:
-        if line.startswith(option):
+        if line.split("=")[0].strip() == option:
             value = line.split("=")[1].strip()
             return value
     raise ValueError(f"Option {option} not found in simfile {simfile}")
@@ -42,8 +42,9 @@ def write_simfile_option(simfile: str, option: str, value: str) -> None:
         lines = f.readlines()
     option_line_idx = None
     for i, line in enumerate(lines):
-        if line.startswith(option):
-            option_line_idx = i
+        if line.split("=")[0].strip() == option:
+                option_line_idx = i
+                break
 
     # If the option is not present, append it to the end of the file
     if option_line_idx is None:
