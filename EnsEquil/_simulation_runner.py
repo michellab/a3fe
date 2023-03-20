@@ -22,7 +22,7 @@ class SimulationRunner(ABC):
     # for each instance
     class_count = _count()
     # Create list of files to be deleted by self.clean()
-    run_files = ["*.log"]
+    run_files = []
 
     def __init__(self,
                  base_dir: _Optional[str] = None,
@@ -50,34 +50,27 @@ class SimulationRunner(ABC):
             be multiplied by +1 or -1 when being added to the total
             free energy change for the super simulation-runner.
         """
-        # Set up the directories
+        # Set up the directories (which may be overwritten if the 
+        # simulation runner is subsequently loaded from a pickle file)
         if base_dir is None:
             base_dir = str(_pathlib.Path.cwd())
         if not _pathlib.Path(base_dir).is_dir():
             _pathlib.Path(base_dir).mkdir(parents=True)
+        self.base_dir = base_dir
+        # Only create the input and output directories if they're called, using properties
         if input_dir is None:
-            input_dir = str(_pathlib.Path(base_dir, "input"))
+            self._input_dir = str(_pathlib.Path(base_dir, "input"))
         if output_dir is None:
-            output_dir = str(_pathlib.Path(base_dir, "output"))
+            self._output_dir = str(_pathlib.Path(base_dir, "output"))
 
         # Check if we are starting from a previous simulation runner
         self.loaded_from_pickle = False
         if _pathlib.Path(f"{base_dir}/{self.__class__.__name__}.pkl").is_file():
-            print(f"Loading previous {self.__class__.__name__}. Any arguments will be overwritten...")
-            with open(f"{base_dir}/{self.__class__.__name__}.pkl", "rb") as file:
-                self.__dict__ = _pkl.load(file)
-            # Now, overwrite the sub-simulation runners dicts with the dicts loaded from their pkl files
-            # so that any changes made to them independently are preserved.
-            for val in self.__dict__.values():
-                if isinstance(val, SimulationRunner):
-                    val.__dict__ = _pkl.load(f"{val.base_dir}/{val.__class__.__name__}.pkl") # type: ignore
-
-            self.loaded_from_pickle = True
+            self._load()
 
         else:
             # Set up the base dir, input dir, output dir, and logging
             self.base_dir = base_dir
-            # Only create the input and output directories if they're called, using properties
             self._input_dir = input_dir
             self._output_dir = output_dir
             
@@ -245,13 +238,22 @@ class SimulationRunner(ABC):
                 sub_sim_runner.stream_log_level = value
                 sub_sim_runner._set_up_logging()
 
-    def clean(self) -> None:
+    def clean(self, clean_logs=False) -> None:
         f"""
         Clean the {self.__class__.__name__} by deleting all files
         with extensions matching {self.__class__.run_files} in the 
         base and output dirs, and resetting the total runtime to 0.
+
+        Parameters
+        ----------
+        clean_logs : bool, default=False
+            If True, also delete the log files.
         """
-        for run_file in self.__class__.run_files:
+        run_files = self.__class__.run_files
+        if clean_logs:
+            run_files += self.__class__.__name__ + ".log"
+
+        for run_file in run_files:
             # Delete files in base directory
             for file in _pathlib.Path(self.base_dir).glob(run_file):
                 self._logger.info(f"Deleting {file}")
@@ -305,19 +307,22 @@ class SimulationRunner(ABC):
     def _load(self) -> None:
         """Load the state of the simulation object from a pickle file, and do
         the same for any sub-simulations."""
-        if _pathlib.Path(f"{self.base_dir}/{self.__class__.__name__}.pkl").is_file():
-            print(f"Loading previous {self.__class__.__name__}. Any arguments will be overwritten...")
-            with open(f"{self.base_dir}/{self.__class__.__name__}.pkl", "rb") as file:
-                self.__dict__ = _pkl.load(file)
+        if not _pathlib.Path(f"{self.base_dir}/{self.__class__.__name__}.pkl").is_file():
+            raise FileNotFoundError(f"Could not find {self.__class__.__name__}.pkl in {self.base_dir}")
 
-            # Now, overwrite the sub-simulation runners dicts with the dicts loaded from their pkl files
-            # so that any changes made to them independently are preserved.
-            for val in self.__dict__.values():
-                if isinstance(val, SimulationRunner):
-                    val._load()
+        print(f"Loading previous {self.__class__.__name__}. Any arguments will be overwritten...")
+        with open(f"{self.base_dir}/{self.__class__.__name__}.pkl", "rb") as file:
+            self.__dict__ = _pkl.load(file)
 
-            # Set up logging
-            self._set_up_logging()
+        # Now, overwrite the sub-simulation runners dicts with the dicts loaded from their pkl files
+        # so that any changes made to them independently are preserved.
+        for sub_sim_runner in self._sub_sim_runners:
+            print(f"Loading previous {sub_sim_runner.__class__.__name__}. Any arguments will be overwritten...")
+            sub_sim_runner._load()
 
-            # Record that the object was loaded from a pickle file
-            self.loaded_from_pickle = True
+        # Set up logging
+        print("Setting up logging...")
+        self._set_up_logging()
+
+        # Record that the object was loaded from a pickle file
+        self.loaded_from_pickle = True
