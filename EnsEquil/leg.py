@@ -208,6 +208,10 @@ class Leg(_SimulationRunner):
         if lig.nAtoms() > 100 or lig.nAtoms() < 5:
             raise ValueError(f"The first molecule in the bound system has {lig.nAtoms()} atoms and is likely not a ligand. " \
                              "Please check that the ligand is the first molecule in the bound system.")
+        # Check that the name is correct
+        if lig._sire_object.name().value() != "LIG":
+            raise ValueError(f"The name of the ligand in the bound system is {lig._sire_object.name().value()} and is not LIG. " \
+                             "Please check that the ligand is the first molecule in the bound system or rename the ligand.")
         self._logger.info(f"Selecting ligand {lig} for decoupling")
         system.updateMolecule(0,lig)
 
