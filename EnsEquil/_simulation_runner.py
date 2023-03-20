@@ -7,6 +7,7 @@ import numpy as _np
 import pathlib as _pathlib
 import pickle as _pkl
 import subprocess as _subprocess
+from threading import Thread as _Thread
 from time import sleep as _sleep
 from typing import Optional as _Optional, Tuple as _Tuple, Dict as _Dict, Any as _Any
 import logging as _logging
@@ -65,6 +66,12 @@ class SimulationRunner(ABC):
             print(f"Loading previous {self.__class__.__name__}. Any arguments will be overwritten...")
             with open(f"{base_dir}/{self.__class__.__name__}.pkl", "rb") as file:
                 self.__dict__ = _pkl.load(file)
+            # Now, overwrite the sub-simulation runners dicts with the dicts loaded from their pkl files
+            # so that any changes made to them independently are preserved.
+            for val in self.__dict__.values():
+                if isinstance(val, SimulationRunner):
+                    val.__dict__ = _pkl.load(f"{val.base_dir}/{val.__class__.__name__}.pkl") # type: ignore
+
             self.loaded_from_pickle = True
 
         else:
@@ -219,9 +226,8 @@ class SimulationRunner(ABC):
                 self.virtual_queue._set_up_logging() # type: ignore
 
         # Update the paths of any sub-simulation runners
-        if hasattr(self, "_sub_sim_runners"):
-            for sub_sim_runner in self._sub_sim_runners:
-                sub_sim_runner.update_paths(old_sub_path, new_sub_path)
+        for sub_sim_runner in self._sub_sim_runners:
+            sub_sim_runner.update_paths(old_sub_path, new_sub_path)
 
     @property
     def stream_log_level(self) -> int:
@@ -271,7 +277,47 @@ class SimulationRunner(ABC):
             self._logger.info(f"{var}: {getattr(self, var)}")
         self._logger.info("##############################################")
 
+    @property
+    def _pickable_dict(self) -> _Dict[str, _Any]:
+        """Return a version of __dict__ that can be pickled, by removing any thread_lock
+        objects, which cannot be pickled."""
+        new_dict = {}
+        for key, val in self.__dict__.items():
+            if isinstance(val, _Thread):
+                new_dict[key] = None
+            # If this is a list of sub-simulation runners, then we need to
+            # recursively call _pickable_dict on each of them and their sub-simulations
+            elif isinstance(val, SimulationRunner):
+                new_dict[key] = val._pickable_dict
+            else:
+                new_dict[key] = val        
+
+        return new_dict
+
     def _dump(self) -> None:
-        """ Dump the current state of the simulation object to a pickle file."""
+        """ Dump the current state of the simulation object to a pickle file, and do
+        the same for any sub-simulations."""
         with open(f"{self.base_dir}/{self.__class__.__name__}.pkl", "wb") as ofile:
-            _pkl.dump(self.__dict__, ofile)
+            _pkl.dump(self._pickable_dict, ofile)
+        for sub_sim_runner in self._sub_sim_runners:
+            sub_sim_runner._dump()
+
+    def _load(self) -> None:
+        """Load the state of the simulation object from a pickle file, and do
+        the same for any sub-simulations."""
+        if _pathlib.Path(f"{self.base_dir}/{self.__class__.__name__}.pkl").is_file():
+            print(f"Loading previous {self.__class__.__name__}. Any arguments will be overwritten...")
+            with open(f"{self.base_dir}/{self.__class__.__name__}.pkl", "rb") as file:
+                self.__dict__ = _pkl.load(file)
+
+            # Now, overwrite the sub-simulation runners dicts with the dicts loaded from their pkl files
+            # so that any changes made to them independently are preserved.
+            for val in self.__dict__.values():
+                if isinstance(val, SimulationRunner):
+                    val._load()
+
+            # Set up logging
+            self._set_up_logging()
+
+            # Record that the object was loaded from a pickle file
+            self.loaded_from_pickle = True
