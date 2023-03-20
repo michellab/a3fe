@@ -94,7 +94,6 @@ class LamWindow(_SimulationRunner):
             self._equilibrated: bool=False
             self.equil_time: _Optional[float]=None
             self._running: bool=False
-            self.tot_simtime: float=0  # ns
 
             # Create the required simulations for this lambda value
             self.sims=[]
@@ -141,7 +140,6 @@ class LamWindow(_SimulationRunner):
         self._logger.info(f"Running simulations for {duration:.3f} ns")
         for sim in self.sims:
             sim.run(duration)
-            self.tot_simtime += duration
 
         self._running=True
 
