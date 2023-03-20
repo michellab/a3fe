@@ -270,7 +270,7 @@ class SimulationRunner(ABC):
         # Clean any sub-simulation runners
         if hasattr(self, "_sub_sim_runners"):
             for sub_sim_runner in self._sub_sim_runners:
-                sub_sim_runner.clean()
+                sub_sim_runner.clean(clean_logs=clean_logs)
 
     def _update_log(self) -> None:
         f""" Update the status log file with the current status of the {self.__class__.__name__}."""
