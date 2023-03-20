@@ -4,6 +4,7 @@ from decimal import Decimal as _Decimal
 import glob as _glob
 from inspect import unwrap
 import os as _os
+import pathlib as _pathlib
 import logging as _logging
 from unittest.mock import NonCallableMagicMock
 import numpy as _np
@@ -86,7 +87,6 @@ class Simulation(_SimulationRunner):
             self._validate_input()
             self.job: _Optional[_Job]=None
             self._running: bool=False
-            self.tot_simtime: float=0  # ns
             self.simfile_path = _os.path.join(self.base_dir, "somd.cfg")
             # Select the correct rst7 and, if supplied, restraints
             self._select_input_files()
@@ -165,11 +165,7 @@ class Simulation(_SimulationRunner):
         """
         Read the SOMD simulation option file and
         add useful attributes to the Simulation object.
-
-        Returns
-        -------
-        time_per_cycle : int
-            Time per cycle, in ns.
+        All times in ns.
         """
 
         timestep=None  # ns
@@ -180,7 +176,7 @@ class Simulation(_SimulationRunner):
         nrg_freq = float(_read_simfile_option(self.simfile_path, "energy frequency"))
 
         self.timestep=timestep / 1_000_000  # fs to ns
-        self.nrg_freq=nrg_freq
+        self.nrg_freq=nrg_freq 
         self.time_per_cycle=timestep * nmoves / 1_000_000  # fs to ns
 
     def _select_input_files(self) -> None:
@@ -289,8 +285,20 @@ class Simulation(_SimulationRunner):
         # Run SOMD - note that command excludes sbatch as this is added by the virtual queue
         cmd=f"--chdir {self.output_dir} {self.input_dir}/run_somd.sh {self.lam}"
         self.job=self.virtual_queue.submit(command = cmd, slurm_file_base=self.slurm_file_base)
-        self.tot_simtime += duration
         self._logger.info(f"Submitted with job {self.job}")
+
+    @property
+    def tot_simtime(self) -> float:
+        """Get the total simulation time in ns"""
+        # Check that the required file exists
+        data_simfile = f"{self.output_dir}/simfile.dat"
+        if not _pathlib.Path(data_simfile).is_file():
+            # Simuation has not been run, hence total simulation time is 0
+            return 0
+        else:
+            # Read last line of simfile with subprocess to make as fast as possible
+            step = int(_subprocess.check_output(['tail', '-1', f"{self.output_dir}/simfile.dat"]).decode("utf-8").strip().split()[0])
+            return step * self.timestep # ns
 
     def kill(self) -> None:
         """Kill the job."""

@@ -19,6 +19,7 @@ from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, O
 from .stage import Stage as _Stage, StageType as _StageType
 from ._simfile import read_simfile_option as _read_simfile_option, write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
+from ._utils import check_has_wat_and_box as _check_has_wat_and_box
 
 class LegType(_Enum):
     """The type of leg in the calculation."""
@@ -198,27 +199,17 @@ class Leg(_SimulationRunner):
         if self.prep_stage == PreparationStage.PARAMETERISED:
             system = self.solvate_input(system) # This also adds ions
         if self.prep_stage == PreparationStage.SOLVATED:
+            _check_has_wat_and_box(system)
             system = self.minimise_input(system)
         if self.prep_stage == PreparationStage.MINIMISED:
+            _check_has_wat_and_box(system)
             system = self.heat_and_preequil_input(system)
-        
-        # Mark the ligand to be decoupled in the absolute binding free energy calculation
-        lig = _BSS.Align.decouple(system[0], intramol=True)
-        # Check that is actually a ligand
-        if lig.nAtoms() > 100 or lig.nAtoms() < 5:
-            raise ValueError(f"The first molecule in the bound system has {lig.nAtoms()} atoms and is likely not a ligand. " \
-                             "Please check that the ligand is the first molecule in the bound system.")
-        # Check that the name is correct
-        if lig._sire_object.name().value() != "LIG":
-            raise ValueError(f"The name of the ligand in the bound system is {lig._sire_object.name().value()} and is not LIG. " \
-                             "Please check that the ligand is the first molecule in the bound system or rename the ligand.")
-        self._logger.info(f"Selecting ligand {lig} for decoupling")
-        system.updateMolecule(0,lig)
-
-        # Run separate equilibration simulations for each of the repeats and 
-        # extract the final structures to give a diverse ensemble of starting
-        # conformations. For the bound leg, this also extracts the restraints.
-        self.ensemble_equilibration(system)
+        if self.prep_stage == PreparationStage.PREEQUILIBRATED:
+            # Run separate equilibration simulations for each of the repeats and 
+            # extract the final structures to give a diverse ensemble of starting
+            # conformations. For the bound leg, this also extracts the restraints.
+            _check_has_wat_and_box(system)
+            self.run_ensemble_equilibration(system)
 
         # Write input files
         self.write_input_files(system)
@@ -269,8 +260,8 @@ class Leg(_SimulationRunner):
             raise ValueError("The leg has not been set up yet. Please call setup() first.")
 
         # If simtime is not None, run short simulations
-        self._logger.info(f"Running short simulations for {simtime} ns to determine optimal lambda windows...")
         if simtime is not None:
+            self._logger.info(f"Running short simulations for {simtime} ns to determine optimal lambda windows...")
             self.run(adaptive=False, runtime=simtime)
             self.wait()
         else:
@@ -564,7 +555,7 @@ class Leg(_SimulationRunner):
                                 system, fileformat=["prm7", "rst7"], property_map={"velocity" : "foo"})
         return system
 
-    def ensemble_equilibration(self, pre_equilibrated_system: _BSS._SireWrappers._system.System) -> None:
+    def run_ensemble_equilibration(self, pre_equilibrated_system: _BSS._SireWrappers._system.System) -> None:
         """
         Run 5 ns simulations with SOMD for each of the ensemble_size runs and extract the final structures
         to use as diverse starting points for the production runs. If this is the bound leg, the restraints
@@ -582,13 +573,28 @@ class Leg(_SimulationRunner):
         None
         """
         ENSEMBLE_EQUILIBRATION_TIME = 5 # ns
+
+        # Mark the ligand to be decoupled in the absolute binding free energy calculation
+        lig = _BSS.Align.decouple(pre_equilibrated_system[0], intramol=True)
+        # Check that is actually a ligand
+        if lig.nAtoms() > 100 or lig.nAtoms() < 5:
+            raise ValueError(f"The first molecule in the bound system has {lig.nAtoms()} atoms and is likely not a ligand. " \
+                             "Please check that the ligand is the first molecule in the bound system.")
+        # Check that the name is correct
+        if lig._sire_object.name().value() != "LIG":
+            raise ValueError(f"The name of the ligand in the bound system is {lig._sire_object.name().value()} and is not LIG. " \
+                             "Please check that the ligand is the first molecule in the bound system or rename the ligand.")
+        self._logger.info(f"Selecting ligand {lig} for decoupling")
+        pre_equilibrated_system.updateMolecule(0,lig)
+        
+        # Create the protocol
         protocol = _BSS.Protocol.Production(timestep=2*_BSS.Units.Time.femtosecond, # 2 fs timestep as 4 fs seems to cause instability even with HMR
                                              runtime=ENSEMBLE_EQUILIBRATION_TIME*_BSS.Units.Time.nanosecond)
-        equil_output_dir = f"{self.base_dir}/ensemble_equilibration"
 
         self._logger.info(f"Running {self.ensemble_size} SOMD ensemble equilibration simulations for {ENSEMBLE_EQUILIBRATION_TIME} ns")
         # Repeat this for each of the ensemble_size repeats
         for i in range(self.ensemble_size):
+            equil_output_dir = f"{self.base_dir}/ensemble_equilibration_{i+1}"
             if self.leg_type == LegType.BOUND:
                 self._logger.info(f"Running SOMD restraint search simulation {i+1} of {self.ensemble_size}")
                 restraint_search = _BSS.FreeEnergy.RestraintSearch(pre_equilibrated_system, protocol=protocol,
@@ -683,8 +689,8 @@ class Leg(_SimulationRunner):
 
             # Copy the final coordinates from the ensemble equilibration stage to the stage input directory
             # and, if this is the bound stage, also copy over the restraints
-            ens_equil_output_dir = f"{self.base_dir}/ensemble_equilibration"
             for i in range(self.ensemble_size):
+                ens_equil_output_dir = f"{self.base_dir}/ensemble_equilibration_{i+1}"
                 coordinates_file = f"{ens_equil_output_dir}/somd_{i+1}.rst7"
                 _shutil.copy(coordinates_file, f"{stage_input_dir}/somd_{i+1}.rst7")
                 if self.leg_type == LegType.BOUND:

@@ -56,24 +56,22 @@ class SimulationRunner(ABC):
             base_dir = str(_pathlib.Path.cwd())
         if not _pathlib.Path(base_dir).is_dir():
             _pathlib.Path(base_dir).mkdir(parents=True)
-        self.base_dir = base_dir
-        # Only create the input and output directories if they're called, using properties
         if input_dir is None:
-            self._input_dir = str(_pathlib.Path(base_dir, "input"))
+            input_dir = str(_pathlib.Path(base_dir, "input"))
         if output_dir is None:
-            self._output_dir = str(_pathlib.Path(base_dir, "output"))
+            output_dir = str(_pathlib.Path(base_dir, "output"))
+
+        # Only create the input and output directories if they're called, using properties
+        self.base_dir = base_dir
+        self._input_dir = input_dir
+        self._output_dir = output_dir
 
         # Check if we are starting from a previous simulation runner
         self.loaded_from_pickle = False
         if _pathlib.Path(f"{base_dir}/{self.__class__.__name__}.pkl").is_file():
-            self._load()
+            self._load() # May overwrite the above attributes and options
 
         else:
-            # Set up the base dir, input dir, output dir, and logging
-            self.base_dir = base_dir
-            self._input_dir = input_dir
-            self._output_dir = output_dir
-            
             # Initialise sub-simulation runners with an empty list
             self._sub_sim_runners = []
 
@@ -191,6 +189,11 @@ class SimulationRunner(ABC):
         f"""Check if the {self.__class__.__name__} is running."""
         return any([sub_sim_runner.running for sub_sim_runner in self._sub_sim_runners])
 
+    @property
+    def tot_simtime(self) -> float:
+        f"""The total simulation time  in ns for the {self.__class__.__name__} and any sub-simulation runners."""
+        return sum([sub_sim_runner.tot_simtime for sub_sim_runner in self._sub_sim_runners]) # ns
+
     def update_paths(self, old_sub_path: str, new_sub_path: str) -> None:
         """ 
         Replace the old sub-path with the new sub-path in the base, input, and output directory
@@ -263,9 +266,6 @@ class SimulationRunner(ABC):
             for file in _pathlib.Path(self.output_dir).glob(run_file):
                 self._logger.info(f"Deleting {file}")
                 _subprocess.run(["rm", file])
-
-        if hasattr(self, "tot_simtime"):
-            self.tot_simtime = 0
 
         # Clean any sub-simulation runners
         if hasattr(self, "_sub_sim_runners"):
