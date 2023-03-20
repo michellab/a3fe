@@ -155,6 +155,7 @@ class Calculation(_SimulationRunner):
         # First, run all the simulations for a 100 ps
         self._logger.info(f"Running simulations for {simtime} ns to determine optimal lambda values...")
         self.run(adaptive=False, runtime=simtime)
+        self.wait()
 
         # Then, determine the optimal lambda windows
         self._logger.info(f"Determining optimal lambda values for each leg...")

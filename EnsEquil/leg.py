@@ -272,6 +272,10 @@ class Leg(_SimulationRunner):
         self._logger.info(f"Running short simulations for {simtime} ns to determine optimal lambda windows...")
         if simtime is not None:
             self.run(adaptive=False, runtime=simtime)
+            self.wait()
+        else:
+            self._logger.info("Simulation time is not 0 - assuming that short simulations have already been run and" 
+                              " extracting optimal lambda values from output files...")
 
         # Now extract the optimal lambda values
         self._logger.info(f"Determining optimal lambda windows for each stage...")
