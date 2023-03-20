@@ -188,25 +188,6 @@ class Stage(_SimulationRunner):
             for win in self.lam_windows:
                 win.kill()
 
-    @property
-    def running(self) -> bool:
-        """Return True if the Stage is currently running."""
-        self._running = False
-
-        # We could be running this in the background, so check the thread
-        if self.run_thread is not None:
-            self._running = self.run_thread.is_alive()
-            return self._running
-
-        # We're not running in the background, so check all the lambda windows
-        else:
-            for win in self.lam_windows:
-                if win.running:
-                    self._running = True
-                    return self._running
-
-        return self._running
-
     def _run_without_threading(self, adaptive:bool=True, runtime:_Optional[float]=None) -> None:
         """ Run the ensemble of simulations constituting the stage (optionally with adaptive 
         equilibration detection), and, if using adaptive equilibration detection, perform 

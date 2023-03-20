@@ -70,7 +70,8 @@ class Job():
         """Check whether the job has failed"""
         with open(self.slurm_outfile, 'r') as f:
             for line in f.readlines():
-                error_statements = ["NaN or Inf has been generated along the simulation",]
+                error_statements = ["NaN or Inf has been generated along the simulation",
+                                    "Particle coordinate is NaN", ]
                 for error in error_statements:
                     if error in line:
                         return True

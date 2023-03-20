@@ -307,18 +307,15 @@ class SimulationRunner(ABC):
     def _load(self) -> None:
         """Load the state of the simulation object from a pickle file, and do
         the same for any sub-simulations."""
+        # Note that we cannot recursively call _load on the sub-simulations
+        # because this results in the creation of different virtual queues for the
+        # stages and sub-lam-windows and simulations
         if not _pathlib.Path(f"{self.base_dir}/{self.__class__.__name__}.pkl").is_file():
             raise FileNotFoundError(f"Could not find {self.__class__.__name__}.pkl in {self.base_dir}")
 
         print(f"Loading previous {self.__class__.__name__}. Any arguments will be overwritten...")
         with open(f"{self.base_dir}/{self.__class__.__name__}.pkl", "rb") as file:
             self.__dict__ = _pkl.load(file)
-
-        # Now, overwrite the sub-simulation runners dicts with the dicts loaded from their pkl files
-        # so that any changes made to them independently are preserved.
-        for sub_sim_runner in self._sub_sim_runners:
-            print(f"Loading previous {sub_sim_runner.__class__.__name__}. Any arguments will be overwritten...")
-            sub_sim_runner._load()
 
         # Set up logging
         print("Setting up logging...")
