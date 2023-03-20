@@ -204,6 +204,10 @@ class Leg(_SimulationRunner):
         
         # Mark the ligand to be decoupled in the absolute binding free energy calculation
         lig = _BSS.Align.decouple(system[0], intramol=True)
+        # Check that is actually a ligand
+        if lig.nAtoms() > 100 or lig.nAtoms() < 5:
+            raise ValueError(f"The first molecule in the bound system has {lig.nAtoms()} atoms and is likely not a ligand. " \
+                             "Please check that the ligand is the first molecule in the bound system.")
         self._logger.info(f"Selecting ligand {lig} for decoupling")
         system.updateMolecule(0,lig)
 
