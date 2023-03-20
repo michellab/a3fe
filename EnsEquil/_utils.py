@@ -1,5 +1,6 @@
 """Utilities for the Ensemble, Window, and Simulation Classes"""
 
+import BioSimSpace.Sandpit.Exscientia as _BSS
 from dataclasses import dataclass as _dataclass
 from enum import Enum as _Enum
 import glob as _glob
@@ -227,3 +228,11 @@ class VirtualQueue():
         for var in vars(self):
             self._logger.debug(f"{var}: {getattr(self, var)} ")
         self._logger.debug("##############################################")
+
+
+def check_has_wat_and_box(system: _BSS._SireWrappers._system.System) -> None:
+    """Check that the system has water and a box."""
+    if system.getBox() == (None, None):
+        raise ValueError("System does not have a box.")
+    if system.nWaterMolecules() == 0:
+        raise ValueError("System does not have water.")
