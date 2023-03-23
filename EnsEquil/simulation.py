@@ -25,8 +25,7 @@ class Simulation(_SimulationRunner):
                           "somd.pert"]
 
     # Files to be cleaned by self.clean()
-    run_files=  ["*.log", 
-                 "*.dcd", 
+    run_files=  ["*.dcd", 
                  "*.out", 
                  "moves.dat", 
                  "simfile.dat",
@@ -294,6 +293,9 @@ class Simulation(_SimulationRunner):
         data_simfile = f"{self.output_dir}/simfile.dat"
         if not _pathlib.Path(data_simfile).is_file():
             # Simuation has not been run, hence total simulation time is 0
+            return 0
+        elif  _os.stat(data_simfile).st_size == 0:
+            # Simfile is empty, hence total simulation time is 0
             return 0
         else:
             # Read last line of simfile with subprocess to make as fast as possible
