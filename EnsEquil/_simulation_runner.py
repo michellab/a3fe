@@ -153,11 +153,6 @@ class SimulationRunner(ABC):
         for sub_sim_runner in self._sub_sim_runners:
             sub_sim_runner.kill()
 
-    def wait(self) -> None:
-        """Wait for the Stage to finish running."""
-        while self.running:
-            _sleep(60) # Check every minute
-
     def analyse(self) -> _Tuple[float, float]:
         f"""
         Analyse the {self.__class__.__name__} and any
@@ -188,11 +183,24 @@ class SimulationRunner(ABC):
     def running(self) -> bool:
         f"""Check if the {self.__class__.__name__} is running."""
         return any([sub_sim_runner.running for sub_sim_runner in self._sub_sim_runners])
+    
+    def wait(self) -> None:
+        f"""Wait for the {self.__class__.__name__} to finish running."""
+        # Give the simulation runner a chance to start
+        _sleep(30)
+        while self.running:
+            _sleep(30) # Check every 30 seconds
 
     @property
     def tot_simtime(self) -> float:
         f"""The total simulation time  in ns for the {self.__class__.__name__} and any sub-simulation runners."""
         return sum([sub_sim_runner.tot_simtime for sub_sim_runner in self._sub_sim_runners]) # ns
+
+    def _refresh_logging(self) -> None:
+        """Refresh the logging for the simulation runner and all sub-simulation runners."""
+        self._set_up_logging()
+        for sub_sim_runner in self._sub_sim_runners:
+            sub_sim_runner._refresh_logging()
 
     def update_paths(self, old_sub_path: str, new_sub_path: str) -> None:
         """ 
@@ -317,9 +325,9 @@ class SimulationRunner(ABC):
         with open(f"{self.base_dir}/{self.__class__.__name__}.pkl", "rb") as file:
             self.__dict__ = _pkl.load(file)
 
-        # Set up logging
+        # Refresh logging
         print("Setting up logging...")
-        self._set_up_logging()
+        self._refresh_logging()
 
         # Record that the object was loaded from a pickle file
         self.loaded_from_pickle = True
