@@ -82,13 +82,13 @@ def run_mbar(output_dir: str,
     free_energies = _np.array([_read_mbar_result(ofile)[0] for ofile in mbar_out_files]) 
     errors = _np.array([_read_mbar_result(ofile)[1] for ofile in mbar_out_files])
 
-    #if delete_outfiles:
-        #for ofile in mbar_out_files:
-            #_subprocess.run(["rm", ofile])
-        #mbar_out_files = []
+    if delete_outfiles:
+        for ofile in mbar_out_files:
+            _subprocess.run(["rm", ofile])
+        mbar_out_files = []
 
-    ## Clean up temporary simfiles
-    #for tmp_simfile in tmp_simfiles:
-        #_subprocess.run(["rm", tmp_simfile])
+    # Clean up temporary simfiles
+    for tmp_simfile in tmp_simfiles:
+        _subprocess.run(["rm", tmp_simfile])
 
     return free_energies, errors, mbar_out_files
