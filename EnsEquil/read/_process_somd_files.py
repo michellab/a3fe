@@ -113,3 +113,39 @@ def read_overlap_mat(outfile: str) -> _np.ndarray:
             overlap_mat.append([float(x) for x in line.split()])
 
     return _np.array(overlap_mat)
+
+def write_truncated_sim_datafile(simfile: str, outfile: str, fraction: float) -> None:
+    """ 
+    Write a truncated simfile, with a certain percentage of the final number of steps
+    discarded.
+
+    Parameters
+    ----------
+    simfile : str
+        The name of the input simfile.
+    outfile : str
+        The name of the output simfile.
+    fraction : float
+        The fraction of the final number of steps to discard.
+
+    Returns
+    -------
+    None
+    """
+    with open(simfile, 'r') as f:
+        lines = f.readlines()
+
+    # Find the start of the data, the end of the data, and the number of steps
+    with open(outfile, 'w') as f:
+        n_lines = len(lines)
+        start_data_idx = None
+        end_data_idx = None
+        for i, line in enumerate(lines):
+            if start_data_idx is None:
+                if not line.startswith("#"):
+                    start_data_idx = lines.index(line)
+                    end_data_idx = round((n_lines - start_data_idx) * fraction) + start_data_idx + 1 # +1 as no data written at t = 0
+            else:
+                if i == end_data_idx:
+                    break
+            f.write(line)
