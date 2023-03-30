@@ -29,7 +29,8 @@ class SimulationRunner(ABC):
                  input_dir: _Optional[str] = None,
                  output_dir: _Optional[str] = None,
                  stream_log_level: int = _logging.INFO,
-                 dg_multiplier: int = 1) -> None:
+                 dg_multiplier: int = 1,
+                 ensemble_size: int = 5) -> None:
         """
         base_dir : str, Optional, default: None
             Path to the base directory for the simulation runner.
@@ -49,6 +50,8 @@ class SimulationRunner(ABC):
             +1 or -1. Records whether the free energy change should 
             be multiplied by +1 or -1 when being added to the total
             free energy change for the super simulation-runner.
+        ensemble_size : int, Optional, default: 5
+            Number of repeats to run.
         """
         # Set up the directories (which may be overwritten if the 
         # simulation runner is subsequently loaded from a pickle file)
@@ -79,6 +82,9 @@ class SimulationRunner(ABC):
             if dg_multiplier not in [-1, 1]:
                 raise ValueError(f"dg_multiplier must be either +1 or -1, not {dg_multiplier}.")
             self.dg_multiplier = dg_multiplier
+
+            # Register the ensemble size
+            self.ensemble_size = ensemble_size
 
             # Set up logging
             self._stream_log_level = stream_log_level
@@ -153,7 +159,7 @@ class SimulationRunner(ABC):
         for sub_sim_runner in self._sub_sim_runners:
             sub_sim_runner.kill()
 
-    def analyse(self) -> _Tuple[float, float]:
+    def analyse(self) -> _Tuple[_np.ndarray, _np.ndarray]:
         f"""
         Analyse the {self.__class__.__name__} and any
         sub-simulations, and return the overall free energy
@@ -161,21 +167,28 @@ class SimulationRunner(ABC):
 
         Returns
         -------
-        float
-            The overall free energy change, in kcal / mol.
+        dg_overall : np.ndarray
+            The overall free energy change for each of the 
+            ensemble size repeats.
+        er_overall : np.ndarray
+            The overall error for each of the ensemble size
+            repeats.
         """
         self._logger.info(f"Analysing {self.__class__.__name__}...")
-        dg_overall = 0
-        errors = []
+        dg_overall = _np.zeros(self.ensemble_size)
+        er_overall = _np.zeros(self.ensemble_size)
 
         # Analyse the sub-simulation runners
         for sub_sim_runner in self._sub_sim_runners:
             dg, er = sub_sim_runner.analyse()
+            # Decide if the component should be added or subtracted
+            # according to the dg_multiplier attribute
             dg_overall += dg * sub_sim_runner.dg_multiplier
-            errors.append(er)
+            er_overall = _np.sqrt(er_overall**2 + er**2)
 
-        # Add varriances
-        er_overall = _np.sqrt(_np.sum(_np.array(errors)**2))
+        # Log the overall free energy changes
+        self._logger.info(f"Overall free energy changes: {dg_overall} kcal mol-1")
+        self._logger.info(f"Overall errors: {er_overall} kcal mol-1")
 
         return dg_overall, er_overall
 

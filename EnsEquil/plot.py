@@ -1,15 +1,14 @@
 """Plotting functions"""
 
-from cProfile import label
-from tkinter import W
 import matplotlib.pyplot as _plt
 from math import ceil as _ceil
 import numpy as _np
-import os as _os
 import scipy.stats as _stats
+import seaborn as _sns
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
 from .process_grads import GradientData
+from ._utils import read_overlap_mat as _read_overlap_mat
 
 def general_plot(x_vals: _np.ndarray, y_vals: _np.ndarray, x_label: str, y_label: str,
                  outfile: str, vline_val: _Optional[float] = None,
@@ -222,3 +221,49 @@ def plot_equilibration_time(lam_windows: _List["LamWindows"], output_dir:str)->N
     fig.legend()
     fig.savefig(f"{output_dir}/equil_times", dpi=300,
                 bbox_inches='tight', facecolor='white', transparent=False)
+
+def plot_overlap_mat(ax: _plt.Axes, mbar_file: str, name: str) -> None:
+    """
+    Plot the overlap matrix for a given MBAR file on the supplied axis.
+
+    Parameters
+    ----------
+    ax : matplotlib axis
+        Axis on which to plot.
+    mbar_file : str
+        Path to MBAR file.
+    name : str
+        Name of the plot.
+
+    Returns
+    -------
+    None
+    """
+    overlap_mat = _read_overlap_mat(mbar_file)
+    _sns.heatmap(overlap_mat, ax=ax, square=True).figure
+    ax.set_title(name)
+
+def plot_overlap_mats(mbar_outfiles: _List[str], output_dir:str) -> None:
+    """
+    Plot the overlap matrices for all mbar outfiles supplied.
+    
+    Parameters
+    ----------
+    mbar_outfiles : List[str]
+        List of MBAR outfiles. It is assumed that these are passed in the same
+        order as the runs they correspond to.
+    output_dir : str
+        The directory to save the plot to.
+
+    Returns
+    -------
+    None
+    """
+    n_runs = len(mbar_outfiles)
+    fig, axs = _plt.subplots(1, n_runs, figsize=(4*n_runs, 4),dpi=1000)
+
+    for i in range(n_runs):
+        plot_overlap_mat(axs[i], mbar_outfiles[i], f"Run {i+1}")
+        
+    fig.tight_layout()
+    fig.savefig(f"{output_dir}/overlap.png")

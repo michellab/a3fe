@@ -69,13 +69,13 @@ class Calculation(_SimulationRunner):
         super().__init__(base_dir=base_dir,
                          input_dir=input_dir,
                          output_dir=None,
-                         stream_log_level=stream_log_level)
+                         stream_log_level=stream_log_level,
+                         ensemble_size=ensemble_size)
         
         if not self.loaded_from_pickle:
             self.block_size = block_size
             self.equil_detection = equil_detection
             self.gradient_threshold = gradient_threshold
-            self.ensemble_size = ensemble_size
             self.setup_complete: bool = False
             
             # Validate the input

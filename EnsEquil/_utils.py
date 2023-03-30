@@ -5,11 +5,12 @@ from dataclasses import dataclass as _dataclass
 from enum import Enum as _Enum
 import glob as _glob
 import logging as _logging
+import numpy as _np
 import os as _os
 import subprocess as _subprocess
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
-def read_mbar_outfile(outfile: str) -> _Tuple[float, float]:
+def read_mbar_result(outfile: str) -> _Tuple[float, float]:
     """ 
     Read the output file from MBAR, and return the free energy and error.
 
@@ -32,6 +33,36 @@ def read_mbar_outfile(outfile: str) -> _Tuple[float, float]:
     free_energy_err = float(lines[-4].split(",")[1].split()[0])
 
     return free_energy, free_energy_err
+
+def read_overlap_mat(outfile: str) -> _np.ndarray:
+    """ 
+    Read the overlap matrix from the mbar outfile.
+
+    Parameters
+    ----------
+    outfile : str
+        The name of the output file.
+
+    Returns
+    -------
+    overlap_mat : np.ndarray
+        The overlap matrix.
+    """
+    with open(outfile, 'r') as f:
+        lines = f.readlines()
+    overlap_mat = []
+    in_overlap_mat = False
+    for line in lines:
+        if line.startswith("#Overlap matrix"):
+            in_overlap_mat = True
+            continue
+        if line.startswith("#"):
+            in_overlap_mat = False
+            continue
+        if in_overlap_mat:
+            overlap_mat.append([float(x) for x in line.split()])
+
+    return _np.array(overlap_mat)
 
 class JobStatus(_Enum):
     """An enumeration of the possible job statuses"""

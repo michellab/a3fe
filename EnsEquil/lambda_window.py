@@ -76,12 +76,12 @@ class LamWindow(_SimulationRunner):
         super().__init__(base_dir=base_dir,
                          input_dir=input_dir,
                          output_dir=output_dir,
-                         stream_log_level=stream_log_level)
+                         stream_log_level=stream_log_level,
+                         ensemble_size=ensemble_size)
 
         if not self.loaded_from_pickle:
             self.virtual_queue=virtual_queue
             self.block_size=block_size
-            self.ensemble_size=ensemble_size
             if equil_detection not in self.equil_detection_methods:
                 raise ValueError(f"Equilibration detection method {equil_detection} not recognised.")
             # Need to pass self object to equilibration detection function

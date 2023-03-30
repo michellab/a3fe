@@ -1,17 +1,12 @@
 """Functionality for managing legs of the calculation."""
 
 import glob as _glob
-from inspect import Parameter
-from operator import eq
-from platform import platform
 import BioSimSpace.Sandpit.Exscientia as _BSS
-#import BioSimSpace as _BSS
 from enum import Enum as _Enum
 import logging as _logging
-from multiprocessing import Pool as _Pool
+import numpy as _np
 import os as _os
 import pathlib as _pathlib
-import pickle as _pkl
 import shutil as _shutil
 import subprocess as _subprocess
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
@@ -128,14 +123,14 @@ class Leg(_SimulationRunner):
 
         super().__init__(base_dir=base_dir,
                          input_dir=input_dir,
-                         stream_log_level=stream_log_level)
+                         stream_log_level=stream_log_level,
+                         ensemble_size=ensemble_size)
 
         if not self.loaded_from_pickle:
             self.stage_types = Leg.required_stages[leg_type]
             self.block_size = block_size
             self.equil_detection = equil_detection
             self.gradient_threshold = gradient_threshold
-            self.ensemble_size = ensemble_size
             self._running: bool = False
 
             # Change the sign of the dg contribution to negative
@@ -728,3 +723,27 @@ class Leg(_SimulationRunner):
             lam_vals = Leg.default_lambda_values[self.leg_type][stage_type]
             lam_vals_str = ", ".join([str(lam_val) for lam_val in lam_vals])
             _write_simfile_option(f"{stage_input_dir}/somd.cfg", "lambda array", lam_vals_str)
+
+    def analyse(self) -> _Tuple[_np.ndarray, _np.ndarray]:
+        f"""
+        Analyse the leg and any sub-simulations, and 
+        return the overall free energy change.
+
+        Returns
+        -------
+        dg_overall : np.ndarray
+            The overall free energy change for each of the 
+            ensemble size repeats.
+        er_overall : np.ndarray
+            The overall error for each of the ensemble size
+            repeats.
+        """
+        dg_overall, er_overall = super().analyse()
+
+        if self.leg_type == LegType.BOUND:
+            # We need to add on the restraint corrections. There are no errors associated with these.
+            rest_corrs = _np.array([self.restraints[i].getCorrection().value() for i in range(self.ensemble_size)])
+            self._logger.info(f"Restraint corrections: {rest_corrs}")
+            dg_overall += rest_corrs
+
+        return dg_overall, er_overall

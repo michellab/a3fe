@@ -13,12 +13,13 @@ import scipy.stats as _stats
 from time import sleep as _sleep
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional, Union as _Union
 
-from ._utils import Job as _Job, VirtualQueue as _VirtualQueue, read_mbar_outfile as _read_mbar_outfile
+from ._utils import Job as _Job, VirtualQueue as _VirtualQueue, read_mbar_result as _read_mbar_result
 from .lambda_window import LamWindow as _LamWindow
 from .plot import (
     plot_gradient_stats as _plot_gradient_stats, 
     plot_gradient_hists as _plot_gradient_hists, 
-    plot_equilibration_time as _plot_equilibration_time
+    plot_equilibration_time as _plot_equilibration_time,
+    plot_overlap_mats as _plot_overlap_mats,
 )
 from .process_grads import GradientData as _GradientData
 from ._simfile import write_simfile_option as _write_simfile_option
@@ -109,7 +110,8 @@ class Stage(_SimulationRunner):
         super().__init__(base_dir=base_dir,
                          input_dir=input_dir,
                          output_dir=output_dir,
-                         stream_log_level=stream_log_level)
+                         stream_log_level=stream_log_level,
+                         ensemble_size=ensemble_size)
 
         if not self.loaded_from_pickle:
             if lambda_values is not None:
@@ -119,7 +121,6 @@ class Stage(_SimulationRunner):
             self.block_size = block_size
             self.equil_detection = equil_detection
             self.gradient_threshold = gradient_threshold
-            self.ensemble_size = ensemble_size
             self._running: bool = False
             self.run_thread: _Optional[_threading.Thread] = None
             # Set boolean to allow us to kill the thread
@@ -331,12 +332,13 @@ class Stage(_SimulationRunner):
         
         Returns
         -------
-        mean_freenrg : float or None
-            If get_frnrg is True, this is the mean free energy of the stage,
-            in kcal mol-1.  Otherwise, this is None.
-        conf_int : float or None
-            If get_frenrg is True, this is the 95% confidence interval of the 
-            free energy, in kcal mol-1. Otherwise, this is None.
+        free_energies : np.ndarray or None
+            The free energy changes for the stage for each of the ensemble
+            size runs, in kcal mol-1.  If get_frnrg is False, this is None.
+        errors : np.ndarray or None
+            The MBAR error estimates for the free energy changes for the stage
+            for each of the ensemble size runs, in kcal mol-1.  If get_frnrg is
+            False, this is None.
         """
 
         # Check that all simulations have equilibrated
@@ -369,11 +371,11 @@ class Stage(_SimulationRunner):
                 with open(outfile, "w") as ofile:
                     _subprocess.run(["analyse_freenrg",
                                     "mbar", "-i", f"{output_dir}/lambda*/run_{str(run).zfill(2)}/simfile_equilibrated.dat",
-                                    "-p", "100", "--overlap", "--temperature",
-                                    "298.0"], stdout=ofile)
+                                    "-p", "100", "--overlap", "--temperature", "298.0"], stdout=ofile)
 
             # Compute overall uncertainty
-            free_energies = _np.array([_read_mbar_outfile(ofile)[0] for ofile in mbar_out_files])  # Ignore MBAR error
+            free_energies = _np.array([_read_mbar_result(ofile)[0] for ofile in mbar_out_files]) 
+            errors = _np.array([_read_mbar_result(ofile)[1] for ofile in mbar_out_files])
             mean_free_energy = _np.mean(free_energies)
             # Gaussian 95 % C.I.
             conf_int = _stats.t.interval(0.95,
@@ -389,6 +391,10 @@ class Stage(_SimulationRunner):
                     for i in range(5):
                         ofile.write(f"Free energy from run {i+1}: {free_energies[i]: .3f} kcal/mol\n")
                     ofile.write("Errors are 95 % C.I.s based on the assumption of a Gaussian distribution of free energies\n")
+
+            # Plot overlap matrices
+            _plot_overlap_mats([ofile for ofile in mbar_out_files], self.output_dir)
+
 
         # Analyse the gradient data and make plots
         unequilibrated_gradient_data = _GradientData(lam_winds=self.lam_windows, equilibrated=False)
@@ -410,9 +416,12 @@ class Stage(_SimulationRunner):
 
 
         # TODO: Make convergence plots (which should be flat)
+        # TODO: Plot PMFs
 
         if get_frnrg:
-            return mean_free_energy, conf_int # type: ignore
+            self._logger.info(f"Overall free energy changes: {free_energies} kcal mol-1") # type: ignore
+            self._logger.info(f"Overall errors: {errors} kcal mol-1") # type: ignore
+            return free_energies, errors # type: ignore
         else:
             return None, None
 
