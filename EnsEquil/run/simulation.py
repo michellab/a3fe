@@ -420,4 +420,7 @@ class Simulation(_SimulationRunner):
     def equil_time(self) -> None:
         raise NotImplementedError("Equilibration time is not determined for a single simulation, only "
                                   "for an ensemble of simulations within a lambda window.")
-        
+    @property
+    def equilibrated(self) -> None:
+        raise NotImplementedError("Equilibration is not detected at the level of single simulations, only "
+                                  "for an ensemble of simulations within a lambda window.")

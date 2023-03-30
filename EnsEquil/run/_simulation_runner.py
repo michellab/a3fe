@@ -210,6 +210,11 @@ class SimulationRunner(ABC):
         return sum([sub_sim_runner.tot_simtime for sub_sim_runner in self._sub_sim_runners]) # ns
 
     @property
+    def equilibrated(self) -> float:
+        f"""Whether the {self.__class__.__name__} is equilibrated."""
+        return all([sub_sim_runner.equilibrated for sub_sim_runner in self._sub_sim_runners])
+
+    @property
     def equil_time(self) -> float:
         f"""The equilibration time in ns for the {self.__class__.__name__} and any sub-simulation runners."""
         return sum([sub_sim_runner.equil_time for sub_sim_runner in self._sub_sim_runners]) # ns
