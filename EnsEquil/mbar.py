@@ -57,11 +57,11 @@ def run_mbar(output_dir: str,
 
     # If percent is less than 100, create temporary truncated simfiles
     tmp_simfiles = [] # Clean these up afterwards
-    if percentage < 100:
-        for simfile in simfiles:
-            tmp_simfile = _os.path.join(_os.path.dirname(simfile), f"simfile_equilibrated_truncated_{percentage}_percent.dat")
-            tmp_simfiles.append(tmp_simfile)
-            _write_truncated_sim_datafile(simfile, tmp_simfile, percentage/100)
+    tmp_simfile_filename = f"simfile_equilibrated_truncated_{round(percentage)}_percent.dat"
+    for simfile in simfiles:
+        tmp_simfile = _os.path.join(_os.path.dirname(simfile), tmp_simfile_filename)
+        tmp_simfiles.append(tmp_simfile)
+        _write_truncated_sim_datafile(simfile, tmp_simfile, percentage/100)
 
     # Run MBAR using pymbar through SOMD
     mbar_out_files = []
@@ -71,7 +71,7 @@ def run_mbar(output_dir: str,
         with open(outfile, "w") as ofile:
             cmd_list = ["analyse_freenrg",
                          "mbar", 
-                         "-i", f"{output_dir}/lambda*/run_{str(run).zfill(2)}/simfile_equilibrated_truncated_{percentage}_percent.dat",
+                         "-i", f"{output_dir}/lambda*/run_{str(run).zfill(2)}/{tmp_simfile_filename}",
                          "-p", "100", 
                          "--overlap", 
                          "--temperature", f"{temperature}"]
@@ -82,13 +82,13 @@ def run_mbar(output_dir: str,
     free_energies = _np.array([_read_mbar_result(ofile)[0] for ofile in mbar_out_files]) 
     errors = _np.array([_read_mbar_result(ofile)[1] for ofile in mbar_out_files])
 
-    if delete_outfiles:
-        for ofile in mbar_out_files:
-            _subprocess.run(["rm", ofile])
-        mbar_out_files = []
+    #if delete_outfiles:
+        #for ofile in mbar_out_files:
+            #_subprocess.run(["rm", ofile])
+        #mbar_out_files = []
 
-    # Clean up temporary simfiles
-    for tmp_simfile in tmp_simfiles:
-        _subprocess.run(["rm", tmp_simfile])
+    ## Clean up temporary simfiles
+    #for tmp_simfile in tmp_simfiles:
+        #_subprocess.run(["rm", tmp_simfile])
 
     return free_energies, errors, mbar_out_files
