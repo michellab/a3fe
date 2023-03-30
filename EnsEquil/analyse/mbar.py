@@ -54,7 +54,7 @@ def run_mbar(output_dir: str,
     # Run MBAR using pymbar through SOMD
     mbar_out_files = []
     for run in range(1, ensemble_size + 1):
-        outfile = f"{output_dir}/freenrg-MBAR-run_{str(run).zfill(2)}.dat"
+        outfile = f"{output_dir}/freenrg-MBAR-run_{str(run).zfill(2)}_{round(percentage)}_percent.dat"
         mbar_out_files.append(outfile)
         with open(outfile, "w") as ofile:
             cmd_list = ["analyse_freenrg",

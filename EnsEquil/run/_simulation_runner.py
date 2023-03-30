@@ -222,6 +222,9 @@ class SimulationRunner(ABC):
             # according to the dg_multiplier attribute
             dg_overall += dgs * sub_sim_runner.dg_multiplier
 
+        self._logger.info(f"Overall free energy changes: {dg_overall} kcal mol-1")
+        self._logger.info(f"Fractions of equilibrated simulation time: {fracts}")
+
         # Plot the overall convergence
         _plot_convergence(fracts, dg_overall, self.tot_simtime, self.equil_time, self.output_dir)
 

@@ -444,14 +444,16 @@ class Stage(_SimulationRunner):
         # Now run mbar with multiprocessing to speed things up
         with _Pool() as pool:
             results = pool.starmap(_run_mbar, [(self.output_dir, self.ensemble_size, percent, False, 298, True) for percent in percents])
-            dg_overall = _np.array([result[0] for result in results]) # Second value in tuple is the error which we ignore here        
+            dg_overall = _np.array([result[0] for result in results]) # result[0] is a 2D array for a given percent
+
+        self._logger.info(f"Overall free energy changes: {dg_overall} kcal mol-1")
+        self._logger.info(f"Fractions of equilibrated simulation time: {fracts}")
 
         # Plot the overall convergence
         _plot_convergence(fracts, dg_overall, self.tot_simtime, self.equil_time, self.output_dir)
 
         return fracts, dg_overall
 
-        return fracts, dg_overall
     def _write_equilibrated_data(self, in_simfile: str,
                                  out_simfile: str,
                                  equil_index: int) -> None:
