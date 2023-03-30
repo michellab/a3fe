@@ -295,9 +295,11 @@ def plot_convergence(fracts: _np.ndarray,
     """
     # Convert fraction of the equilibrated simulation time to total simulation time in ns
     times = fracts * (tot_simtime - equil_time) + equil_time
+    # Add zero time to the start
+    times = _np.concatenate((_np.array([0]), times)) 
 
-    # Add Nans to pad dgs so that the arrays are the same sizes
-    nans = _np.empty((dgs.shape[0], dgs.shape[1] - len(times)))
+    # Add single Nan to correspond to zero time
+    nans = _np.empty((dgs.shape[0], 1))
     nans[:] = _np.nan
     dgs = _np.hstack((nans, dgs))
 
