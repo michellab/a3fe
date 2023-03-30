@@ -444,7 +444,7 @@ class Stage(_SimulationRunner):
         # Now run mbar with multiprocessing to speed things up
         with _Pool() as pool:
             results = pool.starmap(_run_mbar, [(self.output_dir, self.ensemble_size, percent, False, 298, True) for percent in percents])
-            dg_overall = _np.array([result[0] for result in results]) # result[0] is a 2D array for a given percent
+            dg_overall = _np.array([result[0] for result in results]).transpose() # result[0] is a 2D array for a given percent
 
         self._logger.info(f"Overall free energy changes: {dg_overall} kcal mol-1")
         self._logger.info(f"Fractions of equilibrated simulation time: {fracts}")
