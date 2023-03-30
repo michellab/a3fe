@@ -213,9 +213,8 @@ class SimulationRunner(ABC):
         # Get the dg_overall in terms of fraction of the total simulation time
         # Use steps of 5 % of the total simulation time
         fracts = _np.arange(0.05, 1.05, 0.05)
-        # Create an array to store the overall free energy change. This should
-        # have shape (len(fracts), ensemble_size)
-        dg_overall = _np.zeros((len(fracts), self.ensemble_size))
+        # Create an array to store the overall free energy change
+        dg_overall = _np.zeros((self.ensemble_size, len(fracts)))
 
         # Now add up the data for each of the sub-simulation runners
         for sub_sim_runner in self._sub_sim_runners:
