@@ -6,6 +6,7 @@ from itertools import count as _count
 import numpy as _np
 import pathlib as _pathlib
 import pickle as _pkl
+import scipy.stats as _stats
 import subprocess as _subprocess
 from threading import Thread as _Thread
 from time import sleep as _sleep
@@ -191,6 +192,22 @@ class SimulationRunner(ABC):
         # Log the overall free energy changes
         self._logger.info(f"Overall free energy changes: {dg_overall} kcal mol-1")
         self._logger.info(f"Overall errors: {er_overall} kcal mol-1")
+
+        # Calculate the 95 % confidence interval assuming Gaussian errors
+        mean_free_energy = _np.mean(dg_overall)
+        # Gaussian 95 % C.I.
+        conf_int = _stats.t.interval(0.95,
+                                    len(dg_overall)-1,
+                                    mean_free_energy,
+                                    scale=_stats.sem(dg_overall))[1] - mean_free_energy  # 95 % C.I.
+
+        # Write overall MBAR stats to file
+        with open(f"{self.output_dir}/overall_stats.dat", "a") as ofile:
+            ofile.write("###################################### Free Energies ########################################\n")
+            ofile.write(f"Mean free energy: {mean_free_energy: .3f} + /- {conf_int:.3f} kcal/mol\n")
+            for i in range(self.ensemble_size):
+                ofile.write(f"Free energy from run {i+1}: {dg_overall[i]: .3f} +/- {er_overall[i]:.3f} kcal/mol\n")
+            ofile.write("Errors are 95 % C.I.s based on the assumption of a Gaussian distribution of free energies\n")
 
         return dg_overall, er_overall
 
