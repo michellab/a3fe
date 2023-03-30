@@ -106,8 +106,20 @@ class Calculation(_SimulationRunner):
                             f"and {_Leg.required_input_files[_LegType.FREE]}")
 
 
-    def setup(self) -> None:
-        """ Set up the calculation."""
+    def setup(self, use_same_restraints:bool = False) -> None:
+        """ 
+        Set up the calculation. This involves parametrising, equilibrating, and
+        deriving restraints for the bound leg. Most of the work is done by the
+        Leg class.
+        
+        Parameters
+        ----------
+        use_same_restraints: bool, default=False
+            If True, the same restraints will be used for all of the bound leg repeats - by default
+            , the restraints generated for the first repeat are used. This allows meaningful
+            comparison between repeats for the bound leg. If False, the unique restraints are
+            generated for each repeat.
+        """
 
         if self.setup_complete:
             self._logger.info("Setup already complete. Skipping...")

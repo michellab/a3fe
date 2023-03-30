@@ -168,7 +168,7 @@ class Leg(_SimulationRunner):
                           f"any preparation stage. Required files are: {Leg.required_input_files[self.leg_type]}")
 
 
-    def setup(self) -> None:
+    def setup(self, use_same_restraints:bool = False) -> None:
         """
         Set up the leg. This involves:
             - Creating the input directories
@@ -179,6 +179,14 @@ class Leg(_SimulationRunner):
             - Running pre-equilibration simulations (and extracting the 
               restraints for the bound leg)
             - Creating the Stage objects
+        
+        Parameters
+        ----------
+        use_same_restraints: bool, default=False
+            If True, the same restraints will be used for all of the bound leg repeats - by default
+            , the restraints generated for the first repeat are used. This allows meaningful
+            comparison between repeats for the bound leg. If False, the unique restraints are
+            generated for each repeat.
         """
         self._logger.info("Setting up leg...")
         # Create input directories, parameterise, solvate, minimise, heat and preequil, all
@@ -207,7 +215,7 @@ class Leg(_SimulationRunner):
             self.run_ensemble_equilibration(system)
 
         # Write input files
-        self.write_input_files(system)
+        self.write_input_files(system, use_same_restraints=use_same_restraints)
 
         # Create the Stage objects, which automatically set themselves up
         self.stages = []
@@ -647,9 +655,22 @@ class Leg(_SimulationRunner):
                 _BSS.IO.saveMolecules(f"{equil_output_dir}/somd_{i+1}", final_system, fileformat=["rst7"], property_map={"velocity" : "foo"})
 
 
-    def write_input_files(self, pre_equilibrated_system: _BSS._SireWrappers._system.System) -> None:
+    def write_input_files(self, 
+                          pre_equilibrated_system: _BSS._SireWrappers._system.System,
+                          use_same_restraints: bool = False) -> None:
         """
         Write the required input files to all of the stage input directories.
+
+        Parameters
+        ----------
+        pre_equilibrated_system: _BSS._SireWrappers._system.System
+            The equilibrated system to run further equilinration on. The final coordinates
+            are then used as input for each of the individual runs.
+        use_same_restraints: bool, default=False
+            If True, the same restraints will be used for all of the bound leg repeats - by default
+            , the restraints generated for the first repeat are used. This allows meaningful
+            comparison between repeats for the bound leg. If False, the unique restraints are
+            generated for each repeat.
         """
         # Dummy values get overwritten later
         DUMMY_RUNTIME = 0.001 # ns
@@ -689,7 +710,10 @@ class Leg(_SimulationRunner):
                 coordinates_file = f"{ens_equil_output_dir}/somd_{i+1}.rst7"
                 _shutil.copy(coordinates_file, f"{stage_input_dir}/somd_{i+1}.rst7")
                 if self.leg_type == LegType.BOUND:
-                    restraint_file = f"{ens_equil_output_dir}/restraint_{i+1}.txt"
+                    if use_same_restraints: # Want to use same restraints for all repeats
+                        restraint_file = f"{ens_equil_output_dir}/restraint_1.txt"
+                    else:
+                        restraint_file = f"{ens_equil_output_dir}/restraint_{i+1}.txt"
                     _shutil.copy(restraint_file, f"{stage_input_dir}/restraint_{i+1}.txt")
 
             # Update the template-config.cfg file with the perturbed residue number generated
