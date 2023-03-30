@@ -415,4 +415,8 @@ class Simulation(_SimulationRunner):
 
     def analyse(self) -> None:
         raise NotImplementedError("Analysis cannot be performed for a single simulation")
+
+    def equil_time(self) -> None:
+        raise NotImplementedError("Equilibration time is not determined for a single simulation, only "
+                                  "for an ensemble of simulations within a lambda window.")
         

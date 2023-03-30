@@ -206,8 +206,13 @@ class SimulationRunner(ABC):
 
     @property
     def tot_simtime(self) -> float:
-        f"""The total simulation time  in ns for the {self.__class__.__name__} and any sub-simulation runners."""
+        f"""The total simulation time in ns for the {self.__class__.__name__} and any sub-simulation runners."""
         return sum([sub_sim_runner.tot_simtime for sub_sim_runner in self._sub_sim_runners]) # ns
+
+    @property
+    def equil_time(self) -> float:
+        f"""The equilibration time in ns for the {self.__class__.__name__} and any sub-simulation runners."""
+        return sum([sub_sim_runner.equil_time for sub_sim_runner in self._sub_sim_runners]) # ns
 
     def _refresh_logging(self) -> None:
         """Refresh the logging for the simulation runner and all sub-simulation runners."""
