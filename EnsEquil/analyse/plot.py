@@ -8,7 +8,7 @@ import seaborn as _sns
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
 from .process_grads import GradientData
-from ._utils import read_overlap_mat as _read_overlap_mat
+from ..read._process_somd_files import read_overlap_mat as _read_overlap_mat
 
 def general_plot(x_vals: _np.ndarray, y_vals: _np.ndarray, x_label: str, y_label: str,
                  outfile: str, vline_val: _Optional[float] = None,
@@ -172,7 +172,7 @@ def plot_gradient_hists(gradients_data: GradientData, output_dir: str) -> None:
     # Plot mixed gradients for each window
     n_lams = len(gradients_data.lam_vals)
     fig, axs = _plt.subplots(nrows=_ceil(n_lams/8), ncols=8, figsize=(40, 5*(n_lams/8)))
-    for i, ax in enumerate(axs.flatten()):
+    for i, ax in enumerate(axs.flatten()): # type: ignore
         if i < n_lams:
             # One histogram for each simulation
             for j, gradients in enumerate(gradients_data.gradients[i]):
@@ -191,7 +191,7 @@ def plot_gradient_hists(gradients_data: GradientData, output_dir: str) -> None:
     fig.savefig(name, dpi=300, bbox_inches='tight', facecolor='white', transparent=False)
     _plt.close(fig)
 
-def plot_equilibration_time(lam_windows: _List["LamWindows"], output_dir:str)->None:
+def plot_equilibration_time(lam_windows: _List["LamWindows"], output_dir:str)->None: # type: ignore
     """
     Plot the equilibration time for each lambda window.
 

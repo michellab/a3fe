@@ -3,7 +3,7 @@
 import numpy as _np
 from typing import List as _List, Tuple as _Tuple, Optional as _Optional, Dict as _Dict, Union as _Union
 
-from .calc_corr import get_statistical_inefficiency as _get_statistical_inefficiency
+from .autocorrelation import get_statistical_inefficiency as _get_statistical_inefficiency
 
 class GradientData():
     """A class to store and process gradient data."""

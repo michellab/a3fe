@@ -7,10 +7,10 @@ import os as _os
 import subprocess as _subprocess
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
-from .detect_equil import check_equil_block_gradient as _check_equil_block_gradient, check_equil_chodera as _check_equil_chodera
+from ..analyse.detect_equil import check_equil_block_gradient as _check_equil_block_gradient, check_equil_chodera as _check_equil_chodera
 from .simulation import Simulation as _Simulation
 from ._simulation_runner import SimulationRunner as _SimulationRunner
-from ._utils import VirtualQueue as _VirtualQueue 
+from ._virtual_queue import VirtualQueue as _VirtualQueue 
 
 class LamWindow(_SimulationRunner):
     """A class to hold and manipulate a set of SOMD simulations at a given lambda value."""

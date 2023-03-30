@@ -12,59 +12,7 @@ from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, O
 
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 
-def read_mbar_result(outfile: str) -> _Tuple[float, float]:
-    """ 
-    Read the output file from MBAR, and return the free energy and error.
 
-    Parameters
-    ----------
-    outfile : str
-        The name of the output file.
-
-    Returns
-    -------
-    free_energy : float
-        The free energy in kcal/mol.
-    free_energy_err : float
-        The error on the free energy in kcal/mol.
-    """
-    with open(outfile, 'r') as f:
-        lines = f.readlines()
-    # The free energy is the 5th last line of the file
-    free_energy = float(lines[-4].split(",")[0])
-    free_energy_err = float(lines[-4].split(",")[1].split()[0])
-
-    return free_energy, free_energy_err
-
-def read_overlap_mat(outfile: str) -> _np.ndarray:
-    """ 
-    Read the overlap matrix from the mbar outfile.
-
-    Parameters
-    ----------
-    outfile : str
-        The name of the output file.
-
-    Returns
-    -------
-    overlap_mat : np.ndarray
-        The overlap matrix.
-    """
-    with open(outfile, 'r') as f:
-        lines = f.readlines()
-    overlap_mat = []
-    in_overlap_mat = False
-    for line in lines:
-        if line.startswith("#Overlap matrix"):
-            in_overlap_mat = True
-            continue
-        if line.startswith("#"):
-            in_overlap_mat = False
-            continue
-        if in_overlap_mat:
-            overlap_mat.append([float(x) for x in line.split()])
-
-    return _np.array(overlap_mat)
 
 class JobStatus(_Enum):
     """An enumeration of the possible job statuses"""
@@ -262,23 +210,3 @@ class VirtualQueue():
         for var in vars(self):
             self._logger.debug(f"{var}: {getattr(self, var)} ")
         self._logger.debug("##############################################")
-
-
-def check_has_wat_and_box(system: _BSS._SireWrappers._system.System) -> None:
-    """Check that the system has water and a box."""
-    if system.getBox() == (None, None):
-        raise ValueError("System does not have a box.")
-    if system.nWaterMolecules() == 0:
-        raise ValueError("System does not have water.")
-
-def _get_simtime(sim_runner: _SimulationRunner) -> float:
-    """
-    Get the simulation time of a sub simulation runner, in ns. This function
-    is used with multiprocessing to speed up the calculation.
-    
-    Parameters
-    ----------
-    sim_runner : SimulationRunner
-        The simulation runner to get the simulation time of.
-    """
-    return sim_runner.tot_simtime # ns

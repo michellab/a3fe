@@ -14,17 +14,19 @@ import scipy.stats as _stats
 from time import sleep as _sleep
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional, Union as _Union
 
-from ._utils import Job as _Job, VirtualQueue as _VirtualQueue, read_mbar_result as _read_mbar_result, _get_simtime
+from ._virtual_queue import Job as _Job, VirtualQueue as _VirtualQueue
+from ..read._process_somd_files import read_mbar_result as _read_mbar_result
 from .lambda_window import LamWindow as _LamWindow
-from .plot import (
+from ..analyse.plot import (
     plot_gradient_stats as _plot_gradient_stats, 
     plot_gradient_hists as _plot_gradient_hists, 
     plot_equilibration_time as _plot_equilibration_time,
     plot_overlap_mats as _plot_overlap_mats,
 )
-from .process_grads import GradientData as _GradientData
-from ._simfile import write_simfile_option as _write_simfile_option
+from ..analyse.process_grads import GradientData as _GradientData
+from ..read._process_somd_files import write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
+from ._utils import get_simtime as _get_simtime
 
 class StageType(_Enum):
     """Enumeration of the types of stage."""

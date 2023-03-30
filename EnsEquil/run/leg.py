@@ -12,7 +12,7 @@ import subprocess as _subprocess
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
 from .stage import Stage as _Stage, StageType as _StageType
-from ._simfile import read_simfile_option as _read_simfile_option, write_simfile_option as _write_simfile_option
+from ..read._process_somd_files import read_simfile_option as _read_simfile_option, write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._utils import check_has_wat_and_box as _check_has_wat_and_box
 
@@ -304,7 +304,7 @@ class Leg(_SimulationRunner):
 
         return stage_input_dirs
 
-    def parameterise_input(self) -> _BSS._SireWrappers._system.System:
+    def parameterise_input(self) -> _BSS._SireWrappers._system.System: # type: ignore
         """
         Paramaterise the input structure, using Open Force Field v.2.0 'Sage'
         for the ligand, AMBER ff14SB for the protein, and TIP3P for the water.
@@ -363,7 +363,7 @@ class Leg(_SimulationRunner):
 
         return parameterised_system
 
-    def solvate_input(self, parameterised_system: _BSS._SireWrappers._system.System) -> _BSS._SireWrappers._system.System:
+    def solvate_input(self, parameterised_system: _BSS._SireWrappers._system.System) -> _BSS._SireWrappers._system.System: # type: ignore
         """
         Determine an appropriate (rhombic dodecahedron) 
         box size, then solvate the input structure using
@@ -406,7 +406,7 @@ class Leg(_SimulationRunner):
                                                molecule=parameterised_system,
                                                box=box, 
                                                angles=angles, 
-                                               ion_conc=ION_CONC)
+                                               ion_conc=ION_CONC) 
 
         # Set the preparation stage
         self.prep_stage = PreparationStage.SOLVATED
@@ -419,7 +419,7 @@ class Leg(_SimulationRunner):
 
         return solvated_system
 
-    def minimise_input(self, solvated_system: _BSS._SireWrappers._system.System) -> _BSS._SireWrappers._system.System:
+    def minimise_input(self, solvated_system: _BSS._SireWrappers._system.System) -> _BSS._SireWrappers._system.System: # type: ignore
         """
         Minimise the input structure with GROMACS. The resulting system is saved to the input directory.
         
@@ -439,7 +439,7 @@ class Leg(_SimulationRunner):
         minimised_system = self._run_process(solvated_system, protocol, prep_stage=PreparationStage.MINIMISED)
         return minimised_system
 
-    def heat_and_preequil_input(self, minimised_system: _BSS._SireWrappers._system.System) -> _BSS._SireWrappers._system.System:
+    def heat_and_preequil_input(self, minimised_system: _BSS._SireWrappers._system.System) -> _BSS._SireWrappers._system.System: # type: ignore
         """ 
         Heat the input structure from 0 to 298.15 K with GROMACS. The resulting system is saved to the input directory.
         
