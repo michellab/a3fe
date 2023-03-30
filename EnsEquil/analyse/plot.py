@@ -3,6 +3,7 @@
 import matplotlib.pyplot as _plt
 from math import ceil as _ceil
 import numpy as _np
+import os as _os
 import scipy.stats as _stats
 import seaborn as _sns
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
@@ -267,3 +268,43 @@ def plot_overlap_mats(mbar_outfiles: _List[str], output_dir:str) -> None:
         
     fig.tight_layout()
     fig.savefig(f"{output_dir}/overlap.png")
+
+
+def plot_convergence(fracts: _np.ndarray,
+                     dgs: _np.ndarray,
+                     tot_simtime: float,
+                     equil_time: float,
+                     output_dir: str) -> None:
+    """ 
+    Plot convergence of free energy estimate as a function of the total
+    simulation time.
+
+    Parameters
+    ----------
+    fracts : np.ndarray
+        Array of fractions of the total equilibrated simulation time at which the dgs were calculated.
+    dgs : np.ndarray
+        Array of free energies at each fraction of the total equilibrated simulation time. This has
+        ensemble size dimensions.
+    tot_simtime : float
+        Total simulation time.
+    equil_time : float
+        Equilibration time.
+    output_dir : str
+        Directory to save the plot to.
+    """
+    # Convert fraction of the equilibrated simulation time to total simulation time in ns
+    times = fracts * (tot_simtime - equil_time) + equil_time
+
+    # Add Nans to pad dgs so that the arrays are the same sizes
+    nans = _np.empty((dgs.shape[0], dgs.shape[1] - len(times)))
+    nans[:] = _np.nan
+    dgs = _np.hstack((nans, dgs))
+
+    # Plot the free energy estimate as a function of the total simulation time
+    outfile = _os.path.join(output_dir, "convergence.png")
+    general_plot(times, 
+                 dgs, 
+                 "Total Simulation Time / ns", 
+                 "Free energy / kcal mol$^{-1}$", 
+                 outfile)

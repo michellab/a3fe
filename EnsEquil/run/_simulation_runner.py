@@ -12,6 +12,8 @@ from time import sleep as _sleep
 from typing import Optional as _Optional, Tuple as _Tuple, Dict as _Dict, Any as _Any
 import logging as _logging
 
+from ..analyse.plot import plot_convergence as _plot_convergence
+
 class SimulationRunner(ABC):
     """An abstract base class for simulation runners. Note that
     self._sub_sim_runners (a list of SimulationRunner objects controlled
@@ -191,6 +193,39 @@ class SimulationRunner(ABC):
         self._logger.info(f"Overall errors: {er_overall} kcal mol-1")
 
         return dg_overall, er_overall
+
+    def analyse_convergence(self) -> _Tuple[_np.ndarray, _np.ndarray]:
+        f"""
+        Get a timeseries of the total free energy change of the
+        {self.__class__.__name__} against total simulation time. Also plot this.
+        Keep this separate from analyse as it is expensive to run.
+        
+        Returns
+        -------
+        fracts : np.ndarray
+            The fraction of the total equilibrated simulation time for each value of dg_overall.
+        dg_overall : np.ndarray
+            The overall free energy change for the {self.__class__.__name__} for
+            each value of total equilibrated simtime for each of the ensemble size repeats. 
+        """
+        self._logger.info(f"Analysing convergence of {self.__class__.__name__}...")
+        
+        # Get the dg_overall in terms of fraction of the total simulation time
+        # Use steps of 5 % of the total simulation time
+        fracts = _np.arange(0.05, 1.05, 0.05)
+        dg_overall = _np.zeros(len(fracts))
+
+        # Now add up the data for each of the sub-simulation runners
+        for sub_sim_runner in self._sub_sim_runners:
+            _, dgs = sub_sim_runner.analyse_convergence()
+            # Decide if the component should be added or subtracted
+            # according to the dg_multiplier attribute
+            dg_overall += dgs * sub_sim_runner.dg_multiplier
+
+        # Plot the overall convergence
+        _plot_convergence(fracts, dg_overall, self.tot_simtime, self.equil_time, self.output_dir)
+
+        return fracts, dg_overall
 
     @property
     def running(self) -> bool:

@@ -424,3 +424,7 @@ class Simulation(_SimulationRunner):
     def equilibrated(self) -> None:
         raise NotImplementedError("Equilibration is not detected at the level of single simulations, only "
                                   "for an ensemble of simulations within a lambda window.")
+
+    def analyse_convergence(self) -> None:
+        raise(NotImplementedError("Convergence analysis is not performed for a single simulation, only "
+                                  " at the level of a stage or above."))

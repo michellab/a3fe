@@ -22,7 +22,9 @@ from ..analyse.plot import (
     plot_gradient_hists as _plot_gradient_hists, 
     plot_equilibration_time as _plot_equilibration_time,
     plot_overlap_mats as _plot_overlap_mats,
+    plot_convergence as _plot_convergence,
 )
+from ..analyse.mbar import run_mbar as _run_mbar
 from ..analyse.process_grads import GradientData as _GradientData
 from ..read._process_somd_files import write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
@@ -363,22 +365,12 @@ class Stage(_SimulationRunner):
                     out_simfile = sim.output_dir + "/simfile_equilibrated.dat"
                     self._write_equilibrated_data(in_simfile, out_simfile, equil_index)
 
-            # Analyse data with MBAR and compute uncertainties
-            output_dir = self.output_dir
-            ensemble_size = self.ensemble_size
-            # This is nasty - assumes naming always the same
-            mbar_out_files = []
-            for run in range(1, ensemble_size + 1):
-                outfile = f"{self.output_dir}/freenrg-MBAR-run_{str(run).zfill(2)}.dat"
-                mbar_out_files.append(outfile)
-                with open(outfile, "w") as ofile:
-                    _subprocess.run(["analyse_freenrg",
-                                    "mbar", "-i", f"{output_dir}/lambda*/run_{str(run).zfill(2)}/simfile_equilibrated.dat",
-                                    "-p", "100", "--overlap", "--temperature", "298.0"], stdout=ofile)
-
-            # Compute overall uncertainty
-            free_energies = _np.array([_read_mbar_result(ofile)[0] for ofile in mbar_out_files]) 
-            errors = _np.array([_read_mbar_result(ofile)[1] for ofile in mbar_out_files])
+            
+            # Run MBAR and compute mean and 95 % C.I. of free energy
+            free_energies, errors, mbar_outfiles = _run_mbar(output_dir=self.output_dir, 
+                                                             ensemble_size=self.ensemble_size,
+                                                             percentage=100,
+                                                             subsampling=False)
             mean_free_energy = _np.mean(free_energies)
             # Gaussian 95 % C.I.
             conf_int = _stats.t.interval(0.95,
@@ -396,7 +388,7 @@ class Stage(_SimulationRunner):
                     ofile.write("Errors are 95 % C.I.s based on the assumption of a Gaussian distribution of free energies\n")
 
             # Plot overlap matrices
-            _plot_overlap_mats([ofile for ofile in mbar_out_files], self.output_dir)
+            _plot_overlap_mats([ofile for ofile in mbar_outfiles], self.output_dir)
 
 
         # Analyse the gradient data and make plots
@@ -417,7 +409,6 @@ class Stage(_SimulationRunner):
                 ofile.write(f"Equilibration time for lambda = {win.lam}: {win.equil_time:.3f} ns per simulation\n")
                 ofile.write(f"Total time simulated for lambda = {win.lam}: {win.sims[0].tot_simtime:.3f} ns per simulation\n")
 
-        # TODO: Make convergence plots (which should be flat)
         # TODO: Plot PMFs
 
         if get_frnrg:
@@ -427,6 +418,40 @@ class Stage(_SimulationRunner):
         else:
             return None, None
 
+    def analyse_convergence(self) -> _Tuple[_np.ndarray, _np.ndarray]:
+        """
+        Get a timeseries of the total free energy change of the
+        stage against total simulation time. Also plot this.
+        This is kept separate from the analyse method as it is
+        expensive to run.
+        
+        Returns
+        -------
+        fracts : np.ndarray
+            The fraction of the total equilibrated simulation time for each value of dg_overall.
+        dg_overall : np.ndarray
+            The overall free energy change for the stage for each value of total equilibrated 
+            simtime for each of the ensemble size repeats. 
+        """
+        self._logger.info("Analysing convergence...")
+        
+        # Get the dg_overall in terms of fraction of the total simulation time
+        # Use steps of 5 % of the total simulation time
+        fracts = _np.arange(0.05, 1.05, 0.05)
+        percents = fracts * 100
+        dg_overall = _np.zeros(len(fracts))
+
+        # Now run mbar with multiprocessing to speed things up
+        with _Pool() as pool:
+            results = pool.starmap(_run_mbar, [(self.output_dir, self.ensemble_size, percent, False, 298, True) for percent in percents])
+            dg_overall = _np.array([result[0] for result in results]) # Second value in tuple is the error which we ignore here        
+
+        # Plot the overall convergence
+        _plot_convergence(fracts, dg_overall, self.tot_simtime, self.equil_time, self.output_dir)
+
+        return fracts, dg_overall
+
+        return fracts, dg_overall
     def _write_equilibrated_data(self, in_simfile: str,
                                  out_simfile: str,
                                  equil_index: int) -> None:
