@@ -5,7 +5,7 @@ import logging as _logging
 import numpy as _np
 import os as _os
 import subprocess as _subprocess
-from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
+from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional, Union as _Union
 
 from ..analyse.detect_equil import check_equil_block_gradient as _check_equil_block_gradient, check_equil_chodera as _check_equil_chodera
 from .simulation import Simulation as _Simulation
@@ -92,7 +92,6 @@ class LamWindow(_SimulationRunner):
             self.gradient_threshold=gradient_threshold
             self.gradient_threshold=gradient_threshold
             self._equilibrated: bool=False
-            self.equil_time: _Optional[float]=None
             self._running: bool=False
 
             # Create the required simulations for this lambda value
@@ -151,7 +150,7 @@ class LamWindow(_SimulationRunner):
                 sim.kill()
             self._running=False
 
-    @ property
+    @property
     def equilibrated(self) -> bool:
         """
         Check if the ensemble of simulations at the lambda window is
@@ -163,8 +162,17 @@ class LamWindow(_SimulationRunner):
         self._equilibrated : bool
             True if the simulation is equilibrated, False otherwise.
         """
-        self._equilibrated, self.equil_time=self.check_equil(self)
+        self._equilibrated, self._equil_time=self.check_equil(self)
         return self._equilibrated
+
+    @property
+    def equil_time(self) -> float:
+        # Avoid calling expensive self.check_equil() function if we don't have to
+        if not self._equilibrated:
+            self._equilibrated, self._equil_time=self.check_equil(self)
+        if self._equil_time is None:
+            raise RuntimeError("Equilibration is not complete so equilibration time cannot be determined")
+        return self._equil_time # ns
 
     def _get_rolling_average(self, data: _np.ndarray, idx_block_size: int) -> _np.ndarray:
         """

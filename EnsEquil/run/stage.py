@@ -417,7 +417,6 @@ class Stage(_SimulationRunner):
                 ofile.write(f"Equilibration time for lambda = {win.lam}: {win.equil_time:.3f} ns per simulation\n")
                 ofile.write(f"Total time simulated for lambda = {win.lam}: {win.sims[0].tot_simtime:.3f} ns per simulation\n")
 
-
         # TODO: Make convergence plots (which should be flat)
         # TODO: Plot PMFs
 
