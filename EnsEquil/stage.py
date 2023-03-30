@@ -5,6 +5,7 @@ from enum import Enum as _Enum
 import os as _os
 import threading as _threading
 import logging as _logging
+from multiprocessing import Pool as _Pool
 import numpy as _np
 import pathlib as _pathlib
 import pickle as _pkl
@@ -13,7 +14,7 @@ import scipy.stats as _stats
 from time import sleep as _sleep
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional, Union as _Union
 
-from ._utils import Job as _Job, VirtualQueue as _VirtualQueue, read_mbar_result as _read_mbar_result
+from ._utils import Job as _Job, VirtualQueue as _VirtualQueue, read_mbar_result as _read_mbar_result, _get_simtime
 from .lambda_window import LamWindow as _LamWindow
 from .plot import (
     plot_gradient_stats as _plot_gradient_stats, 
@@ -466,6 +467,14 @@ class Stage(_SimulationRunner):
             # Now write the data, skipping the non-equilibrated portion
             for line in lines[equil_index + non_data_lines:]:
                 ofile.write(line)
+
+    @property
+    def tot_simtime(self) -> float:
+        f"""The total simulation time in ns for the stage."""
+        # Use multiprocessing at the level of stages to speed this us - this is a good place as stages
+        # have lots of windows, so we benefit the most from parallelisation here.
+        with _Pool() as pool:
+            return sum(pool.map(_get_simtime, self._sub_sim_runners))
 
     def _mv_output(self, save_name: str) -> None:
         """

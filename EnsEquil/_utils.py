@@ -10,6 +10,8 @@ import os as _os
 import subprocess as _subprocess
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
+from ._simulation_runner import SimulationRunner as _SimulationRunner
+
 def read_mbar_result(outfile: str) -> _Tuple[float, float]:
     """ 
     Read the output file from MBAR, and return the free energy and error.
@@ -268,3 +270,15 @@ def check_has_wat_and_box(system: _BSS._SireWrappers._system.System) -> None:
         raise ValueError("System does not have a box.")
     if system.nWaterMolecules() == 0:
         raise ValueError("System does not have water.")
+
+def _get_simtime(sim_runner: _SimulationRunner) -> float:
+    """
+    Get the simulation time of a sub simulation runner, in ns. This function
+    is used with multiprocessing to speed up the calculation.
+    
+    Parameters
+    ----------
+    sim_runner : SimulationRunner
+        The simulation runner to get the simulation time of.
+    """
+    return sim_runner.tot_simtime # ns
