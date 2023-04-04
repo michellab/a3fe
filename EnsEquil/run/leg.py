@@ -13,6 +13,7 @@ from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, O
 
 from .stage import Stage as _Stage, StageType as _StageType
 from ..read._process_somd_files import read_simfile_option as _read_simfile_option, write_simfile_option as _write_simfile_option
+from .. read._process_bss_systems import rename_lig as _rename_lig
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._utils import check_has_wat_and_box as _check_has_wat_and_box
 
@@ -49,9 +50,9 @@ class PreparationStage(_Enum):
         """Return the input files required for the simulation in this stage."""
         if self == PreparationStage.STRUCTURES_ONLY:
             if leg_type == LegType.BOUND:
-                return ["protein.pdb", "ligand.pdb"]
+                return ["protein.pdb", "ligand.sdf"] # Need sdf for parameterisation of lig
             elif leg_type == LegType.FREE:
-                return ["ligand.pdb"]
+                return ["ligand.sdf"]
         else:
             return [f"{leg_type.name.lower()}{self.file_suffix}.{file_type}" for file_type in ["prm7", "rst7"]]
 
@@ -322,9 +323,10 @@ class Leg(_SimulationRunner):
         self._logger.info("Parameterising input...")
         # Parameterise the ligand
         self._logger.info("Parameterising ligand...")
-        lig = _BSS.IO.readMolecules(f"{self.input_dir}/ligand.pdb")[0]
-        param_lig = _BSS.Parameters.parameterise(molecule=lig, forcefield=FORCEFIELDS["ligand"]).getMolecule()
-
+        lig_sys = _BSS.IO.readMolecules(f"{self.input_dir}/ligand.sdf")
+        # Ensure that the ligand is named "LIG"
+        _rename_lig(lig_sys, "LIG")
+        param_lig = _BSS.Parameters.parameterise(molecule=lig_sys[0], forcefield=FORCEFIELDS["ligand"]).getMolecule()
 
         # If bound, then parameterise the protein and waters and add to the system
         if self.leg_type == LegType.BOUND:
@@ -334,14 +336,16 @@ class Leg(_SimulationRunner):
             param_protein = _BSS.Parameters.parameterise(molecule=protein, 
                                                          forcefield=FORCEFIELDS["protein"]).getMolecule()
 
-            # Parameterise the waters
-            self._logger.info("Parameterising crystallographic waters...")
-            waters = _BSS.IO.readMolecules(f"{self.input_dir}/waters.pdb")
+            # Parameterise the waters, if they are supplied
+            # Check that waters are supplied
             param_waters = []
-            for water in waters:
-                param_waters.append(_BSS.Parameters.parameterise(molecule=water, 
-                                                                 water_model=FORCEFIELDS["water"],
-                                                                 forcefield=FORCEFIELDS["protein"]).getMolecule())
+            if _pathlib.Path(f"{self.input_dir}/waters.pdb").exists():
+                self._logger.info("Crystallographic waters detected. Parameterising...")
+                waters = _BSS.IO.readMolecules(f"{self.input_dir}/waters.pdb")
+                for water in waters:
+                    param_waters.append(_BSS.Parameters.parameterise(molecule=water, 
+                                                                    water_model=FORCEFIELDS["water"],
+                                                                    forcefield=FORCEFIELDS["protein"]).getMolecule())
 
             # Create the system
             self._logger.info("Assembling parameterised system...")
