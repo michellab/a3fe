@@ -392,7 +392,10 @@ class Leg(_SimulationRunner):
         # Get the minimium and maximum coordinates of the bounding box that
         # minimally encloses the protein.
         self._logger.info("Determining optimal rhombic dodecahedral box...")
-        box_min, box_max = parameterised_system.getAxisAlignedBoundingBox()
+        # Want to get box size based on complex/ ligand, exlcuding any crystallographic waters
+        non_waters = [mol for mol in parameterised_system if mol.nAtoms() != 3]
+        dry_system = _BSS._SireWrappers._system.System(non_waters) # type: ignore
+        box_min, box_max = dry_system.getAxisAlignedBoundingBox()
 
         # Work out the box size from the difference in the coordinates.
         box_size = [y - x for x, y in zip(box_min, box_max)]
