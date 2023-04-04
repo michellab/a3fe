@@ -22,7 +22,7 @@ class Calculation(_SimulationRunner):
                             "ligand.pdb",
                             "template_config.cfg"] # Waters.pdb is optional
 
-    required_legs = [_LegType.BOUND, _LegType.FREE]
+    required_legs = [_LegType.FREE, _LegType.BOUND]
 
     def __init__(self, 
                  block_size: float = 1,
