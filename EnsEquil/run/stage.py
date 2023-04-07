@@ -325,7 +325,7 @@ class Stage(_SimulationRunner):
 
         return lam_vals
 
-    def analyse(self, get_frnrg:bool = True) -> _Union[_Tuple[float, float], _Tuple[None, None]]:
+    def analyse(self, get_frnrg:bool = True, subsampling=False) -> _Union[_Tuple[float, float], _Tuple[None, None]]:
         r""" Analyse the results of the ensemble of simulations. Requires that
         all lambda windows have equilibrated.
           
@@ -334,6 +334,9 @@ class Stage(_SimulationRunner):
         get_frnrg : bool, optional, default=True
             If True, the free energy will be calculated with MBAR, otherwise
             this will be skipped.
+        subsampling: bool, optional, default=False
+            If True, the free energy will be calculated by subsampling using
+            the methods contained within pymbar.
         
         Returns
         -------
@@ -370,7 +373,7 @@ class Stage(_SimulationRunner):
             free_energies, errors, mbar_outfiles = _run_mbar(output_dir=self.output_dir, 
                                                              ensemble_size=self.ensemble_size,
                                                              percentage=100,
-                                                             subsampling=False)
+                                                             subsampling=subsampling)
             mean_free_energy = _np.mean(free_energies)
             # Gaussian 95 % C.I.
             conf_int = _stats.t.interval(0.95,

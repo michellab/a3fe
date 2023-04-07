@@ -755,10 +755,16 @@ class Leg(_SimulationRunner):
             lam_vals_str = ", ".join([str(lam_val) for lam_val in lam_vals])
             _write_simfile_option(f"{stage_input_dir}/somd.cfg", "lambda array", lam_vals_str)
 
-    def analyse(self) -> _Tuple[_np.ndarray, _np.ndarray]:
+    def analyse(self, subsampling=False) -> _Tuple[_np.ndarray, _np.ndarray]:
         f"""
         Analyse the leg and any sub-simulations, and 
         return the overall free energy change.
+
+        Parameters
+        ----------
+        subsampling: bool, optional, default=False
+            If True, the free energy will be calculated by subsampling using
+            the methods contained within pymbar.
 
         Returns
         -------
@@ -769,7 +775,7 @@ class Leg(_SimulationRunner):
             The overall error for each of the ensemble size
             repeats.
         """
-        dg_overall, er_overall = super().analyse()
+        dg_overall, er_overall = super().analyse(subsampling=subsampling)
 
         if self.leg_type == LegType.BOUND:
             # We need to add on the restraint corrections. There are no errors associated with these.

@@ -162,11 +162,17 @@ class SimulationRunner(ABC):
         for sub_sim_runner in self._sub_sim_runners:
             sub_sim_runner.kill()
 
-    def analyse(self) -> _Tuple[_np.ndarray, _np.ndarray]:
+    def analyse(self, subsampling=False) -> _Tuple[_np.ndarray, _np.ndarray]:
         f"""
         Analyse the {self.__class__.__name__} and any
         sub-simulations, and return the overall free energy
         change.
+
+        Parameters
+        ----------
+        subsampling: bool, optional, default=False
+            If True, the free energy will be calculated by subsampling using
+            the methods contained within pymbar.
 
         Returns
         -------
@@ -183,7 +189,7 @@ class SimulationRunner(ABC):
 
         # Analyse the sub-simulation runners
         for sub_sim_runner in self._sub_sim_runners:
-            dg, er = sub_sim_runner.analyse()
+            dg, er = sub_sim_runner.analyse(subsampling=subsampling)
             # Decide if the component should be added or subtracted
             # according to the dg_multiplier attribute
             dg_overall += dg * sub_sim_runner.dg_multiplier
