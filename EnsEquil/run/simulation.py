@@ -413,6 +413,10 @@ class Simulation(_SimulationRunner):
         for option, name in input_paths.items():
             _write_simfile_option(self.simfile_path, option, _os.path.join(self.input_dir, name))
 
+    def set_simfile_option(self, option: str, value: str) -> None:
+        """Set the value of an option in the simulation configuration file."""
+        _write_simfile_option(self.simfile_path, option, value)
+
     def analyse(self) -> None:
         raise NotImplementedError("Analysis cannot be performed for a single simulation")
 

@@ -312,6 +312,11 @@ class SimulationRunner(ABC):
         for sub_sim_runner in self._sub_sim_runners:
             sub_sim_runner.update_paths(old_sub_path, new_sub_path)
 
+    def set_simfile_option(self, option: str, value: str) -> None:
+        """Set the value of an option in the simulation configuration file."""
+        for sub_sim_runner in self._sub_sim_runners:
+            sub_sim_runner.set_simfile_option(option, value)
+
     @property
     def stream_log_level(self) -> int:
         """The log level for the stream handler."""

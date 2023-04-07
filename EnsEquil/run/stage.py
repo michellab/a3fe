@@ -14,8 +14,8 @@ import scipy.stats as _stats
 from time import sleep as _sleep
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional, Union as _Union
 
-from ._virtual_queue import Job as _Job, VirtualQueue as _VirtualQueue
-from ..read._process_somd_files import read_mbar_result as _read_mbar_result
+from ._virtual_queue import VirtualQueue as _VirtualQueue
+from ..read._process_somd_files import write_simfile_option as _write_simfile_option
 from .lambda_window import LamWindow as _LamWindow
 from ..analyse.plot import (
     plot_gradient_stats as _plot_gradient_stats, 
@@ -517,6 +517,12 @@ class Stage(_SimulationRunner):
         self._logger.info(f"Moving contents of output directory to {save_name}")
         base_dir = _pathlib.Path(self.output_dir).parent.resolve()
         _os.rename(self.output_dir, _os.path.join(base_dir, save_name))
+
+    def set_simfile_option(self, option: str, value: str) -> None:
+        """Set the value of an option in the simulation configuration file."""
+        simfile = _os.path.join(self.input_dir, "somd.cfg")
+        _write_simfile_option(simfile, option, value)
+        super().set_simfile_option(option, value)
 
     def update(self, save_name: str = "output_saved") -> None:
         """
