@@ -57,13 +57,12 @@ def run_mbar(output_dir: str,
         raise FileNotFoundError("No equilibrated simfiles found. Have you run the simulations "
                                  "and checked for equilibration?")
 
-    # If percent is less than 100, create temporary truncated simfiles
+    # Create temporary truncated simfiles
     tmp_simfiles = [] # Clean these up afterwards
-    if percentage < 100:
-        for simfile in simfiles:
-            tmp_simfile = _os.path.join(_os.path.dirname(simfile), "simfile_truncated.dat")
-            tmp_simfiles.append(tmp_simfile)
-            _write_truncated_sim_datafile(simfile, tmp_simfile, percentage/100)
+    for simfile in simfiles:
+        tmp_simfile = _os.path.join(_os.path.dirname(simfile), "simfile_truncated.dat")
+        tmp_simfiles.append(tmp_simfile)
+        _write_truncated_sim_datafile(simfile, tmp_simfile, percentage/100)
 
     # Run MBAR using pymbar through SOMD
     mbar_out_files = []

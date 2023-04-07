@@ -384,7 +384,7 @@ class Stage(_SimulationRunner):
                     ofile.write("###################################### Free Energies ########################################\n")
                     ofile.write(f"Mean free energy: {mean_free_energy: .3f} + /- {conf_int:.3f} kcal/mol\n")
                     for i in range(self.ensemble_size):
-                        ofile.write(f"Free energy from run {i+1}: {dg_overall[i]: .3f} +/- {er_overall[i]:.3f} kcal/mol\n")
+                        ofile.write(f"Free energy from run {i+1}: {free_energies[i]: .3f} +/- {errors[i]:.3f} kcal/mol\n")
                     ofile.write("Errors are 95 % C.I.s based on the assumption of a Gaussian distribution of free energies\n")
 
             # Plot overlap matrices
