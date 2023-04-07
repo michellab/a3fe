@@ -16,7 +16,7 @@ Assuming that you already have SLURM installed, we first need to install the [Bi
 ```bash
 mamba create -n ensequil -c conda-forge -c openbiosim/label/dev biosimspace --only-deps
 mamba activate ensequil
-mamba install -c conda-forge ambertools pytest
+mamba install -c conda-forge ambertools pytest watchdog
 ```
 Now download BioSimSpace, install, and test:
 ```bash
