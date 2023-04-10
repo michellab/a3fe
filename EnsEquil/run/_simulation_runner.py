@@ -25,7 +25,8 @@ class SimulationRunner(ABC):
     # for each instance
     class_count = _count()
     # Create list of files to be deleted by self.clean()
-    run_files = []
+    run_files = ["*.png",
+                 "overall_stats.dat"]
 
     def __init__(self,
                  base_dir: _Optional[str] = None,
