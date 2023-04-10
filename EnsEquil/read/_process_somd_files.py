@@ -114,6 +114,44 @@ def read_overlap_mat(outfile: str) -> _np.ndarray:
 
     return _np.array(overlap_mat)
 
+def read_mbar_pmf(outfile: str) -> _Tuple[_np.ndarray, _np.ndarray, _np.ndarray]:
+    """ 
+    Read the PMF from the mbar outfile.
+
+    Parameters
+    ----------
+    outfile : str
+        The name of the output file.
+
+    Returns
+    -------
+    lam : np.ndarray
+        The lambda values.
+    pmf : np.ndarray
+        The PMF in kcal/mol.
+    pmf_err : np.ndarray
+        The MBAR error in the PMF in kcal/mol.
+    """
+    with open(outfile, 'r') as f:
+        lines = f.readlines()
+    lam = []
+    pmf = []
+    pmf_err = []
+    in_pmf = False
+    for line in lines:
+        if line.startswith("#PMF from MBAR in kcal/mol"):
+            in_pmf = True
+            continue
+        if line.startswith("#"):
+            in_pmf = False
+            continue
+        if in_pmf:
+            lam.append(float(line.split()[0]))
+            pmf.append(float(line.split()[1]))
+            pmf_err.append(float(line.split()[2]))
+
+    return _np.array(lam), _np.array(pmf), _np.array(pmf_err)
+
 def write_truncated_sim_datafile(simfile: str, outfile: str, fraction: float) -> None:
     """ 
     Write a truncated simfile, with a certain percentage of the final number of steps

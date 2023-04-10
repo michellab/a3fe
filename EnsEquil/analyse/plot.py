@@ -9,7 +9,7 @@ import seaborn as _sns
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
 from .process_grads import GradientData
-from ..read._process_somd_files import read_overlap_mat as _read_overlap_mat
+from ..read._process_somd_files import read_overlap_mat as _read_overlap_mat, read_mbar_pmf as _read_mbar_pmf
 
 def general_plot(x_vals: _np.ndarray, y_vals: _np.ndarray, x_label: str, y_label: str,
                  outfile: str, vline_val: _Optional[float] = None,
@@ -350,3 +350,35 @@ def plot_convergence(fracts: _np.ndarray,
                  "Total Simulation Time / ns", 
                  "Free energy / kcal mol$^{-1}$", 
                  outfile)
+
+def plot_mbar_pmf(outfiles: _List[str], output_dir: str) -> None:
+    """
+    Plot the PMF from MBAR for each run.
+
+    Parameters
+    ----------
+    outfiles : List[str]
+        List of MBAR output files. It is assumed that 
+        these are passed in the same order as the runs 
+        they correspond to.
+    output_dir : str
+        Directory to save the plot to.
+
+    Returns
+    -------
+    None
+    """
+    lams_overall = []
+    dgs_overall = []
+    for i, out_file in enumerate(outfiles):
+        lams, dgs, _ = _read_mbar_pmf(out_file)
+        if i == 0:
+            lams_overall = lams
+        if len(lams) != len(lams_overall):
+            raise ValueError("Lambda windows do not match between runs.")
+        dgs_overall.append(dgs)
+
+    general_plot(_np.array(lams_overall),
+                 _np.array(dgs_overall), 
+                 r"$\lambda$", "Free energy / kcal mol$^{-1}$",
+                 outfile=f"{output_dir}/mbar_pmf.png")

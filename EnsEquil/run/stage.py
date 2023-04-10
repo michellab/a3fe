@@ -20,9 +20,11 @@ from .lambda_window import LamWindow as _LamWindow
 from ..analyse.plot import (
     plot_gradient_stats as _plot_gradient_stats, 
     plot_gradient_hists as _plot_gradient_hists, 
+    plot_gradient_timeseries as _plot_gradient_timeseries,
     plot_equilibration_time as _plot_equilibration_time,
     plot_overlap_mats as _plot_overlap_mats,
     plot_convergence as _plot_convergence,
+    plot_mbar_pmf as _plot_mbar_pmf,
 )
 from ..analyse.mbar import run_mbar as _run_mbar
 from ..analyse.process_grads import GradientData as _GradientData
@@ -390,9 +392,9 @@ class Stage(_SimulationRunner):
                         ofile.write(f"Free energy from run {i+1}: {free_energies[i]: .3f} +/- {errors[i]:.3f} kcal/mol\n")
                     ofile.write("Errors are 95 % C.I.s based on the assumption of a Gaussian distribution of free energies\n")
 
-            # Plot overlap matrices
-            _plot_overlap_mats([ofile for ofile in mbar_outfiles], self.output_dir)
-
+            # Plot overlap matrices and PMFs
+            _plot_overlap_mats(mbar_outfiles, self.output_dir)
+            _plot_mbar_pmf(mbar_outfiles, self.output_dir)
 
         # Analyse the gradient data and make plots
         unequilibrated_gradient_data = _GradientData(lam_winds=self.lam_windows, equilibrated=False)
@@ -402,6 +404,7 @@ class Stage(_SimulationRunner):
         _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="stat_ineff")
         _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="integrated_sem")
         _plot_gradient_hists(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir)
+        _plot_gradient_timeseries(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir)
 
         # Make plots of equilibration time
         _plot_equilibration_time(lam_windows=self.lam_windows, output_dir=self.output_dir)
