@@ -192,6 +192,46 @@ def plot_gradient_hists(gradients_data: GradientData, output_dir: str) -> None:
     fig.savefig(name, dpi=300, bbox_inches='tight', facecolor='white', transparent=False)
     _plt.close(fig)
 
+def plot_gradient_timeseries(gradients_data: GradientData, output_dir: str) -> None:
+    """ 
+    Plot timeseries of the gradients for a list of lambda windows.
+    If equilibrated is True, only data after equilibration is used.
+
+    Parameters
+    ----------
+    gradients_data : GradientData
+        GradientData object containing the gradient data.
+    output_dir : str
+        Directory to save the plot to.
+    equilibrated : bool
+        If True, only equilibrated data is used.
+
+    Returns
+    -------
+    None
+    """
+    # Plot mixed gradients for each window
+    n_lams = len(gradients_data.lam_vals)
+    fig, axs = _plt.subplots(nrows=_ceil(n_lams/8), ncols=8, figsize=(40, 5*(n_lams/8)))
+    for i, ax in enumerate(axs.flatten()): # type: ignore
+        if i < n_lams:
+            # One histogram for each simulation
+            for j, gradients in enumerate(gradients_data.gradients[i]):
+                ax.plot(gradients_data.times[i], gradients, alpha=0.5, label=f"Run {j+1}")
+            ax.legend()
+            ax.set_title(f"$\lambda$ = {gradients_data.lam_vals[i]}")
+            ax.set_xlabel("Time / ns")
+            ax.set_ylabel(r"$\frac{\mathrm{d}h}{\mathrm{d}\lambda}$ / kcal mol$^{-1}$")
+            ax.text(0.05, 0.95, f"Std. dev. = {_np.std(gradients_data.gradients[i]):.2f}" + r" kcal mol$^{-1}$", transform=ax.transAxes)
+            ax.text(0.05, 0.9, f"Mean = {_np.mean(gradients_data.gradients[i]):.2f}" + r" kcal mol$^{-1}$", transform=ax.transAxes)
+    
+    fig.tight_layout()
+    name = f"{output_dir}/gradient_timeseries"
+    if gradients_data.equilibrated:
+        name += "_equilibrated"
+    fig.savefig(name, dpi=300, bbox_inches='tight', facecolor='white', transparent=False)
+    _plt.close(fig)
+
 def plot_equilibration_time(lam_windows: _List["LamWindows"], output_dir:str)->None: # type: ignore
     """
     Plot the equilibration time for each lambda window.

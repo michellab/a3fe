@@ -86,9 +86,18 @@ class GradientData():
         # Get the statistical inefficiencies in units of simulation time
         stat_ineffs_all_winds = _np.array(stat_ineffs_all_winds) * lam_winds[0].sims[0].timestep # Timestep should be same for all sims
 
+        # Get the times
+        if equilibrated:
+            start_times = _np.array([win._equil_time for win in lam_winds])
+        else:
+            start_times = _np.array([0 for win in lam_winds])
+        end_times = _np.array([win.sims[0].tot_simtime for win in lam_winds]) # All sims at given lam run for same time
+        times = _np.array([_np.linspace(start, end, len(gradients[0] + 1))[1:] for start, end, gradients in zip(start_times, end_times, gradients_all_winds)])
+
         # Save the calculated attributes
         self.lam_vals = lam_vals
         self.gradients = gradients_all_winds
+        self.times = times
         self.means = means_all_winds
         self.sems_overall = sems_tot_all_winds
         self.sems_intra = sems_intra_all_winds
