@@ -397,14 +397,14 @@ class Stage(_SimulationRunner):
             _plot_mbar_pmf(mbar_outfiles, self.output_dir)
 
         # Analyse the gradient data and make plots
-        unequilibrated_gradient_data = _GradientData(lam_winds=self.lam_windows, equilibrated=False)
-        _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="mean")
-        _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="intra_run_variance")
-        _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="sem")
-        _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="stat_ineff")
-        _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="integrated_sem")
-        _plot_gradient_hists(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir)
-        _plot_gradient_timeseries(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir)
+        equilibrated_gradient_data = _GradientData(lam_winds=self.lam_windows, equilibrated=True)
+        _plot_gradient_stats(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir, plot_type="mean")
+        _plot_gradient_stats(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir, plot_type="intra_run_variance")
+        _plot_gradient_stats(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir, plot_type="sem")
+        _plot_gradient_stats(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir, plot_type="stat_ineff")
+        _plot_gradient_stats(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir, plot_type="integrated_sem")
+        _plot_gradient_hists(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir)
+        _plot_gradient_timeseries(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir)
 
         # Make plots of equilibration time
         _plot_equilibration_time(lam_windows=self.lam_windows, output_dir=self.output_dir)
