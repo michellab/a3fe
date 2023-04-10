@@ -827,6 +827,8 @@ class Leg(_SimulationRunner):
             # We need to add on the restraint corrections. There are no errors associated with these.
             rest_corrs = _np.array([self.restraints[i].getCorrection().value() for i in range(self.ensemble_size)])
             self._logger.info(f"Correcting convergence plots with restraint corrections: {rest_corrs}")
+            # Make sure the shape is correct
+            rest_corrs = [rest_corr * _np.ones(len(fracts)) for rest_corr in rest_corrs]
             dg_overall += rest_corrs
 
         self._logger.info(f"Overall free energy changes: {dg_overall} kcal mol-1")
