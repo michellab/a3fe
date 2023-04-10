@@ -5,6 +5,7 @@ from math import ceil as _ceil
 import numpy as _np
 import os as _os
 import scipy.stats as _stats
+from scipy.stats import kruskal as _kruskal
 import seaborn as _sns
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
@@ -184,6 +185,15 @@ def plot_gradient_hists(gradients_data: GradientData, output_dir: str) -> None:
             ax.set_ylabel("Probability density")
             ax.text(0.05, 0.95, f"Std. dev. = {_np.std(gradients_data.gradients[i]):.2f}" + r" kcal mol$^{-1}$", transform=ax.transAxes)
             ax.text(0.05, 0.9, f"Mean = {_np.mean(gradients_data.gradients[i]):.2f}" + r" kcal mol$^{-1}$", transform=ax.transAxes)
+            # Check if there is a significant difference between any of the sets of gradients
+            # compare samples
+            stat, p = _kruskal(*gradients_data.subsampled_gradients[i])
+            ax.text(0.05, 0.85, f"Kruskal-Wallis p = {p:.2f}", transform=ax.transAxes)
+            # If there is a significant difference, highlight the window
+            if p < 0.05:
+                    ax.tick_params(color='red')
+                    for spine in ax.spines.values():
+                        spine.set_edgecolor('red')
     
     fig.tight_layout()
     name = f"{output_dir}/gradient_hists"

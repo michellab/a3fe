@@ -25,6 +25,7 @@ class GradientData():
         # Get mean and variance of gradients, including both intra-run and inter-run components
         lam_vals = []
         gradients_all_winds = []
+        gradients_subsampled_all_winds = []
         means_all_winds = []
         sems_tot_all_winds = []
         sems_intra_all_winds = []
@@ -58,7 +59,7 @@ class GradientData():
                 gradients_wind.append(gradients)
                 means_intra.append(mean)
                 stat_ineffs_wind.append(stat_ineff)
-                gradients_subsampled_wind.append(gradients[::int(stat_ineff)])
+                gradients_subsampled_wind.append(subsampled_grads)
                 vars_intra.append(var)
                 squared_sems_intra.append(squared_sem)
 
@@ -76,6 +77,7 @@ class GradientData():
             sem_intra = _np.sqrt(squared_sem_intra)
             sem_inter = _np.sqrt(squared_sem_inter)
             gradients_all_winds.append(_np.array(gradients_wind))
+            gradients_subsampled_all_winds.append(gradients_subsampled_wind)
             means_all_winds.append(mean_overall)
             sems_tot_all_winds.append(tot_sem)
             sems_intra_all_winds.append(sem_intra)
@@ -97,6 +99,7 @@ class GradientData():
         # Save the calculated attributes
         self.lam_vals = lam_vals
         self.gradients = gradients_all_winds
+        self.subsampled_gradients = gradients_subsampled_all_winds
         self.times = times
         self.means = means_all_winds
         self.sems_overall = sems_tot_all_winds
