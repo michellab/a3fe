@@ -251,7 +251,7 @@ class SimulationRunner(ABC):
         self._logger.info(f"Fractions of equilibrated simulation time: {fracts}")
 
         # Plot the overall convergence
-        _plot_convergence(fracts, dg_overall, self.tot_simtime, self.equil_time, self.output_dir)
+        _plot_convergence(fracts, dg_overall, self.tot_simtime, self.equil_time, self.output_dir, self.ensemble_size)
 
         return fracts, dg_overall
 

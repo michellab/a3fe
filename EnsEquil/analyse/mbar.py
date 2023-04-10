@@ -60,7 +60,7 @@ def run_mbar(output_dir: str,
     # Create temporary truncated simfiles
     tmp_simfiles = [] # Clean these up afterwards
     for simfile in simfiles:
-        tmp_simfile = _os.path.join(_os.path.dirname(simfile), "simfile_truncated.dat")
+        tmp_simfile = _os.path.join(_os.path.dirname(simfile), f"simfile_truncated_{round(percentage)}_percent.dat")
         tmp_simfiles.append(tmp_simfile)
         _write_truncated_sim_datafile(simfile, tmp_simfile, percentage/100)
 
@@ -72,7 +72,7 @@ def run_mbar(output_dir: str,
         with open(outfile, "w") as ofile:
             cmd_list = ["analyse_freenrg",
                          "mbar", 
-                         "-i", f"{output_dir}/lambda*/run_{str(run).zfill(2)}/simfile_truncated.dat",
+                         "-i", f"{output_dir}/lambda*/run_{str(run).zfill(2)}/simfile_truncated_{round(percentage)}_percent.dat",
                          "-p", "100", 
                          "--overlap", 
                          "--temperature", f"{temperature}"]

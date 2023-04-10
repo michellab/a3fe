@@ -324,7 +324,8 @@ def plot_convergence(fracts: _np.ndarray,
                      dgs: _np.ndarray,
                      tot_simtime: float,
                      equil_time: float,
-                     output_dir: str) -> None:
+                     output_dir: str,
+                     ensemble_size: int) -> None:
     """ 
     Plot convergence of free energy estimate as a function of the total
     simulation time.
@@ -342,9 +343,12 @@ def plot_convergence(fracts: _np.ndarray,
         Equilibration time.
     output_dir : str
         Directory to save the plot to.
+    ensemble_size : int
+        Number of simulations in the ensemble.
     """
     # Convert fraction of the equilibrated simulation time to total simulation time in ns
-    times = fracts * (tot_simtime - equil_time) + equil_time
+    tot_equil_time = equil_time * ensemble_size
+    times = fracts * (tot_simtime - tot_equil_time) + tot_equil_time
     # Add zero time to the start
     times = _np.concatenate((_np.array([0]), times)) 
 
