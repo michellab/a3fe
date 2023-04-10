@@ -350,18 +350,18 @@ class SimulationRunner(ABC):
         clean_logs : bool, default=False
             If True, also delete the log files.
         """
-        run_files = self.__class__.run_files
+        delete_files = self.__class__.run_files
         if clean_logs:
-            run_files += self.__class__.__name__ + ".log"
+            delete_files.append(self.__class__.__name__ + ".log")
 
-        for run_file in run_files:
+        for del_file in delete_files:
             # Delete files in base directory
-            for file in _pathlib.Path(self.base_dir).glob(run_file):
+            for file in _pathlib.Path(self.base_dir).glob(del_file):
                 self._logger.info(f"Deleting {file}")
                 _subprocess.run(["rm", file])
 
             # Delete files in output directory
-            for file in _pathlib.Path(self.output_dir).glob(run_file):
+            for file in _pathlib.Path(self.output_dir).glob(del_file):
                 self._logger.info(f"Deleting {file}")
                 _subprocess.run(["rm", file])
 
