@@ -94,7 +94,7 @@ class GradientData():
         else:
             start_times = _np.array([0 for win in lam_winds])
         end_times = _np.array([win.sims[0].tot_simtime for win in lam_winds]) # All sims at given lam run for same time
-        times = _np.array([_np.linspace(start, end, len(gradients[0]) + 1)[1:] for start, end, gradients in zip(start_times, end_times, gradients_all_winds)])
+        times = [_np.linspace(start, end, len(gradients[0]) + 1)[1:] for start, end, gradients in zip(start_times, end_times, gradients_all_winds)]
 
         # Save the calculated attributes
         self.lam_vals = lam_vals
