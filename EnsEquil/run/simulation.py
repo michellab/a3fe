@@ -195,13 +195,15 @@ class Simulation(_SimulationRunner):
         else:
             self._logger.info("Only one rst7 file found - not renaming")
 
-        # Check how may restraints files we have
-        restraint_files = _glob.glob(_os.path.join(self.input_dir, "restraint*.txt"))
-        # If we have many restraints files, rename the correct one to
-        # somd.restraints and delete any others
-        if len(restraint_files) > 1:
-            self._logger.info("Multiple restraint files found - renaming")
-            _subprocess.run(["mv", _os.path.join(self.input_dir, f"restraint_{self.run_no}.txt"), _os.path.join(self.input_dir, "restraint.txt")])
+        # If we already have a restraints.txt file, continue, 
+        if _os.path.isfile(_os.path.join(self.input_dir, "restraint.txt")):
+            self._logger.info("restraint.txt file found")
+        # Otherwise rename the appropriate file
+        else:
+            old_restr_file = _os.path.join(self.input_dir, f"restraint_{self.run_no}.txt") 
+            target_restr_file = _os.path.join(self.input_dir, "restraint.txt")
+            self._logger.info(f"Renaming {old_restr_file} to {target_restr_file}")
+            _subprocess.run(["mv", old_restr_file, target_restr_file])
             unwanted_rest_files = _glob.glob(_os.path.join(self.input_dir, "restraint_?.txt"))
             for file in unwanted_rest_files:
                 _subprocess.run(["rm", file])
