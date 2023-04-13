@@ -196,7 +196,10 @@ class Stage(_SimulationRunner):
             for win in self.lam_windows:
                 win.kill()
 
-    def _run_without_threading(self, adaptive:bool=True, runtime:_Optional[float]=None) -> None:
+    def _run_without_threading(self, 
+                              adaptive:bool=True,
+                              runtime:_Optional[float]=None,
+                              max_runtime: float = 30) -> None:
         """ Run the ensemble of simulations constituting the stage (optionally with adaptive 
         equilibration detection), and, if using adaptive equilibration detection, perform 
         analysis once finished.  This function is called by run() with threading, so that
@@ -210,6 +213,8 @@ class Stage(_SimulationRunner):
             If False, the stage will run for the specified runtime and analysis will not be performed.
         runtime : float, Optional, default: None
             If adaptive is False, runtime must be supplied and stage will run for this number of nanoseconds. 
+        max_runtime : float, Optional, default: 30
+            The maximum runtime for a single simulation during an adaptive simulation, in ns. Only used when adaptive == True. 
 
         Returns
         -------
@@ -260,8 +265,13 @@ class Stage(_SimulationRunner):
                                 if win.equilibrated:
                                     self._logger.info(f"{win} has equilibrated at {win.equil_time:.3f} ns")
                                 else:
-                                    self._logger.info(f"{win} has not equilibrated. Resubmitting for {self.block_size:.3f} ns")
-                                    win.run(self.block_size)
+                                    # Check that we haven't exceeded the maximum runtime for any simulations
+                                    if win.tot_simtime / win.ensemble_size >= max_runtime:
+                                        self._logger.info(f"{win} has not equilibrated but simulations have exceeded the maximum runtime of "
+                                                          f"{max_runtime} ns. Terminating simulations") 
+                                    else: # Not equilibrated and not over the maximum runtime, so resubmit
+                                        self._logger.info(f"{win} has not equilibrated. Resubmitting for {self.block_size:.3f} ns")
+                                        win.run(self.block_size)
                             else: # Not in adaptive mode
                                 self._logger.info(f"{win} has finished at {win.tot_simtime:.3f} ns")
 
