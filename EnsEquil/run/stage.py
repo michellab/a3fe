@@ -165,6 +165,15 @@ class Stage(_SimulationRunner):
     def __str__(self) -> str:
         return f"Stage (type = {self.stage_type.name.lower()})"
 
+    @property
+    def lam_windows(self) -> _List[_SimulationRunner]:
+        return self._sub_sim_runners
+
+    @lam_windows.setter
+    def legs(self, value) -> None:
+        self._logger.info("Modifying/ creating lambda windows")
+        self._sub_sim_runners = value
+
     def run(self, adaptive:bool=True, runtime:_Optional[float]=None) -> None:
         """ Run the ensemble of simulations constituting the stage (optionally with adaptive 
         equilibration detection), and, if using adaptive equilibration detection, perform 
@@ -582,9 +591,6 @@ class Stage(_SimulationRunner):
                                                 stream_log_level=self.stream_log_level
                                                 )
                                     )
-
-        # Point self._sub_sim_runners to self.lam_windows
-        self._sub_sim_runners = self.lam_windows
 
 class StageContextManager():
     """Stage context manager to ensure that all stages are killed when

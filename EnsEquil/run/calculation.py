@@ -89,6 +89,15 @@ class Calculation(_SimulationRunner):
             # Save the state and update log
             self._update_log()
             self._dump()
+    
+    @property
+    def legs(self) -> _List[_SimulationRunner]:
+        return self._sub_sim_runners
+
+    @legs.setter
+    def legs(self, value) -> None:
+        self._logger.info("Modifying/ creating legs")
+        self._sub_sim_runners = value
 
     def _validate_input(self) -> None:
         """Check that the required input files are present in the input directory."""
@@ -144,9 +153,6 @@ class Calculation(_SimulationRunner):
                        stream_log_level=self.stream_log_level)
             self.legs.append(leg)
             leg.setup()
-
-        # Point _sub_sim_runners to self.legs
-        self._sub_sim_runners = self.legs
 
         # Save the state
         self.setup_complete = True

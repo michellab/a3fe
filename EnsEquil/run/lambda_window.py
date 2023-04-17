@@ -117,15 +117,21 @@ class LamWindow(_SimulationRunner):
                                  output_dir=sim_base_dir,
                                  stream_log_level=stream_log_level))
 
-            # Point self._sub_sim_runners to the simulations
-            self._sub_sim_runners=self.sims
-
             # Save the state and update log
             self._update_log()
             self._dump()
 
     def __str__(self) -> str:
         return f"LamWindow (lam={self.lam:.3f})"
+
+    @property
+    def sims(self) -> _List[_SimulationRunner]:
+        return self._sub_sim_runners
+
+    @sims.setter
+    def legs(self, value) -> None:
+        self._logger.info("Modifying/ creating simulations")
+        self._sub_sim_runners = value
 
     def run(self, duration: float=2.5) -> None:
         """

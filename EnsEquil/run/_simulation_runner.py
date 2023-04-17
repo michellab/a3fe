@@ -1,6 +1,9 @@
 """Abstract base class for simulation runners."""
 
+from __future__ import annotations
+
 from abc import ABC
+import copy as _copy
 import glob as _glob
 from itertools import count as _count
 import numpy as _np
@@ -11,7 +14,7 @@ import scipy.stats as _stats
 import subprocess as _subprocess
 from threading import Thread as _Thread
 from time import sleep as _sleep
-from typing import Optional as _Optional, Tuple as _Tuple, Dict as _Dict, Any as _Any
+from typing import Optional as _Optional, Tuple as _Tuple, Dict as _Dict, Any as _Any, List as _List
 import logging as _logging
 
 from ..analyse.plot import plot_convergence as _plot_convergence

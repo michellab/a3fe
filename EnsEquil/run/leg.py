@@ -155,6 +155,15 @@ class Leg(_SimulationRunner):
     def __str__(self) -> str:
         return f"Leg (type = {self.leg_type.name})"
 
+    @property
+    def stages(self) -> _List[_SimulationRunner]:
+        return self._sub_sim_runners
+
+    @stages.setter
+    def legs(self, value) -> None:
+        self._logger.info("Modifying/ creating stages")
+        self._sub_sim_runners = value
+
     def _validate_input(self) -> None:
         """Check that the required files are provided for the leg type and set the preparation stage
         according to the files present."""
@@ -245,9 +254,6 @@ class Leg(_SimulationRunner):
                                       input_dir=self.stage_input_dirs[stage_type],
                                       output_dir=self.stage_input_dirs[stage_type].replace("input", "output"),
                                       stream_log_level=self.stream_log_level))
-
-        # Point _sub_sim_runners to self.stages
-        self._sub_sim_runners = self.stages
 
         self._logger.info("Setup complete.")
         # Save state
