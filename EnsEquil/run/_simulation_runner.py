@@ -297,6 +297,11 @@ class SimulationRunner(ABC):
         return sum([sub_sim_runner.tot_gpu_time for sub_sim_runner in self._sub_sim_runners]) # GPU hours
 
     @property
+    def failed_simulations(self) -> _List[SimulationRunner]:
+        """The failed sub-simulation runners"""
+        return [failure for sub_sim_runner in self._sub_sim_runners for failure in sub_sim_runner.failed_simulations]
+
+    @property
     def equilibrated(self) -> float:
         f"""Whether the {self.__class__.__name__} is equilibrated."""
         return all([sub_sim_runner.equilibrated for sub_sim_runner in self._sub_sim_runners])

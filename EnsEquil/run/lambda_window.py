@@ -185,6 +185,11 @@ class LamWindow(_SimulationRunner):
             raise RuntimeError("Equilibration is not complete so equilibration time cannot be determined")
         return self._equil_time # ns
 
+    @property
+    def failed_simulations(self) -> _List[_SimulationRunner]:
+        """The failed simulations"""
+        return [sim for sim in self.sims if sim.failed]
+
     def _get_rolling_average(self, data: _np.ndarray, idx_block_size: int) -> _np.ndarray:
         """
         Calculate the rolling average of a 1D array.

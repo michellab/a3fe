@@ -311,11 +311,9 @@ class Simulation(_SimulationRunner):
     @property
     def tot_gpu_time(self) -> float:
         """Get the total simulation time in GPU hours"""
-        # Check for all slurm output files
-        if not hasattr(self, "slurm_file_base"):
-            self._get_slurm_file_base()
-        slurm_output_files = _glob.glob(f"{self.slurm_file_base}*")
-        
+        # Get output files
+        slurm_output_files = self.slurm_output_files
+
         # If we don't have any output files, we haven't run any simulations
         if len(slurm_output_files) == 0:
             return 0
@@ -330,6 +328,31 @@ class Simulation(_SimulationRunner):
 
         # And convert to GPU hours
         return tot_gpu_time / 3600
+
+    @property
+    def failed(self) -> bool:
+        """Whether the simulation has failed"""
+        # Check if we are still running
+        if self.running:
+            return False
+
+        # We are not running, so all slurm output files should contain the 
+        # "Simulation took" line
+        if self.slurm_output_files:
+            for file in self.slurm_output_files:
+                with open(file, "rt") as file:
+                    for line in file.readlines():
+                        if line.startswith("Simulation took"):
+                            return False
+
+        # We aren't running and have output files, but no "Simulation took" line -> Failure
+        return True
+
+    @property
+    def slurm_output_files(self) -> _List[str]:
+        if not hasattr(self, "slurm_file_base"):
+            self._get_slurm_file_base()
+        return _glob.glob(f"{self.slurm_file_base}*")
 
     def kill(self) -> None:
         """Kill the job."""
