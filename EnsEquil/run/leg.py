@@ -85,7 +85,8 @@ class Leg(_SimulationRunner):
                  ensemble_size: int = 5,
                  base_dir: _Optional[str] = None,
                  input_dir: _Optional[str] = None,
-                 stream_log_level: int = _logging.INFO) -> None:
+                 stream_log_level: int = _logging.INFO,
+                 update_paths: bool = True) -> None:
         """
         Instantiate a calculation based on files in the input dir. If leg.pkl exists in the
         base directory, the calculation will be loaded from this file and any arguments
@@ -115,6 +116,9 @@ class Leg(_SimulationRunner):
         stream_log_level : int, Optional, default: logging.INFO
             Logging level to use for the steam file handlers for the
             calculation object and its child objects.
+        update_paths: bool, optional, default: True
+            if true, if the simulation runner is loaded by unpickling, then
+            update_paths() is called.
 
         Returns
         -------
@@ -126,7 +130,8 @@ class Leg(_SimulationRunner):
         super().__init__(base_dir=base_dir,
                          input_dir=input_dir,
                          stream_log_level=stream_log_level,
-                         ensemble_size=ensemble_size)
+                         ensemble_size=ensemble_size,
+                         update_paths=update_paths)
 
         if not self.loaded_from_pickle:
             self.stage_types = Leg.required_stages[leg_type]

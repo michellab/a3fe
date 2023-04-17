@@ -34,7 +34,8 @@ class SimulationRunner(ABC):
                  output_dir: _Optional[str] = None,
                  stream_log_level: int = _logging.INFO,
                  dg_multiplier: int = 1,
-                 ensemble_size: int = 5) -> None:
+                 ensemble_size: int = 5,
+                 update_paths: bool =True) -> None:
         """
         base_dir : str, Optional, default: None
             Path to the base directory for the simulation runner.
@@ -56,6 +57,9 @@ class SimulationRunner(ABC):
             free energy change for the super simulation-runner.
         ensemble_size : int, Optional, default: 5
             Number of repeats to run.
+        update_paths: bool, Optional, default: True
+            If True, if the simulation runner is loaded by unpickling, then
+            update_paths() is called.
         """
         # Set up the directories (which may be overwritten if the 
         # simulation runner is subsequently loaded from a pickle file)
@@ -77,6 +81,10 @@ class SimulationRunner(ABC):
         self.loaded_from_pickle = False
         if _pathlib.Path(f"{base_dir}/{self.__class__.__name__}.pkl").is_file():
             self._load() # May overwrite the above attributes and options
+
+            # Update the paths if required
+            if update_paths:
+                self.update_paths()
 
         else:
             # Initialise sub-simulation runners with an empty list

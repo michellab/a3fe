@@ -67,7 +67,8 @@ class Stage(_SimulationRunner):
                  base_dir: _Optional[str] = None,
                  input_dir: _Optional[str] = None,
                  output_dir: _Optional[str] = None,
-                 stream_log_level: int = _logging.INFO) -> None:
+                 stream_log_level: int = _logging.INFO,
+                 update_paths: bool = True) -> None:
         """
         Initialise an ensemble of SOMD simulations, constituting the Stage. If Stage.pkl exists in the
         output directory, the Stage will be loaded from this file and any arguments
@@ -105,6 +106,9 @@ class Stage(_SimulationRunner):
         stream_log_level : int, Optional, default: logging.INFO
             Logging level to use for the steam file handlers for the
             Ensemble object and its child objects.
+        update_paths: bool, Optional, default: True
+            If True, if the simulation runner is loaded by unpickling, then
+            update_paths() is called.
 
         Returns
         -------
@@ -118,7 +122,8 @@ class Stage(_SimulationRunner):
                          input_dir=input_dir,
                          output_dir=output_dir,
                          stream_log_level=stream_log_level,
-                         ensemble_size=ensemble_size)
+                         ensemble_size=ensemble_size,
+                         update_paths=update_paths)
 
         if not self.loaded_from_pickle:
             if lambda_values is not None:

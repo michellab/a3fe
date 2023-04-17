@@ -28,7 +28,8 @@ class LamWindow(_SimulationRunner):
                  base_dir: _Optional[str] = None,
                  input_dir: _Optional[str] = None,
                  output_dir: _Optional[str] = None,
-                 stream_log_level: int=_logging.INFO) -> None:
+                 stream_log_level: int=_logging.INFO,
+                 update_paths: bool = True) -> None:
         """
         Initialise a LamWindow object.
 
@@ -64,6 +65,9 @@ class LamWindow(_SimulationRunner):
         stream_log_level : int, Optional, default: logging.INFO
             Logging level to use for the steam file handlers for the
             Ensemble object and its child objects.
+        update_paths: bool, Optional, default: True
+            If true, if the simulation runner is loaded by unpickling, then
+            update_paths() is called.
 
         Returns
         -------
@@ -77,7 +81,8 @@ class LamWindow(_SimulationRunner):
                          input_dir=input_dir,
                          output_dir=output_dir,
                          stream_log_level=stream_log_level,
-                         ensemble_size=ensemble_size)
+                         ensemble_size=ensemble_size,
+                         update_paths=update_paths)
 
         if not self.loaded_from_pickle:
             self.virtual_queue=virtual_queue

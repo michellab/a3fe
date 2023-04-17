@@ -31,7 +31,8 @@ class Calculation(_SimulationRunner):
                  ensemble_size: int = 5,
                  input_dir: _Optional[str] = None,
                  base_dir: _Optional[str] = None,
-                 stream_log_level: int = _logging.INFO) -> None:
+                 stream_log_level: int = _logging.INFO,
+                 update_paths: bool = True) -> None:
         """
         Instantiate a calculation based on files in the input dir. If calculation.pkl exists in the
         base directory, the calculation will be loaded from this file and any arguments
@@ -61,6 +62,9 @@ class Calculation(_SimulationRunner):
         stream_log_level : int, Optional, default: logging.INFO
             Logging level to use for the steam file handlers for the
             calculation object and its child objects.
+        update_paths: bool, Optional, default: True
+            If True, if the simulation runner is loaded by unpickling, then
+            update_paths() is called.
 
         Returns
         -------
@@ -70,7 +74,8 @@ class Calculation(_SimulationRunner):
                          input_dir=input_dir,
                          output_dir=None,
                          stream_log_level=stream_log_level,
-                         ensemble_size=ensemble_size)
+                         ensemble_size=ensemble_size,
+                         update_paths=update_paths)
         
         if not self.loaded_from_pickle:
             self.block_size = block_size
