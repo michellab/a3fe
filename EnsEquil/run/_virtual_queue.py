@@ -187,7 +187,9 @@ class VirtualQueue():
                 #if process_output.startswith("sbatch: error"):
                     #raise RuntimeError(f"Error submitting job: {process_output}")
                 try:
-                job.slurm_job_id = int((process_output.split()[-1]))
+                    job.slurm_job_id = int((process_output.split()[-1]))
+                except Exception as e:
+                    raise RuntimeError(f"Error submitting job: {process_output}") from e 
 
         #self._logger.info(f"Queue updated")
         #self._logger.info(f"Slurm queue slurm job ids: {[job.slurm_job_id for job in self._slurm_queue]}")
