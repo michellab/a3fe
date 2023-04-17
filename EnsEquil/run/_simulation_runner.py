@@ -4,6 +4,7 @@ from abc import ABC
 import glob as _glob
 from itertools import count as _count
 import numpy as _np
+import os as _os
 import pathlib as _pathlib
 import pickle as _pkl
 import scipy.stats as _stats
@@ -84,7 +85,14 @@ class SimulationRunner(ABC):
 
             # Update the paths if required
             if update_paths:
-                self.update_paths()
+                # Find out what the new base dir should be
+                if base_dir is None:
+                    new_sub_path = _os.getcwd()
+                else:
+                    new_sub_path = base_dir
+                # The sub path will have changed if we've moved the pickle
+                self.update_paths(old_sub_path=self.base_dir, 
+                                  new_sub_path=new_sub_path)
 
         else:
             # Initialise sub-simulation runners with an empty list
@@ -398,6 +406,7 @@ class SimulationRunner(ABC):
         new_dict = {}
         for key, val in self.__dict__.items():
             if isinstance(val, _Thread):
+                print(val)
                 new_dict[key] = None
             # If this is a list of sub-simulation runners, then we need to
             # recursively call _pickable_dict on each of them and their sub-simulations

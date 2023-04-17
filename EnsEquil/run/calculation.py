@@ -203,16 +203,6 @@ class Calculation(_SimulationRunner):
             raise ValueError("The calculation has not been set up yet. Please call setup() first.")
         super().run(adaptive=adaptive, runtime=runtime)
 
-    def update_paths(self) -> None:
-        """ 
-        Update the paths of the calculation and its legs. This is useful if the calculation is being
-        moved to a new location (e.g. was set up locally and is now being run on a cluster). This assumes
-        that this command is being run from the new base directory.
-        """
-        old_base_dir = self.base_dir
-        new_base_dir = _os.getcwd()
-        super().update_paths(old_sub_path=old_base_dir, new_sub_path=new_base_dir)
-
     def update_run_somd(self) -> None:
         """ 
         Overwrite the run_somd.sh script in all simulation output dirs with 
