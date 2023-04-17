@@ -28,7 +28,7 @@ from ..analyse.plot import (
 )
 from ..analyse.mbar import run_mbar as _run_mbar
 from ..analyse.process_grads import GradientData as _GradientData
-from .enums import StageType as StageType
+from .enums import StageType as _StageType
 from ..read._process_somd_files import write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._utils import get_simtime as _get_simtime
@@ -40,7 +40,7 @@ class Stage(_SimulationRunner):
     """
 
     def __init__(self, 
-                 stage_type: StageType,
+                 stage_type: _StageType,
                  block_size: float = 1,
                  equil_detection: str = "block_gradient",
                  gradient_threshold: _Optional[float] = None,

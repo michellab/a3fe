@@ -12,7 +12,7 @@ import subprocess as _subprocess
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
 from ..analyse.plot import plot_convergence as _plot_convergence
-from .enums import LegType, PreparationStage
+from .enums import LegType as _LegType, PreparationStage as _PreparationStage
 from .stage import Stage as _Stage, StageType as _StageType
 from ..read._process_somd_files import read_simfile_option as _read_simfile_option, write_simfile_option as _write_simfile_option
 from .. read._process_bss_systems import rename_lig as _rename_lig
@@ -25,22 +25,22 @@ class Leg(_SimulationRunner):
     """
     # Required input files for each leg type and preparation stage.
     required_input_files = {}
-    for leg_type in LegType:
+    for leg_type in _LegType:
         required_input_files[leg_type] = {}
-        for prep_stage in PreparationStage:
+        for prep_stage in _PreparationStage:
             required_input_files[leg_type][prep_stage] = ["run_somd.sh", "template_config.cfg"] + prep_stage.get_simulation_input_files(leg_type)
 
-    required_stages = {LegType.BOUND: [_StageType.RESTRAIN, _StageType.DISCHARGE, _StageType.VANISH],
-                        LegType.FREE: [_StageType.DISCHARGE, _StageType.VANISH]}
+    required_stages = {_LegType.BOUND: [_StageType.RESTRAIN, _StageType.DISCHARGE, _StageType.VANISH],
+                        _LegType.FREE: [_StageType.DISCHARGE, _StageType.VANISH]}
 
-    default_lambda_values = {LegType.BOUND: { _StageType.RESTRAIN: [0.000, 0.125, 0.250, 0.375, 0.500, 1.000],
+    default_lambda_values = {_LegType.BOUND: { _StageType.RESTRAIN: [0.000, 0.125, 0.250, 0.375, 0.500, 1.000],
                                              _StageType.DISCHARGE: [0.000, 0.143, 0.286, 0.429, 0.571, 0.714, 0.857, 1.000],
                                              _StageType.VANISH: [0.000, 0.025, 0.050, 0.075, 0.100, 0.125, 0.150, 0.175, 0.200, 0.225, 0.250, 0.275, 0.300, 0.325, 0.350, 0.375, 0.400, 0.425, 0.450, 0.475, 0.500, 0.525, 0.550, 0.575, 0.600, 0.625, 0.650, 0.675, 0.700, 0.725, 0.750, 0.800, 0.850, 0.900, 0.950, 1.000]},
-                            LegType.FREE: { _StageType.DISCHARGE: [0.000, 0.143, 0.286, 0.429, 0.571, 0.714, 0.857, 1.000],
+                            _LegType.FREE: { _StageType.DISCHARGE: [0.000, 0.143, 0.286, 0.429, 0.571, 0.714, 0.857, 1.000],
                                             _StageType.VANISH: [0.000, 0.028, 0.056, 0.111, 0.167, 0.222, 0.278, 0.333, 0.389, 0.444, 0.500, 0.556, 0.611, 0.667, 0.722, 0.778, 0.889, 1.000 ]}}
 
     def __init__(self, 
-                 leg_type: LegType,
+                 leg_type: _LegType,
                  block_size: float = 1,
                  equil_detection: str = "block_gradient",
                  gradient_threshold: _Optional[float] = None,
@@ -104,7 +104,7 @@ class Leg(_SimulationRunner):
 
             # Change the sign of the dg contribution to negative
             # if this is the bound leg
-            if self.leg_type == LegType.BOUND:
+            if self.leg_type == _LegType.BOUND:
                 self.dg_multiplier = -1
 
             # Validate the input
@@ -130,7 +130,7 @@ class Leg(_SimulationRunner):
         """Check that the required files are provided for the leg type and set the preparation stage
         according to the files present."""
         # Check backwards, as we care about the most advanced preparation stage
-        for prep_stage in reversed(PreparationStage):
+        for prep_stage in reversed(_PreparationStage):
             files_absent = False
             for file in Leg.required_input_files[self.leg_type][prep_stage]:
                 if not _os.path.isfile(f"{self.input_dir}/{file}"):
@@ -172,20 +172,20 @@ class Leg(_SimulationRunner):
         # First, create the input directories
         self.create_stage_input_dirs()
         # Then load in the input files
-        if self.prep_stage == PreparationStage.STRUCTURES_ONLY:
+        if self.prep_stage == _PreparationStage.STRUCTURES_ONLY:
             system = self.parameterise_input()
         else:
             system = _BSS.IO.readMolecules([f"{self.input_dir}/{file}" for file in self.prep_stage.get_simulation_input_files(self.leg_type)])
         # Now, process the input files depending on the preparation stage
-        if self.prep_stage == PreparationStage.PARAMETERISED:
+        if self.prep_stage == _PreparationStage.PARAMETERISED:
             system = self.solvate_input(system) # This also adds ions
-        if self.prep_stage == PreparationStage.SOLVATED:
+        if self.prep_stage == _PreparationStage.SOLVATED:
             _check_has_wat_and_box(system)
             system = self.minimise_input(system)
-        if self.prep_stage == PreparationStage.MINIMISED:
+        if self.prep_stage == _PreparationStage.MINIMISED:
             _check_has_wat_and_box(system)
             system = self.heat_and_preequil_input(system)
-        if self.prep_stage == PreparationStage.PREEQUILIBRATED:
+        if self.prep_stage == _PreparationStage.PREEQUILIBRATED:
             # Run separate equilibration simulations for each of the repeats and 
             # extract the final structures to give a diverse ensemble of starting
             # conformations. For the bound leg, this also extracts the restraints.
@@ -198,7 +198,7 @@ class Leg(_SimulationRunner):
         # Make sure the stored restraints reflect the restraints used. TODO:
         # make this more robust my using the SOMD functionality to extract 
         # results from the simfiles
-        if self.leg_type == LegType.BOUND and use_same_restraints:
+        if self.leg_type == _LegType.BOUND and use_same_restraints:
             # Use the first restraints
             first_restr = self.restraints[0]
             self.restraints = [first_restr for _ in range(self.ensemble_size)]
@@ -310,7 +310,7 @@ class Leg(_SimulationRunner):
         param_lig = _BSS.Parameters.parameterise(molecule=lig_sys[0], forcefield=FORCEFIELDS["ligand"]).getMolecule()
 
         # If bound, then parameterise the protein and waters and add to the system
-        if self.leg_type == LegType.BOUND:
+        if self.leg_type == _LegType.BOUND:
             # Parameterise the protein
             self._logger.info("Parameterising protein...")
             protein = _BSS.IO.readMolecules(f"{self.input_dir}/protein.pdb")[0]
@@ -339,7 +339,7 @@ class Leg(_SimulationRunner):
             parameterised_system = param_lig.toSystem()
 
         # Set the parameterisation stage
-        self.prep_stage = PreparationStage.PARAMETERISED
+        self.prep_stage = _PreparationStage.PARAMETERISED
         # Save the system
         self._logger.info("Saving parameterised system...")
         _BSS.IO.saveMolecules(f"{self.base_dir}/input/{self.leg_type.name.lower()}{self.prep_stage.file_suffix}",
@@ -397,7 +397,7 @@ class Leg(_SimulationRunner):
                                                ion_conc=ION_CONC) 
 
         # Set the preparation stage
-        self.prep_stage = PreparationStage.SOLVATED
+        self.prep_stage = _PreparationStage.SOLVATED
 
         # Save the system
         self._logger.info("Saving solvated system")
@@ -424,7 +424,7 @@ class Leg(_SimulationRunner):
         STEPS = 1000 # This is the default for _BSS
         self._logger.info(f"Minimising input structure with {STEPS} steps...")
         protocol = _BSS.Protocol.Minimisation(steps=STEPS)
-        minimised_system = self._run_process(solvated_system, protocol, prep_stage=PreparationStage.MINIMISED)
+        minimised_system = self._run_process(solvated_system, protocol, prep_stage=_PreparationStage.MINIMISED)
         return minimised_system
 
     def heat_and_preequil_input(self, minimised_system: _BSS._SireWrappers._system.System) -> _BSS._SireWrappers._system.System: # type: ignore
@@ -457,7 +457,7 @@ class Leg(_SimulationRunner):
         equil1 = self._run_process(minimised_system, protocol)
 
         # If this is the bound leg, carry out step with backbone restraints
-        if self.leg_type == LegType.BOUND:
+        if self.leg_type == _LegType.BOUND:
             self._logger.info(f"NVT equilibration for {RUNTIME_NVT} ps while restraining all backbone atoms")
             protocol = _BSS.Protocol.Equilibration(
                                             runtime=RUNTIME_NVT*_BSS.Units.Time.picosecond, 
@@ -491,13 +491,13 @@ class Leg(_SimulationRunner):
                                         pressure=1*_BSS.Units.Pressure.atm,
                                         temperature=END_TEMP*_BSS.Units.Temperature.kelvin,
                                         )
-        preequilibrated_system = self._run_process(equil4, protocol, prep_stage=PreparationStage.PREEQUILIBRATED)
+        preequilibrated_system = self._run_process(equil4, protocol, prep_stage=_PreparationStage.PREEQUILIBRATED)
 
         return preequilibrated_system
 
     def _run_process(self, system: _BSS._SireWrappers._system.System,
                      protocol: _BSS.Protocol._protocol.Protocol,
-                     prep_stage: _Optional[PreparationStage] = None) -> _BSS._SireWrappers._system.System:
+                     prep_stage: _Optional[_PreparationStage] = None) -> _BSS._SireWrappers._system.System:
         """
         Run a process with GROMACS.
         
@@ -586,7 +586,7 @@ class Leg(_SimulationRunner):
         # Repeat this for each of the ensemble_size repeats
         for i in range(self.ensemble_size):
             equil_output_dir = f"{self.base_dir}/ensemble_equilibration_{i+1}"
-            if self.leg_type == LegType.BOUND:
+            if self.leg_type == _LegType.BOUND:
                 self._logger.info(f"Running SOMD restraint search simulation {i+1} of {self.ensemble_size}")
                 restraint_search = _BSS.FreeEnergy.RestraintSearch(pre_equilibrated_system, protocol=protocol,
                                                                 engine='Gromacs', work_dir=equil_output_dir)
@@ -624,7 +624,7 @@ class Leg(_SimulationRunner):
                 else:
                     self.restraints.append(restraint)
 
-            elif self.leg_type == LegType.FREE:
+            elif self.leg_type == _LegType.FREE:
                 self._logger.info(f"Running SOMD ensemble equilibration simulation {i+1} of {self.ensemble_size}")
                 process = _BSS.Process.Gromacs(pre_equilibrated_system, protocol=protocol, work_dir=equil_output_dir)
                 process.start()
@@ -668,7 +668,7 @@ class Leg(_SimulationRunner):
 
         for stage_type, stage_input_dir in self.stage_input_dirs.items():
             self._logger.info(f"Writing input files for {self.leg_type.name} leg {stage_type.name} stage")
-            restraint = self.restraints[0] if self.leg_type == LegType.BOUND else None
+            restraint = self.restraints[0] if self.leg_type == _LegType.BOUND else None
             protocol = _BSS.Protocol.FreeEnergy(runtime=DUMMY_RUNTIME*_BSS.Units.Time.nanosecond, 
                                                 lam_vals=DUMMY_LAM_VALS, 
                                                 perturbation_type=stage_type.bss_perturbation_type)
@@ -697,7 +697,7 @@ class Leg(_SimulationRunner):
                 ens_equil_output_dir = f"{self.base_dir}/ensemble_equilibration_{i+1}"
                 coordinates_file = f"{ens_equil_output_dir}/somd_{i+1}.rst7"
                 _shutil.copy(coordinates_file, f"{stage_input_dir}/somd_{i+1}.rst7")
-                if self.leg_type == LegType.BOUND:
+                if self.leg_type == _LegType.BOUND:
                     if use_same_restraints: # Want to use same restraints for all repeats
                         restraint_file = f"{ens_equil_output_dir}/restraint_1.txt"
                     else:
@@ -758,7 +758,7 @@ class Leg(_SimulationRunner):
         """
         dg_overall, er_overall = super().analyse(subsampling=subsampling)
 
-        if self.leg_type == LegType.BOUND:
+        if self.leg_type == _LegType.BOUND:
             # We need to add on the restraint corrections. There are no errors associated with these.
             rest_corrs = _np.array([self.restraints[i].getCorrection().value() for i in range(self.ensemble_size)])
             self._logger.info(f"Restraint corrections: {rest_corrs}")
@@ -795,7 +795,7 @@ class Leg(_SimulationRunner):
             # according to the dg_multiplier attribute
             dg_overall += dgs * sub_sim_runner.dg_multiplier
 
-        if self.leg_type == LegType.BOUND:
+        if self.leg_type == _LegType.BOUND:
             # We need to add on the restraint corrections. There are no errors associated with these.
             rest_corrs = _np.array([self.restraints[i].getCorrection().value() for i in range(self.ensemble_size)])
             self._logger.info(f"Correcting convergence plots with restraint corrections: {rest_corrs}")
