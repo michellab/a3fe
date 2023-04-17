@@ -400,28 +400,26 @@ class SimulationRunner(ABC):
         self._logger.info("##############################################")
 
     @property
-    def _pickable_dict(self) -> _Dict[str, _Any]:
-        """Return a version of __dict__ that can be pickled, by removing any thread_lock
-        objects, which cannot be pickled."""
-        new_dict = {}
-        for key, val in self.__dict__.items():
-            if isinstance(val, _Thread):
-                print(val)
-                new_dict[key] = None
-            # If this is a list of sub-simulation runners, then we need to
-            # recursively call _pickable_dict on each of them and their sub-simulations
-            elif isinstance(val, SimulationRunner):
-                new_dict[key] = val._pickable_dict
-            else:
-                new_dict[key] = val        
-
-        return new_dict
-
+    def _picklable_copy(self) -> SimulationRunner:
+        """Return a copy of the SimulationRunner which can be pickled."""
+        picklable_copy = _copy.copy(self)
+        # Remove any threads which can't be pcikled
+        if hasattr(picklable_copy, "run_thread"):
+            picklable_copy.run_thread = None
+        # Now run this recursively on any simulations runners stored
+        # in lists by the current simulation runner
+        for key, val in picklable_copy.__dict__.items():
+            if isinstance(val, _List):
+                if len(val) > 0:
+                    if isinstance(val[0], SimulationRunner):
+                        picklable_copy.__dict__[key] = [sim_runner._picklable_copy for sim_runner in val]
+        return picklable_copy
+        
     def _dump(self) -> None:
         """ Dump the current state of the simulation object to a pickle file, and do
         the same for any sub-simulations."""
         with open(f"{self.base_dir}/{self.__class__.__name__}.pkl", "wb") as ofile:
-            _pkl.dump(self._pickable_dict, ofile)
+            _pkl.dump(self._picklable_copy.__dict__, ofile)
         for sub_sim_runner in self._sub_sim_runners:
             sub_sim_runner._dump()
 
