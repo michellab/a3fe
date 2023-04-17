@@ -273,6 +273,11 @@ class SimulationRunner(ABC):
         return sum([sub_sim_runner.tot_simtime for sub_sim_runner in self._sub_sim_runners]) # ns
 
     @property
+    def tot_gpu_time(self) -> float:
+        f"""The total simulation time in GPU hours for the {self.__class__.__name__} and any sub-simulation runners."""
+        return sum([sub_sim_runner.tot_gpu_time for sub_sim_runner in self._sub_sim_runners]) # GPU hours
+
+    @property
     def equilibrated(self) -> float:
         f"""Whether the {self.__class__.__name__} is equilibrated."""
         return all([sub_sim_runner.equilibrated for sub_sim_runner in self._sub_sim_runners])

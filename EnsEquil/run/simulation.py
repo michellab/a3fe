@@ -303,6 +303,29 @@ class Simulation(_SimulationRunner):
             step = int(_subprocess.check_output(['tail', '-1', f"{self.output_dir}/simfile.dat"]).decode("utf-8").strip().split()[0])
             return step * self.timestep # ns
 
+    @property
+    def tot_gpu_time(self) -> float:
+        """Get the total simulation time in GPU hours"""
+        # Check for all slurm output files
+        if not hasattr(self, "slurm_file_base"):
+            self._get_slurm_file_base()
+        slurm_output_files = _glob.glob(f"{self.slurm_file_base}*")
+        
+        # If we don't have any output files, we haven't run any simulations
+        if len(slurm_output_files) == 0:
+            return 0
+
+        # Otherwise, add up the simulation time in seconds
+        tot_gpu_time = 0
+        for file in slurm_output_files:
+            with open(file, "rt") as file:
+                for line in file.readlines():
+                    if line.startswith("Simulation took"):
+                        tot_gpu_time += float(line.split(" ")[2])
+
+        # And convert to GPU hours
+        return tot_gpu_time / 3600
+
     def kill(self) -> None:
         """Kill the job."""
         if not self.job:
