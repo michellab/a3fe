@@ -9,7 +9,7 @@ import os as _os
 import subprocess as _subprocess
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
-from .enums import JobStatus as JobStatus
+from .enums import JobStatus as _JobStatus
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 
 @_dataclass
@@ -18,7 +18,7 @@ class Job():
     virtual_job_id: int
     command: str
     slurm_job_id: _Optional[int] = None
-    status: JobStatus = JobStatus.NONE # type: ignore
+    status: _JobStatus = _JobStatus.NONE # type: ignore
     slurm_file_base: _Optional[str] = None
 
     def __str__(self) -> str:
@@ -123,7 +123,7 @@ class VirtualQueue():
         # Increment this so that it is never used again for this queue
         self._available_virt_job_id += 1
         job = Job(virtual_job_id, command, slurm_file_base=slurm_file_base)
-        job.status = JobStatus.QUEUED # type: ignore
+        job.status = _JobStatus.QUEUED # type: ignore
         self._pre_queue.append(job)
         self._logger.info(f"{job} submitted")
         # Now update - the job will be moved to the real queue if there is space
@@ -140,7 +140,7 @@ class VirtualQueue():
             _subprocess.run(["scancel", str(job.slurm_job_id)])
         else:  # Job is in the pre-queue
             self._pre_queue.remove(job)
-        job.status = JobStatus.KILLED # type: ignore
+        job.status = _JobStatus.KILLED # type: ignore
 
     def update(self) -> None:
         """Remove jobs from the queue if they have finished, then move jobs from
@@ -159,9 +159,9 @@ class VirtualQueue():
             if job.slurm_job_id not in running_slurm_job_ids:
                 # Check if it has failed
                 if job.has_failed():
-                    job.status = JobStatus.FAILED # type: ignore
+                    job.status = _JobStatus.FAILED # type: ignore
                 else:
-                    job.status = JobStatus.FINISHED # type: ignore
+                    job.status = _JobStatus.FINISHED # type: ignore
         # Update the slurm queue
         self._slurm_queue = [job for job in self._slurm_queue if job.slurm_job_id in running_slurm_job_ids]
 

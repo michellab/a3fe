@@ -12,8 +12,8 @@ import subprocess as _subprocess
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
 from ..analyse.plot import plot_convergence as _plot_convergence
-from .enums import LegType as _LegType, PreparationStage as _PreparationStage
-from .stage import Stage as _Stage, StageType as _StageType
+from .enums import LegType as _LegType, PreparationStage as _PreparationStage, StageType as _StageType
+from .stage import Stage as _Stage
 from ..read._process_somd_files import read_simfile_option as _read_simfile_option, write_simfile_option as _write_simfile_option
 from .. read._process_bss_systems import rename_lig as _rename_lig
 from ._simulation_runner import SimulationRunner as _SimulationRunner

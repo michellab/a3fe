@@ -7,8 +7,8 @@ import os as _os
 import shutil as _shutil
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional, Callable as _Callable
 
-from .leg import Leg as _Leg, LegType as _LegType, PreparationStage as _PreparationStage
-from .stage import Stage as _Stage, StageContextManager as _StageContextManager
+from .enums import LegType as _LegType, PreparationStage as _PreparationStage
+from .leg import Leg as _Leg
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 
 class Calculation(_SimulationRunner):

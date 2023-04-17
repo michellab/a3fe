@@ -9,9 +9,10 @@ import numpy as _np
 import subprocess as _subprocess
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
+from .enums import JobStatus as _JobStatus
 from ..read._process_somd_files import read_simfile_option as _read_simfile_option, write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
-from ._virtual_queue import Job as _Job, VirtualQueue as _VirtualQueue, JobStatus as _JobStatus
+from ._virtual_queue import Job as _Job, VirtualQueue as _VirtualQueue
 
 class Simulation(_SimulationRunner):
     """Class to store information about a single SOMD simulation."""
