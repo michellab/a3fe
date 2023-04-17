@@ -28,28 +28,10 @@ from ..analyse.plot import (
 )
 from ..analyse.mbar import run_mbar as _run_mbar
 from ..analyse.process_grads import GradientData as _GradientData
+from .enums import StageType as StageType
 from ..read._process_somd_files import write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._utils import get_simtime as _get_simtime
-
-class StageType(_Enum):
-    """Enumeration of the types of stage."""
-    RESTRAIN = 1
-    DISCHARGE = 2
-    VANISH = 3
-
-    @property
-    def bss_perturbation_type(self) -> str:
-        """Return the corresponding BSS perturbation type."""
-        if self == StageType.RESTRAIN:
-            return "restraint"
-        elif self == StageType.DISCHARGE:
-            return "discharge_soft"
-        elif self == StageType.VANISH:
-            return "vanish_soft"
-        else:
-            raise ValueError("Unknown stage type.")
-        
 
 class Stage(_SimulationRunner):
     """

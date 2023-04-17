@@ -12,50 +12,12 @@ import subprocess as _subprocess
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
 from ..analyse.plot import plot_convergence as _plot_convergence
+from .enums import LegType, PreparationStage
 from .stage import Stage as _Stage, StageType as _StageType
 from ..read._process_somd_files import read_simfile_option as _read_simfile_option, write_simfile_option as _write_simfile_option
 from .. read._process_bss_systems import rename_lig as _rename_lig
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._utils import check_has_wat_and_box as _check_has_wat_and_box
-
-class LegType(_Enum):
-    """The type of leg in the calculation."""
-    BOUND = 1
-    FREE = 2
-
-class PreparationStage(_Enum):
-    """The stage of preparation of the input files."""
-    STRUCTURES_ONLY = 1
-    PARAMETERISED = 2
-    SOLVATED = 3
-    MINIMISED = 4
-    PREEQUILIBRATED = 5
-
-    @property
-    def file_suffix(self) -> str:
-        """Return the suffix to use for the files in this stage."""
-        if self == PreparationStage.STRUCTURES_ONLY:
-            return ""
-        elif self == PreparationStage.PARAMETERISED:
-            return "_param"
-        elif self == PreparationStage.SOLVATED:
-            return "_solv"
-        elif self == PreparationStage.MINIMISED:
-            return "_min"
-        elif self == PreparationStage.PREEQUILIBRATED:
-            return "_preequil"
-        else:
-            raise ValueError(f"Unknown preparation stage: {self}")
-        
-    def get_simulation_input_files(self, leg_type: LegType) -> _List[str]:
-        """Return the input files required for the simulation in this stage."""
-        if self == PreparationStage.STRUCTURES_ONLY:
-            if leg_type == LegType.BOUND:
-                return ["protein.pdb", "ligand.sdf"] # Need sdf for parameterisation of lig
-            elif leg_type == LegType.FREE:
-                return ["ligand.sdf"]
-        else:
-            return [f"{leg_type.name.lower()}{self.file_suffix}.{file_type}" for file_type in ["prm7", "rst7"]]
 
 class Leg(_SimulationRunner):
     """
@@ -156,7 +118,7 @@ class Leg(_SimulationRunner):
         return f"Leg (type = {self.leg_type.name})"
 
     @property
-    def stages(self) -> _List[_SimulationRunner]:
+    def stages(self) -> _List[_Stage]:
         return self._sub_sim_runners
 
     @stages.setter
@@ -242,7 +204,6 @@ class Leg(_SimulationRunner):
             self.restraints = [first_restr for _ in range(self.ensemble_size)]
 
         # Create the Stage objects, which automatically set themselves up
-        self.stages = []
         for stage_type in self.required_stages[self.leg_type]:
             self.stages.append(_Stage(stage_type=stage_type,
                                       block_size=self.block_size,
@@ -298,7 +259,7 @@ class Leg(_SimulationRunner):
             self._logger.info(f"Determining optimal lambda windows for {stage}...")
             optimal_lam_vals = stage.get_optimal_lam_vals(delta_sem=delta_sem)
             # Create new LamWindow objects with the optimal lambda values, then save data
-            stage.lam_vals = optimal_lam_vals 
+            stage.lam_vals = list(optimal_lam_vals)
             stage.update(save_name="lam_val_determination") # This deletes all of the old LamWindow objects and creates a new output dir
 
         # Save state
