@@ -137,7 +137,6 @@ class Stage(_SimulationRunner):
             self.run_thread: _Optional[_threading.Thread] = None
             # Set boolean to allow us to kill the thread
             self.kill_thread: bool = False
-            self.lam_windows: _List[_LamWindow] = []
             self.running_wins: _List[_LamWindow] = []
             self.virtual_queue = _VirtualQueue(log_dir=self.base_dir)
             # Creating lambda window objects sets up required input directories
@@ -166,7 +165,7 @@ class Stage(_SimulationRunner):
         return f"Stage (type = {self.stage_type.name.lower()})"
 
     @property
-    def lam_windows(self) -> _List[_SimulationRunner]:
+    def lam_windows(self) -> _List[_LamWindow]:
         return self._sub_sim_runners
 
     @lam_windows.setter
@@ -574,10 +573,8 @@ class Stage(_SimulationRunner):
         _write_simfile_option(simfile=f"{self.input_dir}/somd.cfg",
                               option="lambda array", 
                               value=", ".join([str(lam) for lam in self.lam_vals]))
-        self._logger.info("Deleting old lambda windows...")
-        del(self.lam_windows)
-        self._logger.info("Creating lambda windows...")
-        self.lam_windows = []
+        self._logger.info("Deleting old lambda windows and creating new ones...")
+        self._sub_sim_runners = []
         for lam_val in self.lam_vals:
             lam_base_dir = _os.path.join(self.output_dir, f"lambda_{lam_val:.3f}")
             self.lam_windows.append(_LamWindow(lam=lam_val, 

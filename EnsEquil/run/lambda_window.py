@@ -100,7 +100,6 @@ class LamWindow(_SimulationRunner):
             self._running: bool=False
 
             # Create the required simulations for this lambda value
-            self.sims=[]
             for run_no in range(1, ensemble_size + 1):
                 # Copy the input files over to the simulation base directory,
                 # which is also the simulation input directory and output directory
@@ -125,7 +124,7 @@ class LamWindow(_SimulationRunner):
         return f"LamWindow (lam={self.lam:.3f})"
 
     @property
-    def sims(self) -> _List[_SimulationRunner]:
+    def sims(self) -> _List[_Simulation]:
         return self._sub_sim_runners
 
     @sims.setter
