@@ -384,7 +384,7 @@ class Leg(_SimulationRunner):
             elif self.leg_type == _LegType.FREE:
                 job_name = "solvate_free"
                 solvate_fn = _slurm_solvate_free
-            self._run_slurm(solvate_fn, wait=True, run_dir=self.input_dir, job_name="solvate_input")
+            self._run_slurm(solvate_fn, wait=True, run_dir=self.input_dir, job_name=job_name)
         else:
             self._logger.info("Solvating input structure...")
             _sysprep_solvate_input(self.leg_type, self.input_dir, self.input_dir)
@@ -758,7 +758,7 @@ class Leg(_SimulationRunner):
             file.writelines(header_lines)
 
         # Submit to the virtual queue
-        cmd = f"sbatch {slurm_file}"
+        cmd = f"--chdir={run_dir} {job_name}.sh" # The virtual queue adds sbatch
         slurm_file_base = _get_slurm_file_base(slurm_file)
         job=self.virtual_queue.submit(cmd, slurm_file_base=slurm_file_base)
         self._logger.info(f"Submitted job {job}")

@@ -148,15 +148,15 @@ def solvate_input(leg_type: _LegType,
 
 # Partial versions of functions for use with slurm
 
-def slurm_solvate_bound() -> _Callable:
+def slurm_solvate_bound() -> None:
     """
     Perform solvation for the bound leg input.
     """
-    return _partial(solvate_input, _LegType.BOUND, input_dir=".", output_dir=".")
+    solvate_input(leg_type=_LegType.BOUND, input_dir=".", output_dir=".")
 
-def slurm_solvate_free() -> _Callable:
+def slurm_solvate_free() -> None:
     """
     Perform solvation for the free leg input.
     """
-    return _partial(solvate_input, _LegType.FREE, input_dir=".", output_dir=".")
+    solvate_input(_LegType.FREE, input_dir=".", output_dir=".")
 
