@@ -1,12 +1,12 @@
 """Functionality for running preparation simulations."""
 
 import BioSimSpace.Sandpit.Exscientia as _BSS
-from functools import partial as _partial
 import pathlib as _pathlib
-from typing import Callable as _Callable
+from typing import Optional as _Optional
 
 from .enums import LegType as _LegType, PreparationStage as _PreparationStage
 from .. read._process_bss_systems import rename_lig as _rename_lig
+from ._utils import check_has_wat_and_box as _check_has_wat_and_box
 
 def parameterise_input(leg_type: _LegType, 
                        input_dir: str, 
@@ -108,7 +108,7 @@ def solvate_input(leg_type: _LegType,
 
     # Load the parameterised system
     print("Loading parameterised system...")
-    parameterised_system = _BSS.IO.readMolecules(f"{input_dir}/{leg_type.name.lower()}{_PreparationStage.PARAMETERISED.file_suffix}*")
+    parameterised_system = _BSS.IO.readMolecules([f"{input_dir}/{file}" for file in _PreparationStage.PARAMETERISED.get_simulation_input_files(leg_type)])
 
     # Determine the box size
     # Taken from https://github.com/michellab/BioSimSpaceTutorials/blob/main/01_introduction/02_molecular_setup.ipynb
@@ -146,17 +146,307 @@ def solvate_input(leg_type: _LegType,
 
     return solvated_system
 
-# Partial versions of functions for use with slurm
+def minimise_input(leg_type: _LegType,
+                   input_dir: str,
+                   output_dir: str) -> _BSS._SireWrappers._system.System: # type: ignore
+    """
+    Minimise the input structure with GROMACS. 
+    
+    Parameters
+    ----------
+    leg_type : LegType
+        The type of the leg.
+    input_dir : str
+        The path to the input directory, where the required files are located.
+    output_dir : str
+        The path to the output directory, where the files will be saved.
+    
+    Returns
+    -------
+    minimised_system : _BSS._SireWrappers._system.System
+        Minimised system.
+    """
+    STEPS = 1000 # This is the default for _BSS
+    
+    # Load the solvated system
+    print("Loading solvated system...")
+    solvated_system = _BSS.IO.readMolecules([f"{input_dir}/{file}" for file in _PreparationStage.SOLVATED.get_simulation_input_files(leg_type)])
+
+    # Check that it is actually solvated in a box of water
+    _check_has_wat_and_box(solvated_system)
+
+    # Minimise
+    print(f"Minimising input structure with {STEPS} steps...")
+    protocol = _BSS.Protocol.Minimisation(steps=STEPS)
+    minimised_system = run_process(solvated_system, protocol)
+
+    # Save, renaming the velocity property to foo so avoid saving velocities. Saving the
+    # velocities sometimes causes issues with the size of the floats overflowing the RST7
+    # format.
+    _BSS.IO.saveMolecules(f"{output_dir}/{leg_type.name.lower()}{_PreparationStage.MINIMISED.file_suffix}",
+                            solvated_system, 
+                            fileformat=["prm7", "rst7"], property_map={"velocity" : "foo"})
+
+    return minimised_system
+
+def heat_and_preequil_input(leg_type: _LegType,
+                            input_dir: str,
+                            output_dir: str) -> _BSS._SireWrappers._system.System: # type: ignore
+    """
+    Heat the input structure from 0 to 298.15 K with GROMACS. 
+    
+    Parameters
+    ----------
+    leg_type : LegType
+        The type of the leg.
+    input_dir : str
+        The path to the input directory, where the required files are located.
+    output_dir : str
+        The path to the output directory, where the files will be saved.
+    
+    Returns
+    -------
+    preequilibrated_system : _BSS._SireWrappers._system.System
+        Pre-Equilibrated system.
+    """
+    RUNTIME_SHORT_NVT = 5 # ps
+    RUNTIME_NVT = 50 # ps 
+    END_TEMP = 298.15 # K
+    RUNTIME_NPT = 400 # ps
+    RUNTIME_NPT_UNRESTRAINED = 1000 # ps
+
+    # Load the minimised system
+    print("Loading minimised system...")
+    minimised_system = _BSS.IO.readMolecules([f"{input_dir}/{file}" for file in _PreparationStage.MINIMISED.get_simulation_input_files(leg_type)])
+
+    # Check that it is solvated and has a box
+    _check_has_wat_and_box(minimised_system)
+
+    print(f"NVT equilibration for {RUNTIME_SHORT_NVT} ps while restraining all non-solvent atoms")
+    protocol = _BSS.Protocol.Equilibration(
+                                    runtime=RUNTIME_SHORT_NVT*_BSS.Units.Time.picosecond, 
+                                    temperature_start=0*_BSS.Units.Temperature.kelvin, 
+                                    temperature_end=END_TEMP*_BSS.Units.Temperature.kelvin,
+                                    restraint="all"
+                                    )
+    equil1 = run_process(minimised_system, protocol)
+
+    # If this is the bound leg, carry out step with backbone restraints
+    if leg_type == _LegType.BOUND:
+        print(f"NVT equilibration for {RUNTIME_NVT} ps while restraining all backbone atoms")
+        protocol = _BSS.Protocol.Equilibration(
+                                        runtime=RUNTIME_NVT*_BSS.Units.Time.picosecond, 
+                                        temperature=END_TEMP*_BSS.Units.Temperature.kelvin, 
+                                        restraint="backbone"
+                                        )
+        equil2 = run_process(equil1, protocol)
+
+    else: # Free leg - skip the backbone restraint step
+        equil2 = equil1
+
+    print(f"NVT equilibration for {RUNTIME_NVT} ps without restraints")
+    protocol = _BSS.Protocol.Equilibration(
+                                    runtime=RUNTIME_NVT*_BSS.Units.Time.picosecond, 
+                                    temperature=END_TEMP*_BSS.Units.Temperature.kelvin,
+                                    )
+    equil3 = run_process(equil2, protocol)
+
+    print(f"NPT equilibration for {RUNTIME_NPT} ps while restraining non-solvent heavy atoms")
+    protocol = _BSS.Protocol.Equilibration(
+                                    runtime=RUNTIME_NPT*_BSS.Units.Time.picosecond, 
+                                    pressure=1*_BSS.Units.Pressure.atm,
+                                    temperature=END_TEMP*_BSS.Units.Temperature.kelvin,
+                                    restraint="heavy",
+                                    )
+    equil4 = run_process(equil3, protocol)
+
+    print(f"NPT equilibration for {RUNTIME_NPT_UNRESTRAINED} ps without restraints")
+    protocol = _BSS.Protocol.Equilibration(
+                                    runtime=RUNTIME_NPT_UNRESTRAINED*_BSS.Units.Time.picosecond, 
+                                    pressure=1*_BSS.Units.Pressure.atm,
+                                    temperature=END_TEMP*_BSS.Units.Temperature.kelvin,
+                                    )
+    preequilibrated_system = run_process(equil4, protocol)
+
+    # Save, renaming the velocity property to foo so avoid saving velocities. Saving the
+    # velocities sometimes causes issues with the size of the floats overflowing the RST7
+    # format.
+    _BSS.IO.saveMolecules(f"{output_dir}/{leg_type.name.lower()}{_PreparationStage.PREEQUILIBRATED.file_suffix}",
+                            preequilibrated_system, 
+                            fileformat=["prm7", "rst7"], property_map={"velocity" : "foo"})
+
+    return preequilibrated_system
+
+def run_ensemble_equilibration(leg_type: _LegType,
+                               input_dir: str,
+                               output_dir: str) -> None:
+    """
+    Parameters
+    ----------
+    leg_type : LegType
+        The type of the leg.
+    input_dir : str
+        The path to the input directory, where the required files are located.
+    output_dir : str
+        The path to the output directory, where the files will be saved.
+    
+    Returns
+    -------
+    None
+    """
+    ENSEMBLE_EQUILIBRATION_TIME = 5 # ns
+
+    # Load the minimised system
+    print("Loading pre-equilibrated system...")
+    pre_equilibrated_system = _BSS.IO.readMolecules([f"{input_dir}/{file}" for file in _PreparationStage.PREEQUILIBRATED.get_simulation_input_files(leg_type)])
+
+    # Check that it is solvated in a box of water
+    _check_has_wat_and_box(pre_equilibrated_system)
+
+    # Mark the ligand to be decoupled in the absolute binding free energy calculation
+    lig = _BSS.Align.decouple(pre_equilibrated_system[0], intramol=True)
+
+    # Check that is actually a ligand
+    if lig.nAtoms() > 100 or lig.nAtoms() < 5:
+        raise ValueError(f"The first molecule in the bound system has {lig.nAtoms()} atoms and is likely not a ligand. " \
+                            "Please check that the ligand is the first molecule in the bound system.")
+
+    # Check that the name is correct
+    if lig._sire_object.name().value() != "LIG":
+        raise ValueError(f"The name of the ligand in the bound system is {lig._sire_object.name().value()} and is not LIG. " \
+                            "Please check that the ligand is the first molecule in the bound system or rename the ligand.")
+    self._logger.info(f"Selecting ligand {lig} for decoupling")
+    pre_equilibrated_system.updateMolecule(0,lig)
+    
+    # Create the protocol
+    protocol = _BSS.Protocol.Production(timestep=2*_BSS.Units.Time.femtosecond, # 2 fs timestep as 4 fs seems to cause instability even with HMR
+                                            runtime=ENSEMBLE_EQUILIBRATION_TIME*_BSS.Units.Time.nanosecond)
+
+    self._logger.info(f"Running {self.ensemble_size} SOMD ensemble equilibration simulations for {ENSEMBLE_EQUILIBRATION_TIME} ns")
+    # Repeat this for each of the ensemble_size repeats
+    for i in range(self.ensemble_size):
+        equil_output_dir = f"{self.base_dir}/ensemble_equilibration_{i+1}"
+        if self.leg_type == _LegType.BOUND:
+            self._logger.info(f"Running SOMD restraint search simulation {i+1} of {self.ensemble_size}")
+            restraint_search = _BSS.FreeEnergy.RestraintSearch(pre_equilibrated_system, protocol=protocol,
+                                                            engine='Gromacs', work_dir=equil_output_dir)
+            restraint_search.start()
+            # After waiting for the restraint search to finish, extract the final system with new coordinates, and the restraints
+            restraint_search.wait()
+            
+            # Check that the process completed successfully and that the final system is not None
+            process = restraint_search._process
+            if process.isError():
+                self._logger.error(process.stdout())
+                self._logger.error(process.stderr())
+                raise _BSS._Exceptions.ThirdPartyError("The process failed.")
+            final_system = process.getSystem(block=True)
+            if final_system is None:
+                self._logger.error(process.stdout())
+                self._logger.error(process.stderr())
+                raise _BSS._Exceptions.ThirdPartyError("The final system is None.")
+
+            restraint = restraint_search.analyse(method='BSS', block=True)
+
+            # Save the final coordinates 
+            self._logger.info(f"Saving somd_{i+1}.rst7 and restraint_{i+1}.txt to {equil_output_dir}")
+            # Save, renaming the velocity property to foo so avoid saving velocities. Saving the
+            # velocities sometimes causes issues with the size of the floats overflowing the RST7
+            # format.
+            _BSS.IO.saveMolecules(f"{equil_output_dir}/somd_{i+1}", final_system, 
+                                    fileformat=["rst7"], property_map={"velocity" : "foo"})
+
+            # Save the restraints to a text file and store within the Leg object
+            with open(f"{equil_output_dir}/restraint_{i+1}.txt", "w") as f:
+                f.write(restraint.toString(engine="SOMD"))
+            if not hasattr(self, "restraints"):
+                self.restraints = [restraint]
+            else:
+                self.restraints.append(restraint)
+
+        elif self.leg_type == _LegType.FREE:
+            self._logger.info(f"Running SOMD ensemble equilibration simulation {i+1} of {self.ensemble_size}")
+            process = _BSS.Process.Gromacs(pre_equilibrated_system, protocol=protocol, work_dir=equil_output_dir)
+            process.start()
+            process.wait()
+            final_system = process.getSystem(block=True)
+            if process.isError():
+                self._logger.error(process.stdout())
+                self._logger.error(process.stderr())
+                raise _BSS._Exceptions.ThirdPartyError("The process failed.")
+            if final_system is None:
+                self._logger.error(process.stdout())
+                self._logger.error(process.stderr())
+                raise _BSS._Exceptions.ThirdPartyError("The final system is None.")
+            # Save the final coordinates 
+            self._logger.info(f"Saving somd_{i+1}.rst7 to {equil_output_dir}")
+            _BSS.IO.saveMolecules(f"{equil_output_dir}/somd_{i+1}", final_system, fileformat=["rst7"], property_map={"velocity" : "foo"})
+
+def run_process(system: _BSS._SireWrappers._system.System,
+                 protocol: _BSS.Protocol._protocol.Protocol,) -> _BSS._SireWrappers._system.System:
+    """
+    Run a process with GROMACS, raising informative
+    errors in the event of a failure.
+    
+    Parameters
+    ----------
+    system : _BSS._SireWrappers._system.System
+        System to run the process on.
+    protocol : _BSS._Protocol._protocol.Protocol
+        Protocol to run the process with.
+    
+    Returns
+    -------
+    system : _BSS._SireWrappers._system.System
+        System after the process has been run.
+    """
+    process = _BSS.Process.Gromacs(system, protocol)
+    process.start()
+    process.wait()
+    import time
+    time.sleep(10)
+    if process.isError():
+        print(process.stdout())
+        print(process.stderr())
+        raise _BSS._Exceptions.ThirdPartyError("The process failed.")
+    system = process.getSystem(block=True)
+    if system is None:
+        print(process.stdout())
+        print(process.stderr())
+        raise _BSS._Exceptions.ThirdPartyError("The final system is None.")
+    
+    return system
+
+# Partial versions of functions for use with slurm. Avoid using functools partial due to issues with getting the name of the fn.
+
+def slurm_parameterise_bound() -> None:
+    """ Parameterise the input structures for the bound leg """
+    parameterise_input(leg_type=_LegType.BOUND, input_dir=".", output_dir=".")
+
+def slurm_parameterise_free() -> None:
+    """ Parameterise the input structures for the free leg """
+    parameterise_input(leg_type=_LegType.FREE, input_dir=".", output_dir=".")
 
 def slurm_solvate_bound() -> None:
-    """
-    Perform solvation for the bound leg input.
-    """
+    """ Perform solvation for the bound leg input.  """
     solvate_input(leg_type=_LegType.BOUND, input_dir=".", output_dir=".")
 
 def slurm_solvate_free() -> None:
-    """
-    Perform solvation for the free leg input.
-    """
+    """ Perform solvation for the free leg input.  """
     solvate_input(_LegType.FREE, input_dir=".", output_dir=".")
 
+def slurm_minimise_bound() -> None:
+    """ Perform minimisation for the bound leg"""
+    minimise_input(leg_type=_LegType.BOUND, input_dir=".", output_dir=".")
+
+def slurm_minimise_free() -> None:
+    """ Perform minimisation for the free leg"""
+    minimise_input(leg_type=_LegType.FREE, input_dir=".", output_dir=".")
+
+def slurm_heat_and_preequil_bound() -> None:
+    """ Perform heating and minimisation for the bound leg"""
+    heat_and_preequil_input(leg_type=_LegType.BOUND, input_dir=".", output_dir=".")
+
+def slurm_heat_and_preequil_free() -> None:
+    """ Perform heating and minimisation for the free leg"""
+    heat_and_preequil_input(leg_type=_LegType.FREE, input_dir=".", output_dir=".")

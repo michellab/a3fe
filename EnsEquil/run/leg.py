@@ -16,15 +16,23 @@ from ..analyse.plot import plot_convergence as _plot_convergence
 from .enums import LegType as _LegType, PreparationStage as _PreparationStage, StageType as _StageType
 from .stage import Stage as _Stage
 from .system_prep import (
+    parameterise_input as _sysprep_parameterise_input,
+    slurm_parameterise_bound as _slurm_parameterise_bound,
+    slurm_parameterise_free as _slurm_parameterise_free,
     solvate_input as _sysprep_solvate_input,
     slurm_solvate_bound as _slurm_solvate_bound,
     slurm_solvate_free as _slurm_solvate_free,
+    minimise_input as _sysprep_minimise_input,
+    slurm_minimise_bound as _slurm_minimise_bound,
+    slurm_minimise_free as _slurm_minimise_free,
+    heat_and_preequil_input as _sysprep_heat_and_preequil_input,
+    slurm_heat_and_preequil_bound as _slurm_heat_and_preequil_bound,
+    slurm_heat_and_preequil_free as _slurm_heat_and_preequil_free
 )
 from ..read._process_slurm_files import get_slurm_file_base as _get_slurm_file_base
 from ..read._process_somd_files import read_simfile_option as _read_simfile_option, write_simfile_option as _write_simfile_option
 from .. read._process_bss_systems import rename_lig as _rename_lig
 from ._simulation_runner import SimulationRunner as _SimulationRunner
-from ._utils import check_has_wat_and_box as _check_has_wat_and_box
 from ._virtual_queue import VirtualQueue as _VirtualQueue, Job as _Job
 
 class Leg(_SimulationRunner):
@@ -182,28 +190,26 @@ class Leg(_SimulationRunner):
         self._logger.info("Setting up leg...")
         # Create input directories, parameterise, solvate, minimise, heat and preequil, all
         # depending on the input files present.
+
         # First, create the input directories
         self.create_stage_input_dirs()
-        # Then load in the input files
+
+        # Then prepare as required according to the preparation stage
         if self.prep_stage == _PreparationStage.STRUCTURES_ONLY:
-            system = self.parameterise_input()
-        else:
-            system = _BSS.IO.readMolecules([f"{self.input_dir}/{file}" for file in self.prep_stage.get_simulation_input_files(self.leg_type)])
-        # Now, process the input files depending on the preparation stage
+            self.parameterise_input()
         if self.prep_stage == _PreparationStage.PARAMETERISED:
-            system = self.solvate_input(system) # This also adds ions
+            self.solvate_input() # This also adds ions
         if self.prep_stage == _PreparationStage.SOLVATED:
-            _check_has_wat_and_box(system)
-            system = self.minimise_input(system)
+            system = self.minimise_input()
         if self.prep_stage == _PreparationStage.MINIMISED:
-            _check_has_wat_and_box(system)
             system = self.heat_and_preequil_input(system)
         if self.prep_stage == _PreparationStage.PREEQUILIBRATED:
             # Run separate equilibration simulations for each of the repeats and 
             # extract the final structures to give a diverse ensemble of starting
             # conformations. For the bound leg, this also extracts the restraints.
-            _check_has_wat_and_box(system)
             self.run_ensemble_equilibration(system)
+
+        # Get system
 
         # Write input files
         self.write_input_files(system, use_same_restraints=use_same_restraints)
@@ -299,67 +305,34 @@ class Leg(_SimulationRunner):
 
         return stage_input_dirs
 
-    def parameterise_input(self) -> None:
+    # TODO: Avoid all the code duplication in the following functions
+
+    def parameterise_input(self, slurm: bool = True) -> None:
         """
         Paramaterise the input structure, using Open Force Field v.2.0 'Sage'
         for the ligand, AMBER ff14SB for the protein, and TIP3P for the water.
         The resulting system is saved to the input directory.
         
-        Returns
-        -------
-        parameterised_system : _BSS._SireWrappers._system.System
-            Parameterised system.
+        Parameters
+        ----------
+        slurm : bool, optional, default=True
+            Whether to use SLURM to run the solvation job, by default True.
         """
-        FORCEFIELDS = {"ligand": "openff_unconstrained-2.0.0", 
-                       "protein": "ff14SB", 
-                       "water": "tip3p"}
-
-        self._logger.info("Parameterising input...")
-        # Parameterise the ligand
-        self._logger.info("Parameterising ligand...")
-        lig_sys = _BSS.IO.readMolecules(f"{self.input_dir}/ligand.sdf")
-        # Ensure that the ligand is named "LIG"
-        _rename_lig(lig_sys, "LIG")
-        param_lig = _BSS.Parameters.parameterise(molecule=lig_sys[0], forcefield=FORCEFIELDS["ligand"]).getMolecule()
-
-        # If bound, then parameterise the protein and waters and add to the system
-        if self.leg_type == _LegType.BOUND:
-            # Parameterise the protein
-            self._logger.info("Parameterising protein...")
-            protein = _BSS.IO.readMolecules(f"{self.input_dir}/protein.pdb")[0]
-            param_protein = _BSS.Parameters.parameterise(molecule=protein, 
-                                                         forcefield=FORCEFIELDS["protein"]).getMolecule()
-
-            # Parameterise the waters, if they are supplied
-            # Check that waters are supplied
-            param_waters = []
-            if _pathlib.Path(f"{self.input_dir}/waters.pdb").exists():
-                self._logger.info("Crystallographic waters detected. Parameterising...")
-                waters = _BSS.IO.readMolecules(f"{self.input_dir}/waters.pdb")
-                for water in waters:
-                    param_waters.append(_BSS.Parameters.parameterise(molecule=water, 
-                                                                    water_model=FORCEFIELDS["water"],
-                                                                    forcefield=FORCEFIELDS["protein"]).getMolecule())
-
-            # Create the system
-            self._logger.info("Assembling parameterised system...")
-            parameterised_system = param_lig + param_protein
-            for water in param_waters:
-                parameterised_system += water
-
-        # This is the free leg, so just turn the ligand into a system
+        if slurm:
+            self._logger.info("Parameterising input structures. Submitting through SLURM...")
+            if self.leg_type == _LegType.BOUND:
+                job_name = "param_bound"
+                fn = _slurm_parameterise_bound
+            elif self.leg_type == _LegType.FREE:
+                job_name = "param_free"
+                fn = _slurm_parameterise_free
+            self._run_slurm(fn, wait=True, run_dir=self.input_dir, job_name=job_name)
         else:
-            parameterised_system = param_lig.toSystem()
+            self._logger.info("Parmeterising input structures...")
+            _sysprep_parameterise_input(self.leg_type, self.input_dir, self.input_dir)
 
-        # Set the parameterisation stage
+        # Update the preparation stage
         self.prep_stage = _PreparationStage.PARAMETERISED
-        # Save the system
-        self._logger.info("Saving parameterised system...")
-        _BSS.IO.saveMolecules(f"{self.base_dir}/input/{self.leg_type.name.lower()}{self.prep_stage.file_suffix}",
-                               parameterised_system, 
-                               fileformat=["prm7", "rst7"])
-
-        return parameterised_system
 
     def solvate_input(self, slurm: bool = True) -> None:
         """
@@ -371,20 +344,17 @@ class Leg(_SimulationRunner):
         Parameters
         ----------
         slurm : bool, optional, default=True
-            Whether to use SLURM to run the solvation job, by default True.
+            Whether to use SLURM to run the job, by default True.
         """
-        # Use functools to create a partial function which takes no arguments
-        solvate_fn = _partial(_sysprep_solvate_input, self.leg_type, self.input_dir, self.input_dir)
-
         if slurm:
             self._logger.info("Solvating input structure. Submitting through SLURM...")
             if self.leg_type == _LegType.BOUND:
                 job_name = "solvate_bound"
-                solvate_fn = _slurm_solvate_bound
+                fn = _slurm_solvate_bound
             elif self.leg_type == _LegType.FREE:
                 job_name = "solvate_free"
-                solvate_fn = _slurm_solvate_free
-            self._run_slurm(solvate_fn, wait=True, run_dir=self.input_dir, job_name=job_name)
+                fn = _slurm_solvate_free
+            self._run_slurm(fn, wait=True, run_dir=self.input_dir, job_name=job_name)
         else:
             self._logger.info("Solvating input structure...")
             _sysprep_solvate_input(self.leg_type, self.input_dir, self.input_dir)
@@ -392,144 +362,55 @@ class Leg(_SimulationRunner):
         # Update the preparation stage
         self.prep_stage = _PreparationStage.SOLVATED
 
-    def minimise_input(self, solvated_system: _BSS._SireWrappers._system.System) -> _BSS._SireWrappers._system.System: # type: ignore
+    def minimise_input(self, slurm: bool = True) -> None:
         """
-        Minimise the input structure with GROMACS. The resulting system is saved to the input directory.
+        Minimise the input structure with GROMACS. 
         
         Parameters
         ----------
-        solvated_system : _BSS._SireWrappers._system.System
-            Solvated system.
-        
-        Returns
-        -------
-        minimised_system : _BSS._SireWrappers._system.System
-            Minimised system.
+        slurm : bool, optional, default=True
+            Whether to use SLURM to run the job, by default True.
         """
-        STEPS = 1000 # This is the default for _BSS
-        self._logger.info(f"Minimising input structure with {STEPS} steps...")
-        protocol = _BSS.Protocol.Minimisation(steps=STEPS)
-        minimised_system = self._run_process(solvated_system, protocol, prep_stage=_PreparationStage.MINIMISED)
-        return minimised_system
+        if slurm:
+            self._logger.info("Minimising input structure. Submitting through SLURM...")
+            if self.leg_type == _LegType.BOUND:
+                job_name = "minimise_bound"
+                fn = _slurm_minimise_bound
+            elif self.leg_type == _LegType.FREE:
+                job_name = "minimise_free"
+                fn = _slurm_minimise_free
+            self._run_slurm(fn, wait=True, run_dir=self.input_dir, job_name=job_name)
+        else:
+            self._logger.info("Minimising input structure...")
+            _sysprep_minimise_input(self.leg_type, self.input_dir, self.input_dir)
 
-    def heat_and_preequil_input(self, minimised_system: _BSS._SireWrappers._system.System) -> _BSS._SireWrappers._system.System: # type: ignore
+        # Update the preparation stage
+        self.prep_stage = _PreparationStage.MINIMISED
+
+    def heat_and_preequil_input(self, slurm: bool = True) -> None:
         """ 
-        Heat the input structure from 0 to 298.15 K with GROMACS. The resulting system is saved to the input directory.
+        Heat the input structure from 0 to 298.15 K with GROMACS.
         
         Parameters
         ----------
-        minimised_system : _BSS._SireWrappers._system.System
-            Minimised system.
-        
-        Returns
-        -------
-        preequilibrated_system : _BSS._SireWrappers._system.System
-            Pre-Equilibrated system.
+        slurm : bool, optional, default=True
+            Whether to use SLURM to run the job, by default True.
         """
-        RUNTIME_SHORT_NVT = 5 # ps
-        RUNTIME_NVT = 50 # ps 
-        END_TEMP = 298.15 # K
-        RUNTIME_NPT = 400 # ps
-        RUNTIME_NPT_UNRESTRAINED = 1000 # ps
+        if slurm:
+            self._logger.info("Heating and equilibrating. Submitting through SLURM...")
+            if self.leg_type == _LegType.BOUND:
+                job_name = "heat_preequil_bound"
+                fn = _slurm_heat_and_preequil_bound
+            elif self.leg_type == _LegType.FREE:
+                job_name = "heat_preequil_free"
+                fn = _slurm_heat_and_preequil_free
+            self._run_slurm(fn, wait=True, run_dir=self.input_dir, job_name=job_name)
+        else:
+            self._logger.info("Heating and equilibrating...")
+            _sysprep_heat_and_preequil_input(self.leg_type, self.input_dir, self.input_dir)
 
-        self._logger.info(f"NVT equilibration for {RUNTIME_SHORT_NVT} ps while restraining all non-solvent atoms")
-        protocol = _BSS.Protocol.Equilibration(
-                                        runtime=RUNTIME_SHORT_NVT*_BSS.Units.Time.picosecond, 
-                                        temperature_start=0*_BSS.Units.Temperature.kelvin, 
-                                        temperature_end=END_TEMP*_BSS.Units.Temperature.kelvin,
-                                        restraint="all"
-                                        )
-        equil1 = self._run_process(minimised_system, protocol)
-
-        # If this is the bound leg, carry out step with backbone restraints
-        if self.leg_type == _LegType.BOUND:
-            self._logger.info(f"NVT equilibration for {RUNTIME_NVT} ps while restraining all backbone atoms")
-            protocol = _BSS.Protocol.Equilibration(
-                                            runtime=RUNTIME_NVT*_BSS.Units.Time.picosecond, 
-                                            temperature=END_TEMP*_BSS.Units.Temperature.kelvin, 
-                                            restraint="backbone"
-                                            )
-            equil2 = self._run_process(equil1, protocol)
-
-        else: # Free leg - skip the backbone restraint step
-            equil2 = equil1
-
-        self._logger.info(f"NVT equilibration for {RUNTIME_NVT} ps without restraints")
-        protocol = _BSS.Protocol.Equilibration(
-                                        runtime=RUNTIME_NVT*_BSS.Units.Time.picosecond, 
-                                        temperature=END_TEMP*_BSS.Units.Temperature.kelvin,
-                                        )
-        equil3 = self._run_process(equil2, protocol)
-
-        self._logger.info(f"NPT equilibration for {RUNTIME_NPT} ps while restraining non-solvent heavy atoms")
-        protocol = _BSS.Protocol.Equilibration(
-                                        runtime=RUNTIME_NPT*_BSS.Units.Time.picosecond, 
-                                        pressure=1*_BSS.Units.Pressure.atm,
-                                        temperature=END_TEMP*_BSS.Units.Temperature.kelvin,
-                                        restraint="heavy",
-                                        )
-        equil4 = self._run_process(equil3, protocol)
-
-        self._logger.info(f"NPT equilibration for {RUNTIME_NPT_UNRESTRAINED} ps without restraints")
-        protocol = _BSS.Protocol.Equilibration(
-                                        runtime=RUNTIME_NPT_UNRESTRAINED*_BSS.Units.Time.picosecond, 
-                                        pressure=1*_BSS.Units.Pressure.atm,
-                                        temperature=END_TEMP*_BSS.Units.Temperature.kelvin,
-                                        )
-        preequilibrated_system = self._run_process(equil4, protocol, prep_stage=_PreparationStage.PREEQUILIBRATED)
-
-        return preequilibrated_system
-
-    def _run_process(self, system: _BSS._SireWrappers._system.System,
-                     protocol: _BSS.Protocol._protocol.Protocol,
-                     prep_stage: _Optional[_PreparationStage] = None) -> _BSS._SireWrappers._system.System:
-        """
-        Run a process with GROMACS.
-        
-        Parameters
-        ----------
-        system : _BSS._SireWrappers._system.System
-            System to run the process on.
-        protocol : _BSS._Protocol._protocol.Protocol
-            Protocol to run the process with.
-        prep_stage : _Optional[PreparationStage]
-            Preparation stage that the leg will be in if the process 
-            completes successfully. If this is supplied, the leg's
-            preparation stage will be updated and the files saved
-            upon completion of the process.
-        
-        Returns
-        -------
-        system : _BSS._SireWrappers._system.System
-            System after the process has been run.
-        """
-        process = _BSS.Process.Gromacs(system, protocol)
-        process.start()
-        process.wait()
-        import time
-        time.sleep(10)
-        if process.isError():
-            self._logger.error(process.stdout())
-            self._logger.error(process.stderr())
-            raise _BSS._Exceptions.ThirdPartyError("The process failed.")
-        system = process.getSystem(block=True)
-        if system is None:
-            self._logger.error(process.stdout())
-            self._logger.error(process.stderr())
-            raise _BSS._Exceptions.ThirdPartyError("The final system is None.")
-        # Save the system if a suffix is supplied
-        if prep_stage is not None:
-            # Update the leg's preparation stage
-            self.prep_stage = prep_stage
-            # Save the files
-            file_name = f"{self.leg_type.name.lower()}{prep_stage.file_suffix}"
-            self._logger.info(f"Saving {file_name} PRM7 and RST7 files to {self.base_dir}/input")
-            # Save, renaming the velocity property to foo so avoid saving velocities. Saving the
-            # velocities sometimes causes issues with the size of the floats overflowing the RST7
-            # format.
-            _BSS.IO.saveMolecules(f"{self.base_dir}/input/{file_name}",
-                                system, fileformat=["prm7", "rst7"], property_map={"velocity" : "foo"})
-        return system
+        # Update the preparation stage
+        self.prep_stage = _PreparationStage.PREEQUILIBRATED
 
     def run_ensemble_equilibration(self, pre_equilibrated_system: _BSS._SireWrappers._system.System) -> None:
         """
