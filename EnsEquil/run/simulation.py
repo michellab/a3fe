@@ -10,6 +10,7 @@ import subprocess as _subprocess
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
 from .enums import JobStatus as _JobStatus
+from ..read._process_slurm_files import get_slurm_file_base as _get_slurm_file_base
 from ..read._process_somd_files import read_simfile_option as _read_simfile_option, write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._virtual_queue import Job as _Job, VirtualQueue as _VirtualQueue
@@ -248,22 +249,10 @@ class Simulation(_SimulationRunner):
     def _get_slurm_file_base(self) -> None:
         """Find out what the slurm output file will be called."""
         # Find the slurm output file
-        with open(f"{self.input_dir}/run_somd.sh", "r") as f:
-            for line in f:
-                split_line = line.split()
-                if len(split_line) > 0 and split_line[0] == "#SBATCH":
-                    if split_line[1] == "--output" or split_line[1] == "-o":
-                        slurm_pattern = split_line[2]
-                        if "%" in slurm_pattern:
-                            file_base = slurm_pattern.split("%")[0]
-                            self.slurm_file_base = _os.path.join(self.input_dir, file_base)
-                            self._logger.info(f"Found slurm output file basename: {self.slurm_file_base}")
-                            break
-                        else:
-                            self.slurm_file_base = _os.path.join(self.input_dir, slurm_pattern)
-                            self._logger.info(f"Found slurm output file basename: {self.slurm_file_base}")
-                            break
-        
+
+        slurm_file = _os.path.join(self.input_dir, "run_somd.sh")
+        self.slurm_file_base = _get_slurm_file_base(slurm_file)
+        self._logger.info(f"Found slurm output file basename: {self.slurm_file_base}")
 
     def run(self, duration: float=2.5) -> None:
         """

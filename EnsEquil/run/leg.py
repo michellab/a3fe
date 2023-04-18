@@ -2,22 +2,30 @@
 
 import glob as _glob
 import BioSimSpace.Sandpit.Exscientia as _BSS
-from enum import Enum as _Enum
+from functools import partial as _partial
 import logging as _logging
 import numpy as _np
 import os as _os
 import pathlib as _pathlib
 import shutil as _shutil
+from time import sleep as _sleep
 import subprocess as _subprocess
-from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
+from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional, Callable as _Callable
 
 from ..analyse.plot import plot_convergence as _plot_convergence
 from .enums import LegType as _LegType, PreparationStage as _PreparationStage, StageType as _StageType
 from .stage import Stage as _Stage
+from .system_prep import (
+    solvate_input as _sysprep_solvate_input,
+    slurm_solvate_bound as _slurm_solvate_bound,
+    slurm_solvate_free as _slurm_solvate_free,
+)
+from ..read._process_slurm_files import get_slurm_file_base as _get_slurm_file_base
 from ..read._process_somd_files import read_simfile_option as _read_simfile_option, write_simfile_option as _write_simfile_option
 from .. read._process_bss_systems import rename_lig as _rename_lig
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._utils import check_has_wat_and_box as _check_has_wat_and_box
+from ._virtual_queue import VirtualQueue as _VirtualQueue, Job as _Job
 
 class Leg(_SimulationRunner):
     """
@@ -101,6 +109,7 @@ class Leg(_SimulationRunner):
             self.equil_detection = equil_detection
             self.gradient_threshold = gradient_threshold
             self._running: bool = False
+            self.jobs: _List[_Job] = []
 
             # Change the sign of the dg contribution to negative
             # if this is the bound leg
@@ -110,9 +119,13 @@ class Leg(_SimulationRunner):
             # Validate the input
             self._validate_input()
 
+            # Create a virtual queue for the prep jobs
+            self.virtual_queue = _VirtualQueue(log_dir=self.base_dir)
+
             # Save the state and update log
             self._update_log()
             self._dump()
+
 
     def __str__(self) -> str:
         return f"Leg (type = {self.leg_type.name})"
@@ -286,7 +299,7 @@ class Leg(_SimulationRunner):
 
         return stage_input_dirs
 
-    def parameterise_input(self) -> _BSS._SireWrappers._system.System: # type: ignore
+    def parameterise_input(self) -> None:
         """
         Paramaterise the input structure, using Open Force Field v.2.0 'Sage'
         for the ligand, AMBER ff14SB for the protein, and TIP3P for the water.
@@ -348,64 +361,36 @@ class Leg(_SimulationRunner):
 
         return parameterised_system
 
-    def solvate_input(self, parameterised_system: _BSS._SireWrappers._system.System) -> _BSS._SireWrappers._system.System: # type: ignore
+    def solvate_input(self, slurm: bool = True) -> None:
         """
         Determine an appropriate (rhombic dodecahedron) 
         box size, then solvate the input structure using
         TIP3P water, adding 150 mM NaCl to the system. 
         The resulting system is saved to the input directory.
-        
+
         Parameters
         ----------
-        parameterised_system : _BSS._SireWrappers._system.System
-            Parameterised system.
-        
-        Returns
-        -------
-        solvated_system : _BSS._SireWrappers._system.System
-            Solvated system.
+        slurm : bool, optional, default=True
+            Whether to use SLURM to run the solvation job, by default True.
         """
-        WATER_MODEL = "tip3p"
-        ION_CONC = 0.15 # M
+        # Use functools to create a partial function which takes no arguments
+        solvate_fn = _partial(_sysprep_solvate_input, self.leg_type, self.input_dir, self.input_dir)
 
-        # Determine the box size
-        # Taken from https://github.com/michellab/BioSimSpaceTutorials/blob/main/01_introduction/02_molecular_setup.ipynb
-        # Get the minimium and maximum coordinates of the bounding box that
-        # minimally encloses the protein.
-        self._logger.info("Determining optimal rhombic dodecahedral box...")
-        # Want to get box size based on complex/ ligand, exlcuding any crystallographic waters
-        non_waters = [mol for mol in parameterised_system if mol.nAtoms() != 3]
-        dry_system = _BSS._SireWrappers._system.System(non_waters) # type: ignore
-        box_min, box_max = dry_system.getAxisAlignedBoundingBox()
+        if slurm:
+            self._logger.info("Solvating input structure. Submitting through SLURM...")
+            if self.leg_type == _LegType.BOUND:
+                job_name = "solvate_bound"
+                solvate_fn = _slurm_solvate_bound
+            elif self.leg_type == _LegType.FREE:
+                job_name = "solvate_free"
+                solvate_fn = _slurm_solvate_free
+            self._run_slurm(solvate_fn, wait=True, run_dir=self.input_dir, job_name="solvate_input")
+        else:
+            self._logger.info("Solvating input structure...")
+            _sysprep_solvate_input(self.leg_type, self.input_dir, self.input_dir)
 
-        # Work out the box size from the difference in the coordinates.
-        box_size = [y - x for x, y in zip(box_min, box_max)]
-
-        # Add 15 A padding to the box size in each dimension.
-        padding = 15 * _BSS.Units.Length.angstrom
-
-        # Work out an appropriate box. This will used in each dimension to ensure
-        # that the cutoff constraints are satisfied if the molecule rotates.
-        box_length = max(box_size) + 2*padding
-        box, angles = _BSS.Box.rhombicDodecahedronHexagon(box_length)
-
-        self._logger.info(f"Solvating system with {WATER_MODEL} water and {ION_CONC} M NaCl...")
-        solvated_system = _BSS.Solvent.solvate(model=WATER_MODEL,
-                                               molecule=parameterised_system,
-                                               box=box, 
-                                               angles=angles, 
-                                               ion_conc=ION_CONC) 
-
-        # Set the preparation stage
+        # Update the preparation stage
         self.prep_stage = _PreparationStage.SOLVATED
-
-        # Save the system
-        self._logger.info("Saving solvated system")
-        _BSS.IO.saveMolecules(f"{self.base_dir}/input/{self.leg_type.name.lower()}{self.prep_stage.file_suffix}",
-                               solvated_system, 
-                               fileformat=["prm7", "rst7"])
-
-        return solvated_system
 
     def minimise_input(self, solvated_system: _BSS._SireWrappers._system.System) -> _BSS._SireWrappers._system.System: # type: ignore
         """
@@ -735,6 +720,64 @@ class Leg(_SimulationRunner):
             lam_vals = Leg.default_lambda_values[self.leg_type][stage_type]
             lam_vals_str = ", ".join([str(lam_val) for lam_val in lam_vals])
             _write_simfile_option(f"{stage_input_dir}/somd.cfg", "lambda array", lam_vals_str)
+
+    def _run_slurm(self, sys_prep_fn: _Callable, wait: bool, run_dir: str, job_name: str) -> None:
+        """
+        Run the supplied function through a slurm job. The function must be in 
+        the _system_prep module.
+
+        Parameters
+        ----------
+        sys_prep_fn: Callable
+            The function to run through slurm.
+        wait: bool
+            If True, the function will wait for the job to complete before returning.
+        run_dir: str
+            The directory to run the job in.
+        job_name: str
+            The name of the job.
+
+        Returns
+        -------
+        None
+        """
+        # Write the slurm script
+        # Get the header from run_somd.sh
+        header_lines = []
+        with open(f"{self.input_dir}/run_somd.sh", "r") as file:
+            for line in file.readlines():
+                if line.startswith("#SBATCH") or line.startswith("#!/bin/bash"):
+                    header_lines.append(line)
+                else:
+                    break
+        
+        # Add lines to run the python function and write out
+        header_lines.append(f"\npython -c 'from EnsEquil.run.system_prep import {sys_prep_fn.__name__}; {sys_prep_fn.__name__}()'")
+        slurm_file = f"{run_dir}/{job_name}.sh"
+        with open(slurm_file, "w") as file:
+            file.writelines(header_lines)
+
+        # Submit to the virtual queue
+        cmd = f"sbatch {slurm_file}"
+        slurm_file_base = _get_slurm_file_base(slurm_file)
+        job=self.virtual_queue.submit(cmd, slurm_file_base=slurm_file_base)
+        self._logger.info(f"Submitted job {job}")
+        self.jobs.append(job)
+        # Update the virtual queue to submit the job
+        self.virtual_queue.update()
+
+        # Always wait untit the job is submitted to the real slrum queue
+        while self.virtual_queue._pre_queue:
+            self._logger.info(f"Waiting for job {job} to be submitted to the real slurm queue")
+            _sleep(5 * 60)
+            self.virtual_queue.update()
+
+        # Wait for the job to complete if we've specified wait
+        if wait:
+            while job in self.virtual_queue.queue:
+                self._logger.info(f"Waiting for job {job} to complete")
+                _sleep(60)
+                self.virtual_queue.update()
 
     def analyse(self, subsampling=False) -> _Tuple[_np.ndarray, _np.ndarray]:
         f"""
