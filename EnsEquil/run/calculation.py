@@ -120,7 +120,7 @@ class Calculation(_SimulationRunner):
                             f"and {_Leg.required_input_files[_LegType.FREE]}")
 
 
-    def setup(self, use_same_restraints:bool = False) -> None:
+    def setup(self, slurm: bool = True, use_same_restraints:bool = False) -> None:
         """ 
         Set up the calculation. This involves parametrising, equilibrating, and
         deriving restraints for the bound leg. Most of the work is done by the
@@ -128,6 +128,8 @@ class Calculation(_SimulationRunner):
         
         Parameters
         ----------
+        slurm : bool, default=True
+            If True, the setup jobs will be run through SLURM.
         use_same_restraints: bool, default=False
             If True, the same restraints will be used for all of the bound leg repeats - by default
             , the restraints generated for the first repeat are used. This allows meaningful
@@ -152,7 +154,7 @@ class Calculation(_SimulationRunner):
                        base_dir=_os.path.join(self.base_dir, leg_type.name.lower()),
                        stream_log_level=self.stream_log_level)
             self.legs.append(leg)
-            leg.setup()
+            leg.setup(slurm=slurm, use_same_restraints=use_same_restraints)
 
         # Save the state
         self.setup_complete = True

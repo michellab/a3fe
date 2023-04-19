@@ -27,7 +27,10 @@ from .system_prep import (
     slurm_minimise_free as _slurm_minimise_free,
     heat_and_preequil_input as _sysprep_heat_and_preequil_input,
     slurm_heat_and_preequil_bound as _slurm_heat_and_preequil_bound,
-    slurm_heat_and_preequil_free as _slurm_heat_and_preequil_free
+    slurm_heat_and_preequil_free as _slurm_heat_and_preequil_free,
+    run_ensemble_equilibration as _sysprep_run_ensemble_equilibration,
+    slurm_ensemble_equilibration_bound as _slurm_ensemble_equilibration_bound,
+    slurm_ensemble_equilibration_free as _slurm_ensemble_equilibration_free,
 )
 from ..read._process_slurm_files import get_slurm_file_base as _get_slurm_file_base
 from ..read._process_somd_files import read_simfile_option as _read_simfile_option, write_simfile_option as _write_simfile_option
@@ -130,6 +133,10 @@ class Leg(_SimulationRunner):
             # Create a virtual queue for the prep jobs
             self.virtual_queue = _VirtualQueue(log_dir=self.base_dir)
 
+            # If this is a bound leg, we want to store restraints
+            if self.leg_type == _LegType.BOUND:
+                self.restraints = []
+
             # Save the state and update log
             self._update_log()
             self._dump()
@@ -167,7 +174,7 @@ class Leg(_SimulationRunner):
                           f"any preparation stage. Required files are: {Leg.required_input_files[self.leg_type]}")
 
 
-    def setup(self, use_same_restraints:bool = False) -> None:
+    def setup(self, slurm: bool =True, use_same_restraints:bool = False) -> None:
         """
         Set up the leg. This involves:
             - Creating the input directories
@@ -181,6 +188,8 @@ class Leg(_SimulationRunner):
         
         Parameters
         ----------
+        slurm : bool, default: True
+            If True, the setup jobs will be run through SLURM.
         use_same_restraints: bool, default=False
             If True, the same restraints will be used for all of the bound leg repeats - by default
             , the restraints generated for the first repeat are used. This allows meaningful
@@ -196,20 +205,18 @@ class Leg(_SimulationRunner):
 
         # Then prepare as required according to the preparation stage
         if self.prep_stage == _PreparationStage.STRUCTURES_ONLY:
-            self.parameterise_input()
+            self.parameterise_input(slurm=slurm)
         if self.prep_stage == _PreparationStage.PARAMETERISED:
-            self.solvate_input() # This also adds ions
+            self.solvate_input(slurm=slurm) # This also adds ions
         if self.prep_stage == _PreparationStage.SOLVATED:
-            system = self.minimise_input()
+            system = self.minimise_input(slurm=slurm)
         if self.prep_stage == _PreparationStage.MINIMISED:
-            system = self.heat_and_preequil_input(system)
+            system = self.heat_and_preequil_input(slurm=slurm)
         if self.prep_stage == _PreparationStage.PREEQUILIBRATED:
             # Run separate equilibration simulations for each of the repeats and 
             # extract the final structures to give a diverse ensemble of starting
             # conformations. For the bound leg, this also extracts the restraints.
-            self.run_ensemble_equilibration(system)
-
-        # Get system
+            system = self.run_ensemble_equilibration(slurm=slurm)
 
         # Write input files
         self.write_input_files(system, use_same_restraints=use_same_restraints)
@@ -326,10 +333,19 @@ class Leg(_SimulationRunner):
             elif self.leg_type == _LegType.FREE:
                 job_name = "param_free"
                 fn = _slurm_parameterise_free
+            else:
+                raise ValueError("Invalid leg type.")
             self._run_slurm(fn, wait=True, run_dir=self.input_dir, job_name=job_name)
+
+            # Check that the required input files have been produced, since slurm can fail silently
+            for file in _PreparationStage.PARAMETERISED.get_simulation_input_files(self.leg_type):
+                if not _os.path.isfile(f"{self.input_dir}/{file}"):
+                    raise RuntimeError(f"SLURM job failed to produce {file}. Please check the output of the " 
+                                       f"last slurm log in {self.input_dir} directory for error.")
         else:
             self._logger.info("Parmeterising input structures...")
             _sysprep_parameterise_input(self.leg_type, self.input_dir, self.input_dir)
+
 
         # Update the preparation stage
         self.prep_stage = _PreparationStage.PARAMETERISED
@@ -354,7 +370,15 @@ class Leg(_SimulationRunner):
             elif self.leg_type == _LegType.FREE:
                 job_name = "solvate_free"
                 fn = _slurm_solvate_free
+            else:
+                raise ValueError("Invalid leg type.")
             self._run_slurm(fn, wait=True, run_dir=self.input_dir, job_name=job_name)
+
+            # Check that the required input files have been produced, since slurm can fail silently
+            for file in _PreparationStage.SOLVATED.get_simulation_input_files(self.leg_type):
+                if not _os.path.isfile(f"{self.input_dir}/{file}"):
+                    raise RuntimeError(f"SLURM job failed to produce {file}. Please check the output of the " 
+                                       f"last slurm log in {self.input_dir} directory for error.")
         else:
             self._logger.info("Solvating input structure...")
             _sysprep_solvate_input(self.leg_type, self.input_dir, self.input_dir)
@@ -379,7 +403,15 @@ class Leg(_SimulationRunner):
             elif self.leg_type == _LegType.FREE:
                 job_name = "minimise_free"
                 fn = _slurm_minimise_free
+            else:
+                raise ValueError("Invalid leg type.")
             self._run_slurm(fn, wait=True, run_dir=self.input_dir, job_name=job_name)
+
+            # Check that the required input files have been produced, since slurm can fail silently
+            for file in _PreparationStage.MINIMISED.get_simulation_input_files(self.leg_type):
+                if not _os.path.isfile(f"{self.input_dir}/{file}"):
+                    raise RuntimeError(f"SLURM job failed to produce {file}. Please check the output of the " 
+                                       f"last slurm log in {self.input_dir} directory for error.")
         else:
             self._logger.info("Minimising input structure...")
             _sysprep_minimise_input(self.leg_type, self.input_dir, self.input_dir)
@@ -404,7 +436,15 @@ class Leg(_SimulationRunner):
             elif self.leg_type == _LegType.FREE:
                 job_name = "heat_preequil_free"
                 fn = _slurm_heat_and_preequil_free
+            else:
+                raise ValueError("Invalid leg type.")
             self._run_slurm(fn, wait=True, run_dir=self.input_dir, job_name=job_name)
+
+            # Check that the required input files have been produced, since slurm can fail silently
+            for file in _PreparationStage.PREEQUILIBRATED.get_simulation_input_files(self.leg_type):
+                if not _os.path.isfile(f"{self.input_dir}/{file}"):
+                    raise RuntimeError(f"SLURM job failed to produce {file}. Please check the output of the " 
+                                       f"last slurm log in {self.input_dir} directory for error.")
         else:
             self._logger.info("Heating and equilibrating...")
             _sysprep_heat_and_preequil_input(self.leg_type, self.input_dir, self.input_dir)
@@ -412,7 +452,7 @@ class Leg(_SimulationRunner):
         # Update the preparation stage
         self.prep_stage = _PreparationStage.PREEQUILIBRATED
 
-    def run_ensemble_equilibration(self, pre_equilibrated_system: _BSS._SireWrappers._system.System) -> None:
+    def run_ensemble_equilibration(self, slurm: bool = True) -> _BSS._SireWrappers._system.System:
         """
         Run 5 ns simulations with SOMD for each of the ensemble_size runs and extract the final structures
         to use as diverse starting points for the production runs. If this is the bound leg, the restraints
@@ -422,95 +462,90 @@ class Leg(_SimulationRunner):
         
         Parameters
         ----------
-        pre_equilibrated_system : _BSS._SireWrappers._system.System
-            Pre-equilibrated system.
-        
-        Returns
-        -------
-        None
+        slurm : bool, optional, default=True
+            Whether to use SLURM to run the job, by default True.
+
         """
-        ENSEMBLE_EQUILIBRATION_TIME = 5 # ns
+        # Generate output dirs and copy over the input
+        outdirs = [f"{self.base_dir}/ensemble_equilibration_{i+1}" for i in range(self.ensemble_size)]
+        for outdir in outdirs:
+            _subprocess.run(["mkdir", "-p", outdir], check=True)
+            for input_file in [f"{self.input_dir}/{ifile}" for ifile in _PreparationStage.PREEQUILIBRATED.get_simulation_input_files(self.leg_type)]:
+                _subprocess.run(["cp", "-r", input_file, outdir], check=True)
 
-        # Mark the ligand to be decoupled in the absolute binding free energy calculation
-        lig = _BSS.Align.decouple(pre_equilibrated_system[0], intramol=True)
-        # Check that is actually a ligand
-        if lig.nAtoms() > 100 or lig.nAtoms() < 5:
-            raise ValueError(f"The first molecule in the bound system has {lig.nAtoms()} atoms and is likely not a ligand. " \
-                             "Please check that the ligand is the first molecule in the bound system.")
-        # Check that the name is correct
-        if lig._sire_object.name().value() != "LIG":
-            raise ValueError(f"The name of the ligand in the bound system is {lig._sire_object.name().value()} and is not LIG. " \
-                             "Please check that the ligand is the first molecule in the bound system or rename the ligand.")
-        self._logger.info(f"Selecting ligand {lig} for decoupling")
-        pre_equilibrated_system.updateMolecule(0,lig)
-        
-        # Create the protocol
-        protocol = _BSS.Protocol.Production(timestep=2*_BSS.Units.Time.femtosecond, # 2 fs timestep as 4 fs seems to cause instability even with HMR
-                                             runtime=ENSEMBLE_EQUILIBRATION_TIME*_BSS.Units.Time.nanosecond)
-
-        self._logger.info(f"Running {self.ensemble_size} SOMD ensemble equilibration simulations for {ENSEMBLE_EQUILIBRATION_TIME} ns")
-        # Repeat this for each of the ensemble_size repeats
-        for i in range(self.ensemble_size):
-            equil_output_dir = f"{self.base_dir}/ensemble_equilibration_{i+1}"
+        if slurm:
             if self.leg_type == _LegType.BOUND:
-                self._logger.info(f"Running SOMD restraint search simulation {i+1} of {self.ensemble_size}")
-                restraint_search = _BSS.FreeEnergy.RestraintSearch(pre_equilibrated_system, protocol=protocol,
-                                                                engine='Gromacs', work_dir=equil_output_dir)
-                restraint_search.start()
-                # After waiting for the restraint search to finish, extract the final system with new coordinates, and the restraints
-                restraint_search.wait()
-                
-                # Check that the process completed successfully and that the final system is not None
-                process = restraint_search._process
-                if process.isError():
-                    self._logger.error(process.stdout())
-                    self._logger.error(process.stderr())
-                    raise _BSS._Exceptions.ThirdPartyError("The process failed.")
-                final_system = process.getSystem(block=True)
-                if final_system is None:
-                    self._logger.error(process.stdout())
-                    self._logger.error(process.stderr())
-                    raise _BSS._Exceptions.ThirdPartyError("The final system is None.")
+                job_name = "ensemble_equil_bound"
+                fn = _slurm_ensemble_equilibration_bound
+            elif self.leg_type == _LegType.FREE:
+                job_name = "ensemble_equil_free"
+                fn = _slurm_ensemble_equilibration_free
+            else:
+                raise ValueError("Invalid leg type.")
 
-                restraint = restraint_search.analyse(method='BSS', block=True)
+            # For each ensemble member, run a 5 ns simulation in a seperate directory
+            
+            for i, outdir in enumerate(outdirs):
+                self._logger.info(f"Running ensemble equilibration for run {i+1}. Submitting through SLURM...")
+                self._run_slurm(fn, wait=False, run_dir=outdir, job_name=job_name)
 
-                # Save the final coordinates 
-                self._logger.info(f"Saving somd_{i+1}.rst7 and restraint_{i+1}.txt to {equil_output_dir}")
-                # Save, renaming the velocity property to foo so avoid saving velocities. Saving the
-                # velocities sometimes causes issues with the size of the floats overflowing the RST7
-                # format.
-                _BSS.IO.saveMolecules(f"{equil_output_dir}/somd_{i+1}", final_system, 
-                                      fileformat=["rst7"], property_map={"velocity" : "foo"})
+            self.virtual_queue.wait() # Wait for all jobs to finish
+
+            # Check that the required input files have been produced, since slurm can fail silently
+            for i, outdir in enumerate(outdirs):
+                for file in _PreparationStage.PREEQUILIBRATED.get_simulation_input_files(self.leg_type):
+                    if not _os.path.isfile(f"{outdir}/{file}"):
+                        raise RuntimeError(f"SLURM job failed to produce {file}. Please check the output of the " 
+                                            f"last slurm log in {outdir} directory for error.")
+
+        else: # Not slurm
+            for i, outdir in enumerate(outdirs):
+                self._logger.info(f"Running ensemble equilibration for run {i+1}. Submitting through SLURM...")
+                _sysprep_solvate_input(self.leg_type, outdir, outdir)
+
+        # Give the output files unique names
+        for i, outdir in enumerate(outdirs):
+            _subprocess.run(["mv", f"{outdir}/somd.rst7", f"{outdir}/somd_{i+1}.rst7"], check=True)
+
+        # Load the system and mark the ligand to be decoupled
+        self._logger.info("Loading pre-equilibrated system...")
+        pre_equilibrated_system = _BSS.IO.readMolecules([f"{self.input_dir}/{file}" for file in _PreparationStage.PREEQUILIBRATED.get_simulation_input_files(self.leg_type)])
+
+        # Mark the ligand to be decoupled so the restraints searching algorithm works
+        lig = _BSS.Align.decouple(pre_equilibrated_system[0], intramol=True)
+        pre_equilibrated_system.updateMolecule(0,lig)
+
+        # If this is the bound leg, search for restraints
+        if self.leg_type == _LegType.BOUND:
+
+            # For each run, load the trajectory and extract the restraints
+            for i, outdir in enumerate(outdirs):
+                self._logger.info(f"Loading trajectory for run {i+1}...")
+                top_file = f"{self.input_dir}/{_PreparationStage.PREEQUILIBRATED.get_simulation_input_files(self.leg_type)[0]}"
+                traj = _BSS.Trajectory.Trajectory(topology=top_file, trajectory=f"{outdir}/gromacs.xtc", system=pre_equilibrated_system)
+                self._logger.info(f"Selecting restraints for run {i+1}...")
+                restraint = _BSS.FreeEnergy.RestraintSearch.analyse(method="BSS", 
+                                                                    system = pre_equilibrated_system,
+                                                                    traj= traj,
+                                                                    work_dir = outdir,
+                                                                    temperature= 298.15 * _BSS.Units.Temperature.kelvin,)
+
+                # Check that we actually generated a restraint
+                if restraint is None:
+                    raise ValueError(f"No restraints found for run {i+1}.")
 
                 # Save the restraints to a text file and store within the Leg object
-                with open(f"{equil_output_dir}/restraint_{i+1}.txt", "w") as f:
-                    f.write(restraint.toString(engine="SOMD"))
-                if not hasattr(self, "restraints"):
-                    self.restraints = [restraint]
-                else:
-                    self.restraints.append(restraint)
+                with open(f"{outdir}/restraint_{i+1}.txt", "w") as f:
+                    f.write(restraint.toString(engine="SOMD")) # type: ignore
+                self.restraints.append(restraint)
 
-            elif self.leg_type == _LegType.FREE:
-                self._logger.info(f"Running SOMD ensemble equilibration simulation {i+1} of {self.ensemble_size}")
-                process = _BSS.Process.Gromacs(pre_equilibrated_system, protocol=protocol, work_dir=equil_output_dir)
-                process.start()
-                process.wait()
-                final_system = process.getSystem(block=True)
-                if process.isError():
-                    self._logger.error(process.stdout())
-                    self._logger.error(process.stderr())
-                    raise _BSS._Exceptions.ThirdPartyError("The process failed.")
-                if final_system is None:
-                    self._logger.error(process.stdout())
-                    self._logger.error(process.stderr())
-                    raise _BSS._Exceptions.ThirdPartyError("The final system is None.")
-                # Save the final coordinates 
-                self._logger.info(f"Saving somd_{i+1}.rst7 to {equil_output_dir}")
-                _BSS.IO.saveMolecules(f"{equil_output_dir}/somd_{i+1}", final_system, fileformat=["rst7"], property_map={"velocity" : "foo"})
+            return pre_equilibrated_system
 
+        else: # Free leg
+            return pre_equilibrated_system
 
     def write_input_files(self, 
-                          pre_equilibrated_system: _BSS._SireWrappers._system.System,
+                          pre_equilibrated_system: _BSS._SireWrappers._system.System, # type: ignore
                           use_same_restraints: bool = False) -> None:
         """
         Write the required input files to all of the stage input directories.
@@ -535,7 +570,7 @@ class Leg(_SimulationRunner):
         for stage_type, stage_input_dir in self.stage_input_dirs.items():
             self._logger.info(f"Writing input files for {self.leg_type.name} leg {stage_type.name} stage")
             restraint = self.restraints[0] if self.leg_type == _LegType.BOUND else None
-            protocol = _BSS.Protocol.FreeEnergy(runtime=DUMMY_RUNTIME*_BSS.Units.Time.nanosecond, 
+            protocol = _BSS.Protocol.FreeEnergy(runtime=DUMMY_RUNTIME*_BSS.Units.Time.nanosecond, # type: ignore
                                                 lam_vals=DUMMY_LAM_VALS, 
                                                 perturbation_type=stage_type.bss_perturbation_type)
             self._logger.info(f"Perturbation type: {stage_type.bss_perturbation_type}")
@@ -639,7 +674,7 @@ class Leg(_SimulationRunner):
             file.writelines(header_lines)
 
         # Submit to the virtual queue
-        cmd = f"--chdir={run_dir} {job_name}.sh" # The virtual queue adds sbatch
+        cmd = f"--chdir={run_dir} {run_dir}/{job_name}.sh" # The virtual queue adds sbatch
         slurm_file_base = _get_slurm_file_base(slurm_file)
         job=self.virtual_queue.submit(cmd, slurm_file_base=slurm_file_base)
         self._logger.info(f"Submitted job {job}")
@@ -647,7 +682,7 @@ class Leg(_SimulationRunner):
         # Update the virtual queue to submit the job
         self.virtual_queue.update()
 
-        # Always wait untit the job is submitted to the real slrum queue
+        # Always wait untit the job is submitted to the real slurm queue
         while self.virtual_queue._pre_queue:
             self._logger.info(f"Waiting for job {job} to be submitted to the real slurm queue")
             _sleep(5 * 60)
@@ -657,7 +692,7 @@ class Leg(_SimulationRunner):
         if wait:
             while job in self.virtual_queue.queue:
                 self._logger.info(f"Waiting for job {job} to complete")
-                _sleep(60)
+                _sleep(30)
                 self.virtual_queue.update()
 
     def analyse(self, subsampling=False) -> _Tuple[_np.ndarray, _np.ndarray]:

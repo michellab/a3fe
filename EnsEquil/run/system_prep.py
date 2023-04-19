@@ -184,7 +184,7 @@ def minimise_input(leg_type: _LegType,
     # velocities sometimes causes issues with the size of the floats overflowing the RST7
     # format.
     _BSS.IO.saveMolecules(f"{output_dir}/{leg_type.name.lower()}{_PreparationStage.MINIMISED.file_suffix}",
-                            solvated_system, 
+                            minimised_system, 
                             fileformat=["prm7", "rst7"], property_map={"velocity" : "foo"})
 
     return minimised_system
@@ -281,6 +281,8 @@ def run_ensemble_equilibration(leg_type: _LegType,
                                input_dir: str,
                                output_dir: str) -> None:
     """
+    Run the ensemble equilibration for the given leg type.
+
     Parameters
     ----------
     leg_type : LegType
@@ -294,9 +296,9 @@ def run_ensemble_equilibration(leg_type: _LegType,
     -------
     None
     """
-    ENSEMBLE_EQUILIBRATION_TIME = 5 # ns
+    ENSEMBLE_EQUILIBRATION_TIME = 0.1 # ns
 
-    # Load the minimised system
+    # Load the pre-equilibrated system
     print("Loading pre-equilibrated system...")
     pre_equilibrated_system = _BSS.IO.readMolecules([f"{input_dir}/{file}" for file in _PreparationStage.PREEQUILIBRATED.get_simulation_input_files(leg_type)])
 
@@ -306,7 +308,7 @@ def run_ensemble_equilibration(leg_type: _LegType,
     # Mark the ligand to be decoupled in the absolute binding free energy calculation
     lig = _BSS.Align.decouple(pre_equilibrated_system[0], intramol=True)
 
-    # Check that is actually a ligand
+    # Check that this is actually a ligand
     if lig.nAtoms() > 100 or lig.nAtoms() < 5:
         raise ValueError(f"The first molecule in the bound system has {lig.nAtoms()} atoms and is likely not a ligand. " \
                             "Please check that the ligand is the first molecule in the bound system.")
@@ -315,75 +317,35 @@ def run_ensemble_equilibration(leg_type: _LegType,
     if lig._sire_object.name().value() != "LIG":
         raise ValueError(f"The name of the ligand in the bound system is {lig._sire_object.name().value()} and is not LIG. " \
                             "Please check that the ligand is the first molecule in the bound system or rename the ligand.")
-    self._logger.info(f"Selecting ligand {lig} for decoupling")
+    print(f"Selecting ligand {lig} for decoupling")
+
+    # Update the system
     pre_equilibrated_system.updateMolecule(0,lig)
     
     # Create the protocol
     protocol = _BSS.Protocol.Production(timestep=2*_BSS.Units.Time.femtosecond, # 2 fs timestep as 4 fs seems to cause instability even with HMR
                                             runtime=ENSEMBLE_EQUILIBRATION_TIME*_BSS.Units.Time.nanosecond)
 
-    self._logger.info(f"Running {self.ensemble_size} SOMD ensemble equilibration simulations for {ENSEMBLE_EQUILIBRATION_TIME} ns")
-    # Repeat this for each of the ensemble_size repeats
-    for i in range(self.ensemble_size):
-        equil_output_dir = f"{self.base_dir}/ensemble_equilibration_{i+1}"
-        if self.leg_type == _LegType.BOUND:
-            self._logger.info(f"Running SOMD restraint search simulation {i+1} of {self.ensemble_size}")
-            restraint_search = _BSS.FreeEnergy.RestraintSearch(pre_equilibrated_system, protocol=protocol,
-                                                            engine='Gromacs', work_dir=equil_output_dir)
-            restraint_search.start()
-            # After waiting for the restraint search to finish, extract the final system with new coordinates, and the restraints
-            restraint_search.wait()
-            
-            # Check that the process completed successfully and that the final system is not None
-            process = restraint_search._process
-            if process.isError():
-                self._logger.error(process.stdout())
-                self._logger.error(process.stderr())
-                raise _BSS._Exceptions.ThirdPartyError("The process failed.")
-            final_system = process.getSystem(block=True)
-            if final_system is None:
-                self._logger.error(process.stdout())
-                self._logger.error(process.stderr())
-                raise _BSS._Exceptions.ThirdPartyError("The final system is None.")
+    # Run - assuming that this will be in the appropriate ensemble equilibration directory
+    print(f"Running SOMD ensemble equilibration simulation for {ENSEMBLE_EQUILIBRATION_TIME} ns")
+    if leg_type == _LegType.BOUND:
+        work_dir = output_dir
+    else:
+        work_dir = None
+    final_system = run_process(pre_equilibrated_system, protocol, work_dir=work_dir)
 
-            restraint = restraint_search.analyse(method='BSS', block=True)
-
-            # Save the final coordinates 
-            self._logger.info(f"Saving somd_{i+1}.rst7 and restraint_{i+1}.txt to {equil_output_dir}")
-            # Save, renaming the velocity property to foo so avoid saving velocities. Saving the
-            # velocities sometimes causes issues with the size of the floats overflowing the RST7
-            # format.
-            _BSS.IO.saveMolecules(f"{equil_output_dir}/somd_{i+1}", final_system, 
-                                    fileformat=["rst7"], property_map={"velocity" : "foo"})
-
-            # Save the restraints to a text file and store within the Leg object
-            with open(f"{equil_output_dir}/restraint_{i+1}.txt", "w") as f:
-                f.write(restraint.toString(engine="SOMD"))
-            if not hasattr(self, "restraints"):
-                self.restraints = [restraint]
-            else:
-                self.restraints.append(restraint)
-
-        elif self.leg_type == _LegType.FREE:
-            self._logger.info(f"Running SOMD ensemble equilibration simulation {i+1} of {self.ensemble_size}")
-            process = _BSS.Process.Gromacs(pre_equilibrated_system, protocol=protocol, work_dir=equil_output_dir)
-            process.start()
-            process.wait()
-            final_system = process.getSystem(block=True)
-            if process.isError():
-                self._logger.error(process.stdout())
-                self._logger.error(process.stderr())
-                raise _BSS._Exceptions.ThirdPartyError("The process failed.")
-            if final_system is None:
-                self._logger.error(process.stdout())
-                self._logger.error(process.stderr())
-                raise _BSS._Exceptions.ThirdPartyError("The final system is None.")
-            # Save the final coordinates 
-            self._logger.info(f"Saving somd_{i+1}.rst7 to {equil_output_dir}")
-            _BSS.IO.saveMolecules(f"{equil_output_dir}/somd_{i+1}", final_system, fileformat=["rst7"], property_map={"velocity" : "foo"})
+    # Save the coordinates only, renaming the velocity property to foo so avoid saving velocities. Saving the
+    # velocities sometimes causes issues with the size of the floats overflowing the RST7
+    # format.
+    print(f"Saving somd.rst7 to {output_dir}")
+    _BSS.IO.saveMolecules(f"{output_dir}/somd",
+                          final_system,
+                          fileformat=["rst7"], 
+                          property_map={"velocity" : "foo"})
 
 def run_process(system: _BSS._SireWrappers._system.System,
-                 protocol: _BSS.Protocol._protocol.Protocol,) -> _BSS._SireWrappers._system.System:
+                 protocol: _BSS.Protocol._protocol.Protocol,
+                 work_dir: _Optional[str]=None) -> _BSS._SireWrappers._system.System:
     """
     Run a process with GROMACS, raising informative
     errors in the event of a failure.
@@ -394,13 +356,16 @@ def run_process(system: _BSS._SireWrappers._system.System,
         System to run the process on.
     protocol : _BSS._Protocol._protocol.Protocol
         Protocol to run the process with.
+    work_dir : str, optional
+        The working directory to run the process in. If none,
+        a temporary directory will be created.
     
     Returns
     -------
     system : _BSS._SireWrappers._system.System
         System after the process has been run.
     """
-    process = _BSS.Process.Gromacs(system, protocol)
+    process = _BSS.Process.Gromacs(system, protocol, work_dir=work_dir)
     process.start()
     process.wait()
     import time
@@ -408,11 +373,15 @@ def run_process(system: _BSS._SireWrappers._system.System,
     if process.isError():
         print(process.stdout())
         print(process.stderr())
+        process.getStdout()
+        process.getStderr()
         raise _BSS._Exceptions.ThirdPartyError("The process failed.")
     system = process.getSystem(block=True)
     if system is None:
         print(process.stdout())
         print(process.stderr())
+        process.getStdout()
+        process.getStderr()
         raise _BSS._Exceptions.ThirdPartyError("The final system is None.")
     
     return system
@@ -450,3 +419,11 @@ def slurm_heat_and_preequil_bound() -> None:
 def slurm_heat_and_preequil_free() -> None:
     """ Perform heating and minimisation for the free leg"""
     heat_and_preequil_input(leg_type=_LegType.FREE, input_dir=".", output_dir=".")
+
+def slurm_ensemble_equilibration_bound() -> None:
+    """ Perform ensemble equilibration for the bound leg"""
+    run_ensemble_equilibration(leg_type=_LegType.BOUND, input_dir=".", output_dir=".")
+
+def slurm_ensemble_equilibration_free() -> None:
+    """ Perform ensemble equilibration for the free leg"""
+    run_ensemble_equilibration(leg_type=_LegType.FREE, input_dir=".", output_dir=".")

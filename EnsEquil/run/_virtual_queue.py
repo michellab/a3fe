@@ -7,6 +7,7 @@ import logging as _logging
 import numpy as _np
 import os as _os
 import subprocess as _subprocess
+from time import sleep as _sleep
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
 from .enums import JobStatus as _JobStatus
@@ -202,3 +203,9 @@ class VirtualQueue():
         for var in vars(self):
             self._logger.debug(f"{var}: {getattr(self, var)} ")
         self._logger.debug("##############################################")
+
+    def wait(self) -> None:
+        """Wait for all jobs to finish."""
+        while len(self.queue) > 0:
+            self.update()
+            _sleep(30)
