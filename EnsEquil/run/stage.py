@@ -216,70 +216,69 @@ class Stage(_SimulationRunner):
         None
         """
         # Use stage context manager to ensure that the stage is killed if an exception is raised
-        with StageContextManager([self]):
-            try:
-                # Reset self.kill_thread so we can restart after killing
-                self.kill_thread = False
+        try:
+            # Reset self.kill_thread so we can restart after killing
+            self.kill_thread = False
 
-                if not adaptive and runtime is None:
-                    raise ValueError("If adaptive equilibration detection is disabled, a runtime must be supplied.")
-                if adaptive and runtime is not None:
-                    raise ValueError("If adaptive equilibration detection is enabled, a runtime cannot be supplied.")
+            if not adaptive and runtime is None:
+                raise ValueError("If adaptive equilibration detection is disabled, a runtime must be supplied.")
+            if adaptive and runtime is not None:
+                raise ValueError("If adaptive equilibration detection is enabled, a runtime cannot be supplied.")
 
-                if not adaptive:
-                    self._logger.info(f"Starting {self}. Adaptive equilibration = {adaptive}...")
-                elif adaptive:
-                    self._logger.info(f"Starting {self}. Adaptive equilibration = {adaptive}...")
-                    if runtime is None:
-                        runtime = 3 * self.block_size
+            if not adaptive:
+                self._logger.info(f"Starting {self}. Adaptive equilibration = {adaptive}...")
+            elif adaptive:
+                self._logger.info(f"Starting {self}. Adaptive equilibration = {adaptive}...")
+                if runtime is None:
+                    runtime = 3 * self.block_size
 
-                # Run initial SOMD simulations
-                for win in self.lam_windows:
-                    # Add buffer of 1 block_size to give chance for the equilibration to be detected.
-                    win.run(runtime) # type: ignore
-                    win._update_log()
-                    self._dump()
-
-                # Periodically check the simulations and analyse/ resubmit as necessary
-                # Copy to ensure that we don't modify self.lam_windows when updating self.running_wins
-                self.running_wins = self.lam_windows.copy() 
+            # Run initial SOMD simulations
+            for win in self.lam_windows:
+                # Add buffer of 1 block_size to give chance for the equilibration to be detected.
+                win.run(runtime) # type: ignore
+                win._update_log()
                 self._dump()
-                while self.running_wins:
-                    _sleep(60 * 1)  # Check every 20 seconds
-                    # Check if we've requested to kill the thread
-                    if self.kill_thread:
-                        self._logger.info(f"Kill thread requested: exiting run loop")
-                        return
-                    # Update the queue before checking the simulations
-                    self.virtual_queue.update()
-                    for win in self.running_wins:
-                        # Check if the window has now finished - calling win.running updates the win._running attribute
-                        if not win.running:
-                            # If we are in adaptive mode, check if the simulation has equilibrated and if not, resubmit
-                            if adaptive:
-                                if win.equilibrated:
-                                    self._logger.info(f"{win} has equilibrated at {win.equil_time:.3f} ns")
-                                else:
-                                    # Check that we haven't exceeded the maximum runtime for any simulations
-                                    if win.tot_simtime / win.ensemble_size >= max_runtime:
-                                        self._logger.info(f"{win} has not equilibrated but simulations have exceeded the maximum runtime of "
-                                                          f"{max_runtime} ns. Terminating simulations") 
-                                    else: # Not equilibrated and not over the maximum runtime, so resubmit
-                                        self._logger.info(f"{win} has not equilibrated. Resubmitting for {self.block_size:.3f} ns")
-                                        win.run(self.block_size)
-                            else: # Not in adaptive mode
-                                self._logger.info(f"{win} has finished at {win.tot_simtime:.3f} ns")
 
-                            # Write status after checking for running and equilibration, as this updates the
-                            # _running and _equilibrated attributes
-                            win._update_log()
-                            self._dump()
+            # Periodically check the simulations and analyse/ resubmit as necessary
+            # Copy to ensure that we don't modify self.lam_windows when updating self.running_wins
+            self.running_wins = self.lam_windows.copy() 
+            self._dump()
+            while self.running_wins:
+                _sleep(60 * 1)  # Check every 20 seconds
+                # Check if we've requested to kill the thread
+                if self.kill_thread:
+                    self._logger.info(f"Kill thread requested: exiting run loop")
+                    return
+                # Update the queue before checking the simulations
+                self.virtual_queue.update()
+                for win in self.running_wins:
+                    # Check if the window has now finished - calling win.running updates the win._running attribute
+                    if not win.running:
+                        # If we are in adaptive mode, check if the simulation has equilibrated and if not, resubmit
+                        if adaptive:
+                            if win.equilibrated:
+                                self._logger.info(f"{win} has equilibrated at {win.equil_time:.3f} ns")
+                            else:
+                                # Check that we haven't exceeded the maximum runtime for any simulations
+                                if win.tot_simtime / win.ensemble_size >= max_runtime:
+                                    self._logger.info(f"{win} has not equilibrated but simulations have exceeded the maximum runtime of "
+                                                        f"{max_runtime} ns. Terminating simulations") 
+                                else: # Not equilibrated and not over the maximum runtime, so resubmit
+                                    self._logger.info(f"{win} has not equilibrated. Resubmitting for {self.block_size:.3f} ns")
+                                    win.run(self.block_size)
+                        else: # Not in adaptive mode
+                            self._logger.info(f"{win} has finished at {win.tot_simtime:.3f} ns")
 
-                    self.running_wins = [win for win in self.running_wins.copy() if win.running]
+                        # Write status after checking for running and equilibration, as this updates the
+                        # _running and _equilibrated attributes
+                        win._update_log()
+                        self._dump()
 
-            except Exception as e:
-                self._logger.exception("")
-                raise e
+                self.running_wins = [win for win in self.running_wins.copy() if win.running]
+
+        except Exception as e:
+            self._logger.exception("")
+            raise e
 
         # All simulations are now finished, so perform final analysis
         self._logger.info(f"All simulations in {self} have finished.")
