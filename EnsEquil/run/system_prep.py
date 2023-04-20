@@ -296,7 +296,7 @@ def run_ensemble_equilibration(leg_type: _LegType,
     -------
     None
     """
-    ENSEMBLE_EQUILIBRATION_TIME = 0.1 # ns
+    ENSEMBLE_EQUILIBRATION_TIME = 5 # ns
 
     # Load the pre-equilibrated system
     print("Loading pre-equilibrated system...")
