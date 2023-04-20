@@ -33,7 +33,7 @@ def test_calculation_loading(calc):
     assert calc.input_dir == "EnsEquil/data/example_run_dir/input"
     assert calc.output_dir == os.path.join(calc.base_dir, "output")
     assert calc.setup_complete == False
-    assert calc.prep_stage == ee.leg.PreparationStage.PARAMETERISED
+    assert calc.prep_stage == ee.run.enums.PreparationStage.PARAMETERISED
     assert calc.stream_log_level == logging.INFO
     # Check that pickle file exists
     assert os.path.exists(os.path.join(calc.base_dir, "Calculation.pkl"))
@@ -60,7 +60,7 @@ def test_calculation_reloading(calc):
     assert calc2.input_dir == "EnsEquil/data/example_run_dir/input"
     assert calc2.output_dir == os.path.join(calc.base_dir, "output")
     assert calc2.setup_complete == False
-    assert calc2.prep_stage == ee.leg.PreparationStage.PARAMETERISED
+    assert calc2.prep_stage == ee.run.enums.PreparationStage.PARAMETERISED
     assert calc2.stream_log_level == logging.INFO
 
 def test_update_paths(calc):
