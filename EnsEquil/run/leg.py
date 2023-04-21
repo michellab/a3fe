@@ -174,7 +174,10 @@ class Leg(_SimulationRunner):
                           f"any preparation stage. Required files are: {Leg.required_input_files[self.leg_type]}")
 
 
-    def setup(self, slurm: bool =True, use_same_restraints:bool = False) -> None:
+    def setup(self, 
+              slurm: bool =True,
+              append_to_ligand_selection:str = "",
+              use_same_restraints:bool = False) -> None:
         """
         Set up the leg. This involves:
             - Creating the input directories
@@ -190,6 +193,12 @@ class Leg(_SimulationRunner):
         ----------
         slurm : bool, default: True
             If True, the setup jobs will be run through SLURM.
+        append_to_ligand_selection: str, optional, default = ""
+            If this is a bound leg, this appends the supplied string to the default atom 
+            selection which chooses the atoms in the ligand to consider as potential anchor
+            points. The default atom selection is f'resname {ligand_resname} and not name H*'.
+            Uses the mdanalysis atom selection language. For example, 'not name O*' will result
+            in an atom selection of f'resname {ligand_resname} and not name H* and not name O*'.
         use_same_restraints: bool, default=False
             If True, the same restraints will be used for all of the bound leg repeats - by default
             , the restraints generated for the first repeat are used. This allows meaningful
@@ -216,7 +225,7 @@ class Leg(_SimulationRunner):
             # Run separate equilibration simulations for each of the repeats and 
             # extract the final structures to give a diverse ensemble of starting
             # conformations. For the bound leg, this also extracts the restraints.
-            system = self.run_ensemble_equilibration(slurm=slurm)
+            system = self.run_ensemble_equilibration(slurm=slurm, append_to_ligand_selection=append_to_ligand_selection)
 
         # Write input files
         self.write_input_files(system, use_same_restraints=use_same_restraints)
@@ -452,7 +461,7 @@ class Leg(_SimulationRunner):
         # Update the preparation stage
         self.prep_stage = _PreparationStage.PREEQUILIBRATED
 
-    def run_ensemble_equilibration(self, slurm: bool = True) -> _BSS._SireWrappers._system.System:
+    def run_ensemble_equilibration(self, slurm: bool = True, append_to_ligand_selection: str ="") -> _BSS._SireWrappers._system.System:
         """
         Run 5 ns simulations with SOMD for each of the ensemble_size runs and extract the final structures
         to use as diverse starting points for the production runs. If this is the bound leg, the restraints
@@ -464,7 +473,12 @@ class Leg(_SimulationRunner):
         ----------
         slurm : bool, optional, default=True
             Whether to use SLURM to run the job, by default True.
-
+        append_to_ligand_selection: str, optional, default = ""
+            If this is a bound leg, this appends the supplied string to the default atom 
+            selection which chooses the atoms in the ligand to consider as potential anchor
+            points. The default atom selection is f'resname {ligand_resname} and not name H*'.
+            Uses the mdanalysis atom selection language. For example, 'not name O*' will result
+            in an atom selection of f'resname {ligand_resname} and not name H* and not name O*'.
         """
         # Generate output dirs and copy over the input
         outdirs = [f"{self.base_dir}/ensemble_equilibration_{i+1}" for i in range(self.ensemble_size)]
@@ -528,7 +542,8 @@ class Leg(_SimulationRunner):
                                                                     system = pre_equilibrated_system,
                                                                     traj= traj,
                                                                     work_dir = outdir,
-                                                                    temperature= 298.15 * _BSS.Units.Temperature.kelvin,)
+                                                                    temperature= 298.15 * _BSS.Units.Temperature.kelvin,
+                                                                    append_to_ligand_selection=append_to_ligand_selection)
 
                 # Check that we actually generated a restraint
                 if restraint is None:

@@ -120,7 +120,10 @@ class Calculation(_SimulationRunner):
                             f"and {_Leg.required_input_files[_LegType.FREE]}")
 
 
-    def setup(self, slurm: bool = True, use_same_restraints:bool = False) -> None:
+    def setup(self, 
+              slurm: bool = True, 
+              append_to_ligand_selection:str = "",
+              use_same_restraints:bool = False) -> None:
         """ 
         Set up the calculation. This involves parametrising, equilibrating, and
         deriving restraints for the bound leg. Most of the work is done by the
@@ -130,6 +133,12 @@ class Calculation(_SimulationRunner):
         ----------
         slurm : bool, default=True
             If True, the setup jobs will be run through SLURM.
+        append_to_ligand_selection: str, optional, default = ""
+            For the bound leg, this appends the supplied string to the default atom 
+            selection which chooses the atoms in the ligand to consider as potential anchor
+            points. The default atom selection is f'resname {ligand_resname} and not name H*'.
+            Uses the mdanalysis atom selection language. For example, 'not name O*' will result
+            in an atom selection of f'resname {ligand_resname} and not name H* and not name O*'.
         use_same_restraints: bool, default=False
             If True, the same restraints will be used for all of the bound leg repeats - by default
             , the restraints generated for the first repeat are used. This allows meaningful
@@ -154,7 +163,7 @@ class Calculation(_SimulationRunner):
                        base_dir=_os.path.join(self.base_dir, leg_type.name.lower()),
                        stream_log_level=self.stream_log_level)
             self.legs.append(leg)
-            leg.setup(slurm=slurm, use_same_restraints=use_same_restraints)
+            leg.setup(slurm=slurm, append_to_ligand_selection=append_to_ligand_selection, use_same_restraints=use_same_restraints)
 
         # Save the state
         self.setup_complete = True
