@@ -207,6 +207,20 @@ class SimulationRunner(ABC):
         dg_overall = _np.zeros(self.ensemble_size)
         er_overall = _np.zeros(self.ensemble_size)
 
+        # Check that this is not still running
+        if self.running:
+            raise RuntimeError(f"Cannot perform analysis as {self.__class__.__name__} is still running")
+
+        # Check that none of the simulations have failed
+        failed_sims_list = self.failed_simulations
+        if failed_sims_list:
+            self._logger.error("Unable to perform analysis as several simulations did not complete successfully")
+            self._logger.error("Please check the output in the following directories:")
+            for failed_sim in failed_sims_list:
+                self._logger.error(failed_sim.base_dir)
+            raise RuntimeError("Unable to perform analysis as several simulations did not complete successfully")
+
+
         # Analyse the sub-simulation runners
         for sub_sim_runner in self._sub_sim_runners:
             dg, er = sub_sim_runner.analyse(subsampling=subsampling)

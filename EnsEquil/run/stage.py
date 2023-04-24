@@ -354,6 +354,18 @@ class Stage(_SimulationRunner):
             for each of the ensemble size runs, in kcal mol-1.  If get_frnrg is
             False, this is None.
         """
+        # Check that this is not still running
+        if self.running:
+            raise RuntimeError(f"Cannot perform analysis as the Stage is still running")
+
+        # Check that none of the simulations have failed
+        failed_sims_list = self.failed_simulations
+        if failed_sims_list:
+            self._logger.error("Unable to perform analysis as several simulations did not complete successfully")
+            self._logger.error("Please check the output in the following directories:")
+            for failed_sim in failed_sims_list:
+                self._logger.error(failed_sim.base_dir)
+            raise RuntimeError("Unable to perform analysis as several simulations did not complete successfully")
 
         # Check that all simulations have equilibrated
         for win in self.lam_windows:
