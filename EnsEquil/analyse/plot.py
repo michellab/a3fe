@@ -196,6 +196,8 @@ def plot_gradient_hists(gradients_data: GradientData, output_dir: str) -> None:
                         ax.tick_params(color='red')
                         for spine in ax.spines.values():
                             spine.set_edgecolor('red')
+        # Hide redundant axes
+        else: ax.remove()
     
     fig.tight_layout()
     name = f"{output_dir}/gradient_hists"
