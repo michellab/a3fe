@@ -12,7 +12,9 @@ A package for running free energy calculations with SOMD with automated equilibr
 
 ### Installation
 
-Assuming that you already have SLURM installed, we first need to install the [BioSimSpace](https://biosimspace.openbiosim.org/) dependencies using mamba (or conda). SOMD, which is used to run the simulations, is contained within Sire, which will be installed as a dependency of BioSimSpace.
+EnsEquil depends on SLURM for scheduling jobs, and on GROMACS for running initial equilibration simulations. Please ensure that your have sourced your GMXRC or loaded your GROMACS module before proceeding with the installation.
+
+We first need to install the [BioSimSpace](https://biosimspace.openbiosim.org/) dependencies using mamba (or conda). SOMD, which is used to run the simulations, is contained within Sire, which will be installed as a dependency of BioSimSpace.
 ```bash
 mamba create -n ensequil -c conda-forge -c openbiosim/label/dev biosimspace --only-deps
 mamba activate ensequil
@@ -36,17 +38,24 @@ Finally, download EnsEquil, install, and test:
  pytest EnsEquil
  ```
  
-### Examples
+### Quick Start
 
-Create a run directory and copy `EnsEquil/EnsEquil/data/example_input` to <your run directory>/input. Replace the `system.*` and `somd.pert` files as you would for a standard SOMD simulation (these can be generated using [BioSimSpace](https://biosimspace.openbiosim.org/)), modify `somd.cfg` to change the simulation settings, and change the SLURM options in `run_somd.sh` to fit your SLURM installation. EnsEquil can then be run through ipython:
+- Activate your EnsEquil conda environment 
+- Create a base directory for the calculation and create an directory called `input` within this
+- Move your input files into the the input directory. For example, if you have parameterised AMBER-format input files, name these bound_param.rst7, bound_param.prm7, free_param.rst7, and free_param.prm7. For more details see the documentation.
+- Copy run somd.sh and template_config.sh from EnsEquil/EnsEquil/data/example_run_dir to your `input` directory, making sure to the SLURM options in run_somd.sh so that the jobs will run on your cluster
+- In the calculation base directory, run the following python code, either through ipython or as a python script (you will likely want to run this with `nohup`/ through tmux to ensure that the calculation is not killed when you lose connection)
 
+```python
+import EnsEquil as ee 
+calc = ee.Calculation()
+calc.setup()
+calc.run()
+calc.wait()
+calc.analyse()
 ```
-ipython
-import EnsEquil as ee
-ens = ee.Stage(block_size=1) # Use a block size of 1 ns to detect equilibration
-ens.run()
-```
-Creating the `ens` ensemble object will result in the creation of all required output directories. After starting the run with `ens.run()`, the ensemble will run in the background (and will be killed if you exit ipython) and you will be able to query the state of, and interact with, the ensemble object.
+
+- Check the results in the ``output`` directories (separate output directories are created for the Calculation, Legs, and Stages)
 
 ### Copyright
 
