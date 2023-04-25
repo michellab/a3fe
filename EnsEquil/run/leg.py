@@ -514,8 +514,8 @@ class Leg(_SimulationRunner):
 
         else: # Not slurm
             for i, outdir in enumerate(outdirs):
-                self._logger.info(f"Running ensemble equilibration for run {i+1}. Submitting through SLURM...")
-                _sysprep_solvate_input(self.leg_type, outdir, outdir)
+                self._logger.info(f"Running ensemble equilibration for run {i+1}.")
+                _sysprep_run_ensemble_equilibration(self.leg_type, outdir, outdir)
 
         # Give the output files unique names
         for i, outdir in enumerate(outdirs):
