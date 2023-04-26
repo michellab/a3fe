@@ -615,7 +615,7 @@ class Leg(_SimulationRunner):
                 _shutil.copy(coordinates_file, f"{stage_input_dir}/somd_{i+1}.rst7")
                 if self.leg_type == _LegType.BOUND:
                     if use_same_restraints: # Want to use same restraints for all repeats
-                        restraint_file = f"{ens_equil_output_dir}/restraint_1.txt"
+                        restraint_file = f"{self.base_dir}/ensemble_equilibration_1/restraint_1.txt"
                     else:
                         restraint_file = f"{ens_equil_output_dir}/restraint_{i+1}.txt"
                     _shutil.copy(restraint_file, f"{stage_input_dir}/restraint_{i+1}.txt")
