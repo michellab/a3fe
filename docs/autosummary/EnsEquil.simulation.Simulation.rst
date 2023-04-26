@@ -1,9 +1,9 @@
 ﻿EnsEquil.simulation.Simulation
 ==============================
 
-.. currentmodule:: EnsEquil.simulation
+.. currentmodule:: EnsEquil
 
-.. autoclass:: Simulation
+.. autoclass:: simulation.Simulation
 
    
    .. automethod:: __init__
@@ -13,13 +13,16 @@
 
    .. autosummary::
    
-      ~Simulation.__init__
-      ~Simulation.clean
-      ~Simulation.kill
-      ~Simulation.read_gradients
-      ~Simulation.run
-      ~Simulation.update_paths
-      ~Simulation.wait
+      ~simulation.Simulation.__init__
+      ~simulation.Simulation.analyse
+      ~simulation.Simulation.analyse_convergence
+      ~simulation.Simulation.clean
+      ~simulation.Simulation.kill
+      ~simulation.Simulation.read_gradients
+      ~simulation.Simulation.run
+      ~simulation.Simulation.set_simfile_option
+      ~simulation.Simulation.update_paths
+      ~simulation.Simulation.wait
    
    
 
@@ -29,12 +32,19 @@
 
    .. autosummary::
    
-      ~Simulation.class_count
-      ~Simulation.input_dir
-      ~Simulation.output_dir
-      ~Simulation.required_input_files
-      ~Simulation.run_files
-      ~Simulation.running
-      ~Simulation.stream_log_level
+      ~simulation.Simulation.class_count
+      ~simulation.Simulation.equil_time
+      ~simulation.Simulation.equilibrated
+      ~simulation.Simulation.failed
+      ~simulation.Simulation.failed_simulations
+      ~simulation.Simulation.input_dir
+      ~simulation.Simulation.output_dir
+      ~simulation.Simulation.required_input_files
+      ~simulation.Simulation.run_files
+      ~simulation.Simulation.running
+      ~simulation.Simulation.slurm_output_files
+      ~simulation.Simulation.stream_log_level
+      ~simulation.Simulation.tot_gpu_time
+      ~simulation.Simulation.tot_simtime
    
    

@@ -1,7 +1,7 @@
-﻿EnsEquil.stage
+﻿EnsEquil.enums
 ==============
 
-.. automodule:: EnsEquil.stage
+.. automodule:: EnsEquil.enums
 
    
    
@@ -17,8 +17,10 @@
 
    .. autosummary::
    
-      Stage
-      StageContextManager
+      JobStatus
+      LegType
+      PreparationStage
+      StageType
    
    
 

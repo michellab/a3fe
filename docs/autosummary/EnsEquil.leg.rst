@@ -18,8 +18,6 @@
    .. autosummary::
    
       Leg
-      LegType
-      PreparationStage
    
    
 
