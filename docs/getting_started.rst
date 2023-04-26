@@ -28,18 +28,20 @@ Quick Start
 
 Some handy commands and code snippets, assuming that you have set up the calculation following the code above:
 
-Terminate all the SLURM jobs:
-``calc.kill()``
-Delete all the output (but not input files), ready to run again:
-``calc.clean()``
-Return any failed simulations and find out where to look for output:
+**Terminate all the SLURM jobs**: ``calc.kill()``
+
+**Delete all the output** (but not input files), ready to run again: ``calc.clean()``
+
+**Return any failed simulations** and find out where to look for output:
+
 .. code-block:: python
 
     failed_sims = calc.failed_simulations
     for failed_sim in failed_sims:
         print(failed_sim.base_dir)
 
-Check how many GPU hours your calculation has cost
+**Check how many GPU hours your calculation has cost**:
+
 .. code-block:: python
 
     print(f"Total GPU hours: {calc.tot_gpu_time:0.f}")
