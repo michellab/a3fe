@@ -1,5 +1,6 @@
 """Utilities for the Ensemble, Window, and Simulation Classes"""
 
+from typing_extensions import Self
 from dataclasses import dataclass as _dataclass
 from enum import Enum as _Enum
 import glob as _glob
@@ -12,6 +13,7 @@ from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, O
 
 from .enums import JobStatus as _JobStatus
 from ._simulation_runner import SimulationRunner as _SimulationRunner
+from ._utils import retry as _retry
 
 @_dataclass
 class Job():
@@ -143,17 +145,71 @@ class VirtualQueue():
             self._pre_queue.remove(job)
         job.status = _JobStatus.KILLED # type: ignore
 
+    def _read_slurm_queue(self) -> _List[int]:
+        """
+        Extract all running slurm job IDs from the SLURM
+        queue.
+
+        Returns
+        -------
+        running_slurm_job_ids: _List[int]
+            List of running SLURM job IDs for the user
+        """        
+        # Get job ids of currently running jobs. This occasionally fails when SLURM is 
+        # busy (e.g. 'slurm_load_jobs error: Socket timed out on send/recv operation'), 
+        # so retry a few times, waiting a while in between
+        @_retry(times=5, exceptions=(ValueError), wait_time=120, logger=self._logger)
+        def _read_slurm_queue_inner() -> _List[int]:
+            """This inner function is defined so that we can pass self._logger
+            to the decorator"""
+            # Get job ids of currently running jobs. This assumes no array jobs.
+            cmd = r"squeue -h -u $USER | awk '{print $1}' | grep -v -E '\[|_' | paste -s -d, -"
+            process = _subprocess.Popen(cmd, shell=True, stdin=_subprocess.PIPE,
+                                        stdout=_subprocess.PIPE, stderr=_subprocess.STDOUT,
+                                        close_fds=True)
+            output = process.communicate()[0]
+            running_slurm_job_ids = [int(job_id) for job_id in output.decode('utf-8').strip().split(",") if job_id != ""]
+            return running_slurm_job_ids
+
+        return _read_slurm_queue_inner()
+
+    def _submit_job(self, job_command:str) -> int:
+        """
+        Submit the supplied command to slurm using sbatch.
+
+        Parameters
+        ----------
+        job_command : str
+            The comand to be run using f"sbatch {job_command}"
+
+        Returns
+        -------
+        slurm_job_id : int
+            The job id for the submitted command
+        """
+        # Define inner loop to allow use of retry decorator with self.logger
+        @_retry(times=5, exceptions=(ValueError), wait_time=120, logger=self._logger)
+        def _submit_job_inner(job_command:str) -> int:
+            cmd = f"sbatch {job_command}"
+            process = _subprocess.Popen(cmd, shell=True, stdin=_subprocess.PIPE,
+                                        stdout=_subprocess.PIPE, stderr=_subprocess.STDOUT,
+                                        close_fds=True)
+            if process.stdout is None:
+                raise ValueError("Could not get stdout from process.")
+            process_output = process.stdout.read()
+            process_output = process_output.decode('utf-8').strip()
+            try:
+                slurm_job_id = int((process_output.split()[-1]))
+            except Exception as e:
+                raise RuntimeError(f"Error submitting job: {process_output}") from e 
+
+        return _submit_job_inner(job_command)
+        
     def update(self) -> None:
         """Remove jobs from the queue if they have finished, then move jobs from
         the pre-queue to the real queue if there is space."""
         # First, remove jobs from the queue if they have finished
-        # Get job ids of currently running jobs. This assumes no array jobs.
-        cmd = r"squeue -h -u $USER | awk '{print $1}' | grep -v -E '\[|_' | paste -s -d, -"
-        process = _subprocess.Popen(cmd, shell=True, stdin=_subprocess.PIPE,
-                                    stdout=_subprocess.PIPE, stderr=_subprocess.STDOUT,
-                                    close_fds=True)
-        output = process.communicate()[0]
-        running_slurm_job_ids = [int(job_id) for job_id in output.decode('utf-8').strip().split(",") if job_id != ""]
+        running_slurm_job_ids = self._read_slurm_queue()
         n_running_slurm_jobs = len(running_slurm_job_ids)
         # Remove completed jobs from the queues and update their status
         for job in self._slurm_queue:
@@ -175,22 +231,7 @@ class VirtualQueue():
             self._slurm_queue += jobs_to_move
             # Submit the jobs
             for job in jobs_to_move:
-                cmd = f"sbatch {job.command}"
-                # Sketchy hack to get sbatch to work on my system
-                #cmd = f"~/Documents/research/scripts/abfe/rbatch.sh {job.command}"
-                process = _subprocess.Popen(cmd, shell=True, stdin=_subprocess.PIPE,
-                                            stdout=_subprocess.PIPE, stderr=_subprocess.STDOUT,
-                                            close_fds=True)
-                if process.stdout is None:
-                    raise ValueError("Could not get stdout from process.")
-                process_output = process.stdout.read()
-                process_output = process_output.decode('utf-8').strip()
-                #if process_output.startswith("sbatch: error"):
-                    #raise RuntimeError(f"Error submitting job: {process_output}")
-                try:
-                    job.slurm_job_id = int((process_output.split()[-1]))
-                except Exception as e:
-                    raise RuntimeError(f"Error submitting job: {process_output}") from e 
+                job.slurm_job_id = self._submit_job(job.command)
 
         #self._logger.info(f"Queue updated")
         #self._logger.info(f"Slurm queue slurm job ids: {[job.slurm_job_id for job in self._slurm_queue]}")
