@@ -11,7 +11,7 @@ Quick Start
 ***********
 - Activate your EnsEquil conda environment 
 - Create a base directory for the calculation and create an directory called ``input`` within this
-- Move your input files into the the input directory. For example, if you have parameterised AMBER-format input files, name these bound_param.rst7, bound_param.prm7, free_param.rst7, and free_param.prm7. For more details see Preparing Input for EnsEquil
+- Move your input files into the the input directory. For example, if you have parameterised AMBER-format input files, name these bound_param.rst7, bound_param.prm7, free_param.rst7, and free_param.prm7. **Ensure that the ligand is named LIG and is the first molecule in the system.** For more details see Preparing Input for EnsEquil
 - Copy run somd.sh and template_config.sh from EnsEquil/EnsEquil/data/example_run_dir to your ``input`` directory, making sure to the SLURM options in run_somd.sh so that the jobs will run on your cluster
 - In the calculation base directory, run the following python code, either through ipython or as a python script (you will likely want to run this with ``nohup``/ through tmux to ensure that the calculation is not killed when you lose connection)
 
@@ -31,6 +31,8 @@ Some handy commands and code snippets, assuming that you have set up the calcula
 **Terminate all the SLURM jobs**: ``calc.kill()``
 
 **Delete all the output** (but not input files), ready to run again: ``calc.clean()``
+
+**Delete the large trajectory and restart files** ``calc.lighten()``
 
 **Return any failed simulations** and find out where to look for output:
 
@@ -172,6 +174,11 @@ directory.**
 Please note that if you are suppling parameterised input files, **the ligand must be the first molecule in the system
 and the ligand must be named "LIG"**. The former can be achieved by reordering the system with BioSimSpace, and the latter
 by simply editing the ligand name in the prm7 files.
+
+**The parameterisation step is liable to failure** and you may find it easier to parameterise the protein and waters using tleap.
+Once you have the files protein.rst7, protein.prm7, and ligand.sdf (and optionally waters.prm7 and waters.rst7), you can use the 
+notebook supplied in EnsEquil/Ensequil/data/example_run_dir/parameterise_and_assemble_input.ipynb to parameterise the ligand and create the parameterised
+input files required by EnsEquil.
 
 Running Simulations
 *******************
