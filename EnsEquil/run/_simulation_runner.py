@@ -414,6 +414,15 @@ class SimulationRunner(ABC):
             for sub_sim_runner in self._sub_sim_runners:
                 sub_sim_runner.clean(clean_logs=clean_logs)
 
+    def lighten(self, clean_logs=False) -> None:
+        f""" Lighten the {self.__class__.__name__} by deleting all restart 
+        and trajectory files."""
+        # The function which does the work is defined in Simulation - here
+        # we just need to pass the command down
+        if hasattr(self, "_sub_sim_runners"):
+            for sub_sim_runner in self._sub_sim_runners:
+                sub_sim_runner.lighten()
+
     def _update_log(self) -> None:
         f""" Update the status log file with the current status of the {self.__class__.__name__}."""
         self._logger.info("##############################################")
