@@ -21,3 +21,47 @@ def get_simtime(sim_runner: _SimulationRunner) -> float:
         The simulation runner to get the simulation time of.
     """
     return sim_runner.tot_simtime # ns
+
+#### Adapted from https://stackoverflow.com/questions/50246304/using-python-decorators-to-retry-request ####
+def retry(times:int, 
+          exceptions:_Tuple[Exception], 
+          wait_time:int,
+          logger:_Logger) -> _Callable:
+    """
+    Retry a function a given number of times if the specified exceptions are raised.
+
+    Parameters
+    ----------
+    times : int
+        The number of retries to attempt before raising the error.
+    exceptions : Tuple[Exception]
+        A list of exceptions for which the function will be retried. The 
+        function will not be retried if an exception is raised which is not
+        supplied.
+    wait_time : int
+        How long to wait between retries, in seconds.
+
+    Returns
+    -------
+    decorator: Callable
+        The retry decorator
+    """    
+    def decorator(func):
+        def newfn(*args, **kwargs):
+            attempt = 0
+            while attempt < times:
+                try:
+                    return func(*args, **kwargs)
+                except exceptions as e:
+                    logger.error(
+                        f'Exception thrown when attempting to run {func}, attempt '
+                        f'{attempt} of {times}'
+                    )
+                    logger.error(f"Exception thrown: {e}")
+                    attempt += 1
+                    # Wait for specified time before trying again
+                    _sleep(wait_time)
+
+            return func(*args, **kwargs)
+        return newfn
+    return decorator
