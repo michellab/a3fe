@@ -98,12 +98,18 @@ and perform a standard minimisation, heating, and pre-equilibration routine.
 At present, EnsEquil uses GROMACS to run all set-up jobs, so please ensure that you have loaded the required CUDA and
 GROMACS modules, or sourced GMXRC. These GROMACS jobs are also submitted through SLURM, and a unique 5 ns "ensemble
 equilibration" simulation is run for each of the ``ensemble_size`` repeats. For the bound leg, these are used to extract
-different restraints for each replicate simulation using the in-built BioSimSpace algorithm (see
+different Boresch restraints for each replicate simulation using the in-built BioSimSpace algorithm (see
 https://github.com/fjclark/BioSimSpace/blob/01dba53b01386a3851e277874f9080c316c4632e/python/BioSimSpace/Sandpit/Exscientia/FreeEnergy/_restraint_search.py#L902).
+This fits force constants of the Boresch restraints according to the fluctuations observed during the fitting simulations, and scores candidate restraints accorinding 
+to how severly they restrict the configurational space accessible to the ligand (more restriction is better as it indicates that the restraints are mimicking a 
+stronger native interaction).
 
 EnsEquil can use a default spacing of lambda windows which should work reasonably for most systems with the default SOMD
 settings. However, to optimise the lambda schedule by running short (200 ps default) simulations and generating a new spacing
 according to the integrated variance of the gradients, run ``calc.get_optimal_lam_vals()``.
+
+One weakness of EnsEquil is that the molecular dynamics engine used for production simulations (SOMD) does not support enhanced sampling; HREX, REST2 etc are not available. However,
+this does mean that all individual SOMD simulations can be run in parallel. 
 
 Preparing Input for EnsEquil
 ****************************
