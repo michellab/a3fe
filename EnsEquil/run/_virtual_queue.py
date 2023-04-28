@@ -200,6 +200,7 @@ class VirtualQueue():
             process_output = process_output.decode('utf-8').strip()
             try:
                 slurm_job_id = int((process_output.split()[-1]))
+                return slurm_job_id
             except Exception as e:
                 raise RuntimeError(f"Error submitting job: {process_output}") from e 
 
