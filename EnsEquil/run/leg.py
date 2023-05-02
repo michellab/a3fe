@@ -738,6 +738,9 @@ class Leg(_SimulationRunner):
             self._logger.info(f"Restraint corrections: {rest_corrs}")
             dg_overall += rest_corrs
 
+            # Update the internally stored dGs after the restraint corrections
+            self._delta_g = dg_overall
+
         return dg_overall, er_overall
     
     def analyse_convergence(self) -> _Tuple[_np.ndarray, _np.ndarray]:

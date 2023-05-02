@@ -436,6 +436,9 @@ class Stage(_SimulationRunner):
         if get_frnrg:
             self._logger.info(f"Overall free energy changes: {free_energies} kcal mol-1") # type: ignore
             self._logger.info(f"Overall errors: {errors} kcal mol-1") # type: ignore
+            # Update the interally-stored results
+            self._delta_g = free_energies
+            self._delta_g_er = errors
             return free_energies, errors # type: ignore
         else:
             return None, None

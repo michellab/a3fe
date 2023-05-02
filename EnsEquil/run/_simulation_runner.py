@@ -106,6 +106,10 @@ class SimulationRunner(ABC):
                 raise ValueError(f"dg_multiplier must be either +1 or -1, not {dg_multiplier}.")
             self.dg_multiplier = dg_multiplier
 
+            # Create attributes to store the free energy
+            self._delta_g: _Union[None, _np.ndarray] = None
+            self._delta_g_er: _Union[None, _np.ndarray] = None
+
             # Register the ensemble size
             self.ensemble_size = ensemble_size
 
@@ -166,6 +170,31 @@ class SimulationRunner(ABC):
     def output_dir(self, value: str) -> None:
         f"""Set the output directory for the {self.__class__.__name__}."""
         self._output_dir = value
+
+    @property
+    def delta_g(self) -> _np.ndarray :
+        f"""The overall free energy change for the {self.__class__.__name__} 
+        for each of the ensemble size replicates"""
+        # We haven't yet performed analysis, so analyse
+        if not self._delta_g:
+            self.analyse()
+            # Check that the analysis actually updated the delta_g attribute
+            if self._delta_g is None:
+                raise ValueError("Analysis failed to update the internal _delta_g attribute")
+        return self._delta_g
+
+    @property
+    def delta_g_er(self) -> _np.ndarray :
+        f"""The overall uncertainties in the free energy changes for the {self.__class__.__name__} 
+        for each of the ensemble size replicates"""
+        # We haven't yet performed analysis, so analyse
+        if not self._delta_g_er:
+            self.analyse()
+            # Check that the analysis actually updated the delta_g_er attribute
+            if self._delta_g_er is None:
+                raise ValueError("Analysis failed to update the internal _delta_g attribute")
+
+        return self._delta_g_er
 
     def __str__(self) -> str:
         return self.__class__.__name__
@@ -248,6 +277,10 @@ class SimulationRunner(ABC):
             for i in range(self.ensemble_size):
                 ofile.write(f"Free energy from run {i+1}: {dg_overall[i]: .3f} +/- {er_overall[i]:.3f} kcal/mol\n")
             ofile.write("Errors are 95 % C.I.s based on the assumption of a Gaussian distribution of free energies\n")
+
+        # Update internal state with result
+        self._delta_g = dg_overall
+        self._delta_g_er = er_overall
 
         return dg_overall, er_overall
 
