@@ -1,7 +1,9 @@
 """"Utilities for SimulationRunners."""
 
 import BioSimSpace.Sandpit.Exscientia as _BSS
+import contextlib as _contextlib
 from logging import Logger as _Logger
+import os as _os
 from time import sleep as _sleep
 from typing import Callable as _Callable, Tuple as _Tuple
 
@@ -69,3 +71,17 @@ def retry(times:int,
             return func(*args, **kwargs)
         return newfn
     return decorator
+
+
+#### Adapted from https://stackoverflow.com/questions/75048986/way-to-temporarily-change-the-directory-in-python-to-execute-code-without-affect ####
+@_contextlib.contextmanager
+def TmpWorkingDir(path):
+    """Temporarily changes to path working directory."""
+    old_cwd = _os.getcwd()
+    print(f"Changing directory to {path}")
+    _os.chdir(_os.path.abspath(path))
+    try:
+        yield
+    finally:
+        print(f"Changing directory to {old_cwd}")
+        _os.chdir(old_cwd)

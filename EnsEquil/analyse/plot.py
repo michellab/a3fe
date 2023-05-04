@@ -4,6 +4,7 @@ import matplotlib.pyplot as _plt
 from math import ceil as _ceil
 import numpy as _np
 import os as _os
+import pandas as _pd
 import scipy.stats as _stats
 from scipy.stats import kruskal as _kruskal
 import seaborn as _sns
@@ -11,6 +12,7 @@ from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, O
 
 from .process_grads import GradientData
 from ..read._process_somd_files import read_overlap_mat as _read_overlap_mat, read_mbar_pmf as _read_mbar_pmf
+from .rmsd import get_rmsd as _get_rmsd
 
 def general_plot(x_vals: _np.ndarray, y_vals: _np.ndarray, x_label: str, y_label: str,
                  outfile: str, vline_val: _Optional[float] = None,
@@ -197,7 +199,8 @@ def plot_gradient_hists(gradients_data: GradientData, output_dir: str) -> None:
                         for spine in ax.spines.values():
                             spine.set_edgecolor('red')
         # Hide redundant axes
-        else: ax.remove()
+        else: 
+            ax.remove()
     
     fig.tight_layout()
     name = f"{output_dir}/gradient_hists"
@@ -403,3 +406,130 @@ def plot_mbar_pmf(outfiles: _List[str], output_dir: str) -> None:
                  _np.array(dgs_overall), 
                  r"$\lambda$", "Free energy / kcal mol$^{-1}$",
                  outfile=f"{output_dir}/mbar_pmf.png")
+
+
+def plot_rmsds(lam_windows: _List["LamWindows"], 
+               output_dir:str,
+               selection: str)->None: # type: ignore
+    """
+    Plot the RMSDs for each lambda window. The reference used is the
+    first frame of the trajectory in each case.
+
+    Parameters
+    ----------
+    lam_windows : List[LamWindows]
+        List of LamWindows objects.
+    output_dir : str
+        Directory to save the plot to.
+    selection: str
+        The selection, written using the MDAnalysis selection language, to 
+        use for the calculation of RMSD.
+
+    Returns
+    -------
+    None
+    """
+    n_lams = len(lam_windows)
+    fig, axs = _plt.subplots(nrows=_ceil(n_lams/8), ncols=8, figsize=(40, 5*(n_lams/8)))
+
+    for i, ax in enumerate(axs.flatten()): # type: ignore
+        if i < n_lams:
+            lam_window = lam_windows[i]
+            # One set of RMSDS for each lambda window 
+            input_dirs = [sim.output_dir for sim in lam_windows[i].sims]
+            rmsds, times = _get_rmsd(input_dirs=input_dirs, selection=selection, tot_simtime=lam_window.sims[0].tot_simtime) # Total simtime should be the same for all sims
+            ax.legend()
+            ax.set_title(f"$\lambda$ = {lam_window.lam}")
+            ax.set_xlabel("Time (ns)")
+            ax.set_ylabel(r"RMSD ($\AA$)")
+            for j, rmsd in enumerate(rmsds):
+                ax.plot(times, rmsd, label=f"Run {j+1}")
+            ax.legend()
+
+            # If we have equilibration data, plot this
+            if lam_window._equilibrated: # Avoid triggering slow equilibration check
+                ax.axvline(x=lam_window.equil_time, color='red', linestyle='dashed')
+            
+        # Hide redundant axes
+        else: 
+            ax.remove()
+
+    fig.tight_layout()
+
+    name = f"{output_dir}/rmsd_{selection.replace(' ','')}" # Use selection string to make sure save name is unique
+    fig.savefig(name, dpi=300, bbox_inches='tight', facecolor='white', transparent=False)
+    _plt.close(fig)
+
+
+def plot_against_exp(all_results: _pd.DataFrame,
+                     output_dir: str,
+                     offset: bool = False,
+                     stats: _Optional[_Dict] = None) -> None:
+    """
+    Plot all results from a set of calculations against the
+    experimental values.
+
+    Parameters
+    ----------
+    all_results : _pd.DataFrame
+        A DataFrame containing the experimental and calculated
+        free energy changes and errors.
+    output_dir : str
+        Directory to save the plot to.
+    offset: bool, Optional, Default = False
+        Whether the calculated absolute binding free energies have been
+        offset so that the mean experimental and calculated values are the same.
+    stats: Dict, Optional, Default = None
+        A dictionary of statistics, obtained using analyse.analyse_set.compute_stats
+    """
+    # Check that the correct columns have been supplied
+    required_columns = ['calc_base_dir', 'exp_dg', 'exp_er', 'calc_cor', 'calc_dg', 'calc_er']
+    if list(all_results.columns) != required_columns:
+        raise ValueError(f"The experimental values file must have the columns {required_columns} but has the columns {all_results.columns}")
+
+    # Create the plot
+    fig, ax = _plt.subplots(1, 1, figsize=(6,6), dpi=1000)
+    ax.errorbar(x=all_results["exp_dg"], y=all_results["calc_dg"], 
+                xerr=all_results["exp_er"], yerr=all_results["calc_er"], 
+                ls='none', c="black", capsize=2, lw=0.5)
+    ax.scatter(x=all_results["exp_dg"], y=all_results["calc_dg"], s=50,zorder=100)
+    ax.set_ylim([-18,0])
+    ax.set_xlim([-18,0])
+    ax.set_aspect('equal')
+    ax.set_xlabel(r"Experimental $\Delta G^o_{\mathrm{Bind}}$ / kcal mol$^{-1}$")
+    ax.set_ylabel(r"Calculated $\Delta G^o_{\mathrm{Bind}}$ / kcal mol$^{-1}$")
+    # 1 kcal mol-1
+    ax.fill_between(
+                    x=[-25, 0], 
+                    y2=[-24,1],
+                    y1=[-26,-1],
+                    lw=0, 
+                    zorder=-10,
+                    alpha=0.5,
+                    color="darkorange")
+    # 2 kcal mol-1
+    ax.fill_between(
+                    x=[-25, 0], 
+                    y2=[-23,2],
+                    y1=[-27,-2],
+                    lw=0, 
+                    zorder=-10,
+                    color="darkorange", 
+                    alpha=0.2)
+
+    # Add text, including number of ligands and stats if supplied
+    n_ligs = len(all_results["calc_dg"])
+    ax.text(0.03, 0.95, f"{n_ligs} ligands", transform=ax.transAxes)
+    if stats:
+        stats_text=""
+        for stat, label in zip(["r", "mue", "rho", "tau"], 
+                               ["Pearson r", "MUE", r"Spearman $\rho$", r"Kendall $\tau$"]):
+            stats_text += f"{label}: {stats[stat][0]:.2f}$^{{{stats[stat][1]:.2f}}}_{{{stats[stat][2]:.2f}}}$\n"
+        ax.text(0.55, 0, stats_text, transform=ax.transAxes)
+
+    if offset:
+        name = f"{output_dir}/overall_results_offset.png" 
+    else:
+        name = f"{output_dir}/overall_results.png" 
+    fig.savefig(name, dpi=300, bbox_inches='tight', facecolor='white', transparent=False)
+    _plt.close(fig)

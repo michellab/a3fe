@@ -14,7 +14,7 @@ import scipy.stats as _stats
 import subprocess as _subprocess
 from threading import Thread as _Thread
 from time import sleep as _sleep
-from typing import Optional as _Optional, Tuple as _Tuple, Dict as _Dict, Any as _Any, List as _List
+from typing import Optional as _Optional, Tuple as _Tuple, Dict as _Dict, Any as _Any, List as _List, Union as _Union
 import logging as _logging
 
 from ..analyse.plot import plot_convergence as _plot_convergence
@@ -210,6 +210,12 @@ class SimulationRunner(ABC):
         self._logger.info(f"Killing {self.__class__.__name__}...")
         for sub_sim_runner in self._sub_sim_runners:
             sub_sim_runner.kill()
+
+    def setup(self) -> None:
+        f"""Set up the {self.__class__.__name__} and all sub-simulation runners."""
+        self._logger.info(f"Setting up {self.__class__.__name__}...")
+        for sub_sim_runner in self._sub_sim_runners:
+            sub_sim_runner.setup()
 
     def analyse(self, subsampling=False) -> _Tuple[_np.ndarray, _np.ndarray]:
         f"""

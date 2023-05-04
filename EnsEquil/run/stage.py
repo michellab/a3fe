@@ -25,6 +25,7 @@ from ..analyse.plot import (
     plot_overlap_mats as _plot_overlap_mats,
     plot_convergence as _plot_convergence,
     plot_mbar_pmf as _plot_mbar_pmf,
+    plot_rmsds as _plot_rmsds
 )
 from ..analyse.mbar import run_mbar as _run_mbar
 from ..analyse.process_grads import GradientData as _GradientData
@@ -32,6 +33,8 @@ from .enums import StageType as _StageType
 from ..read._process_somd_files import write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._utils import get_simtime as _get_simtime
+
+
 
 class Stage(_SimulationRunner):
     """
@@ -376,6 +379,8 @@ class Stage(_SimulationRunner):
                 raise RuntimeError("Despite equilibration being detected, no equilibration time was found.")
 
         if get_frnrg:
+            self._logger.info("Computing free energy changes using the MBAR")
+
             # Remove unequilibrated data from the equilibrated output directory
             for win in self.lam_windows:
                 equil_time = win.equil_time
@@ -412,7 +417,14 @@ class Stage(_SimulationRunner):
             _plot_overlap_mats(mbar_outfiles, self.output_dir)
             _plot_mbar_pmf(mbar_outfiles, self.output_dir)
 
+        # Plot RMSDS
+        #self._logger.info("Plotting RMSDs")
+        #selections = ["resname LIG and (not name H*)"] #, "protein"]
+        #for selection in selections:
+            #_plot_rmsds(lam_windows=self.lam_windows, output_dir=self.output_dir, selection=selection)
+
         # Analyse the gradient data and make plots
+        self._logger.info("Plotting gradients data")
         equilibrated_gradient_data = _GradientData(lam_winds=self.lam_windows, equilibrated=True)
         _plot_gradient_stats(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir, plot_type="mean")
         _plot_gradient_stats(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir, plot_type="intra_run_variance")
@@ -423,15 +435,15 @@ class Stage(_SimulationRunner):
         _plot_gradient_timeseries(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir)
 
         # Make plots of equilibration time
+        self._logger.info("Plotting equilibration times")
         _plot_equilibration_time(lam_windows=self.lam_windows, output_dir=self.output_dir)
+
 
         # Write out stats
         with open(f"{self.output_dir}/overall_stats.dat", "a") as ofile:
             for win in self.lam_windows:
                 ofile.write(f"Equilibration time for lambda = {win.lam}: {win.equil_time:.3f} ns per simulation\n")
                 ofile.write(f"Total time simulated for lambda = {win.lam}: {win.sims[0].tot_simtime:.3f} ns per simulation\n")
-
-        # TODO: Plot PMFs
 
         if get_frnrg:
             self._logger.info(f"Overall free energy changes: {free_energies} kcal mol-1") # type: ignore
@@ -520,6 +532,9 @@ class Stage(_SimulationRunner):
             # Now write the data, skipping the non-equilibrated portion
             for line in lines[equil_index + non_data_lines:]:
                 ofile.write(line)
+
+    def setup(self) -> None:
+        raise NotImplementedError("Stages are set up when they are created")
 
     @property
     def tot_simtime(self) -> float:

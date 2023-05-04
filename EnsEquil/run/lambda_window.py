@@ -224,3 +224,6 @@ class LamWindow(_SimulationRunner):
     def analyse_convergence(self) -> None:
         raise(NotImplementedError("Convergence analysis is not performed for a single lambda window, only "
                                   " at the level of a stage or above."))
+
+    def setup(self) -> None:
+        raise NotImplementedError("LamWindows are set up when they are created")
