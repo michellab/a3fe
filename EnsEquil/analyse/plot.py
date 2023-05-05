@@ -522,8 +522,8 @@ def plot_against_exp(all_results: _pd.DataFrame,
     ax.text(0.03, 0.95, f"{n_ligs} ligands", transform=ax.transAxes)
     if stats:
         stats_text=""
-        for stat, label in zip(["r", "mue", "rho", "tau"], 
-                               ["Pearson r", "MUE", r"Spearman $\rho$", r"Kendall $\tau$"]):
+        for stat, label in zip(["r2", "mue", "rho", "tau"], 
+                               ["R$^2$", "MUE", r"Spearman $\rho$", r"Kendall $\tau$"]):
             stats_text += f"{label}: {stats[stat][0]:.2f}$^{{{stats[stat][1]:.2f}}}_{{{stats[stat][2]:.2f}}}$\n"
         ax.text(0.55, 0, stats_text, transform=ax.transAxes)
 

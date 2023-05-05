@@ -25,7 +25,7 @@ def compute_stats(all_results: _pd.DataFrame) -> _Dict[str, _List[float]]:
     """
 
     # This will hold metric: [value, upper_err, lower_er]
-    results = {"r":[], "mue":[], "rmse":[], "rho":[], "tau":[]}
+    results = {"r":[], "r2":[], "mue":[], "rmse":[], "rho":[], "tau":[]}
 
     # Get the bootstrapped results
     n_bootstrap = 1000
@@ -108,13 +108,15 @@ def compute_statistic(exp_dg: _pd.Series,
         The desired statistic.
     """
     # Check that requested metric is implemented
-    allowed_stats = ["r", "mue", "rmse", "rho", "tau"]
+    allowed_stats = ["r", "r2", "mue", "rmse", "rho", "tau"]
     if statistic not in allowed_stats:
         raise ValueError(f"Statistic must be one of {allowed_stats} but was {statistic}")
 
     if statistic == "r":
-        #return _metrics.r2_score(exp_dg, calc_dg)
         return _stats.pearsonr(exp_dg, calc_dg)[0]
+    if statistic == "r2":
+        m, c, r, p, sem = _stats.linregress(exp_dg, calc_dg)
+        return r**2
     if statistic == "mue":
         return _metrics.mean_absolute_error(exp_dg, calc_dg)
     if statistic == "rmse":
