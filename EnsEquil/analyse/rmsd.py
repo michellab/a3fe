@@ -43,7 +43,7 @@ def get_rmsd(input_dirs: _List[str],
         # Need to copy the topology file to a parm7 extension so that this is recognised by MDAnanlysis
         with _TemporaryDirectory() as tmpdir:
             top_file = _os.path.join(tmpdir, "somd.parm7")
-            _subprocess.run(["cp", "/projects/cc/clark_kckl866/projects_working/ephb4_2vwz_pose1/input/free_preequil.prm7" , top_file],
+            _subprocess.run(["cp", f"{input_dir}/somd.prm7" , top_file],
                              check=True)
 
             # Convert to .gro file
