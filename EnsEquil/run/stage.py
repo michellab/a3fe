@@ -418,10 +418,10 @@ class Stage(_SimulationRunner):
             _plot_mbar_pmf(mbar_outfiles, self.output_dir)
 
         # Plot RMSDS
-        #self._logger.info("Plotting RMSDs")
-        #selections = ["resname LIG and (not name H*)"] #, "protein"]
-        #for selection in selections:
-            #_plot_rmsds(lam_windows=self.lam_windows, output_dir=self.output_dir, selection=selection)
+        self._logger.info("Plotting RMSDs")
+        selections = ["resname LIG and (not name H*)"] #, "protein"]
+        for selection in selections:
+            _plot_rmsds(lam_windows=self.lam_windows, output_dir=self.output_dir, selection=selection)
 
         # Analyse the gradient data and make plots
         self._logger.info("Plotting gradients data")

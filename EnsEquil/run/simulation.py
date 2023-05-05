@@ -352,7 +352,7 @@ class Simulation(_SimulationRunner):
             self._logger.info(f"Killing job {self.job}")
             self.virtual_queue.kill(self.job)
 
-    def lighten(self, clean_logs=False) -> None:
+    def lighten(self) -> None:
         f""" Lighten the simulation by deleting all restart 
         and trajectory files."""
         delete_files = ["*.dcd", "*.s3", "*.s3.previous", "gradients.s3"]
@@ -367,15 +367,6 @@ class Simulation(_SimulationRunner):
             for file in _pathlib.Path(self.output_dir).glob(del_file):
                 self._logger.info(f"Deleting {file}")
                 _subprocess.run(["rm", file])
-
-    def lighten(self, clean_logs=False) -> None:
-        f""" Lighten the {self.__class__.__name__} by deleting all restart 
-        and trajectory files."""
-        # The function which does the work is defined in Simulation - here
-        # we just need to pass the command down
-        if hasattr(self, "_sub_sim_runners"):
-            for sub_sim_runner in self._sub_sim_runners:
-                sub_sim_runner.lighten()
 
     def _set_n_cycles(self, n_cycles: int) -> None:
         """
