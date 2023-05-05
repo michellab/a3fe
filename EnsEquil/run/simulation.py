@@ -355,7 +355,7 @@ class Simulation(_SimulationRunner):
     def lighten(self) -> None:
         f""" Lighten the simulation by deleting all restart 
         and trajectory files."""
-        delete_files = ["*.dcd", "*.s3", "*.s3.previous", "gradients.s3"]
+        delete_files = ["*.dcd", "*.s3", "*.s3.previous", "gradients.s3" "simfile_equilibrated.dat", "latest.pdb"]
 
         for del_file in delete_files:
             # Delete files in base directory

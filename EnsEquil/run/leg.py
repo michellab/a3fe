@@ -787,3 +787,17 @@ class Leg(_SimulationRunner):
         _plot_convergence(fracts, dg_overall, self.tot_simtime, self.equil_time, self.output_dir, self.ensemble_size)
 
         return fracts, dg_overall
+
+    def lighten(self) -> None:
+        f""" Lighten the leg by deleting ensemble equilibration output
+        and lightening all sub-simulation runners"""
+        # Remove the ensemble equilibration directories
+        for direct in _pathlib.Path(self.base_dir).glob("ensemble_equilibration*"):
+            print("DIRECTOIRY TO REMOVE", direct)
+            self._logger.info(f"Deleting {direct}")
+            _subprocess.run(["rm", "-rf", direct])
+
+        # Lighten all the sub-simulation runners
+        if hasattr(self, "_sub_sim_runners"):
+            for sub_sim_runner in self._sub_sim_runners:
+                sub_sim_runner.lighten()
