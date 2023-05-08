@@ -91,7 +91,7 @@ class Calculation(_SimulationRunner):
             self._dump()
     
     @property
-    def legs(self) -> _List[_SimulationRunner]:
+    def legs(self) -> _List[_Leg]:
         return self._sub_sim_runners
 
     @legs.setter
@@ -169,7 +169,10 @@ class Calculation(_SimulationRunner):
         self.setup_complete = True
         self._dump()
 
-    def get_optimal_lam_vals(self, simtime:float = 0.1, delta_sem:float = 0.1) -> None:
+    def get_optimal_lam_vals(self, 
+                             simtime:float = 0.1,
+                             er_type:str = "sem",
+                             delta_er:float = 0.1) -> None:
         """
         Determine the optimal lambda windows for each stage of the calculation
         by running short simulations at each lambda value and analysing them
@@ -178,9 +181,16 @@ class Calculation(_SimulationRunner):
         ----------
         simtime : float, Optional, default: 0.1
             The length of the short simulations to run, in ns.
-        delta_sem : float, default: 0.1
-            The desired integrated standard error of the mean of the gradients
-            between each lambda value, in kcal mol-1.        
+        er_type: str, optional, default="sem"
+            Whether to integrate the standard error of the mean ("sem") or root 
+            variance of the gradients ("root_var") to calculate the optimal 
+            lambda values.
+        delta_er : float, default=0.1
+            If er_type == "root_var", the desired integrated root variance of the gradients
+            between each lambda value, in kcal mol^(-1). If er_type == "sem", the
+            desired integrated standard error of the mean of the gradients between each lambda
+            value, in kcal mol^(-1) ns^(1/2). A sensible default for root_var is 1 kcal mol-1.
+            If not provided, the number of lambda windows must be provided with n_lam_vals.    
         
         Returns
         -------
@@ -192,10 +202,10 @@ class Calculation(_SimulationRunner):
         self.wait()
 
         # Then, determine the optimal lambda windows
-        self._logger.info(f"Determining optimal lambda values for each leg...")
+        self._logger.info(f"Determining optimal lambda values for each leg with er_type = {er_type} and delta_er = {delta_er}...")
         for leg in self.legs:
             # Set simtime = None to avoid running any more simulations
-            leg.get_optimal_lam_vals(simtime=None, delta_sem=delta_sem)
+            leg.get_optimal_lam_vals(simtime=None, er_type=er_type, delta_er=delta_er)
 
         # Save state
         self._dump()

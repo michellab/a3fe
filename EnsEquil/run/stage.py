@@ -286,30 +286,40 @@ class Stage(_SimulationRunner):
         # All simulations are now finished, so perform final analysis
         self._logger.info(f"All simulations in {self} have finished.")
 
-    def get_optimal_lam_vals(self, delta_sem: float = 0.1) -> _np.ndarray:
+    def get_optimal_lam_vals(self, 
+                             er_type: str = "sem",
+                             delta_er: float = 0.1) -> _np.ndarray:
         """
         Get the optimal lambda values for the stage, based on the 
         integrated SEM, and create plots.
 
         Parameters
         ----------
-        delta_sem : float, default: 0.1
-            The desired integrated standard error of the mean of the gradients
-            between each lambda value, in kcal mol-1.        
+        er_type: str, optional, default="sem"
+            Whether to integrate the standard error of the mean ("sem") or root 
+            variance of the gradients ("root_var") to calculate the optimal 
+            lambda values.
+        delta_er : float, default=0.1
+            If er_type == "root_var", the desired integrated root variance of the gradients
+            between each lambda value, in kcal mol^(-1). If er_type == "sem", the
+            desired integrated standard error of the mean of the gradients between each lambda
+            value, in kcal mol^(-1) ns^(1/2). A sensible default for root_var is 1 kcal mol-1.
+            If not provided, the number of lambda windows must be provided with n_lam_vals.    
         Returns
         -------
         optimal_lam_vals : np.ndarray
             List of optimal lambda values for the stage.
         """
-        self._logger.info("Calculating optimal lambda values...")
+        self._logger.info(f"Calculating optimal lambda values with er_type = {er_type} and delta_er = {delta_er}...")
         unequilibrated_gradient_data = _GradientData(lam_winds=self.lam_windows, equilibrated=False)
         _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="mean")
         _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="intra_run_variance")
         _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="sem")
         _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="stat_ineff")
         _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="integrated_sem")
+        _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="integrated_var")
         _plot_gradient_hists(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir)
-        return unequilibrated_gradient_data.calculate_optimal_lam_vals(delta_sem=delta_sem)
+        return unequilibrated_gradient_data.calculate_optimal_lam_vals(er_type=er_type, delta_er=delta_er)
 
 
     def _get_lam_vals(self) -> _List[float]:
@@ -420,8 +430,8 @@ class Stage(_SimulationRunner):
         # Plot RMSDS
         self._logger.info("Plotting RMSDs")
         selections = ["resname LIG and (not name H*)"] #, "protein"]
-        for selection in selections:
-            _plot_rmsds(lam_windows=self.lam_windows, output_dir=self.output_dir, selection=selection)
+        #for selection in selections:
+            #_plot_rmsds(lam_windows=self.lam_windows, output_dir=self.output_dir, selection=selection)
 
         # Analyse the gradient data and make plots
         self._logger.info("Plotting gradients data")
@@ -431,6 +441,7 @@ class Stage(_SimulationRunner):
         _plot_gradient_stats(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir, plot_type="sem")
         _plot_gradient_stats(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir, plot_type="stat_ineff")
         _plot_gradient_stats(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir, plot_type="integrated_sem")
+        _plot_gradient_stats(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir, plot_type="integrated_var")
         _plot_gradient_hists(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir)
         _plot_gradient_timeseries(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir)
 

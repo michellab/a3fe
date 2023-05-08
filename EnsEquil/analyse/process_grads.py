@@ -73,7 +73,7 @@ class GradientData():
             mean_overall = _np.mean(means_intra)
 
             # Store the final results, converting to arrays for consistency.
-            tot_sem = _np.sqrt(squared_sem_inter + squared_sem_intra)
+            tot_sem = _np.sqrt(squared_sem_inter + squared_sem_intra)  # This isn't really a meaningful quantity
             sem_intra = _np.sqrt(squared_sem_intra)
             sem_inter = _np.sqrt(squared_sem_inter)
             gradients_all_winds.append(_np.array(gradients_wind))
@@ -96,11 +96,15 @@ class GradientData():
         end_times = _np.array([win.sims[0].tot_simtime for win in lam_winds]) # All sims at given lam run for same time
         times = [_np.linspace(start, end, len(gradients[0]) + 1)[1:] for start, end, gradients in zip(start_times, end_times, gradients_all_winds)]
 
+        # Get the total sampling time per window
+        sampling_times = end_times - start_times
+
         # Save the calculated attributes
         self.lam_vals = lam_vals
         self.gradients = gradients_all_winds
         self.subsampled_gradients = gradients_subsampled_all_winds
         self.times = times
+        self.sampling_times = sampling_times
         self.means = means_all_winds
         self.sems_overall = sems_tot_all_winds
         self.sems_intra = sems_intra_all_winds
@@ -108,13 +112,45 @@ class GradientData():
         self.vars_intra = vars_intra_all_winds
         self.stat_ineffs = stat_ineffs_all_winds
 
-    @property
-    def smoothened_sems(self)-> _np.ndarray:
-        """Calculate the standard error of the mean of the gradients, using a block
-        average over 3 points to smooth the data."""
+    def get_sems(self,
+                 origin: str = "inter",
+                 smoothen: bool = True)-> _np.ndarray:
+        """
+        Return the standardised standard error of the mean of the gradients, optionally
+        smoothened by a block average over 3 points.
+        
+        Parameters
+        ----------
+        origin: str, optional, default="inter"
+            Whether to use the inter-run or intra-run standard error of the mean
+        smoothen: bool, optional, default=True
+            Whether to smoothen the standard error of the mean by a block average
+            over 3 points.
+
+        Returns
+        -------
+        sems: np.ndarray
+            The standardised standard error of the mean of the gradients, in kcal mol^-1 ns^(1/2).
+        """
+        # Check options are valid
+        if origin not in ["inter", "intra"]:
+            raise ValueError("origin must be either 'inter' or 'intra'")
+
+        if origin == "inter":
+            sems = self.sems_inter
+        elif origin == "intra":
+            sems = self.sems_intra
+
+        # Standardise the SEMs according to the total simulation time
+        sems *= _np.sqrt(self.sampling_times) # type: ignore
+
+        if not smoothen:
+            return sems # type: ignore
+
+        # Smoothen the standard error of the mean by a block average over 3 points
         smoothened_sems = []
-        max_ind = len(self.sems_overall) - 1
-        for i, sem in enumerate(self.sems_overall):
+        max_ind = len(sems) - 1 # type: ignore
+        for i, sem in enumerate(sems): # type: ignore
             # Calculate the block average for each point
             if i == 0:
                 sem_smooth = (sem + self.sems_overall[i+1]) /2
@@ -128,72 +164,119 @@ class GradientData():
         self._smoothened_sems = smoothened_sems
         return smoothened_sems
 
-    @property
-    def integrated_sems(self)-> _np.ndarray:
-        """Calculate the integrated standard error of the mean of the gradients
-        as a function of lambda, using the trapezoidal rule."""
+    def get_integrated_error(self,
+                             er_type: str = "sem",
+                             origin: str = "inter",
+                             smoothen: bool = True)-> _np.ndarray:
+        """
+        Calculate the integrated standard error of the mean or root variance of the gradients
+        as a function of lambda, using the trapezoidal rule.
 
-        integrated_sems = []
+        Parameters
+        ----------
+        er_type: str, optional, default="sem"
+            Whether to integrate the standard error of the mean ("sem") or root 
+            variance of the gradients ("root_var").
+        origin: str, optional, default="inter"
+            The origin of the SEM to integrate - this is ignore if er_type == "root_var".
+            Can be either 'inter' or 'intra' for inter-run and intra-run SEMs respectively.
+        smoothen: bool, optional, default=True
+            Whether to use the smoothened SEMs or not. If False, the raw SEMs
+            are used. If er_type == "root_var", this option is ignored.
+
+        Returns
+        -------
+        integrated_errors: np.ndarray
+            The integrated SEMs as a function of lambda, in kcal mol^-1 ns^(1/2).
+        """
+        # Check options are valid
+        if er_type not in ["sem", "root_var"]:
+            raise ValueError("er_type must be either 'sem' or 'root_var'")
+        if origin not in ["inter", "intra"]:
+            raise ValueError("origin must be either 'inter' or 'intra'")
+
+        integrated_errors = []
         x_vals = self.lam_vals
-        # No need to use smoothened SEMs as the trapezoidal rule results in some smoothing
-        # between neighbours
-        y_vals = self.sems_overall
+        # Note that the trapezoidal rule results in some smoothing between neighbours
+        # even without smoothening
+        if er_type == "sem":
+            y_vals = self.get_sems(origin=origin, smoothen=smoothen)
+        elif er_type == "root_var":
+            y_vals = _np.sqrt(self.vars_intra)
         n_vals = len(x_vals)
 
         for i in range(n_vals):
             # No need to worry about indexing off the end of the array with numpy
             # Note that _np.trapz(y_vals[:1], x_vals[:1]) gives 0, as required
-            integrated_sems.append(_np.trapz(y_vals[:i+1], x_vals[:i+1]))
+            integrated_errors.append(_np.trapz(y_vals[:i+1], x_vals[:i+1])) #type: ignore
         
-        integrated_sems = _np.array(integrated_sems)
-        self._integrated_sems = integrated_sems
-        return integrated_sems
+        integrated_errors = _np.array(integrated_errors)
+        self._integrated_sems = integrated_errors
+        return integrated_errors
     
-    def calculate_optimal_lam_vals(self, delta_sem: _Optional[float] = None, 
-                                   n_lam_vals: _Optional[int] = None)-> _np.ndarray:
+    def calculate_optimal_lam_vals(self, 
+                                   er_type: str = "sem",
+                                   delta_er: _Optional[float] = None, 
+                                   n_lam_vals: _Optional[int] = None,
+                                   sem_origin: str = "inter",
+                                   smoothen_sems: bool = True)-> _np.ndarray:
         """
         Calculate the optimal lambda values for a given number of lambda values
         to sample, using the integrated standard error of the mean of the gradients
-        as a function of lambda, using the trapezoidal rule.
+        or root variance as a function of lambda, using the trapezoidal rule.
 
         Parameters
         ----------
-        delta_sem : float, optional
-            The desired integrated standard error of the mean of the gradients
-            between each lambda value, in kcal mol-1. If not provided, the number of lambda
-            windows must be provided with n_lam_vals.
+        er_type: str, optional, default="sem"
+            Whether to integrate the standard error of the mean ("sem") or root
+            variance of the gradients ("root_var").
+        delta_er : float, optional
+            If er_type == "root_var", the desired integrated root variance of the gradients
+            between each lambda value, in kcal mol^(-1). If er_type == "sem", the
+            desired integrated standard error of the mean of the gradients between each lambda
+            value, in kcal mol^(-1) ns^(1/2). If not provided, the number of lambda
+            windows must be provided with n_lam_vals.    
         n_lam_vals : int, optional
-            The number of lambda values to sample. If not provided, the desired
-            integrated standard error of the mean of the gradients between each
-            lambda value must be provided with delta_sem.
+            The number of lambda values to sample. If not provided, delta_er must be provided.
+        sem_origin: str, optional, default="inter"
+            The origin of the SEM to integrate. Can be either 'inter' or 'intra'
+            for inter-run and intra-run SEMs respectively. If er_type == "root_var",
+            this is ignored.
+        smoothen_sems: bool, optional, default=True
+            Whether to use the smoothened SEMs or not. If False, the raw SEMs
+            are used. If True, the SEMs are smoothened by a block average over
+            3 points. If er_type == "root_var", this is ignored.
 
         Returns
         -------
         optimal_lam_vals : np.ndarray
             The optimal lambda values to sample.
         """
-        if delta_sem is None and n_lam_vals is None:
-            raise ValueError("Either delta_sem or n_lam_vals must be provided.")
-        elif delta_sem is not None and n_lam_vals is not None:
-            raise ValueError("Only one of delta_sem or n_lam_vals can be provided.")
+        if delta_er is None and n_lam_vals is None:
+            raise ValueError("Either delta_er or n_lam_vals must be provided.")
+        elif delta_er is not None and n_lam_vals is not None:
+            raise ValueError("Only one of delta_er or n_lam_vals can be provided.")
 
         # Calculate the integrated standard error of the mean of the gradients
         # as a function of lambda, using the trapezoidal rule.
-        integrated_sems = self.integrated_sems
-        total_sem = integrated_sems[-1]
+        integrated_errors = self.get_integrated_error(er_type=er_type, 
+                                                      origin=sem_origin,
+                                                      smoothen=smoothen_sems)
+        
+        total_error = integrated_errors[-1]
 
         # If the number of lambda values is not provided, calculate it from the
         # desired integrated standard error of the mean between lam vals
         if n_lam_vals is None:
-            n_lam_vals = int(total_sem / delta_sem) + 1
+            n_lam_vals = int(total_error / delta_er) + 1
 
         # Convert the number of lambda values to an array of SEM values
-        requested_sem_vals = _np.linspace(0, total_sem, n_lam_vals)
+        requested_sem_vals = _np.linspace(0, total_error, n_lam_vals)
 
         # For each desired SEM value, map it to a lambda value
         optimal_lam_vals = []
         for requested_sem in requested_sem_vals:
-            optimal_lam_val = _np.interp(requested_sem, integrated_sems, self.lam_vals)
+            optimal_lam_val = _np.interp(requested_sem, integrated_errors, self.lam_vals)
             optimal_lam_val = _np.round(optimal_lam_val, 3)
             optimal_lam_vals.append(optimal_lam_val)
 

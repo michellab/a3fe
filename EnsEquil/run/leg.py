@@ -256,7 +256,10 @@ class Leg(_SimulationRunner):
         self._dump()
 
 
-    def get_optimal_lam_vals(self, simtime:_Optional[float] = 0.1, delta_sem: float = 0.1) -> None:
+    def get_optimal_lam_vals(self, 
+                             simtime:_Optional[float] = 0.1, 
+                             er_type: str = "sem",
+                             delta_er: float = 0.1) -> None:
         """
         Determine the optimal lambda windows for each stage of the leg
         by running short simulations at each lambda value and analysing them.
@@ -267,9 +270,16 @@ class Leg(_SimulationRunner):
             The length of the short simulations to run, in ns. If None is provided,
             it is assumed that the simulations have already been run and the
             optimal lambda values are extracted from the output files.
-        delta_sem : float, default: 0.1
-            The desired integrated standard error of the mean of the gradients
-            between each lambda value, in kcal mol-1.        
+        er_type: str, optional, default="sem"
+            Whether to integrate the standard error of the mean ("sem") or root 
+            variance of the gradients ("root_var") to calculate the optimal 
+            lambda values.
+        delta_er : float, default=0.1
+            If er_type == "root_var", the desired integrated root variance of the gradients
+            between each lambda value, in kcal mol^(-1). If er_type == "sem", the
+            desired integrated standard error of the mean of the gradients between each lambda
+            value, in kcal mol^(-1) ns^(1/2). A sensible default for root_var is 1 kcal mol-1.
+            If not provided, the number of lambda windows must be provided with n_lam_vals.    
         
         Returns
         -------
@@ -289,10 +299,10 @@ class Leg(_SimulationRunner):
                               " extracting optimal lambda values from output files...")
 
         # Now extract the optimal lambda values
-        self._logger.info(f"Determining optimal lambda windows for each stage...")
+        self._logger.info(f"Determining optimal lambda windows for each stage with er_type = {er_type} and delta_er = {delta_er}...")
         for stage in self.stages:
             self._logger.info(f"Determining optimal lambda windows for {stage}...")
-            optimal_lam_vals = stage.get_optimal_lam_vals(delta_sem=delta_sem)
+            optimal_lam_vals = stage.get_optimal_lam_vals(er_type=er_type, delta_er=delta_er)
             # Create new LamWindow objects with the optimal lambda values, then save data
             stage.lam_vals = list(optimal_lam_vals)
             stage.update(save_name="lam_val_determination") # This deletes all of the old LamWindow objects and creates a new output dir

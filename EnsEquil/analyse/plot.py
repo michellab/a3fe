@@ -82,7 +82,7 @@ def plot_gradient_stats(gradients_data: GradientData, output_dir: str, plot_type
     """
     # Check plot_type is valid
     plot_type = plot_type.lower()
-    plot_types = ["mean", "intra_run_variance", "sem", "stat_ineff", "integrated_sem"]
+    plot_types = ["mean", "intra_run_variance", "sem", "stat_ineff", "integrated_sem", "integrated_var"]
     if not plot_type in plot_types:
         raise ValueError(f"'plot_type' must be one of {plot_types}, not {plot_type}")
     
@@ -121,29 +121,60 @@ def plot_gradient_stats(gradients_data: GradientData, output_dir: str, plot_type
 
     elif plot_type == "integrated_sem":
         handle1, *_ = ax.bar(gradients_data.lam_vals,
-               gradients_data.sems_overall,
+               gradients_data.get_sems(origin="inter", smoothen=True),
                label = "SEMs",
                width=0.02, edgecolor='black')
-        ax.set_ylabel(r"SEM($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $) / kcal mol$^{-1}$"),
+        ax.set_ylabel(r"SEM($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $) / kcal mol$^{-1}$ ns$^{1/2}$"),
         ax.legend()
         # Get second y axis so we can plot on different scales
         ax2= ax.twinx()
         handle2, = ax2.plot(gradients_data.lam_vals,
-               gradients_data.integrated_sems,
+               gradients_data.get_integrated_error(er_type="sem", origin="inter", smoothen=True),
                label = "Integrated SEM", color='red', linewidth=2)
         # Add vertical lines to show optimal lambda windows
         delta_sem = 0.1
-        integrated_sems = gradients_data.integrated_sems
+        integrated_sems = gradients_data.get_integrated_error(er_type="sem", origin="inter", smoothen=True)
         total_sem = integrated_sems[-1]
         sem_vals = _np.linspace(0, total_sem, int(total_sem/delta_sem) + 1)
-        optimal_lam_vals = gradients_data.calculate_optimal_lam_vals(delta_sem = 0.1)
+        optimal_lam_vals = gradients_data.calculate_optimal_lam_vals(er_type="sem", 
+                                                                     delta_er=delta_sem , 
+                                                                     sem_origin="inter", 
+                                                                     smoothen_sems=True)
         # Add horizontal lines at sem vals
         for sem_val in sem_vals:
             ax2.axhline(y=sem_val, color='black', linestyle='dashed', linewidth=0.5)
         # Add vertical lines at optimal lambda vals
         for lam_val in optimal_lam_vals:
             ax2.axvline(x=lam_val, color='black', linestyle='dashed', linewidth=0.5)
-        ax2.set_ylabel(r"Integrated SEM($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $) / kcal mol$^{-1}$"),
+        ax2.set_ylabel(r"Integrated Standardised SEM($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $) / kcal mol$^{-1}$ ns$^{1/2}$"),
+
+    elif plot_type == "integrated_var":
+        handle1, *_ = ax.bar(gradients_data.lam_vals,
+               _np.sqrt(gradients_data.vars_intra),
+               label = "Variances",
+               width=0.02, edgecolor='black')
+        ax.set_ylabel(r"(Var($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $))$^{1/2}$ / kcal mol$^{-1}$"),
+        ax.legend()
+        # Get second y axis so we can plot on different scales
+        ax2= ax.twinx()
+        handle2, = ax2.plot(gradients_data.lam_vals,
+               gradients_data.get_integrated_error(er_type="root_var"),
+               label = "Integrated Sqr(Var)", color='red', linewidth=2)
+        # Add vertical lines to show optimal lambda windows
+        delta_root_var = 1 # kcal mol^-1
+        integrated_root_var = gradients_data.get_integrated_error(er_type="root_var")
+        total_root_var = integrated_root_var[-1]
+        root_var_vals = _np.linspace(0, total_root_var, int(total_root_var/delta_root_var) + 1)
+        optimal_lam_vals = gradients_data.calculate_optimal_lam_vals(er_type="root_var", 
+                                                                     delta_er=delta_root_var)
+        # Add horizontal lines at sem vals
+        for root_var_val in root_var_vals:
+            ax2.axhline(y=root_var_val, color='black', linestyle='dashed', linewidth=0.5)
+        # Add vertical lines at optimal lambda vals
+        for lam_val in optimal_lam_vals:
+            ax2.axvline(x=lam_val, color='black', linestyle='dashed', linewidth=0.5)
+        ax2.set_ylabel(r"Integrated (Var($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $))$^{1/2}$ / kcal mol$^{-1}$"),
+        ax2.legend()
         ax2.legend()
 
     ax.set_xlabel(r"$\lambda$")
