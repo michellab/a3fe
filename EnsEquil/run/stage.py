@@ -288,7 +288,9 @@ class Stage(_SimulationRunner):
 
     def get_optimal_lam_vals(self, 
                              er_type: str = "sem",
-                             delta_er: float = 0.1) -> _np.ndarray:
+                             delta_er: _Optional[float] = None, 
+                             n_lam_vals: _Optional[int] = None,
+                             ) -> _np.ndarray:
         """
         Get the optimal lambda values for the stage, based on the 
         integrated SEM, and create plots.
@@ -299,12 +301,15 @@ class Stage(_SimulationRunner):
             Whether to integrate the standard error of the mean ("sem") or root 
             variance of the gradients ("root_var") to calculate the optimal 
             lambda values.
-        delta_er : float, default=0.1
+        delta_er : float, optional, default=None
             If er_type == "root_var", the desired integrated root variance of the gradients
             between each lambda value, in kcal mol^(-1). If er_type == "sem", the
             desired integrated standard error of the mean of the gradients between each lambda
-            value, in kcal mol^(-1) ns^(1/2). A sensible default for root_var is 1 kcal mol-1.
-            If not provided, the number of lambda windows must be provided with n_lam_vals.    
+            value, in kcal mol^(-1) ns^(1/2). A sensible default for sem is 0.1 kcal mol-1 ns1/2,
+            and for root_var is 1 kcal mol-1.  If not provided, the number of lambda windows must be 
+            provided with n_lam_vals.    
+        n_lam_vals : int, optional, default=None
+            The number of lambda values to sample. If not provided, delta_er must be provided.
         Returns
         -------
         optimal_lam_vals : np.ndarray
@@ -319,7 +324,9 @@ class Stage(_SimulationRunner):
         _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="integrated_sem")
         _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="integrated_var")
         _plot_gradient_hists(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir)
-        return unequilibrated_gradient_data.calculate_optimal_lam_vals(er_type=er_type, delta_er=delta_er)
+        return unequilibrated_gradient_data.calculate_optimal_lam_vals(er_type=er_type, 
+                                                                       delta_er=delta_er,
+                                                                       n_lam_vals=n_lam_vals)
 
 
     def _get_lam_vals(self) -> _List[float]:
