@@ -207,6 +207,9 @@ class LamWindow(_SimulationRunner):
             Initial values (before there is sufficient data to calculate
             a block average) are set to nan.
         """
+        if idx_block_size > len(data):
+            raise ValueError("Block size cannot be larger than the length of the data array.")
+
         rolling_av=_np.full(len(data), _np.nan)
 
         for i in range(len(data)):
