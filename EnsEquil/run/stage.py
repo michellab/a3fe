@@ -218,7 +218,6 @@ class Stage(_SimulationRunner):
         -------
         None
         """
-        # Use stage context manager to ensure that the stage is killed if an exception is raised
         try:
             # Reset self.kill_thread so we can restart after killing
             self.kill_thread = False
@@ -247,7 +246,7 @@ class Stage(_SimulationRunner):
             self.running_wins = self.lam_windows.copy() 
             self._dump()
             while self.running_wins:
-                _sleep(60 * 1)  # Check every 20 seconds
+                _sleep(60 * 1)  # Check every 60 seconds
                 # Check if we've requested to kill the thread
                 if self.kill_thread:
                     self._logger.info(f"Kill thread requested: exiting run loop")
@@ -261,23 +260,24 @@ class Stage(_SimulationRunner):
                         if adaptive:
                             if win.equilibrated:
                                 self._logger.info(f"{win} has equilibrated at {win.equil_time:.3f} ns")
+                                self.running_wins.remove(win)
                             else:
                                 # Check that we haven't exceeded the maximum runtime for any simulations
                                 if win.tot_simtime / win.ensemble_size >= max_runtime:
                                     self._logger.info(f"{win} has not equilibrated but simulations have exceeded the maximum runtime of "
                                                         f"{max_runtime} ns. Terminating simulations") 
+                                    self.running_wins.remove(win)
                                 else: # Not equilibrated and not over the maximum runtime, so resubmit
                                     self._logger.info(f"{win} has not equilibrated. Resubmitting for {self.block_size:.3f} ns")
                                     win.run(self.block_size)
                         else: # Not in adaptive mode
                             self._logger.info(f"{win} has finished at {win.tot_simtime:.3f} ns")
+                            self.running_wins.remove(win)
 
-                        # Write status after checking for running and equilibration, as this updates the
-                        # _running and _equilibrated attributes
+                        # Write status after checking for running and equilibration, as the
+                        # _running and _equilibrated attributes have now been updated
                         win._update_log()
                         self._dump()
-
-                self.running_wins = [win for win in self.running_wins.copy() if win.running]
 
         except Exception as e:
             self._logger.exception("")
