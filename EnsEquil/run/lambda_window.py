@@ -25,6 +25,7 @@ class LamWindow(_SimulationRunner):
                  block_size: float=1,
                  equil_detection: str="block_gradient",
                  gradient_threshold: _Optional[float]=None,
+                 runtime_constant: _Optional[float]=None,
                  ensemble_size: int=5, 
                  base_dir: _Optional[str] = None,
                  input_dir: _Optional[str] = None,
@@ -56,6 +57,9 @@ class LamWindow(_SimulationRunner):
             below which the simulation is considered equilibrated. If None, no theshold is
             set and the simulation is equilibrated when the gradient passes through 0. A 
             sensible value appears to be 0.5 kcal mol-1 ns-1.
+        runtime_constant : float, Optional, default: None
+            The runtime constant to use for the calculation. This must be supplied if running
+            adaptively. Each window is run until the SEM**2 / runtime >= runtime_constant.
         ensemble_size : int, Optional, default: 5
             Number of simulations to run at this lambda value.
         base_dir : str, Optional, default: None
@@ -101,7 +105,7 @@ class LamWindow(_SimulationRunner):
             if equil_detection != "block_gradient" and gradient_threshold is not None:
                 raise ValueError("Gradient threshold can only be set for block gradient method.")
             self.gradient_threshold=gradient_threshold
-            self.gradient_threshold=gradient_threshold
+            self.runtime_constant=runtime_constant
             self._equilibrated: bool=False
             self._running: bool=False
 

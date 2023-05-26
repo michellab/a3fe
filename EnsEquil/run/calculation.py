@@ -28,6 +28,7 @@ class Calculation(_SimulationRunner):
                  block_size: float = 1,
                  equil_detection: str = "block_gradient",
                  gradient_threshold: _Optional[float] = None,
+                 runtime_constant: _Optional[float] = None,
                  ensemble_size: int = 5,
                  input_dir: _Optional[str] = None,
                  base_dir: _Optional[str] = None,
@@ -51,6 +52,9 @@ class Calculation(_SimulationRunner):
             below which the simulation is considered equilibrated. If None, no theshold is
             set and the simulation is equilibrated when the gradient passes through 0. A 
             sensible value appears to be 0.5 kcal mol-1 ns-1.
+        runtime_constant : float, Optional, default: None
+            The runtime constant to use for the calculation. This must be supplied if running
+            adaptively. Each window is run until the SEM**2 / runtime >= runtime_constant.
         ensemble_size : int, Optional, default: 5
             Number of simulations to run in the ensemble.
         base_dir : str, Optional, default: None
@@ -81,6 +85,7 @@ class Calculation(_SimulationRunner):
             self.block_size = block_size
             self.equil_detection = equil_detection
             self.gradient_threshold = gradient_threshold
+            self.runtime_constant = runtime_constant
             self.setup_complete: bool = False
             
             # Validate the input
@@ -123,7 +128,7 @@ class Calculation(_SimulationRunner):
     def setup(self, 
               slurm: bool = True, 
               append_to_ligand_selection:str = "",
-              use_same_restraints:bool = False,
+              use_same_restraints:bool = True,
               short_ensemble_equil: bool = False) -> None:
         """ 
         Set up the calculation. This involves parametrising, equilibrating, and
@@ -140,7 +145,7 @@ class Calculation(_SimulationRunner):
             points. The default atom selection is f'resname {ligand_resname} and not name H*'.
             Uses the mdanalysis atom selection language. For example, 'not name O*' will result
             in an atom selection of f'resname {ligand_resname} and not name H* and not name O*'.
-        use_same_restraints: bool, default=False
+        use_same_restraints: bool, default=True
             If True, the same restraints will be used for all of the bound leg repeats - by default
             , the restraints generated for the first repeat are used. This allows meaningful
             comparison between repeats for the bound leg. If False, the unique restraints are
@@ -161,6 +166,7 @@ class Calculation(_SimulationRunner):
             leg = _Leg(leg_type=leg_type,
                        block_size = self.block_size,
                        equil_detection=self.equil_detection,
+                       runtime_constant=self.runtime_constant,
                        gradient_threshold=self.gradient_threshold,
                        ensemble_size=self.ensemble_size,
                        input_dir=self.input_dir,

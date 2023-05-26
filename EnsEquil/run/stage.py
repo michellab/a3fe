@@ -47,6 +47,7 @@ class Stage(_SimulationRunner):
                  block_size: float = 1,
                  equil_detection: str = "block_gradient",
                  gradient_threshold: _Optional[float] = None,
+                 runtime_constant: _Optional[float] = None,
                  ensemble_size: int = 5,
                  lambda_values: _Optional[_List[float]] = None,
                  base_dir: _Optional[str] = None,
@@ -74,6 +75,9 @@ class Stage(_SimulationRunner):
             below which the simulation is considered equilibrated. If None, no theshold is
             set and the simulation is equilibrated when the gradient passes through 0. A 
             sensible value appears to be 0.5 kcal mol-1 ns-1.
+        runtime_constant : float, Optional, default: None
+            The runtime constant to use for the calculation. This must be supplied if running
+            adaptively. Each window is run until the SEM**2 / runtime >= runtime_constant.
         ensemble_size : int, Optional, default: 5
             Number of simulations to run in the ensemble.
         lambda_values : List[float], Optional, default: None
@@ -118,6 +122,7 @@ class Stage(_SimulationRunner):
             self.block_size = block_size
             self.equil_detection = equil_detection
             self.gradient_threshold = gradient_threshold
+            self.runtime_constant = runtime_constant
             self._running: bool = False
             self.run_thread: _Optional[_threading.Thread] = None
             # Set boolean to allow us to kill the thread
@@ -134,6 +139,7 @@ class Stage(_SimulationRunner):
                                                     block_size=self.block_size,
                                                     equil_detection=self.equil_detection,
                                                     gradient_threshold=self.gradient_threshold,
+                                                    runtime_constant=self.runtime_constant,
                                                     ensemble_size=self.ensemble_size,
                                                     base_dir=lam_base_dir,
                                                     input_dir=self.input_dir,
@@ -624,6 +630,7 @@ class Stage(_SimulationRunner):
                                                 block_size=self.block_size,
                                                 equil_detection=self.equil_detection,
                                                 gradient_threshold=self.gradient_threshold,
+                                                runtime_constant=self.runtime_constant,
                                                 ensemble_size=self.ensemble_size,
                                                 base_dir=lam_base_dir,
                                                 input_dir=self.input_dir,
