@@ -2,6 +2,7 @@
 
 import numpy as _np
 from typing import List as _List, Tuple as _Tuple, Optional as _Optional, Dict as _Dict, Union as _Union
+from scipy.constants import gas_constant as _R
 
 from .autocorrelation import get_statistical_inefficiency as _get_statistical_inefficiency
 
@@ -100,6 +101,7 @@ class GradientData():
         sampling_times = end_times - start_times
 
         # Save the calculated attributes
+        self.n_lam = len(lam_vals)
         self.lam_vals = lam_vals
         self.gradients = gradients_all_winds
         self.subsampled_gradients = gradients_subsampled_all_winds
@@ -283,3 +285,42 @@ class GradientData():
         optimal_lam_vals = _np.array(optimal_lam_vals)
         self._optimal_lam_vals = optimal_lam_vals
         return optimal_lam_vals
+
+    def get_predicted_overlap_mat(self, temperature: float = 298) -> _np.ndarray:
+        """
+        Calculate the predicted overlap matrix for the lambda windows
+        based on the intra-run variances alone. The relationship is
+        var_ij = beta^-2 
+
+        Parameters
+        ----------
+        temperature: float, optional, default=298
+            The temperature in Kelvin.
+
+        Returns
+        -------
+        predicted_overlap_mat: np.ndarray
+            The predicted overlap matrix for the lambda windows.
+        """
+        # Constants and empty matrix
+        beta = (4.184 * 1000) / (_R * temperature)  # in kcal mol^-1
+        predicted_overlap_mat = _np.zeros((self.n_lam, self.n_lam))
+
+        # Start with upper triangle
+        for base_index in range(self.n_lam):
+            unnormalised_overlap = 1
+            for i in range(self.n_lam - base_index):
+                if i != 0:
+                    delta_lam = self.lam_vals[base_index + i] - self.lam_vals[base_index + i - 1]
+                    av_var = (self.vars_intra[base_index + i] + self.vars_intra[base_index + i - 1]) / 2
+                    unnormalised_overlap /= beta * delta_lam * _np.sqrt(av_var)
+                predicted_overlap_mat[base_index, base_index + i] = unnormalised_overlap
+
+        # Copy the upper triangle to get the lower triangle, making sure not to duplicate the diagonal
+        predicted_overlap_mat += predicted_overlap_mat.T - _np.diag(_np.diag(predicted_overlap_mat))
+    
+        # Normalise by row
+        for i in range(self.n_lam):
+            predicted_overlap_mat[i, :] /= predicted_overlap_mat[i, :].sum()
+
+        return predicted_overlap_mat

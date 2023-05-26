@@ -137,7 +137,8 @@ def plot_gradient_stats(gradients_data: GradientData, output_dir: str, plot_type
         total_sem = integrated_sems[-1]
         sem_vals = _np.linspace(0, total_sem, int(total_sem/delta_sem) + 1)
         optimal_lam_vals = gradients_data.calculate_optimal_lam_vals(er_type="sem", 
-                                                                     delta_er=delta_sem , 
+                                                                     #delta_er=delta_sem , 
+                                                                     n_lam_vals=30,
                                                                      sem_origin="inter", 
                                                                      smoothen_sems=True)
         # Add horizontal lines at sem vals
@@ -166,7 +167,8 @@ def plot_gradient_stats(gradients_data: GradientData, output_dir: str, plot_type
         total_root_var = integrated_root_var[-1]
         root_var_vals = _np.linspace(0, total_root_var, int(total_root_var/delta_root_var) + 1)
         optimal_lam_vals = gradients_data.calculate_optimal_lam_vals(er_type="root_var", 
-                                                                     delta_er=delta_root_var)
+                                                                     #delta_er=delta_root_var)
+                                                                     n_lam_vals=30)
         # Add horizontal lines at sem vals
         for root_var_val in root_var_vals:
             ax2.axhline(y=root_var_val, color='black', linestyle='dashed', linewidth=0.5)
@@ -311,7 +313,12 @@ def plot_equilibration_time(lam_windows: _List["LamWindows"], output_dir:str)->N
     fig.savefig(f"{output_dir}/equil_times", dpi=300,
                 bbox_inches='tight', facecolor='white', transparent=False)
 
-def plot_overlap_mat(ax: _plt.Axes, mbar_file: str, name: str) -> None:
+def plot_overlap_mat(ax: _plt.Axes, 
+                     name: str,
+                     mbar_file: _Optional[str] = None,
+                     predicted: bool = False,
+                     gradient_data: _Optional[GradientData] = None 
+                     ) -> None:
     """
     Plot the overlap matrix for a given MBAR file on the supplied axis.
 
@@ -319,46 +326,82 @@ def plot_overlap_mat(ax: _plt.Axes, mbar_file: str, name: str) -> None:
     ----------
     ax : matplotlib axis
         Axis on which to plot.
-    mbar_file : str
-        Path to MBAR file.
     name : str
         Name of the plot.
+    mbar_file : str, optional, default=None
+        Path to MBAR file.
+    predicted : bool, default=False
+        If True, the overlap matrix is predicted from the variances of the
+        gradient alone.
+    gradient_data : GradientData, optional
+        GradientData object containing the gradient data. Only required if
+        predicted is True.
 
     Returns
     -------
     None
     """
-    overlap_mat = _read_overlap_mat(mbar_file)
+    if predicted and not gradient_data:
+        raise ValueError("GradientData object must be supplied if predicted is True.")
+    if not predicted and not mbar_file:
+        raise ValueError("MBAR file must be supplied if predicted is False.")
+    if predicted:
+        overlap_mat = gradient_data.get_predicted_overlap_mat() # type: ignore
+    else:
+        overlap_mat = _read_overlap_mat(mbar_file) # type: ignore
     _sns.heatmap(overlap_mat, ax=ax, square=True).figure
     ax.set_title(name)
 
-def plot_overlap_mats(mbar_outfiles: _List[str], output_dir:str) -> None:
+def plot_overlap_mats(output_dir:str,
+                      mbar_outfiles: _Optional[_List[str]] = None,
+                      predicted:bool = False,
+                      gradient_data: _Optional[GradientData] = None
+                      ) -> None:
     """
     Plot the overlap matrices for all mbar outfiles supplied.
     
     Parameters
     ----------
-    mbar_outfiles : List[str]
-        List of MBAR outfiles. It is assumed that these are passed in the same
-        order as the runs they correspond to.
     output_dir : str
         The directory to save the plot to.
+    mbar_outfiles : Optional[List[str]], default=None
+        List of MBAR outfiles. It is assumed that these are passed in the same
+        order as the runs they correspond to. This is required if predicted
+        is False (the default).
+    predicted : bool, default=False
+        If True, the overlap matrices are predicted from the variances of the 
+        gradient alone.
+    gradient_data : GradientData
+        GradientData object containing the gradient data. Only required if predicted
+        is True.
 
     Returns
     -------
     None
     """
-    n_runs = len(mbar_outfiles)
-    fig, axs = _plt.subplots(1, n_runs, figsize=(4*n_runs, 4),dpi=1000)
+    if predicted:
+        if not gradient_data:
+            raise ValueError("GradientData object required if predicted is True.")
+        n_runs = 1 # Only one plot if predicted
+    else:
+        if not mbar_outfiles:
+            raise ValueError("MBAR outfiles required if predicted is False.")
+        n_runs = len(mbar_outfiles)
+    fig, axs = _plt.subplots(1, n_runs, figsize=(4*n_runs, 4),dpi=300)
     # Avoid not subscriptable errors when there is only one run
     if n_runs == 1:
         axs = [axs]
 
     for i in range(n_runs):
-        plot_overlap_mat(axs[i], mbar_outfiles[i], f"Run {i+1}")
+        plot_overlap_mat(ax = axs[i],
+                         name = f"Run {i+1}" if not predicted else "Predicted",
+                         mbar_file = mbar_outfiles[i] if mbar_outfiles else None,
+                         predicted=predicted,
+                         gradient_data=gradient_data)
         
     fig.tight_layout()
-    fig.savefig(f"{output_dir}/overlap.png")
+    name = f"{output_dir}/overlap_mats" if not predicted else f"{output_dir}/predicted_overlap_mats"
+    fig.savefig(name)
 
 
 def plot_convergence(fracts: _np.ndarray,
