@@ -5,6 +5,7 @@ from glob import glob
 import logging
 import os
 import pytest
+import shutil
 import subprocess
 from tempfile import TemporaryDirectory
 
@@ -80,7 +81,7 @@ def test_update_paths(calc):
 ######################## Testings Requiring SLURM ########################
 
 # Check if slurm is present and only run following tests if so
-SLURM_PRESENT = subprocess.run(["sinfo"], capture_output=True).returncode == 0
+SLURM_PRESENT = False if shutil.which("sbatch") is None else True
 
 @pytest.fixture(scope = "module")
 def calc_slurm():
