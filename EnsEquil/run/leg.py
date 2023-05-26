@@ -31,6 +31,8 @@ from .system_prep import (
     run_ensemble_equilibration as _sysprep_run_ensemble_equilibration,
     slurm_ensemble_equilibration_bound as _slurm_ensemble_equilibration_bound,
     slurm_ensemble_equilibration_free as _slurm_ensemble_equilibration_free,
+    slurm_ensemble_equilibration_bound_short as _slurm_ensemble_equilibration_bound_short,
+    slurm_ensemble_equilibration_free_short as _slurm_ensemble_equilibration_free_short,
 )
 from ..read._process_slurm_files import get_slurm_file_base as _get_slurm_file_base
 from ..read._process_somd_files import read_simfile_option as _read_simfile_option, write_simfile_option as _write_simfile_option
@@ -177,7 +179,8 @@ class Leg(_SimulationRunner):
     def setup(self, 
               slurm: bool =True,
               append_to_ligand_selection:str = "",
-              use_same_restraints:bool = False) -> None:
+              use_same_restraints:bool = False,
+              short_ensemble_equil: bool = False,) -> None:
         """
         Set up the leg. This involves:
             - Creating the input directories
@@ -204,6 +207,9 @@ class Leg(_SimulationRunner):
             , the restraints generated for the first repeat are used. This allows meaningful
             comparison between repeats for the bound leg. If False, the unique restraints are
             generated for each repeat.
+        short_ensemble_equil: bool, default=False
+            If True, the ensemble equilibration will be run for 0.1 ns instead of 5 ns. This is
+            not recommended for production runs, but can be useful for testing.
         """
         self._logger.info("Setting up leg...")
         # Create input directories, parameterise, solvate, minimise, heat and preequil, all
@@ -225,7 +231,9 @@ class Leg(_SimulationRunner):
             # Run separate equilibration simulations for each of the repeats and 
             # extract the final structures to give a diverse ensemble of starting
             # conformations. For the bound leg, this also extracts the restraints.
-            system = self.run_ensemble_equilibration(slurm=slurm, append_to_ligand_selection=append_to_ligand_selection)
+            system = self.run_ensemble_equilibration(slurm=slurm, 
+                                                     append_to_ligand_selection=append_to_ligand_selection,
+                                                     short_ensemble_equil=short_ensemble_equil)
 
         # Write input files
         self.write_input_files(system, use_same_restraints=use_same_restraints)
@@ -471,7 +479,10 @@ class Leg(_SimulationRunner):
         # Update the preparation stage
         self.prep_stage = _PreparationStage.PREEQUILIBRATED
 
-    def run_ensemble_equilibration(self, slurm: bool = True, append_to_ligand_selection: str ="") -> _BSS._SireWrappers._system.System:
+    def run_ensemble_equilibration(self, 
+                                   slurm: bool = True, 
+                                   append_to_ligand_selection: str ="",
+                                   short_ensemble_equil: bool = False) -> _BSS._SireWrappers._system.System:
         """
         Run 5 ns simulations with SOMD for each of the ensemble_size runs and extract the final structures
         to use as diverse starting points for the production runs. If this is the bound leg, the restraints
@@ -489,6 +500,9 @@ class Leg(_SimulationRunner):
             points. The default atom selection is f'resname {ligand_resname} and not name H*'.
             Uses the mdanalysis atom selection language. For example, 'not name O*' will result
             in an atom selection of f'resname {ligand_resname} and not name H* and not name O*'.
+        short_ensemble_equil: bool, optional, default=False
+            Whether to run a short ensemble equilibration of 0.1 ns instead of the default 5 ns.
+            This is not recommended for production runs, but can be useful for testing.
         """
         # Generate output dirs and copy over the input
         outdirs = [f"{self.base_dir}/ensemble_equilibration_{i+1}" for i in range(self.ensemble_size)]
@@ -500,10 +514,10 @@ class Leg(_SimulationRunner):
         if slurm:
             if self.leg_type == _LegType.BOUND:
                 job_name = "ensemble_equil_bound"
-                fn = _slurm_ensemble_equilibration_bound
+                fn = _slurm_ensemble_equilibration_bound if not short_ensemble_equil else _slurm_ensemble_equilibration_bound_short
             elif self.leg_type == _LegType.FREE:
                 job_name = "ensemble_equil_free"
-                fn = _slurm_ensemble_equilibration_free
+                fn = _slurm_ensemble_equilibration_free if not short_ensemble_equil else _slurm_ensemble_equilibration_free_short
             else:
                 raise ValueError("Invalid leg type.")
 
@@ -525,7 +539,7 @@ class Leg(_SimulationRunner):
         else: # Not slurm
             for i, outdir in enumerate(outdirs):
                 self._logger.info(f"Running ensemble equilibration for run {i+1}.")
-                _sysprep_run_ensemble_equilibration(self.leg_type, outdir, outdir)
+                _sysprep_run_ensemble_equilibration(self.leg_type, outdir, outdir, short_ensemble_equil)
 
         # Give the output files unique names
         for i, outdir in enumerate(outdirs):

@@ -123,7 +123,8 @@ class Calculation(_SimulationRunner):
     def setup(self, 
               slurm: bool = True, 
               append_to_ligand_selection:str = "",
-              use_same_restraints:bool = False) -> None:
+              use_same_restraints:bool = False,
+              short_ensemble_equil: bool = False) -> None:
         """ 
         Set up the calculation. This involves parametrising, equilibrating, and
         deriving restraints for the bound leg. Most of the work is done by the
@@ -144,6 +145,9 @@ class Calculation(_SimulationRunner):
             , the restraints generated for the first repeat are used. This allows meaningful
             comparison between repeats for the bound leg. If False, the unique restraints are
             generated for each repeat.
+        short_ensemble_equil: bool, default=False
+            If True, the ensemble equilibration will be run for 0.1 ns instead of 5 ns. This is
+            not recommended for production calculations, but is useful for testing.
         """
 
         if self.setup_complete:
@@ -163,7 +167,10 @@ class Calculation(_SimulationRunner):
                        base_dir=_os.path.join(self.base_dir, leg_type.name.lower()),
                        stream_log_level=self.stream_log_level)
             self.legs.append(leg)
-            leg.setup(slurm=slurm, append_to_ligand_selection=append_to_ligand_selection, use_same_restraints=use_same_restraints)
+            leg.setup(slurm=slurm,
+                      append_to_ligand_selection=append_to_ligand_selection,
+                      use_same_restraints=use_same_restraints,
+                      short_ensemble_equil=short_ensemble_equil)
 
         # Save the state
         self.setup_complete = True

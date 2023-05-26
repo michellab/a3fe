@@ -279,7 +279,8 @@ def heat_and_preequil_input(leg_type: _LegType,
 
 def run_ensemble_equilibration(leg_type: _LegType,
                                input_dir: str,
-                               output_dir: str) -> None:
+                               output_dir: str,
+                               short: bool = False) -> None:
     """
     Run the ensemble equilibration for the given leg type.
 
@@ -291,12 +292,17 @@ def run_ensemble_equilibration(leg_type: _LegType,
         The path to the input directory, where the required files are located.
     output_dir : str
         The path to the output directory, where the files will be saved.
+    short : bool, optional, default=False
+        Whether to run the short version of the ensemble equilibration, by default False.
+        This is used during testing. The short runtime is 0.1 ns.
     
     Returns
     -------
     None
     """
     ENSEMBLE_EQUILIBRATION_TIME = 5 # ns
+    if short:
+        ENSEMBLE_EQUILIBRATION_TIME = 0.1 # ns
 
     # Load the pre-equilibrated system
     print("Loading pre-equilibrated system...")
@@ -427,3 +433,11 @@ def slurm_ensemble_equilibration_bound() -> None:
 def slurm_ensemble_equilibration_free() -> None:
     """ Perform ensemble equilibration for the free leg"""
     run_ensemble_equilibration(leg_type=_LegType.FREE, input_dir=".", output_dir=".")
+
+def slurm_ensemble_equilibration_bound_short() -> None:
+    """ Perform ensemble equilibration for the bound leg"""
+    run_ensemble_equilibration(leg_type=_LegType.BOUND, input_dir=".", output_dir=".", short=True)
+
+def slurm_ensemble_equilibration_free_short() -> None:
+    """ Perform ensemble equilibration for the free leg"""
+    run_ensemble_equilibration(leg_type=_LegType.FREE, input_dir=".", output_dir=".", short=True)

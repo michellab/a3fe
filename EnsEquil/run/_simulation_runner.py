@@ -199,6 +199,9 @@ class SimulationRunner(ABC):
     def __str__(self) -> str:
         return self.__class__.__name__
 
+    #def __del__(self) -> None:
+        #self._dump() # Save the state to the pickle file before deletion
+
     def run(self, *args, **kwargs) -> None:
         f"""Run the {self.__class__.__name__}"""
         self._logger.info(f"Running {self.__class__.__name__}...")

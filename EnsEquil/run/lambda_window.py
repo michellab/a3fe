@@ -21,6 +21,7 @@ class LamWindow(_SimulationRunner):
     def __init__(self,
                  lam: float,
                  virtual_queue: _VirtualQueue,
+                 lam_val_weight: _Optional[float]=None,
                  block_size: float=1,
                  equil_detection: str="block_gradient",
                  gradient_threshold: _Optional[float]=None,
@@ -39,6 +40,10 @@ class LamWindow(_SimulationRunner):
             Lambda value for the simulation.
         virtual_queue : VirtualQueue
             VirtualQueue object to use for submitting jobs.
+        lam_val_weight : float, Optional, default: None
+            Weight to use for this lambda value in the free energy calculation.
+            This must be suplied if using the check_equil_shrinking_block_gradient
+            method for equilibration detection.
         block_size : float, Optional, default: 1
             Size of the blocks to use for equilibration detection,
             in ns.
@@ -85,6 +90,7 @@ class LamWindow(_SimulationRunner):
                          update_paths=update_paths)
 
         if not self.loaded_from_pickle:
+            self.lam_val_weight=lam_val_weight
             self.virtual_queue=virtual_queue
             self.block_size=block_size
             if equil_detection not in self.equil_detection_methods:

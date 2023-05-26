@@ -125,9 +125,11 @@ class Stage(_SimulationRunner):
             self.running_wins: _List[_LamWindow] = []
             self.virtual_queue = _VirtualQueue(log_dir=self.base_dir)
             # Creating lambda window objects sets up required input directories
-            for lam_val in self.lam_vals:
+            lam_val_weights = self.lam_val_weights
+            for i, lam_val in enumerate(self.lam_vals):
                 lam_base_dir = _os.path.join(self.output_dir, f"lambda_{lam_val:.3f}")
                 self.lam_windows.append(_LamWindow(lam=lam_val, 
+                                                   lam_val_weight=lam_val_weights[i],
                                                    virtual_queue=self.virtual_queue,
                                                     block_size=self.block_size,
                                                     equil_detection=self.equil_detection,
@@ -157,6 +159,21 @@ class Stage(_SimulationRunner):
     def legs(self, value) -> None:
         self._logger.info("Modifying/ creating lambda windows")
         self._sub_sim_runners = value
+
+    @property
+    def lam_val_weights(self) -> _List[float]:
+        """Return the weights for each lambda window. These are calculated
+        according to how each windows contributes to the overall free energy
+        estimate, as given by TI and the trapezoidal rule."""
+        lam_val_weights = []
+        for i, lam_val in enumerate(self.lam_vals):
+            if i == 0:
+                lam_val_weights.append(0.5 * (self.lam_vals[i+1] - lam_val))
+            elif i == len(self.lam_vals) - 1:
+                lam_val_weights.append(0.5 * (lam_val - self.lam_vals[i-1]))
+            else:
+                lam_val_weights.append(0.5 * (self.lam_vals[i+1] - self.lam_vals[i-1]))
+        return lam_val_weights
 
     def run(self, adaptive:bool=True, runtime:_Optional[float]=None) -> None:
         """ Run the ensemble of simulations constituting the stage (optionally with adaptive 
@@ -317,12 +334,8 @@ class Stage(_SimulationRunner):
         """
         self._logger.info(f"Calculating optimal lambda values with er_type = {er_type} and delta_er = {delta_er}...")
         unequilibrated_gradient_data = _GradientData(lam_winds=self.lam_windows, equilibrated=False)
-        _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="mean")
-        _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="intra_run_variance")
-        _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="sem")
-        _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="stat_ineff")
-        _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="integrated_sem")
-        _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type="integrated_var")
+        for plot_type in ["mean", "intra_run_variance", "sem", "stat_ineff", "integrated_sem", "integrated_var"]:
+            _plot_gradient_stats(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir, plot_type=plot_type)
         _plot_gradient_hists(gradients_data=unequilibrated_gradient_data, output_dir=self.output_dir)
         return unequilibrated_gradient_data.calculate_optimal_lam_vals(er_type=er_type, 
                                                                        delta_er=delta_er,
@@ -431,8 +444,10 @@ class Stage(_SimulationRunner):
                     ofile.write("Errors are 95 % C.I.s based on the assumption of a Gaussian distribution of free energies\n")
 
             # Plot overlap matrices and PMFs
-            _plot_overlap_mats(mbar_outfiles, self.output_dir)
+            _plot_overlap_mats(output_dir=self.output_dir, mbar_outfiles=mbar_outfiles)
             _plot_mbar_pmf(mbar_outfiles, self.output_dir)
+            equilibrated_gradient_data = _GradientData(lam_winds=self.lam_windows, equilibrated=True)
+            _plot_overlap_mats(output_dir=self.output_dir, predicted=True, gradient_data=equilibrated_gradient_data)
 
         # Plot RMSDS
         self._logger.info("Plotting RMSDs")
@@ -443,12 +458,8 @@ class Stage(_SimulationRunner):
         # Analyse the gradient data and make plots
         self._logger.info("Plotting gradients data")
         equilibrated_gradient_data = _GradientData(lam_winds=self.lam_windows, equilibrated=True)
-        _plot_gradient_stats(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir, plot_type="mean")
-        _plot_gradient_stats(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir, plot_type="intra_run_variance")
-        _plot_gradient_stats(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir, plot_type="sem")
-        _plot_gradient_stats(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir, plot_type="stat_ineff")
-        _plot_gradient_stats(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir, plot_type="integrated_sem")
-        _plot_gradient_stats(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir, plot_type="integrated_var")
+        for plot_type in ["mean", "intra_run_variance", "sem", "stat_ineff", "integrated_sem", "integrated_var"]:
+            _plot_gradient_stats(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir, plot_type=plot_type)
         _plot_gradient_hists(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir)
         _plot_gradient_timeseries(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir)
 
@@ -604,9 +615,11 @@ class Stage(_SimulationRunner):
                               value=", ".join([str(lam) for lam in self.lam_vals]))
         self._logger.info("Deleting old lambda windows and creating new ones...")
         self._sub_sim_runners = []
-        for lam_val in self.lam_vals:
+        lam_val_weights = self.lam_val_weights
+        for i, lam_val in enumerate(self.lam_vals):
             lam_base_dir = _os.path.join(self.output_dir, f"lambda_{lam_val:.3f}")
             self.lam_windows.append(_LamWindow(lam=lam_val, 
+                                                lam_val_weight = lam_val_weights[i],
                                                 virtual_queue=self.virtual_queue,
                                                 block_size=self.block_size,
                                                 equil_detection=self.equil_detection,
