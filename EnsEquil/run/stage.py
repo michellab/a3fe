@@ -123,6 +123,7 @@ class Stage(_SimulationRunner):
             self.equil_detection = equil_detection
             self.gradient_threshold = gradient_threshold
             self.runtime_constant = runtime_constant
+            self._maximally_efficient = False # Set to True if the stage has been run so as to reach max efficieny
             self._running: bool = False
             self.run_thread: _Optional[_threading.Thread] = None
             # Set boolean to allow us to kill the thread
@@ -255,11 +256,10 @@ class Stage(_SimulationRunner):
             elif adaptive:
                 self._logger.info(f"Starting {self}. Adaptive equilibration = {adaptive}...")
                 if runtime is None:
-                    runtime = 3 * self.block_size
+                    runtime = 0.2 # ns
 
             # Run initial SOMD simulations
             for win in self.lam_windows:
-                # Add buffer of 1 block_size to give chance for the equilibration to be detected.
                 win.run(runtime) # type: ignore
                 win._update_log()
                 self._dump()
@@ -268,39 +268,12 @@ class Stage(_SimulationRunner):
             # Copy to ensure that we don't modify self.lam_windows when updating self.running_wins
             self.running_wins = self.lam_windows.copy() 
             self._dump()
-            while self.running_wins:
-                _sleep(60 * 1)  # Check every 60 seconds
-                # Check if we've requested to kill the thread
-                if self.kill_thread:
-                    self._logger.info(f"Kill thread requested: exiting run loop")
-                    return
-                # Update the queue before checking the simulations
-                self.virtual_queue.update()
-                for win in self.running_wins:
-                    # Check if the window has now finished - calling win.running updates the win._running attribute
-                    if not win.running:
-                        # If we are in adaptive mode, check if the simulation has equilibrated and if not, resubmit
-                        if adaptive:
-                            if win.equilibrated:
-                                self._logger.info(f"{win} has equilibrated at {win.equil_time:.3f} ns")
-                                self.running_wins.remove(win)
-                            else:
-                                # Check that we haven't exceeded the maximum runtime for any simulations
-                                if win.tot_simtime / win.ensemble_size >= max_runtime:
-                                    self._logger.info(f"{win} has not equilibrated but simulations have exceeded the maximum runtime of "
-                                                        f"{max_runtime} ns. Terminating simulations") 
-                                    self.running_wins.remove(win)
-                                else: # Not equilibrated and not over the maximum runtime, so resubmit
-                                    self._logger.info(f"{win} has not equilibrated. Resubmitting for {self.block_size:.3f} ns")
-                                    win.run(self.block_size)
-                        else: # Not in adaptive mode
-                            self._logger.info(f"{win} has finished at {win.tot_simtime:.3f} ns")
-                            self.running_wins.remove(win)
-
-                        # Write status after checking for running and equilibration, as the
-                        # _running and _equilibrated attributes have now been updated
-                        win._update_log()
-                        self._dump()
+            
+            # Run the appropriate run loop
+            if adaptive:
+                self._run_loop_adaptive_efficiency()
+            else: 
+                self._run_loop_non_adaptive()
 
         except Exception as e:
             self._logger.exception("")
@@ -309,6 +282,152 @@ class Stage(_SimulationRunner):
         # All simulations are now finished, so perform final analysis
         self._logger.info(f"All simulations in {self} have finished.")
 
+    def _run_loop_non_adaptive(self, cycle_pause: int = 60) -> None:
+        """ The run loop for non-adaptive runs. Simply wait
+        until all lambda windows have finished running.
+        
+        Parameters
+        ----------
+        cycle_pause : int, Optional, default: 60
+            The number of seconds to wait between checking the status of the simulations."""
+
+        while self.running_wins:
+            _sleep(cycle_pause)  # Check every 60 seconds
+            # Check if we've requested to kill the thread
+            if self.kill_thread:
+                self._logger.info(f"Kill thread requested: exiting run loop")
+                return
+
+            # Update the queue before checking the simulations
+            self.virtual_queue.update()
+
+            # Check if everything has finished
+            for win in self.running_wins:
+                # Check if the window has now finished - calling win.running updates the win._running attribute
+                if not win.running:
+                    self._logger.info(f"{win} has finished at {win.tot_simtime:.3f} ns")
+                    self.running_wins.remove(win)
+
+                    # Write status after checking for running and equilibration, as the
+                    # _running and _equilibrated attributes have now been updated
+                    win._update_log()
+                    self._dump()
+
+    def _run_loop_adaptive_equilibration(self, 
+                                         cycle_pause: int = 60, # seconds
+                                         max_runtime: float = 30 # ns
+                                         ) -> None:
+        """ Run loop which adaptively checks for equilibration, and resubmits
+        the calculation if it has not equilibrated.
+        
+        Parameters
+        ----------
+        cycle_pause : int, Optional, default: 60
+            The number of seconds to wait between checking the status of the simulations.
+        max_runtime : float, Optional, default: 30
+            The maximum runtime for a single simulation during an adaptive simulation, in ns."""
+
+        while self.running_wins:
+            _sleep(cycle_pause)  # Check every 60 seconds
+            # Check if we've requested to kill the thread
+            if self.kill_thread:
+                self._logger.info(f"Kill thread requested: exiting run loop")
+                return
+
+            # Update the queue before checking the simulations
+            self.virtual_queue.update()
+
+            for win in self.running_wins:
+                # Check if the window has now finished - calling win.running updates the win._running attribute
+                if not win.running:
+                    # If we are in adaptive mode, check if the simulation has equilibrated and if not, resubmit
+                    if win.equilibrated:
+                        self._logger.info(f"{win} has equilibrated at {win.equil_time:.3f} ns")
+                        self.running_wins.remove(win)
+                    else:
+                        # Check that we haven't exceeded the maximum runtime for any simulations
+                        if win.tot_simtime / win.ensemble_size >= max_runtime:
+                            self._logger.info(f"{win} has not equilibrated but simulations have exceeded the maximum runtime of "
+                                                f"{max_runtime} ns. Terminating simulations") 
+                            self.running_wins.remove(win)
+                        else: # Not equilibrated and not over the maximum runtime, so resubmit
+                            self._logger.info(f"{win} has not equilibrated. Resubmitting for {self.block_size:.3f} ns")
+                            win.run(self.block_size)
+
+                    # Write status after checking for running and equilibration, as the
+                    # _running and _equilibrated attributes have now been updated
+                    win._update_log()
+                    self._dump()
+
+        
+    def _run_loop_adaptive_efficiency(self, 
+                                        cycle_pause: int = 60, # seconds
+                                        maximum_runtime: float = 30 # ns
+                                        ) -> None:
+        """ Run loop which allocates sampling time in order to achieve maximal estimation
+        efficiency of the free energy difference.
+        
+        Parameters
+        ----------
+        cycle_pause : int, Optional, default: 60
+            The number of seconds to wait between checking the status of the simulations.
+        maximum_runtime : float, Optional, default: 30
+            The maximum runtime for a single simulation during an adaptive simulation, in ns."""
+
+        while not self._maximally_efficient:
+
+            # Firstly, wait til all window have finished
+            while self.running_wins:
+                _sleep(cycle_pause)  # Check every 60 seconds
+                # Check if we've requested to kill the thread
+                if self.kill_thread:
+                    self._logger.info(f"Kill thread requested: exiting run loop")
+                    return
+                # Update the queue before checking the simulations
+                self.virtual_queue.update()
+                for win in self.running_wins:
+                    if not win.running:
+                        self.running_wins.remove(win)
+                    # Write status after checking for running and equilibration, as the
+                    # _running and _equilibrated attributes have now been updated
+                    win._update_log()
+                    self._dump()
+
+            # Now all windows have finished, check if we have reached the maximum 
+            # efficiency and resubmit if not
+            # Get the gradient data and extract the per-lambda SEM of the free energy change
+            gradient_data = _GradientData(lam_winds=self.lam_windows, equilibrated=False)
+            smooth_dg_sems = gradient_data.get_sems(origin="inter_delta_g", smoothen=True)
+
+            # For each window, calculate the predicted most efficient run time. See if we have reached this
+            # and if not, resubmit for this remaining time
+            for i, win in enumerate(self.lam_windows):
+                normalised_sem_dg = smooth_dg_sems[i]
+                predicted_run_time_max_eff = (1 / _np.sqrt(self.runtime_constant)) * normalised_sem_dg
+                win._logger.info(f"Predicted maximum efficiency run time for is {predicted_run_time_max_eff:.3f} ns")
+                # Make sure that we don't exceed the maximum per-simulation runtime
+                if predicted_run_time_max_eff > maximum_runtime * win.ensemble_size:
+                    win._logger.info(f"Predicted maximum efficiency run time per window is "
+                                        f"{predicted_run_time_max_eff / win.ensemble_size}, which exceeds the maximum runtime of "
+                                        f"{maximum_runtime} ns. Running to the maximum runtime instead.")
+                    predicted_run_time_max_eff = maximum_runtime * win.ensemble_size
+                actual_run_time = win.tot_simtime
+                if actual_run_time < predicted_run_time_max_eff - 0.1: # Small tolerance to avoid rounding errors
+                    resubmit_time = (predicted_run_time_max_eff - actual_run_time) / win.ensemble_size
+                    resubmit_time = round(resubmit_time, 1) # Round to the nearest 0.1 ns
+                    # We have not reached the maximum efficiency, so resubmit for the remaining time
+                    if resubmit_time > 0:
+                        win._logger.info(f"Window has not reached maximum efficiency. Resubmitting for {resubmit_time:.3f} ns")
+                        win.run(resubmit_time)
+                        self.running_wins.append(win)
+                else: # We have reached or exceeded the maximum efficiency runtime
+                    win._logger.info(f"Window has reached the most efficient run time at {actual_run_time}. "
+                                        "No further simulation required")
+
+            # If there are no running lambda windows, we must have reached the maximum efficiency
+            if not self.running_wins:
+                self._maximally_efficient = True
+            
     def get_optimal_lam_vals(self, 
                              er_type: str = "sem",
                              delta_er: _Optional[float] = None, 
@@ -464,7 +583,14 @@ class Stage(_SimulationRunner):
         # Analyse the gradient data and make plots
         self._logger.info("Plotting gradients data")
         equilibrated_gradient_data = _GradientData(lam_winds=self.lam_windows, equilibrated=True)
-        for plot_type in ["mean", "intra_run_variance", "sem", "stat_ineff", "integrated_sem", "integrated_var"]:
+        for plot_type in ["mean",
+                          "intra_run_variance",
+                          "sem",
+                          "stat_ineff",
+                          "integrated_sem",
+                          "integrated_var",
+                          "sq_sem_sim_time",
+                          "pred_best_simtime",]:
             _plot_gradient_stats(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir, plot_type=plot_type)
         _plot_gradient_hists(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir)
         _plot_gradient_timeseries(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir)

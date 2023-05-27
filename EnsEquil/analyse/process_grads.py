@@ -24,6 +24,8 @@ class GradientData():
         self.equilibrated = equilibrated
 
         # Get mean and variance of gradients, including both intra-run and inter-run components
+        # Note that sems/ vars generally refer to the sems/ vars of the gradients, and not the
+        # free energy changes. 
         lam_vals = []
         gradients_all_winds = []
         gradients_subsampled_all_winds = []
@@ -89,6 +91,10 @@ class GradientData():
         # Get the statistical inefficiencies in units of simulation time
         stat_ineffs_all_winds = _np.array(stat_ineffs_all_winds) * lam_winds[0].sims[0].timestep # Timestep should be same for all sims
 
+        # Get the SEMs of the free energy changes from the inter-run SEMs of the gradients
+        lam_weights = _np.array([lam.lam_val_weight for lam in lam_winds])
+        sems_inter_delta_g = _np.array(sems_inter_all_winds) * lam_weights
+
         # Get the times
         if equilibrated:
             start_times = _np.array([win._equil_time for win in lam_winds])
@@ -107,12 +113,15 @@ class GradientData():
         self.subsampled_gradients = gradients_subsampled_all_winds
         self.times = times
         self.sampling_times = sampling_times
+        self.total_times = end_times
         self.means = means_all_winds
         self.sems_overall = sems_tot_all_winds
         self.sems_intra = sems_intra_all_winds
         self.sems_inter = sems_inter_all_winds
         self.vars_intra = vars_intra_all_winds
         self.stat_ineffs = stat_ineffs_all_winds
+        self.sems_inter_delta_g = sems_inter_delta_g
+        self.runtime_constant = lam_winds[0].runtime_constant # Assume all the same
 
     def get_sems(self,
                  origin: str = "inter",
@@ -124,7 +133,10 @@ class GradientData():
         Parameters
         ----------
         origin: str, optional, default="inter"
-            Whether to use the inter-run or intra-run standard error of the mean
+            Can be "inter", "intra", or "inter_delta_g". Whether to use the 
+            inter-run or intra-run standard error of the mean, or the
+            inter-run standard error of the mean of the free energy changes,
+            respectively.
         smoothen: bool, optional, default=True
             Whether to smoothen the standard error of the mean by a block average
             over 3 points.
@@ -135,16 +147,16 @@ class GradientData():
             The standardised standard error of the mean of the gradients, in kcal mol^-1 ns^(1/2).
         """
         # Check options are valid
-        if origin not in ["inter", "intra"]:
-            raise ValueError("origin must be either 'inter' or 'intra'")
+        if origin not in ["inter", "intra", "inter_delta_g"]:
+            raise ValueError("origin must be either 'inter' or 'intra' or 'inter_delta_g'")
 
-        if origin == "inter":
-            sems = self.sems_inter
-        elif origin == "intra":
-            sems = self.sems_intra
+        origins = {"inter": self.sems_inter,
+                   "intra": self.sems_intra,
+                   "inter_delta_g": self.sems_inter_delta_g}
+        sems = origins[origin]
 
         # Standardise the SEMs according to the total simulation time
-        sems *= _np.sqrt(self.sampling_times) # type: ignore
+        sems *= _np.sqrt(self.total_times) # type: ignore
 
         if not smoothen:
             return sems # type: ignore

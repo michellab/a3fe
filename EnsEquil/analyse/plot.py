@@ -74,7 +74,8 @@ def plot_gradient_stats(gradients_data: GradientData, output_dir: str, plot_type
     output_dir : str
         Directory to save the plot to.
     plot_type : str
-        Type of plot to make. Can be "mean", "variance", "sem", "stat_ineff", or "integrated_sem".
+        Type of plot to make. Can be "mean", "variance", "sem", "stat_ineff", "integrated_sem",
+        "sq_sem_sim_time" or "integrated_var".
 
     Returns
     -------
@@ -82,7 +83,7 @@ def plot_gradient_stats(gradients_data: GradientData, output_dir: str, plot_type
     """
     # Check plot_type is valid
     plot_type = plot_type.lower()
-    plot_types = ["mean", "intra_run_variance", "sem", "stat_ineff", "integrated_sem", "integrated_var"]
+    plot_types = ["mean", "intra_run_variance", "sem", "stat_ineff", "integrated_sem", "sq_sem_sim_time", "integrated_var", "pred_best_simtime"]
     if not plot_type in plot_types:
         raise ValueError(f"'plot_type' must be one of {plot_types}, not {plot_type}")
     
@@ -148,6 +149,20 @@ def plot_gradient_stats(gradients_data: GradientData, output_dir: str, plot_type
         for lam_val in optimal_lam_vals:
             ax2.axvline(x=lam_val, color='black', linestyle='dashed', linewidth=0.5)
         ax2.set_ylabel(r"Integrated Standardised SEM($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $) / kcal mol$^{-1}$ ns$^{1/2}$"),
+    
+    elif plot_type == "sq_sem_sim_time":
+        ax.bar(gradients_data.lam_vals,
+               gradients_data.sems_inter_delta_g**2 / gradients_data.total_times,
+               width=0.02, edgecolor='black')
+        ax.set_ylabel(r"(SEM($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $))$^2$ / Total Sim Time / kcal$^2$ mol$^{-2}$ ns$^{-1}$"),
+        ax.legend()
+
+    elif plot_type == "pred_best_simtime":
+        ax.bar(gradients_data.lam_vals,
+               gradients_data.get_sems(origin="inter_delta_g", smoothen=False) / _np.sqrt(gradients_data.runtime_constant),
+               width=0.02, edgecolor='black')
+        ax.set_ylabel(r"Predicted most efficient runtimes /  ns"),
+        ax.legend()
 
     elif plot_type == "integrated_var":
         handle1, *_ = ax.bar(gradients_data.lam_vals,
