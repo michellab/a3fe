@@ -117,7 +117,12 @@ class LamWindow(_SimulationRunner):
                 sim_base_dir = _os.path.join(self.base_dir, run_name)
                 _subprocess.call(["mkdir", "-p", sim_base_dir])
                 for file in _glob.glob(_os.path.join(self.input_dir, "*")):
-                    _subprocess.call(["cp", file, sim_base_dir])
+                    # If the file is a coordinates, topology, or restraint file,
+                    # make a symbolic link to it, otherwise copy it
+                    if file.endswith((".rst7", ".prm7", ".txt")):
+                        _subprocess.call(["ln", "-s", _os.path.relpath(file, sim_base_dir), sim_base_dir])
+                    else:
+                        _subprocess.call(["cp", file, sim_base_dir])
                 self.sims.append(_Simulation(lam=lam,
                                  run_no=run_no,
                                  virtual_queue=virtual_queue,
