@@ -6,6 +6,7 @@ import os as _os
 import pathlib as _pathlib
 import logging as _logging
 import numpy as _np
+from sire.units import k_boltz as _k_boltz
 import subprocess as _subprocess
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
 
@@ -426,9 +427,23 @@ class Simulation(_SimulationRunner):
 
         steps=[]
         grads=[]
+        temp = None # Temperature in K
 
         for line in lines:
             vals=line.split()
+            # Get the temperature, checking the units
+            if line.startswith("#Generating temperature is"):
+                temp=vals[3]
+                try:
+                    unit = vals[4]
+                except IndexError:
+                    # Must be °C
+                    temp, unit = temp.split("°")
+                if unit == "C":
+                    temp = float(temp) + 273.15 # Convert to K
+                else:
+                    temp = float(temp)
+            # Get the gradients
             if not line.startswith("#"):
                 step=int(vals[0].strip())
                 if not endstate: #  Return the infinitesimal gradients
@@ -444,6 +459,8 @@ class Simulation(_SimulationRunner):
 
         times_arr=_np.array(times)
         grads_arr=_np.array(grads)
+        # convert gradients to kcal/mol by dividing by beta
+        grads_arr *= temp * _k_boltz.value()
 
         return times_arr, grads_arr
 
