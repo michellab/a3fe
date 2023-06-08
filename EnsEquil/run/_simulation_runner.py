@@ -67,14 +67,21 @@ class SimulationRunner(ABC):
         """
         # Set up the directories (which may be overwritten if the 
         # simulation runner is subsequently loaded from a pickle file)
+        # Make sure that we always use absolute paths
         if base_dir is None:
             base_dir = str(_pathlib.Path.cwd())
+        else:
+            base_dir = str(_pathlib.Path(base_dir).resolve())
         if not _pathlib.Path(base_dir).is_dir():
             _pathlib.Path(base_dir).mkdir(parents=True)
         if input_dir is None:
             input_dir = str(_pathlib.Path(base_dir, "input"))
+        else:
+            input_dir = str(_pathlib.Path(input_dir).resolve())
         if output_dir is None:
             output_dir = str(_pathlib.Path(base_dir, "output"))
+        else:
+            output_dir = str(_pathlib.Path(output_dir).resolve())
 
         # Only create the input and output directories if they're called, using properties
         self.base_dir = base_dir
