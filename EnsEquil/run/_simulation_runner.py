@@ -481,6 +481,18 @@ class SimulationRunner(ABC):
             for sub_sim_runner in self._sub_sim_runners:
                 sub_sim_runner.lighten()
 
+    def _close_logging_handlers(self) -> None:
+        """Close the logging file handlers. This can be
+        useful when loading and closing many Calculations,
+        as deleting the Calculation objects will not close
+        the file handlers."""
+        handlers = self._logger.handlers[:]
+        for handler in handlers:
+            self._logger.removeHandler(handler)
+            handler.close()
+        for sub_sim_runner in self._sub_sim_runners:
+            sub_sim_runner._close_logging_handlers()
+
     def _update_log(self) -> None:
         f""" Update the status log file with the current status of the {self.__class__.__name__}."""
         self._logger.info("##############################################")

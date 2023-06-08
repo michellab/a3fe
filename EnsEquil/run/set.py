@@ -1,5 +1,6 @@
 """Functionality for manipulating sets of Calculations"""
 
+import copy as _copy
 import logging as _logging
 import numpy as _np
 import os as _os
@@ -62,7 +63,7 @@ class Set(_SimulationRunner):
             is set to `current_working_directory/output`.
         stream_log_level : int, Optional, default: logging.INFO
             Logging level to use for the steam file handlers for the
-            calculation object and its child objects.
+            set object and its child objects.
         update_paths: bool, Optional, default: True
             If True, if the simulation runner is loaded by unpickling, then
             update_paths() is called.
@@ -86,19 +87,23 @@ class Set(_SimulationRunner):
                 # Temporarily move to the calculation base directory
                 with _TmpWorkingDir(calc_path) as _:
                     if calc_args:
-                        calc = _Calculation(**calc_args)
+                        calc = _Calculation(**calc_args, stream_log_level=stream_log_level)
                     else:
-                        calc = _Calculation()
+                        calc = _Calculation(stream_log_level=stream_log_level)
                     # Save the calculation to a pickle before unloading from memory
                     calc._dump()
+                    calc._close_logging_handlers()
                     del calc
-
-            # Point self._sub_sim_runners at the calculation generator
-            self._sub_sim_runners = self.calcs
 
             # Save the state and update log
             self._update_log()
             self._dump()
+
+        # Point self._sub_sim_runners at the calculation generator
+        # Do this outside of the if statement to ensure that the generator is always created,
+        # because it is lost upon dumping to a pickle (can't pickle generator objects)
+        self._sub_sim_runners = self.calcs
+
     
     @property
     def calcs(self) -> _Iterable[_Calculation]:
@@ -126,6 +131,7 @@ class Set(_SimulationRunner):
                 # TODO: Add more specific exception handling
                 self._logger.error(f"Error setting up calculation in {calc.base_dir}: {e}")
             finally:
+                calc._close_logging_handlers()
                 del calc
 
     def run(self, 
@@ -176,6 +182,7 @@ class Set(_SimulationRunner):
                 # TODO: Add more specific exception handling
                 self._logger.error(f"Error running calculation in {calc.base_dir}: {e}")
             finally:
+                calc._close_logging_handlers()
                 del calc
 
     def _run_calc_non_adaptive_opt(self, calc: _Calculation) -> None:
@@ -254,6 +261,7 @@ class Set(_SimulationRunner):
             all_dgs.loc[name, "calc_er"] = conf_int
 
             # Remove the calcultion from memory
+            calc._close_logging_handlers()
             del calc
 
         # Offset the calculated values with their corrections
@@ -283,3 +291,11 @@ class Set(_SimulationRunner):
                          offset=offset,
                          stats = stats)
 
+    @property
+    def _picklable_copy(self) -> _SimulationRunner:
+        """Return a copy of the Set which can be pickled. To do this,
+        we must avoid trying to pickle the Calculations stored as sub
+        simulation runners."""
+        picklable_copy = _copy.copy(self)
+        picklable_copy._sub_sim_runners = []
+        return picklable_copy
