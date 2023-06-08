@@ -223,9 +223,12 @@ class Calculation(_SimulationRunner):
         # Save state
         self._dump()
 
-    def run(self, adaptive:bool=True, runtime:_Optional[float]=None) -> None:
+    def run(self, 
+            adaptive:bool=True,
+            runtime:_Optional[float]=None,
+            parallel: bool = True) -> None:
         """
-        Run all stages in parallel and perform analysis once finished.
+        Run all stages and perform analysis once finished.
 
         Parameters
         ----------
@@ -234,6 +237,8 @@ class Calculation(_SimulationRunner):
             If False, the stages will run for the specified runtime and analysis will not be performed.
         runtime : float, Optional, default: None
             If adaptive is False, runtime must be supplied and stage will run for this number of nanoseconds. 
+        parallel : bool, Optional, default: True
+            If True, the stages will run in parallel. If False, the stages will run sequentially.
 
         Returns
         -------
@@ -241,7 +246,7 @@ class Calculation(_SimulationRunner):
         """
         if not self.setup_complete:
             raise ValueError("The calculation has not been set up yet. Please call setup() first.")
-        super().run(adaptive=adaptive, runtime=runtime)
+        super().run(adaptive=adaptive, runtime=runtime, parallel=parallel)
 
     def update_run_somd(self) -> None:
         """ 

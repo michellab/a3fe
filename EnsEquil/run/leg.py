@@ -740,6 +740,33 @@ class Leg(_SimulationRunner):
                 _sleep(30)
                 self.virtual_queue.update()
 
+    def run(self, 
+            adaptive:bool=True,
+            runtime:_Optional[float]=None,
+            parallel: bool = True) -> None:
+        """
+        Run all stages and perform analysis once finished.
+
+        Parameters
+        ----------
+        adaptive : bool, Optional, default: True
+            If True, the stages will run until the simulations are equilibrated and perform analysis afterwards.
+            If False, the stages will run for the specified runtime and analysis will not be performed.
+        runtime : float, Optional, default: None
+            If adaptive is False, runtime must be supplied and stage will run for this number of nanoseconds. 
+        parallel : bool, Optional, default: True
+            If True, the stages will run in parallel. If False, the stages will run sequentially.
+
+        Returns
+        -------
+        None
+        """
+        self._logger.info(f"Running {self.__class__.__name__}...")
+        for stage in self.stages:
+            stage.run(adaptive=adaptive, runtime=runtime)
+            if not parallel:
+                stage.wait()
+
     def analyse(self, subsampling=False) -> _Tuple[_np.ndarray, _np.ndarray]:
         f"""
         Analyse the leg and any sub-simulations, and 

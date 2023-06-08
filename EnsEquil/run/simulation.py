@@ -512,3 +512,7 @@ class Simulation(_SimulationRunner):
 
     def setup(self) -> None:
         raise NotImplementedError("Simulations are set up when they are created")
+
+    @property
+    def is_complete(self) -> bool:
+        raise NotImplementedError()

@@ -4,11 +4,20 @@ import logging as _logging
 import numpy as _np
 import os as _os
 import scipy.stats as _stats
-from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional, Callable as _Callable
+from typing import (
+    Dict as _Dict,
+    List as _List,
+    Tuple as _Tuple,
+    Any as _Any,
+    Optional as _Optional,
+    Callable as _Callable,
+    Iterable as _Iterable,
+)
 
 from ..analyse.analyse_set import compute_stats as _compute_stats
-from .calculation import Calculation as _Calculation
 from ..analyse.plot import plot_against_exp as _plt_against_exp
+from .calculation import Calculation as _Calculation
+from .enums import SetProtocol as _SetProtocol
 from ..read._read_exp_dgs import read_exp_dgs as _read_exp_dgs
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 
@@ -18,7 +27,8 @@ from ._utils import TmpWorkingDir as _TmpWorkingDir
 class Set(_SimulationRunner):
     """ 
     Class to set up, run, and analyse sets of ABFE calculations
-    (each represented by Calculation objects).
+    (each represented by Calculation objects). This runs calculations
+    sequentially to avoid overloading the system.
     """
     def __init__(self,
                  calc_paths: _Optional[_List] = None,
@@ -69,32 +79,145 @@ class Set(_SimulationRunner):
         
         if not self.loaded_from_pickle:
             # Load/ create the Calculations - temporarily shift to the Calculation base dir
-            if not calc_paths:
-                calc_paths = [direct for direct in _os.listdir() if _os.isdir(direct)]
+            if not calc_paths: # If not supplied, assume that every sub-directory is a calculation base dir
+                calc_paths = [directory for directory in _os.listdir() if _os.path.isdir(directory)]
             self.calc_paths = calc_paths
-            # TODO: Find a better solution which doesn't open a stupid number of files
-            #for calc_path in calc_paths:
+            for calc_path in calc_paths:
                 # Temporarily move to the calculation base directory
-                #with _TmpWorkingDir(calc_path) as _:
-                    #if calc_args:
-                        #calc = _Calculation(**calc_args)
-                    #else:
-                        #calc = _Calculation()
-                    #self.calcs.append(calc)
+                with _TmpWorkingDir(calc_path) as _:
+                    if calc_args:
+                        calc = _Calculation(**calc_args)
+                    else:
+                        calc = _Calculation()
+                    # Save the calculation to a pickle before unloading from memory
+                    calc._dump()
+                    del calc
+
+            # Point self._sub_sim_runners at the calculation generator
+            self._sub_sim_runners = self.calcs
 
             # Save the state and update log
             self._update_log()
             self._dump()
     
     @property
-    def calcs(self) -> _List[_Calculation]:
-        return self._sub_sim_runners
+    def calcs(self) -> _Iterable[_Calculation]:
+        """Generator to avoid loading all calculations into memory at once"""
+        for calc_path in self.calc_paths:
+            yield _Calculation(base_dir=calc_path)
 
     @calcs.setter
-    def calcs(self, value) -> None:
-        self._logger.info("Modifying/ creating Calculations")
-        self._sub_sim_runners = value
+    def calcs(self, value: _Calculation) -> None:
+        """Take the Calculation and add its base directory to the calc_paths list"""
+        self._logger.info(f"Adding base directory {value.base_dir} to list of stored calculation base dirs")
+        self.calc_paths.append(value.base_dir)
 
+    def setup(self) -> None:
+        """ Set up all calculations sequentially.  """
+        for calc in self.calcs:
+            if calc.setup_complete:
+                self._logger.info(f"Calculation in {calc.base_dir} is already set up. Skipping...")
+                continue
+            try:
+                self._logger.info(f"Setting up calculation in {calc.base_dir}")
+                calc.setup()
+                self._logger.info(f"Calculation in {calc.base_dir} successfully set up")
+            except Exception as e:
+                # TODO: Add more specific exception handling
+                self._logger.error(f"Error setting up calculation in {calc.base_dir}: {e}")
+            finally:
+                del calc
+
+    def run(self, 
+            adaptive:bool=True, 
+            runtime:_Optional[float]=None,
+            run_stages_parallel: bool=False,
+            protocol: _SetProtocol = _SetProtocol.STANDARD) -> None:
+        """
+        Run all calculations. Analysis is not performed by default.
+
+        Parameters
+        ----------
+        adaptive : bool, Optional, default: True
+            If True, the stages will run until the simulations are equilibrated and perform analysis afterwards.
+            If False, the stages will run for the specified runtime and analysis will not be performed.
+        runtime : float, Optional, default: None
+            If adaptive is False, runtime must be supplied and stage will run for this number of nanoseconds. 
+        run_stages_parallel: bool, Optional, default: False
+            If True, the stages for each individual calculation will be run in parallel. Can casuse issues with 
+            QOS limits on HPC clusters as each stage might try to submit jobs at the same time, resulting in
+            oversubmission of jobs. Each calculation will still be run sequentially.
+        protocol: SetProtocol: Optional, default: SetProtocol.STANDARD
+            The protocol to use for the calculations. This must be a SetProtocol enum.
+
+        Returns
+        -------
+        None
+        """
+        self._logger.info(f"Running calculations with protocol {protocol}")
+        if protocol == _SetProtocol.NONADAPTIVE_OPT:
+            self._logger.warning("Running calculations in with non-adaptive optimised protocol. As a result, "
+                                "the runtime, adaptive and parallel arguments will be ignored.")
+
+        # Run each calculation sqeuentially.
+        for calc in self.calcs:
+            if calc.is_complete:
+                self._logger.info(f"Calculation in {calc.base_dir} is already complete. Skipping...")
+                continue
+            try:
+                self._logger.info(f"Running calculation in {calc.base_dir}")
+                if protocol == _SetProtocol.STANDARD:
+                    calc.run(adaptive=adaptive, runtime=runtime, parallel=run_stages_parallel)
+                    calc.wait()
+                if protocol == _SetProtocol.NONADAPTIVE_OPT:
+                    self._run_calc_non_adaptive_opt(calc)
+                self._logger.info(f"Calculation in {calc.base_dir} completed successfully")
+            except Exception as e:
+                # TODO: Add more specific exception handling
+                self._logger.error(f"Error running calculation in {calc.base_dir}: {e}")
+            finally:
+                del calc
+
+    def _run_calc_non_adaptive_opt(self, calc: _Calculation) -> None:
+        """
+        Run a calculation using the non-adaptive optimised protocol.
+        This involves running all stages for 6 ns and discarding the 
+        first ns, other than for bound vanish, which is run for 8 ns
+        and the first 3 ns are discarded. Stages are run sequentially
+        and not directly through the Calculation object.
+
+        Parameters
+        ----------
+        calc : _Calculation
+            The calculation to run.
+        
+        Returns
+        -------
+        None
+        """
+        for leg in calc.legs: 
+            for stage in leg.stages: 
+                if leg.leg_type.value == 1 and stage.stage_type.value == 3: # Bound (1) vanish (3) 
+                    stage.run(adaptive=False, runtime=8)
+                    stage.wait()
+                else: 
+                    stage.run(adaptive=False, runtime=6)
+                    stage.wait()
+        calc.wait()
+        # Set the equilibration time to 1 ns unless bound vanish, in which case 3 ns
+        for leg in calc.legs: 
+            for stage in leg.stages: 
+                if leg.leg_type.value == 1 and stage.stage_type.value == 3: # Bound (1) vanish (3)
+                    for lam in stage.lam_windows: 
+                        lam._equilibrated = True 
+                        lam._equil_time=3
+                else:
+                    for lam in stage.lam_windows:  
+                        lam._equilibrated = True  
+                        lam._equil_time=1
+        calc._dump()
+        calc.analyse()
+        
     def analyse(self, exp_dgs_path: str, offset: bool) -> None:
         """
         Analyse all calculations in the set and plot the 
@@ -118,26 +241,20 @@ class Set(_SimulationRunner):
         all_dgs["calc_er"] = _np.nan
 
         # Get the calculated dGs
-        for calc_path in self.calc_paths:
-            # Calculate the 95 % C.I. based on the five replicate runs
-            #dgs = calc.delta_g
-            #dg = dgs.mean()
-            #conf_int = _stats.t.interval(0.95,
-                                        #len(dgs)-1,
-                                        #dg,
-                                        #scale=_stats.sem(dgs))[1] - dg  # 95 % C.I.
+        for calc in self.calcs:
             # For now, just pull the results from the output files
-            with open(_os.path.join(calc_path, "output", "overall_stats.dat"), "rt") as ifile:
+            with open(_os.path.join(calc.output_dir, "overall_stats.dat"), "rt") as ifile:
                 lines = ifile.readlines()
                 dg = float(lines[1].split(" ")[3])
                 conf_int = float(lines[1].split(" ")[-2])
                 print(dg, conf_int)
             # Get the name of the ligand for the calculation and use this to add the results
-            #name = all_dgs.index[all_dgs["calc_base_dir"] == calc.base_dir]
-            abs_calc_path = _os.path.abspath(calc_path)
-            name = all_dgs.index[all_dgs["calc_base_dir"] == abs_calc_path]
+            name = all_dgs.index[all_dgs["calc_base_dir"] == calc.base_dir]
             all_dgs.loc[name, "calc_dg"] = dg
             all_dgs.loc[name, "calc_er"] = conf_int
+
+            # Remove the calcultion from memory
+            del calc
 
         # Offset the calculated values with their corrections
         all_dgs["calc_dg"] += all_dgs["calc_cor"]
