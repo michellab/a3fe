@@ -4,6 +4,7 @@ from asyncio import subprocess
 from glob import glob
 import logging
 import os
+import pathlib
 import pytest
 import shutil
 import subprocess
@@ -33,7 +34,7 @@ def test_calculation_loading(calc):
     # Check that the calculation has the correct attributes
     assert calc.loaded_from_pickle == False
     assert calc.ensemble_size == 6
-    assert calc.input_dir == "EnsEquil/data/example_run_dir/input"
+    assert calc.input_dir == str(pathlib.Path("EnsEquil/data/example_run_dir/input").resolve())
     assert calc.output_dir == os.path.join(calc.base_dir, "output")
     assert calc.setup_complete == False
     assert calc.prep_stage == ee.run.enums.PreparationStage.PARAMETERISED
@@ -60,7 +61,7 @@ def test_calculation_reloading(calc):
     calc2 = ee.Calculation(base_dir=calc.base_dir, input_dir="EnsEquil/data/example_run_dir/input")
     assert calc2.loaded_from_pickle == True
     assert calc2.ensemble_size == 6
-    assert calc2.input_dir == "EnsEquil/data/example_run_dir/input"
+    assert calc2.input_dir == str(pathlib.Path("EnsEquil/data/example_run_dir/input").resolve())
     assert calc2.output_dir == os.path.join(calc.base_dir, "output")
     assert calc2.setup_complete == False
     assert calc2.prep_stage == ee.run.enums.PreparationStage.PARAMETERISED
