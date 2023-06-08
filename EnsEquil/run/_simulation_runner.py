@@ -143,11 +143,11 @@ class SimulationRunner(ABC):
         self._logger.propagate = False
         # For the file handler, we want to log everything
         file_handler = _logging.FileHandler(f"{self.base_dir}/{self.__class__.__name__}.log")
-        file_handler.setFormatter(_logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+        file_handler.setFormatter(_logging.Formatter("%(levelname)s - %(asctime)s - %(name)s - %(message)s"))
         file_handler.setLevel(_logging.DEBUG)
         # For the stream handler, we want to log at the user-specified level
         stream_handler = _logging.StreamHandler()
-        stream_handler.setFormatter(_logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
+        stream_handler.setFormatter(_logging.Formatter("%(levelname)s - %(asctime)s - %(name)s - %(message)s"))
         stream_handler.setLevel(self._stream_log_level)
         # Add the handlers to the logger
         self._logger.addHandler(file_handler)
