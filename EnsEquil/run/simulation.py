@@ -34,7 +34,9 @@ class Simulation(_SimulationRunner):
                                                "*.s3", 
                                                "*.s3.previous",
                                                "latest.pdb", 
-                                               "gradients.dat",]
+                                               "gradients.dat",
+                                               "equilibration_block_gradient.txt",
+                                               "equilibration_shrinking_block_gradient"]
 
     def __init__(self, 
                  lam: float, 

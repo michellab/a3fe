@@ -42,6 +42,9 @@ class Stage(_SimulationRunner):
     single stage of a calculation.
     """
 
+    # Files to be cleaned by self.clean()
+    run_files = _SimulationRunner.run_files + ["check_equil_multiwindow.txt"]
+
     def __init__(self, 
                  stage_type: _StageType,
                  block_size: float = 1,
