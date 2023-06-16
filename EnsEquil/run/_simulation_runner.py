@@ -91,18 +91,7 @@ class SimulationRunner(ABC):
         # Check if we are starting from a previous simulation runner
         self.loaded_from_pickle = False
         if _pathlib.Path(f"{base_dir}/{self.__class__.__name__}.pkl").is_file():
-            self._load() # May overwrite the above attributes and options
-
-            # Update the paths if required
-            if update_paths:
-                # Find out what the new base dir should be
-                if base_dir is None:
-                    new_sub_path = _os.getcwd()
-                else:
-                    new_sub_path = base_dir
-                # The sub path will have changed if we've moved the pickle
-                self.update_paths(old_sub_path=self.base_dir, 
-                                  new_sub_path=new_sub_path)
+            self._load(update_paths=update_paths) # May overwrite the above attributes and options
 
         else:
             # Initialise sub-simulation runners with an empty list
@@ -524,18 +513,34 @@ class SimulationRunner(ABC):
         for sub_sim_runner in self._sub_sim_runners:
             sub_sim_runner._dump()
 
-    def _load(self) -> None:
+    def _load(self, update_paths: bool = True) -> None:
         """Load the state of the simulation object from a pickle file, and do
-        the same for any sub-simulations."""
+        the same for any sub-simulations.
+        
+        Parameters
+        ----------
+        update_paths : bool, default=True
+            If True, update the paths of the simulation object and any sub-simulation runners
+            so that the base directory becomes the directory passed to the SimulationRunner,
+            or the current working directory if no directory was passed.
+        """
         # Note that we cannot recursively call _load on the sub-simulations
         # because this results in the creation of different virtual queues for the
         # stages and sub-lam-windows and simulations
         if not _pathlib.Path(f"{self.base_dir}/{self.__class__.__name__}.pkl").is_file():
             raise FileNotFoundError(f"Could not find {self.__class__.__name__}.pkl in {self.base_dir}")
 
+        # Store previous value of base dir before it is potentially overwritten below
+        suppliied_base_dir = self.base_dir
+
+        # Load the SimulationRunner, possibly overwriting directories
         print(f"Loading previous {self.__class__.__name__}. Any arguments will be overwritten...")
         with open(f"{self.base_dir}/{self.__class__.__name__}.pkl", "rb") as file:
             self.__dict__ = _pkl.load(file)
+
+        if update_paths:
+            self.update_paths(old_sub_path=self.base_dir,
+                                new_sub_path=suppliied_base_dir)
 
         # Refresh logging
         print("Setting up logging...")
