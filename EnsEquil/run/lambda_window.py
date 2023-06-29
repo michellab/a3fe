@@ -7,7 +7,11 @@ import os as _os
 import subprocess as _subprocess
 from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional, Union as _Union
 
-from ..analyse.detect_equil import check_equil_block_gradient as _check_equil_block_gradient, check_equil_chodera as _check_equil_chodera
+from ..analyse.detect_equil import (
+    check_equil_block_gradient as _check_equil_block_gradient,
+    check_equil_chodera as _check_equil_chodera,
+    dummy_check_equil_multiwindow as _dummy_check_equil_multiwindow
+)
 from .simulation import Simulation as _Simulation
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._virtual_queue import VirtualQueue as _VirtualQueue 
@@ -15,8 +19,9 @@ from ._virtual_queue import VirtualQueue as _VirtualQueue
 class LamWindow(_SimulationRunner):
     """A class to hold and manipulate a set of SOMD simulations at a given lambda value."""
 
-    equil_detection_methods={"block_gradient": _check_equil_block_gradient,
-                               "chodera": _check_equil_chodera}
+    equil_detection_methods={"multiwindow": _dummy_check_equil_multiwindow,
+                              "block_gradient": _check_equil_block_gradient,
+                              "chodera": _check_equil_chodera}
 
     def __init__(self,
                  lam: float,
@@ -50,6 +55,7 @@ class LamWindow(_SimulationRunner):
             in ns.
         equil_detection : str, Optional, default: "block_gradient"
             Method to use for equilibration detection. Options are:
+            - "multiwindow": Use the multiwindow method to detect equilibration.
             - "block_gradient": Use the gradient of the block averages to detect equilibration.
             - "chodera": Use Chodera's method to detect equilibration.
         gradient_threshold : float, Optional, default: None

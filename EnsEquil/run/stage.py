@@ -5,6 +5,7 @@ from enum import Enum as _Enum
 import os as _os
 import threading as _threading
 import logging as _logging
+from math import ceil as _ceil
 from multiprocessing import Pool as _Pool
 import numpy as _np
 import pathlib as _pathlib
@@ -26,6 +27,10 @@ from ..analyse.plot import (
     plot_convergence as _plot_convergence,
     plot_mbar_pmf as _plot_mbar_pmf,
     plot_rmsds as _plot_rmsds
+)
+from ..analyse.detect_equil import (
+    check_equil_multiwindow_kpss as _check_equil_multiwindow_kpss,
+    dummy_check_equil_multiwindow as _dummy_check_equil_multiwindow
 )
 from ..analyse.mbar import run_mbar as _run_mbar
 from ..analyse.process_grads import GradientData as _GradientData
@@ -274,7 +279,10 @@ class Stage(_SimulationRunner):
             
             # Run the appropriate run loop
             if adaptive:
-                self._run_loop_adaptive_efficiency()
+                # Allocate simulation time to achieve maximum efficiency
+                self._run_loop_adaptive_efficiency(max_runtime=max_runtime)
+                # Check that equilibration has been achieved and resubmit if required
+                self._run_loop_adaptive_equilibration_multiwindow(max_runtime=max_runtime)
             else: 
                 self._run_loop_non_adaptive()
 
@@ -365,7 +373,7 @@ class Stage(_SimulationRunner):
         
     def _run_loop_adaptive_efficiency(self, 
                                         cycle_pause: int = 60, # seconds
-                                        maximum_runtime: float = 30 # ns
+                                        max_runtime: float = 30 # ns
                                         ) -> None:
         """ Run loop which allocates sampling time in order to achieve maximal estimation
         efficiency of the free energy difference.
@@ -374,10 +382,12 @@ class Stage(_SimulationRunner):
         ----------
         cycle_pause : int, Optional, default: 60
             The number of seconds to wait between checking the status of the simulations.
-        maximum_runtime : float, Optional, default: 30
+        max_runtime : float, Optional, default: 30
             The maximum runtime for a single simulation during an adaptive simulation, in ns."""
 
         while not self._maximally_efficient:
+            self._logger.info("Maximum efficiency for given runtime constant not achieved." 
+                              " Allocating simulation time to achieve maximum efficiency...")
 
             # Firstly, wait til all window have finished
             while self.running_wins:
@@ -403,23 +413,27 @@ class Stage(_SimulationRunner):
             smooth_dg_sems = gradient_data.get_sems(origin="inter_delta_g", smoothen=True)
 
             # For each window, calculate the predicted most efficient run time. See if we have reached this
-            # and if not, resubmit for this remaining time
+            # and if not, resubmit for more simulation time
             for i, win in enumerate(self.lam_windows):
                 normalised_sem_dg = smooth_dg_sems[i]
                 predicted_run_time_max_eff = (1 / _np.sqrt(self.runtime_constant)) * normalised_sem_dg
+                actual_run_time = win.tot_simtime
                 win._logger.info(f"Predicted maximum efficiency run time for is {predicted_run_time_max_eff:.3f} ns")
+                win._logger.info(f"Actual run time is {actual_run_time} ns")
                 # Make sure that we don't exceed the maximum per-simulation runtime
-                if predicted_run_time_max_eff > maximum_runtime * win.ensemble_size:
+                if predicted_run_time_max_eff > max_runtime * win.ensemble_size:
                     win._logger.info(f"Predicted maximum efficiency run time per window is "
                                         f"{predicted_run_time_max_eff / win.ensemble_size}, which exceeds the maximum runtime of "
-                                        f"{maximum_runtime} ns. Running to the maximum runtime instead.")
-                    predicted_run_time_max_eff = maximum_runtime * win.ensemble_size
-                actual_run_time = win.tot_simtime
-                if actual_run_time < predicted_run_time_max_eff - 0.1: # Small tolerance to avoid rounding errors
+                                        f"{max_runtime} ns. Running to the maximum runtime instead.")
+                    predicted_run_time_max_eff = max_runtime * win.ensemble_size
+                if actual_run_time < predicted_run_time_max_eff:
                     resubmit_time = (predicted_run_time_max_eff - actual_run_time) / win.ensemble_size
-                    resubmit_time = round(resubmit_time, 1) # Round to the nearest 0.1 ns
-                    # We have not reached the maximum efficiency, so resubmit for the remaining time
-                    if resubmit_time > 0:
+                    # Resubmit a maximum of the current total simulation time again. This avoids issues with
+                    # overestimating the best runtime intially and then resubmitting for too long
+                    if resubmit_time > actual_run_time / win.ensemble_size:
+                        resubmit_time = actual_run_time / win.ensemble_size
+                    resubmit_time = _ceil(resubmit_time*10)/10 # Round up to the nearest 0.1 ns
+                    if resubmit_time > 0: # We have not reached the maximum efficiency, so resubmit for the remaining time
                         win._logger.info(f"Window has not reached maximum efficiency. Resubmitting for {resubmit_time:.3f} ns")
                         win.run(resubmit_time)
                         self.running_wins.append(win)
@@ -430,7 +444,60 @@ class Stage(_SimulationRunner):
             # If there are no running lambda windows, we must have reached the maximum efficiency
             if not self.running_wins:
                 self._maximally_efficient = True
-            
+
+    def _run_loop_adaptive_equilibration_multiwindow(self, 
+                                                     cycle_pause: int = 60, # seconds
+                                                     max_runtime: float = 30 # ns
+                                                     ) -> None:
+        """ Run loop which detects equilibration using the check_equil_multiwindow method.
+        This checks if equilibration has been achieved over the whole stage, and if not,
+        halves the runtime of the simulations and using the adaptive efficiency loop before
+        re-checking for equilibration.
+        
+        Parameters
+        ----------
+        cycle_pause : int, Optional, default: 60
+            The number of seconds to wait between checking the status of the simulations.
+        max_runtime : float, Optional, default: 30
+            The maximum runtime for a single simulation during an adaptive simulation, in ns."""
+        # Check that all lambda windows have the correct equilibration detection method
+        if any([window.check_equil != _dummy_check_equil_multiwindow for window in self.lam_windows]):
+            raise ValueError("Not all lambda windows have the correct equilibration detection method. "
+                              "This should be set to dummy_check_equil_multiwindow")
+        if not self.runtime_constant:
+            raise ValueError("Cannot run adaptive equilibration multiwindow without a runtime constant")
+
+        # Assumes that we have not already equilibrated
+        while not self.equilibrated:
+            if self.kill_thread:
+                # Check if we've requested to kill the thread
+                self._logger.info(f"Kill thread requested: exiting run loop")
+                return
+
+            # Check if we have reached equilibration
+            self.wait()
+            self._logger.info("Checking for equilibration with the check_equil_multiwindow algorithm...")
+            equilibrated, fractional_equil_time = _check_equil_multiwindow_kpss(self.lam_windows, output_dir=self.output_dir)
+            if equilibrated:
+                total_simtime = self.tot_simtime
+                tot_equil_time = total_simtime * fractional_equil_time # type: ignore
+                self._logger.info("Equilibration achieved")
+                self._logger.info(f"Fractional equilibration time is {fractional_equil_time}")
+                self._logger.info(f"Total equilibration time is {tot_equil_time}")
+                self._logger.info(f"Total simulation time is {total_simtime}")
+                self._logger.info(f"Runtime constant is {self.runtime_constant}")
+                break
+            else:
+                self._logger.info("Equilibration not achieved. Quartering runtime constant and running adaptive efficiency loop")
+                # Quarter the simulation constant to double the predicted runtime, 
+                # and run the adaptive efficiency loop again
+                self.runtime_constant /= 4
+                self._maximally_efficient = False
+                # Make all windows running, as is required for the adaptive efficiency loop
+                self.running_wins = self.lam_windows.copy()
+                self._run_loop_adaptive_efficiency(cycle_pause=cycle_pause,
+                                                   max_runtime=max_runtime)
+
     def get_optimal_lam_vals(self, 
                              er_type: str = "sem",
                              delta_er: _Optional[float] = None, 
@@ -593,7 +660,8 @@ class Stage(_SimulationRunner):
                           "integrated_sem",
                           "integrated_var",
                           "sq_sem_sim_time",
-                          "pred_best_simtime",]:
+                          #"pred_best_simtime",
+                          ]:
             _plot_gradient_stats(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir, plot_type=plot_type)
         _plot_gradient_hists(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir)
         _plot_gradient_timeseries(gradients_data=equilibrated_gradient_data, output_dir=self.output_dir)

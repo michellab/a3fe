@@ -79,7 +79,7 @@ def test_update_paths(calc):
         assert calc3.base_dir == current_dir
         assert calc3._logger.handlers[0].baseFilename == os.path.join(current_dir, "Calculation.log") # type: ignore
 
-######################## Testings Requiring SLURM ########################
+######################## Tests Requiring SLURM ########################
 
 # Check if slurm is present and only run following tests if so
 SLURM_PRESENT = False if shutil.which("sbatch") is None else True
@@ -88,13 +88,12 @@ SLURM_PRESENT = False if shutil.which("sbatch") is None else True
 def calc_slurm():
     """Create a calculation object to use in tests"""
     with TemporaryDirectory() as dirname:
-        local_dir = "EnsEquil/test/temp_test_output"
         # Copy the example input directory to the temporary directory
         # as we'll create some new files there
-        subprocess.run(["mkdir", "-p", local_dir])
-        subprocess.run(["cp", "-r", "EnsEquil/data/example_run_dir/input", f"{local_dir}/input"])
-        calc = ee.Calculation(base_dir=local_dir, 
-                              input_dir=f"{local_dir}/input",
+        subprocess.run(["mkdir", "-p", dirname])
+        subprocess.run(["cp", "-r", "EnsEquil/data/example_run_dir/input", f"{dirname}/input"])
+        calc = ee.Calculation(base_dir=dirname, 
+                              input_dir=f"{dirname}/input",
                               ensemble_size=2,
                               stream_log_level=logging.CRITICAL,) # Shut up the logging
         calc._dump()
@@ -142,8 +141,8 @@ def test_integration_calculation(calc_slurm):
     # different to the old ones
     for leg in LEGS_WITH_STAGES.keys():
         for stage in LEGS_WITH_STAGES[leg]:
-            assert os.path.exists(os.path.join(calc_slurm.base_dir, leg, stage, "output_saved"))
-            lam_dirs_old = glob(os.path.join(calc_slurm.base_dir, leg, stage, "output_saved", "lam*"))
+            assert os.path.exists(os.path.join(calc_slurm.base_dir, leg, stage, "lam_val_determination"))
+            lam_dirs_old = glob(os.path.join(calc_slurm.base_dir, leg, stage, "lam_val_determination", "lam*"))
             lam_dirs_new = glob(os.path.join(calc_slurm.base_dir, leg, stage, "output", "lam*"))
             assert lam_dirs_old != lam_dirs_new
 
@@ -151,7 +150,7 @@ def test_integration_calculation(calc_slurm):
     calc_slurm.run(adaptive=False, runtime=0.1)
     calc_slurm.wait()
     assert calc_slurm.running == False
-    # Set the entire simulation time to equilibrated
+   # Set the entire simulation time to equilibrated
     for leg in calc_slurm.legs:
         for stage in leg.stages:
             for lam_win in stage.lam_windows:
@@ -169,7 +168,6 @@ def test_integration_calculation(calc_slurm):
     # Check that the free energy change is sane
     with open(os.path.join(calc_slurm.base_dir, "output", "overall_stats.dat"), "r") as f:
         dg = float(f.readlines()[1].split(" ")[3])
-        print(dg)
         assert dg < -5
         assert dg > -25
 
@@ -177,60 +175,3 @@ def test_integration_calculation(calc_slurm):
     calc_slurm.run(adaptive=False, runtime=0.1)
     calc_slurm.kill()
     assert not calc_slurm.running
-
-
-
-
-
-# Test that finding optimal lambda windows works
-#@pytest.mark.skipif(not SLURM_PRESENT, reason="SLURM not present")
-#def test_get_optimal_lam_vals(calc_slurm):
-    #"""Check that the optimal lambda window creation function works"""
-    #calc_slurm.get_optimal_lam_vals()
-    ## Check that the old runs have been moved, and that the new lambda values are
-    ## different to the old ones
-    #for leg in LEGS_WITH_STAGES.keys():
-        #for stage in LEGS_WITH_STAGES[leg]:
-            #assert os.path.exists(os.path.join(calc_slurm.base_dir, leg, stage, "output_saved"))
-            #lam_dirs_old = glob(os.path.join(calc_slurm.base_dir, leg, stage, "output_saved", "lam*"))
-            #lam_dirs_new = glob(os.path.join(calc_slurm.base_dir, leg, stage, "output", "lam*"))
-            #assert lam_dirs_old != lam_dirs_new
-
-## Test that the simulation runs and
-#@pytest.mark.skipif(not SLURM_PRESENT, reason="SLURM not present")
-#def test_run_calc_non_adaptive(calc_slurm):
-    #"""Check that a short, non-adaptive run works"""
-    #calc_slurm.run(adaptive=False, runtime=0.1)
-    #calc_slurm.wait()
-    #assert calc_slurm.running == False
-    ## Set the entire simulation time to equilibrated
-    #for leg in calc_slurm.legs:
-        #for stage in leg.stages:
-            #for lam_win in stage.lam_windows:
-                #lam_win._equilibrated = True
-                #lam_win._equil_time = 0
-    #for leg in calc_slurm.legs:
-        #for stage in leg.stages:
-            #for lam_win in stage.lam_windows:
-                #assert round(lam_win.tot_simtime / lam_win.ensemble_size, 1) == 0.1
-
-## Test that the analysis runs and gives a reasonable result
-#@pytest.mark.skipif(not SLURM_PRESENT, reason="SLURM not present")
-#def test_analysis(calc_slurm):
-    #"""Check that analysis runs and gives a sane result"""
-    #calc_slurm.analyse()
-    ## Check that the output file exists
-    #assert os.path.exists(os.path.join(calc_slurm.base_dir, "output", "overall_stats.dat"))
-    ## Check that the free energy change is sane
-    #with open(os.path.join(calc_slurm.base_dir, "output", "overall_stats.dat"), "r") as f:
-        #dg = float(f.readlines()[1].split(" ")[3])
-        #print(dg)
-        #assert dg < -5
-        #assert dg > -25
-
-#@pytest.mark.skipif(not SLURM_PRESENT, reason="SLURM not present")
-#def test_kill_calc(calc_slurm):
-    #"""Check that all calculations can be killed"""
-    #calc_slurm.run(adaptive=False, runtime=0.1)
-    #calc_slurm.kill()
-    #assert not calc_slurm.running
