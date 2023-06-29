@@ -201,7 +201,7 @@ EnsEquil is designed to be run adaptively, but can be run non-adaptively:
 .. code-block:: python
 
     # Run all windows for 5 ns
-    calc.run(adaptive=False, duration=5)
+    calc.run(adaptive=False, runtime=5)
     calc.wait()
     # Check if we have equilibrated and analyse if so
     if calc.equilibrated:

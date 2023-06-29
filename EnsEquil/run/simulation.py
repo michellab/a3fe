@@ -311,31 +311,31 @@ class Simulation(_SimulationRunner):
         self.slurm_file_base = _get_slurm_file_base(slurm_file)
         self._logger.info(f"Found slurm output file basename: {self.slurm_file_base}")
 
-    def run(self, duration: float = 2.5) -> None:
+    def run(self, runtime: float = 2.5) -> None:
         """
         Run a SOMD simulation.
 
         Parameters
         ----------
-        duration : float, Optional, default: 2.5
-            Duration of simulation, in ns.
+        runtime : float, Optional, default: 2.5
+            Runtime of simulation, in ns.
 
         Returns
         -------
         None
         """
-        # Need to make sure that duration is a multiple of the time per cycle
-        # otherwise actual time could be quite different from requested duration
-        remainder = _Decimal(str(duration)) % _Decimal(str(self.time_per_cycle))
+        # Need to make sure that runtime is a multiple of the time per cycle
+        # otherwise actual time could be quite different from requested runtime
+        remainder = _Decimal(str(runtime)) % _Decimal(str(self.time_per_cycle))
         if round(float(remainder), 4) != 0:
             raise ValueError(
                 (
-                    "Duration must be a multiple of the time per cycle. "
-                    f"Duration is {duration} ns, and time per cycle is {self.time_per_cycle} ns."
+                    "Runtime must be a multiple of the time per cycle. "
+                    f"Runtime is {runtime} ns, and time per cycle is {self.time_per_cycle} ns."
                 )
             )
         # Need to modify the config file to set the correction n_cycles
-        n_cycles = int(duration / self.time_per_cycle)
+        n_cycles = int(runtime / self.time_per_cycle)
         self._set_n_cycles(n_cycles)
 
         # Run SOMD - note that command excludes sbatch as this is added by the virtual queue

@@ -182,23 +182,23 @@ class LamWindow(_SimulationRunner):
         self._logger.info("Modifying/ creating simulations")
         self._sub_sim_runners = value
 
-    def run(self, duration: float = 2.5) -> None:
+    def run(self, runtime: float = 2.5) -> None:
         """
         Run all simulations at the lambda value.
 
         Parameters
         ----------
-        duration : float, Optional, default: 2.5
-            Duration of simulation, in ns.
+        runtime : float, Optional, default: 2.5
+            Runtime of simulation, in ns.
 
         Returns
         -------
         None
         """
         # Run the simulations
-        self._logger.info(f"Running simulations for {duration:.3f} ns")
+        self._logger.info(f"Running simulations for {runtime:.3f} ns")
         for sim in self.sims:
-            sim.run(duration)
+            sim.run(runtime)
 
         self._running = True
 
