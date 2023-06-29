@@ -204,7 +204,12 @@ class Stage(_SimulationRunner):
                 )
         return lam_val_weights
 
-    def run(self, adaptive: bool = True, runtime: _Optional[float] = None) -> None:
+    def run(
+        self,
+        run_nos: _Optional[_List[int]] = None,
+        adaptive: bool = True,
+        runtime: _Optional[float] = None,
+    ) -> None:
         """Run the ensemble of simulations constituting the stage (optionally with adaptive
         equilibration detection), and, if using adaptive equilibration detection, perform
         analysis once finished.
@@ -221,10 +226,16 @@ class Stage(_SimulationRunner):
         -------
         None
         """
+        # Check run numbers
+        if run_nos is not None:
+            self._check_run_nos(run_nos)
+        else:
+            run_nos = list(range(1, self.ensemble_size + 1))
         if not adaptive and runtime is None:
             raise ValueError(
                 "If adaptive equilibration detection is disabled, a runtime must be supplied."
             )
+        # Check adaptive and runtime settings
         if adaptive and runtime is not None:
             raise ValueError(
                 "If adaptive equilibration detection is enabled, a runtime cannot be supplied."
@@ -233,7 +244,9 @@ class Stage(_SimulationRunner):
         # Run in the background with threading so that user can continuously check
         # the status of the Stage object
         self.run_thread = _threading.Thread(
-            target=self._run_without_threading, args=(adaptive, runtime), name=str(self)
+            target=self._run_without_threading,
+            args=(run_nos, adaptive, runtime),
+            name=str(self),
         )
         self.run_thread.start()
 
@@ -248,6 +261,7 @@ class Stage(_SimulationRunner):
 
     def _run_without_threading(
         self,
+        run_nos: _List[int],
         adaptive: bool = True,
         runtime: _Optional[float] = None,
         max_runtime: float = 30,
@@ -260,6 +274,8 @@ class Stage(_SimulationRunner):
 
         Parameters
         ----------
+        run_nos : List[int]
+            The run numbers to run.
         adaptive : bool, Optional, default: True
             If True, the stage will run until the simulations are equilibrated and perform analysis afterwards.
             If False, the stage will run for the specified runtime and analysis will not be performed.
@@ -298,7 +314,7 @@ class Stage(_SimulationRunner):
 
             # Run initial SOMD simulations
             for win in self.lam_windows:
-                win.run(runtime)  # type: ignore
+                win.run(run_nos=run_nos, runtime=runtime)  # type: ignore
                 win._update_log()
                 self._dump()
 
@@ -310,10 +326,12 @@ class Stage(_SimulationRunner):
             # Run the appropriate run loop
             if adaptive:
                 # Allocate simulation time to achieve maximum efficiency
-                self._run_loop_adaptive_efficiency(max_runtime=max_runtime)
+                self._run_loop_adaptive_efficiency(
+                    run_nos=run_nos, max_runtime=max_runtime
+                )
                 # Check that equilibration has been achieved and resubmit if required
                 self._run_loop_adaptive_equilibration_multiwindow(
-                    max_runtime=max_runtime
+                    run_nos=run_nos, max_runtime=max_runtime
                 )
             else:
                 self._run_loop_non_adaptive()
@@ -358,13 +376,18 @@ class Stage(_SimulationRunner):
                     self._dump()
 
     def _run_loop_adaptive_equilibration(
-        self, cycle_pause: int = 60, max_runtime: float = 30  # seconds  # ns
+        self,
+        run_nos: _List[int],
+        cycle_pause: int = 60,
+        max_runtime: float = 30,  # seconds  # ns
     ) -> None:
         """Run loop which adaptively checks for equilibration, and resubmits
         the calculation if it has not equilibrated.
 
         Parameters
         ----------
+        run_nos : List[int]
+            The run numbers to run.
         cycle_pause : int, Optional, default: 60
             The number of seconds to wait between checking the status of the simulations.
         max_runtime : float, Optional, default: 30
@@ -402,7 +425,7 @@ class Stage(_SimulationRunner):
                             self._logger.info(
                                 f"{win} has not equilibrated. Resubmitting for {self.block_size:.3f} ns"
                             )
-                            win.run(self.block_size)
+                            win.run(run_nos=run_nos, runtime=self.block_size)
 
                     # Write status after checking for running and equilibration, as the
                     # _running and _equilibrated attributes have now been updated
@@ -410,13 +433,18 @@ class Stage(_SimulationRunner):
                     self._dump()
 
     def _run_loop_adaptive_efficiency(
-        self, cycle_pause: int = 60, max_runtime: float = 30  # seconds  # ns
+        self,
+        run_nos: _List[int],
+        cycle_pause: int = 60,
+        max_runtime: float = 30,  # seconds  # ns
     ) -> None:
         """Run loop which allocates sampling time in order to achieve maximal estimation
         efficiency of the free energy difference.
 
         Parameters
         ----------
+        run_nos : List[int]
+            The run numbers to run.
         cycle_pause : int, Optional, default: 60
             The number of seconds to wait between checking the status of the simulations.
         max_runtime : float, Optional, default: 30
@@ -493,7 +521,7 @@ class Stage(_SimulationRunner):
                         win._logger.info(
                             f"Window has not reached maximum efficiency. Resubmitting for {resubmit_time:.3f} ns"
                         )
-                        win.run(resubmit_time)
+                        win.run(run_nos=run_nos, runtime=resubmit_time)
                         self.running_wins.append(win)
                 else:  # We have reached or exceeded the maximum efficiency runtime
                     win._logger.info(
@@ -506,7 +534,10 @@ class Stage(_SimulationRunner):
                 self._maximally_efficient = True
 
     def _run_loop_adaptive_equilibration_multiwindow(
-        self, cycle_pause: int = 60, max_runtime: float = 30  # seconds  # ns
+        self,
+        run_nos: _List[int],
+        cycle_pause: int = 60,
+        max_runtime: float = 30,  # seconds  # ns
     ) -> None:
         """Run loop which detects equilibration using the check_equil_multiwindow method.
         This checks if equilibration has been achieved over the whole stage, and if not,
@@ -515,6 +546,8 @@ class Stage(_SimulationRunner):
 
         Parameters
         ----------
+        run_nos : List[int]
+            The run numbers to run.
         cycle_pause : int, Optional, default: 60
             The number of seconds to wait between checking the status of the simulations.
         max_runtime : float, Optional, default: 30
@@ -573,7 +606,7 @@ class Stage(_SimulationRunner):
                 # Make all windows running, as is required for the adaptive efficiency loop
                 self.running_wins = self.lam_windows.copy()
                 self._run_loop_adaptive_efficiency(
-                    cycle_pause=cycle_pause, max_runtime=max_runtime
+                    run_nos=run_nos, cycle_pause=cycle_pause, max_runtime=max_runtime
                 )
 
     def get_optimal_lam_vals(

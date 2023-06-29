@@ -251,6 +251,7 @@ class Calculation(_SimulationRunner):
 
     def run(
         self,
+        run_nos: _Optional[_List[int]] = None,
         adaptive: bool = True,
         runtime: _Optional[float] = None,
         parallel: bool = True,
@@ -260,6 +261,8 @@ class Calculation(_SimulationRunner):
 
         Parameters
         ----------
+        run_nos : List[int], Optional, default: None
+            List of run numbers to run. If None, all runs will be run.
         adaptive : bool, Optional, default: True
             If True, the stages will run until the simulations are equilibrated and perform analysis afterwards.
             If False, the stages will run for the specified runtime and analysis will not be performed.
@@ -276,7 +279,9 @@ class Calculation(_SimulationRunner):
             raise ValueError(
                 "The calculation has not been set up yet. Please call setup() first."
             )
-        super().run(adaptive=adaptive, runtime=runtime, parallel=parallel)
+        super().run(
+            run_nos=run_nos, adaptive=adaptive, runtime=runtime, parallel=parallel
+        )
 
     def update_run_somd(self) -> None:
         """

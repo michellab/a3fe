@@ -231,11 +231,47 @@ class SimulationRunner(ABC):
     # def __del__(self) -> None:
     # self._dump() # Save the state to the pickle file before deletion
 
-    def run(self, *args, **kwargs) -> None:
-        f"""Run the {self.__class__.__name__}"""
-        self._logger.info(f"Running {self.__class__.__name__}...")
+    def run(self, run_nos: _Optional[_List[int]] = None, *args, **kwargs) -> None:
+        f"""
+        Run the {self.__class__.__name__}
+
+        Parameters
+        ----------
+        run_nos : List[int], Optional, default=None
+            A list of the run numbers to run. If None, all runs are run.
+
+        *args, **kwargs
+            Any additional arguments to pass to the run method of the
+            sub-simulation runners.
+        """
+        if run_nos is not None:
+            self._check_run_nos(run_nos)
+        else:
+            run_nos = list(range(1, self.ensemble_size + 1))
+
+        self._logger.info(
+            f"Running run numbers {run_nos} for {self.__class__.__name__}..."
+        )
         for sub_sim_runner in self._sub_sim_runners:
-            sub_sim_runner.run(*args, **kwargs)
+            sub_sim_runner.run(run_nos=run_nos, *args, **kwargs)
+
+    def _check_run_nos(self, run_nos: _List[int]) -> None:
+        """Check the requested run numbers are valid."""
+        # Check that the run numbers correspond to valid runs
+        if any([run_no > self.ensemble_size for run_no in run_nos]):
+            raise ValueError(
+                f"Invalid run numbers {run_nos}. All run numbers must be less than or equal to {self.ensemble_size}"
+            )
+        # Check that no run numbers are repeated
+        if len(run_nos) != len(set(run_nos)):
+            raise ValueError(
+                f"Invalid run numbers {run_nos}. All run numbers must be unique"
+            )
+        # Check that the run numbers are greater than 0
+        if any([run_no < 1 for run_no in run_nos]):
+            raise ValueError(
+                f"Invalid run numbers {run_nos}. All run numbers must be greater than 0"
+            )
 
     def kill(self) -> None:
         f"""Kill the {self.__class__.__name__}"""

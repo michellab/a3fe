@@ -182,12 +182,14 @@ class LamWindow(_SimulationRunner):
         self._logger.info("Modifying/ creating simulations")
         self._sub_sim_runners = value
 
-    def run(self, runtime: float = 2.5) -> None:
+    def run(self, run_nos: _Optional[_List[int]] = None, runtime: float = 2.5) -> None:
         """
         Run all simulations at the lambda value.
 
         Parameters
         ----------
+        run_nos : List[int], Optional, default: None
+            List of run numbers to run. If None, all simulations are run.
         runtime : float, Optional, default: 2.5
             Runtime of simulation, in ns.
 
@@ -195,10 +197,17 @@ class LamWindow(_SimulationRunner):
         -------
         None
         """
+        # Check that the supplied run numbers are valid, and generate run
+        # numbers if none are supplied
+        if run_nos is None:
+            run_nos = list(range(1, self.ensemble_size + 1))
+        else:
+            self._check_run_nos(run_nos)
+
         # Run the simulations
-        self._logger.info(f"Running simulations for {runtime:.3f} ns")
-        for sim in self.sims:
-            sim.run(runtime)
+        self._logger.info(f"Running simulations {run_nos} for {runtime:.3f} ns")
+        for run_no in run_nos:  # type: ignore
+            self.sims[run_no - 1].run(runtime)
 
         self._running = True
 

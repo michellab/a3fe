@@ -155,6 +155,7 @@ class Set(_SimulationRunner):
 
     def run(
         self,
+        run_nos: _Optional[_List[int]] = None,
         adaptive: bool = True,
         runtime: _Optional[float] = None,
         run_stages_parallel: bool = False,
@@ -165,6 +166,8 @@ class Set(_SimulationRunner):
 
         Parameters
         ----------
+        run_nos : List[int], Optional, default: None
+            List of run numbers to run. If None, all runs will be run.
         adaptive : bool, Optional, default: True
             If True, the stages will run until the simulations are equilibrated and perform analysis afterwards.
             If False, the stages will run for the specified runtime and analysis will not be performed.
@@ -181,7 +184,13 @@ class Set(_SimulationRunner):
         -------
         None
         """
+        # Check that run numbers are valid
+        if run_nos is not None:
+            self._check_run_nos(run_nos)
+        else:
+            run_nos = list(range(1, self.ensemble_size + 1))
         self._logger.info(f"Running calculations with protocol {protocol}")
+
         if protocol == _SetProtocol.NONADAPTIVE_OPT:
             self._logger.warning(
                 "Running calculations in with non-adaptive optimised protocol. As a result, "
@@ -199,7 +208,10 @@ class Set(_SimulationRunner):
                 self._logger.info(f"Running calculation in {calc.base_dir}")
                 if protocol == _SetProtocol.STANDARD:
                     calc.run(
-                        adaptive=adaptive, runtime=runtime, parallel=run_stages_parallel
+                        run_nos=run_nos,
+                        adaptive=adaptive,
+                        runtime=runtime,
+                        parallel=run_stages_parallel,
                     )
                     calc.wait()
                 if protocol == _SetProtocol.NONADAPTIVE_OPT:

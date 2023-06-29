@@ -980,6 +980,7 @@ class Leg(_SimulationRunner):
 
     def run(
         self,
+        run_nos: _Optional[_List[int]],
         adaptive: bool = True,
         runtime: _Optional[float] = None,
         parallel: bool = True,
@@ -989,6 +990,8 @@ class Leg(_SimulationRunner):
 
         Parameters
         ----------
+        run_nos : Optional[List[int]], default=None
+            If specified, only run the specified runs. Otherwise, run all runs.
         adaptive : bool, Optional, default: True
             If True, the stages will run until the simulations are equilibrated and perform analysis afterwards.
             If False, the stages will run for the specified runtime and analysis will not be performed.
@@ -1001,9 +1004,16 @@ class Leg(_SimulationRunner):
         -------
         None
         """
-        self._logger.info(f"Running {self.__class__.__name__}...")
+        if run_nos is not None:
+            self._check_run_nos(run_nos)
+        else:
+            run_nos = list(range(1, self.ensemble_size + 1))
+
+        self._logger.info(
+            f"Running run numbers {run_nos} for {self.__class__.__name__}..."
+        )
         for stage in self.stages:
-            stage.run(adaptive=adaptive, runtime=runtime)
+            stage.run(run_nos=run_nos, adaptive=adaptive, runtime=runtime)
             if not parallel:
                 stage.wait()
 
