@@ -204,7 +204,7 @@ EnsEquil is designed to be run adaptively, but can be run non-adaptively:
     calc.run(adaptive=False, runtime=5)
     calc.wait()
     # Check if we have equilibrated and analyse if so
-    if calc.equilibrated:
+    if calc.is_equilibrated():
         calc.analyse()
     else:
         print("Calculation not yet equilibrated")

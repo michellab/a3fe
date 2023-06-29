@@ -6,11 +6,12 @@ import logging
 import os
 import pathlib
 import pytest
-import shutil
 import subprocess
 from tempfile import TemporaryDirectory
 
 import EnsEquil as ee
+
+from . import RUN_SLURM_TESTS, SLURM_PRESENT
 
 LEGS_WITH_STAGES = {"bound": ["discharge", "vanish"], "free": ["discharge", "vanish"]}
 
@@ -97,9 +98,6 @@ def test_update_paths(calc):
 
 ######################## Tests Requiring SLURM ########################
 
-# Check if slurm is present and only run following tests if so
-SLURM_PRESENT = False if shutil.which("sbatch") is None else True
-
 
 @pytest.fixture(scope="module")
 def calc_slurm():
@@ -125,6 +123,7 @@ def calc_slurm():
 
 # Test that the preparation stages work
 @pytest.mark.skipif(not SLURM_PRESENT, reason="SLURM not present")
+@pytest.mark.skipif(not RUN_SLURM_TESTS, reason="RUN_SLURM_TESTS is False")
 def test_integration_calculation(calc_slurm):
     """Integration test to check that all major stages of the calculation work."""
 

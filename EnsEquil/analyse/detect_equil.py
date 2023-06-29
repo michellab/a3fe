@@ -15,7 +15,7 @@ from statsmodels.tsa.stattools import kpss as _kpss
 from .plot import general_plot as _general_plot
 
 
-def check_equil_block_gradient(lam_win: "LamWindow") -> _Tuple[bool, _Optional[float]]:  # type: ignore
+def check_equil_block_gradient(lam_win: "LamWindow", run_nos: _Optional[_List[int]]) -> _Tuple[bool, _Optional[float]]:  # type: ignore
     """
     Check if the ensemble of simulations at the lambda window is
     equilibrated based on the ensemble gradient between averaged blocks.
@@ -25,6 +25,9 @@ def check_equil_block_gradient(lam_win: "LamWindow") -> _Tuple[bool, _Optional[f
     lam_win : LamWindow
         Lambda window to check for equilibration.
 
+    run_nos : List[int], Optional, default: None
+        The run numbers to use for MBAR. If None, all runs will be used.
+
     Returns
     -------
     equilibrated : bool
@@ -32,6 +35,8 @@ def check_equil_block_gradient(lam_win: "LamWindow") -> _Tuple[bool, _Optional[f
     equil_time : float
         Time taken to equilibrate per simulation, in ns.
     """
+    run_nos = lam_win._get_valid_run_nos(run_nos)
+
     # Get the gradient threshold and complain if it does not exist
     gradient_threshold = lam_win.gradient_threshold
 
@@ -47,7 +52,8 @@ def check_equil_block_gradient(lam_win: "LamWindow") -> _Tuple[bool, _Optional[f
     equilibrated = False
     equil_time = None
 
-    for sim in lam_win.sims:
+    for run_no in run_nos:
+        sim = lam_win.sims[run_no - 1]
         _, dh_dl = sim.read_gradients()  # Times should be the same for all sims
         dh_dls.append(dh_dl)
         # Create array of nan so that d_dh_dl has the same length as times irrespective of
@@ -91,6 +97,7 @@ def check_equil_block_gradient(lam_win: "LamWindow") -> _Tuple[bool, _Optional[f
         ofile.write(f"Equilibrated: {equilibrated}\n")
         ofile.write(f"Equilibration time: {equil_time} ns\n")
         ofile.write(f"Block size: {lam_win.block_size} ns\n")
+        ofile.write(f"Run numbers: {run_nos}\n")
 
     # Change name of plots depending on whether a gradient threshold is set
     append_to_name = "_threshold" if gradient_threshold else ""
@@ -109,6 +116,7 @@ def check_equil_block_gradient(lam_win: "LamWindow") -> _Tuple[bool, _Optional[f
         vline_val=equil_time + 1 * lam_win.block_size
         if equil_time is not None
         else None,
+        run_nos=run_nos,
     )
 
     _general_plot(
@@ -121,13 +129,16 @@ def check_equil_block_gradient(lam_win: "LamWindow") -> _Tuple[bool, _Optional[f
         if equil_time is not None
         else None,
         hline_val=0,
+        run_nos=run_nos,
     )
 
     return equilibrated, equil_time
 
 
 def check_equil_multiwindow(
-    lambda_windows: _List["LamWindow"], output_dir: str
+    lambda_windows: _List["LamWindow"],
+    output_dir: str,
+    run_nos: _Optional[_List[int]] = None,
 ) -> _Tuple[bool, _Optional[float]]:  # type: ignore
     """
     Check if a set of lambda windows are equilibrated based on the ensemble gradient
@@ -144,6 +155,8 @@ def check_equil_multiwindow(
         List of lambda windows to check for equilibration.
     output_dir : str
         Directory to write output files to.
+    run_nos : List[int], Optional, default: None
+        The run numbers to use. If None, all runs will be used.
 
     Returns
     -------
@@ -152,6 +165,8 @@ def check_equil_multiwindow(
     fractional_equil_time : float
         Time taken to equilibrate, as a fraction of the total simulation time.
     """
+    run_nos = lambda_windows[0]._get_valid_run_nos(run_nos)
+
     if any([not lam_win.lam_val_weight for lam_win in lambda_windows]):
         raise ValueError(
             "Lambda value weight not set for all windows. Please set the lambda value weight to "
@@ -161,13 +176,14 @@ def check_equil_multiwindow(
     # Combine all gradients to get the change in free energy with increasing simulation time.
     # Do this so that the total simulation time for each window is spread evenly over the total
     # simulation time for the whole calculation
-    ens_size = lambda_windows[0].ensemble_size
+    n_runs = len(run_nos)
     overall_dgs = _np.zeros(
-        [ens_size, 100]
+        [n_runs, 100]
     )  # One point for each % of the total simulation time
-    overall_times = _np.zeros([ens_size, 100])
+    overall_times = _np.zeros([n_runs, 100])
     for lam_win in lambda_windows:
-        for i, sim in enumerate(lam_win.sims):
+        for i, run in enumerate(run_nos):
+            sim = lam_win.sims[run - 1]
             times, grads = sim.read_gradients()
             dgs = [grad * lam_win.lam_val_weight for grad in grads]
             # Convert times and dgs to arrays of length 100. Do this with block averaging
@@ -183,10 +199,7 @@ def check_equil_multiwindow(
             overall_times[i] += times_resized
     # Check that we have the same total times for each run
     if not all(
-        [
-            _np.isclose(overall_times[i, -1], overall_times[0, -1])
-            for i in range(ens_size)
-        ]
+        [_np.isclose(overall_times[i, -1], overall_times[0, -1]) for i in range(n_runs)]
     ):
         raise ValueError(
             "Total simulation times are not the same for all runs. Please ensure that "
@@ -223,7 +236,12 @@ def check_equil_multiwindow(
             equilibrated = True
             fractional_equil_time = percentage_discard / 100
             equil_time = (
-                _np.sum([lam_win.tot_simtime for lam_win in lambda_windows])
+                _np.sum(
+                    [
+                        lam_win.get_total_simtime(run_nos=run_nos)
+                        for lam_win in lambda_windows
+                    ]
+                )
                 * fractional_equil_time
             )
             break
@@ -234,7 +252,9 @@ def check_equil_multiwindow(
             lam_win._equilibrated = True
             # Equilibration time is per-simulation
             lam_win._equil_time = (
-                fractional_equil_time * lam_win.tot_simtime / lam_win.ensemble_size
+                fractional_equil_time
+                * lam_win.get_total_simtime(run_nos=run_nos)
+                / lam_win.ensemble_size
             )  # ns
 
     # Write out data
@@ -243,6 +263,7 @@ def check_equil_multiwindow(
         ofile.write(f"Overall gradient {overall_grad_dg} +/- {conf_int[1] - overall_grad_dg} kcal mol^-1 ns^-1\n")  # type: ignore
         ofile.write(f"Fractional equilibration time: {fractional_equil_time} \n")
         ofile.write(f"Equilibration time: {equil_time} ns\n")
+        ofile.write(f"Run numbers: {run_nos}\n")
 
     # Create plots of the overall gradients
     _general_plot(
@@ -251,13 +272,16 @@ def check_equil_multiwindow(
         x_label="Total Simulation Time / ns",
         y_label=r"$\Delta G$ / kcal mol$^{-1}$",
         outfile=f"{output_dir}/check_equil_multiwindow.png",
+        run_nos=run_nos,
     )
 
     return equilibrated, fractional_equil_time
 
 
 def check_equil_multiwindow_kpss(
-    lambda_windows: _List["LamWindow"], output_dir: str
+    lambda_windows: _List["LamWindow"],
+    output_dir: str,
+    run_nos: _Optional[_List[int]] = None,
 ) -> _Tuple[bool, _Optional[float]]:  # type: ignore
     """
     Check if a set of lambda windows are equilibrated based on the KPSS test for stationarity.
@@ -275,6 +299,8 @@ def check_equil_multiwindow_kpss(
         List of lambda windows to check for equilibration.
     output_dir : str
         Directory to write output files to.
+    run_nos : List[int], Optional, default: None
+        The run numbers to use. If None, all runs will be used.
 
     Returns
     -------
@@ -283,6 +309,8 @@ def check_equil_multiwindow_kpss(
     fractional_equil_time : float
         Time taken to equilibrate, as a fraction of the total simulation time.
     """
+    run_nos = lambda_windows[0]._get_valid_run_nos(run_nos)
+
     if any([not lam_win.lam_val_weight for lam_win in lambda_windows]):
         raise ValueError(
             "Lambda value weight not set for all windows. Please set the lambda value weight to "
@@ -292,13 +320,14 @@ def check_equil_multiwindow_kpss(
     # Combine all gradients to get the change in free energy with increasing simulation time.
     # Do this so that the total simulation time for each window is spread evenly over the total
     # simulation time for the whole calculation
-    ens_size = lambda_windows[0].ensemble_size
+    n_runs = len(run_nos)
     overall_dgs = _np.zeros(
-        [ens_size, 100]
+        [n_runs, 100]
     )  # One point for each % of the total simulation time
-    overall_times = _np.zeros([ens_size, 100])
+    overall_times = _np.zeros([n_runs, 100])
     for lam_win in lambda_windows:
-        for i, sim in enumerate(lam_win.sims):
+        for i, run_no in enumerate(run_nos):
+            sim = lam_win.sims[run_no - 1]
             times, grads = sim.read_gradients()
             dgs = [grad * lam_win.lam_val_weight for grad in grads]
             # Convert times and dgs to arrays of length 100. Do this with block averaging
@@ -314,10 +343,7 @@ def check_equil_multiwindow_kpss(
             overall_times[i] += times_resized
     # Check that we have the same total times for each run
     if not all(
-        [
-            _np.isclose(overall_times[i, -1], overall_times[0, -1])
-            for i in range(ens_size)
-        ]
+        [_np.isclose(overall_times[i, -1], overall_times[0, -1]) for i in range(n_runs)]
     ):
         raise ValueError(
             "Total simulation times are not the same for all runs. Please ensure that "
@@ -341,7 +367,12 @@ def check_equil_multiwindow_kpss(
             equilibrated = True
             fractional_equil_time = percentage_discard / 100
             equil_time = (
-                _np.sum([lam_win.tot_simtime for lam_win in lambda_windows])
+                _np.sum(
+                    [
+                        lam_win.get_tot_simtime(run_nos=run_nos)
+                        for lam_win in lambda_windows
+                    ]
+                )
                 * fractional_equil_time
             )
             break
@@ -352,7 +383,9 @@ def check_equil_multiwindow_kpss(
             lam_win._equilibrated = True
             # Equilibration time is per-simulation
             lam_win._equil_time = (
-                fractional_equil_time * lam_win.tot_simtime / lam_win.ensemble_size
+                fractional_equil_time
+                * lam_win.get_tot_simtime(run_nos=run_nos)
+                / lam_win.ensemble_size
             )  # ns
 
     # Write out data
@@ -361,6 +394,7 @@ def check_equil_multiwindow_kpss(
         ofile.write(f"p value: {p_value}\n")
         ofile.write(f"Fractional equilibration time: {fractional_equil_time} \n")
         ofile.write(f"Equilibration time: {equil_time} ns\n")
+        ofile.write(f"Run numbers: {run_nos}\n")
 
     # Create plots of the overall gradients
     _general_plot(
@@ -370,12 +404,15 @@ def check_equil_multiwindow_kpss(
         y_label=r"$\Delta G$ / kcal mol$^{-1}$",
         outfile=f"{output_dir}/check_equil_multiwindow_kpss.png",
         vline_val=equil_time,
+        run_nos=run_nos,
     )
 
     return equilibrated, fractional_equil_time
 
 
-def dummy_check_equil_multiwindow(lam_win: "LamWindow") -> _Tuple[bool, _Optional[float]]:  # type: ignore
+def dummy_check_equil_multiwindow(
+    lam_win: "LamWindow", run_nos: _Optional[_List[int]] = None
+) -> _Tuple[bool, _Optional[float]]:  # type: ignore
     """
     Becuse "check_equil_multiwindow" checks multiple windows at once and sets the _equilibrated
     and _equil_time attributes of the lambda windows, but EnsEquil was written based on per-window
@@ -385,7 +422,9 @@ def dummy_check_equil_multiwindow(lam_win: "LamWindow") -> _Tuple[bool, _Optiona
     Parameters
     ----------
     lam_win : LamWindow
-        Lambda window to check for equilibration.
+        Lambda window to check for equilibration (ignored in practice)
+    run_nos : List[int], Optional, default: None
+        Ignored in practice, but included for consistency.
 
     Returns
     -------
@@ -397,7 +436,9 @@ def dummy_check_equil_multiwindow(lam_win: "LamWindow") -> _Tuple[bool, _Optiona
     return lam_win._equilibrated, lam_win._equil_time
 
 
-def check_equil_shrinking_block_gradient(lam_win: "LamWindow") -> _Tuple[bool, _Optional[float]]:  # type: ignore
+def check_equil_shrinking_block_gradient(
+    lam_win: "LamWindow", run_nos: _Optional[_List[int]] = None
+) -> _Tuple[bool, _Optional[float]]:  # type: ignore
     """
     Check if the ensemble of simulations at the lambda window is
     equilibrated based on the ensemble gradient between averaged blocks,
@@ -409,6 +450,8 @@ def check_equil_shrinking_block_gradient(lam_win: "LamWindow") -> _Tuple[bool, _
     ----------
     lam_win : LamWindow
         Lambda window to check for equilibration.
+    run_nos : List[int], Optional, default: None
+        The run numbers to use. If None, all runs will be used.
 
     Returns
     -------
@@ -417,6 +460,8 @@ def check_equil_shrinking_block_gradient(lam_win: "LamWindow") -> _Tuple[bool, _
     equil_time : float
         Time taken to equilibrate per simulation, in ns.
     """
+    run_nos = lam_win._get_valid_run_nos(run_nos)
+
     # Get the gradient threshold and complain if it does not exist
     if not lam_win.gradient_threshold:
         raise ValueError(
@@ -453,7 +498,7 @@ def check_equil_shrinking_block_gradient(lam_win: "LamWindow") -> _Tuple[bool, _
     largest_idx_block_size = None
     for block_size_ind, frac_block_size in enumerate(frac_block_sizes):
         idx_block_size = int(
-            (lam_win.tot_simtime / lam_win.ensemble_size)
+            (lam_win.get_tot_simtime(run_nos=run_nos) / lam_win.ensemble_size)
             * frac_block_size
             * time_to_ind
         )
@@ -466,7 +511,8 @@ def check_equil_shrinking_block_gradient(lam_win: "LamWindow") -> _Tuple[bool, _
         if block_size_ind == 1:
             largest_idx_block_size = idx_block_size
 
-        for sim in lam_win.sims:
+        for run_no in run_nos:
+            sim = lam_win.sims[run_no - 1]
             _, dh_dl = sim.read_gradients()  # Times should be the same for all sims
             dh_dls.append(dh_dl)
             # Create array of nan so that d_dh_dl has the same length as times irrespective of
@@ -509,7 +555,9 @@ def check_equil_shrinking_block_gradient(lam_win: "LamWindow") -> _Tuple[bool, _
                 equilibrated = True
                 equil_d_dh_dls = d_dh_dls
                 equil_block_size = (
-                    frac_block_size * lam_win.tot_simtime / lam_win.ensemble_size
+                    frac_block_size
+                    * lam_win.get_tot_simtime(run_nos=run_nos)
+                    / lam_win.ensemble_size
                 )
                 equil_idx_block_size = idx_block_size
                 break
@@ -522,6 +570,7 @@ def check_equil_shrinking_block_gradient(lam_win: "LamWindow") -> _Tuple[bool, _
         ofile.write(f"Equilibration time: {equil_time} ns\n")
         ofile.write(f"Successful block size (ns): {equil_block_size}\n")
         ofile.write(f"Gradient threshold: {gradient_threshold}\n")
+        ofile.write(f"Run numbers: {run_nos}\n")
 
     # Save plots of dh/dl and d_dh/dl
 
@@ -543,6 +592,7 @@ def check_equil_shrinking_block_gradient(lam_win: "LamWindow") -> _Tuple[bool, _
         vline_val=equil_time + 1 * equil_block_size
         if equil_block_size is not None
         else None,
+        run_nos=run_nos,
     )  # type: ignore
 
     # This will use the latest dh/dls generated with the final block size above
@@ -555,12 +605,13 @@ def check_equil_shrinking_block_gradient(lam_win: "LamWindow") -> _Tuple[bool, _
         outfile=f"{lam_win.output_dir}/ddhdl_block_gradient",
         vline_val=equil_time + 2 * equil_block_size if equil_block_size is not None else None,  # type: ignore
         hline_val=0,
+        run_nos=run_nos,
     )
 
     return equilibrated, equil_time
 
 
-def check_equil_chodera(lam_win: "LamWindow") -> _Tuple[bool, _Optional[float]]:  # type: ignore
+def check_equil_chodera(lam_win: "LamWindow", run_nos: _Optional[_List[int]] = None) -> _Tuple[bool, _Optional[float]]:  # type: ignore
     """
     Check if the ensemble of simulations at the lambda window is
     equilibrated based Chodera's method of maximising the number
@@ -575,6 +626,8 @@ def check_equil_chodera(lam_win: "LamWindow") -> _Tuple[bool, _Optional[float]]:
     ----------
     lam_win : LamWindow
         Lambda window to check for equilibration.
+    run_nos : List[int], Optional, default: None
+        The run numbers to use. If None, all runs will be used.
 
     Returns
     -------
@@ -583,6 +636,8 @@ def check_equil_chodera(lam_win: "LamWindow") -> _Tuple[bool, _Optional[float]]:
     equil_time : float
         Time taken to equilibrate, in ns.
     """
+    run_nos = lam_win._get_valid_run_nos(run_nos)
+
     # Conversion between time and gradient indices.
     time_to_ind = 1 / (lam_win.sims[0].timestep * lam_win.sims[0].nrg_freq)
     idx_block_size = int(lam_win.block_size * time_to_ind)
@@ -593,7 +648,8 @@ def check_equil_chodera(lam_win: "LamWindow") -> _Tuple[bool, _Optional[float]]:
     equilibrated = False
     equil_time = None
 
-    for sim in lam_win.sims:
+    for run_no in run_nos:
+        sim = lam_win.sims[run_no - 1]
         _, dh_dl = sim.read_gradients()
         dh_dls.append(dh_dl)
 
@@ -617,6 +673,7 @@ def check_equil_chodera(lam_win: "LamWindow") -> _Tuple[bool, _Optional[float]]:
         ofile.write(f"Equilibration time: {equil_time} ns\n")
         ofile.write(f"Number of uncorrelated samples: {Neff_max}\n")
         ofile.write(f"Staistical inefficiency: {g}\n")
+        ofile.write(f"Run numbers: {run_nos}\n")
 
     # Save plots of dh/dl and d_dh/dl
     # Use rolling average to smooth out the data
@@ -637,6 +694,7 @@ def check_equil_chodera(lam_win: "LamWindow") -> _Tuple[bool, _Optional[float]]:
         # Shift the equilibration time by block size to account for the
         # delay in the rolling average calculation.
         vline_val=v_line_x,
+        run_nos=run_nos,
     )
 
     return equilibrated, equil_time

@@ -345,10 +345,15 @@ class Simulation(_SimulationRunner):
         )
         self._logger.info(f"Submitted with job {self.job}")
 
-    @property
-    def tot_simtime(self) -> float:
-        """Get the total simulation time in ns"""
-        # Check that the required file exists
+    def get_tot_simtime(self) -> float:
+        """
+        Get the total simulation time in ns
+
+        Returns
+        -------
+        tot_simtime : float
+            Total simulation time in ns.
+        """
         data_simfile = f"{self.output_dir}/simfile.dat"
         if not _pathlib.Path(data_simfile).is_file():
             # Simuation has not been run, hence total simulation time is 0
@@ -405,8 +410,11 @@ class Simulation(_SimulationRunner):
                         if line.startswith("Simulation took"):
                             return False
 
-        # We aren't running and have output files, but no "Simulation took" line -> Failure
-        return True
+            # We aren't running and have output files, but no "Simulation took" line -> Failure
+            return True
+
+        else:  # No output files - assume we haven't run or failed
+            return False
 
     @property
     def slurm_output_files(self) -> _List[str]:

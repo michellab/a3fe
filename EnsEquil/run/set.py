@@ -184,11 +184,8 @@ class Set(_SimulationRunner):
         -------
         None
         """
-        # Check that run numbers are valid
-        if run_nos is not None:
-            self._check_run_nos(run_nos)
-        else:
-            run_nos = list(range(1, self.ensemble_size + 1))
+        run_nos = self._get_valid_run_nos(run_nos)
+
         self._logger.info(f"Running calculations with protocol {protocol}")
 
         if protocol == _SetProtocol.NONADAPTIVE_OPT:

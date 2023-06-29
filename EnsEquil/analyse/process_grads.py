@@ -22,6 +22,7 @@ class GradientData:
         self,
         lam_winds: _List["LamWindow"],
         equilibrated: bool,
+        run_nos: _Optional[_List[int]] = None,
     ) -> None:  # type: ignore
         """
         Calculate the gradients, means, and variances of the gradients for each lambda
@@ -33,6 +34,8 @@ class GradientData:
             List of lambda windows.
         equilibrated : bool
             If True, only equilibrated data is used.
+        run_nos : List[int], Optional, default: None
+            The run numbers to use. If None, all runs will be used.
         """
         self.equilibrated = equilibrated
 
@@ -50,8 +53,9 @@ class GradientData:
         stat_ineffs_all_winds = []
 
         for lam in lam_winds:
-            # Record the lambda value
+            # Record the lambda value and get sensible run numbers
             lam_vals.append(lam.lam)
+            run_nos = lam._get_valid_run_nos(run_nos=run_nos)
 
             # Get all gradients and statistical inefficiencies
             gradients_wind = []
@@ -61,7 +65,8 @@ class GradientData:
             vars_intra = []
             squared_sems_intra = []
             # Get intra-run quantities
-            for sim in lam.sims:
+            for run_no in run_nos:
+                sim = lam.sims[run_no - 1]
                 # Get the gradients, mean, and statistical inefficiencies
                 _, gradients = sim.read_gradients(equilibrated_only=equilibrated)
                 stat_ineff = _get_statistical_inefficiency(gradients)
@@ -81,11 +86,11 @@ class GradientData:
 
             # Get overall intra-run quantities
             var_intra = _np.mean(vars_intra)
-            squared_sem_intra = _np.mean(squared_sems_intra) / len(lam.sims)
+            squared_sem_intra = _np.mean(squared_sems_intra) / len(run_nos)
             stat_ineff = _np.mean(stat_ineffs_wind)
 
             # Get inter-run quantities
-            squared_sem_inter = _np.var(means_intra) / len(lam.sims)
+            squared_sem_inter = _np.var(means_intra) / len(run_nos)
             mean_overall = _np.mean(means_intra)
 
             # Store the final results, converting to arrays for consistency.

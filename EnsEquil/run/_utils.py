@@ -5,7 +5,12 @@ import contextlib as _contextlib
 from logging import Logger as _Logger
 import os as _os
 from time import sleep as _sleep
-from typing import Callable as _Callable, Tuple as _Tuple
+from typing import (
+    Callable as _Callable,
+    Tuple as _Tuple,
+    Optional as _Optional,
+    List as _List,
+)
 
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 
@@ -18,7 +23,9 @@ def check_has_wat_and_box(system: _BSS._SireWrappers._system.System) -> None:  #
         raise ValueError("System does not have water.")
 
 
-def get_simtime(sim_runner: _SimulationRunner) -> float:
+def get_simtime(
+    sim_runner: _SimulationRunner, run_nos: _Optional[_List[int]] = None
+) -> float:
     """
     Get the simulation time of a sub simulation runner, in ns. This function
     is used with multiprocessing to speed up the calculation.
@@ -27,8 +34,11 @@ def get_simtime(sim_runner: _SimulationRunner) -> float:
     ----------
     sim_runner : SimulationRunner
         The simulation runner to get the simulation time of.
+    run_nos : List[int], Optional, default: None
+        The run numbers to use for MBAR. If None, all runs will be used.
     """
-    return sim_runner.tot_simtime  # ns
+    run_nos = sim_runner._get_valid_run_nos(run_nos=run_nos)
+    return sim_runner.get_tot_simtime(run_nos=run_nos)  # ns
 
 
 #### Adapted from https://stackoverflow.com/questions/50246304/using-python-decorators-to-retry-request ####

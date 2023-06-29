@@ -32,6 +32,7 @@ def general_plot(
     outfile: str,
     vline_val: _Optional[float] = None,
     hline_val: _Optional[float] = None,
+    run_nos: _Optional[_List[int]] = None,
 ) -> None:
     """
     Plot several sets of y_vals against one set of x vals, and show confidence
@@ -55,6 +56,9 @@ def general_plot(
         equilibration.
     hline_val : float, Optional
         y value to draw a horizontal line at.
+    run_nos : List[int], Optional
+        List of of the numbers of the runs supplied. If None, the runs are
+        numbered in the order supplied from 1.
     """
     y_avg = _np.mean(y_vals, axis=0)
     conf_int = _stats.t.interval(
@@ -64,7 +68,7 @@ def general_plot(
     fig, ax = _plt.subplots(figsize=(8, 6))
     ax.plot(x_vals, y_avg, label="Mean", linewidth=2)
     for i, entry in enumerate(y_vals):
-        ax.plot(x_vals, entry, alpha=0.5, label=f"run {i+1}")
+        ax.plot(x_vals, entry, alpha=0.5, label=f"run {run_nos[i] if run_nos else i+1}")
     if vline_val is not None:
         ax.axvline(x=vline_val, color="red", linestyle="dashed")
     if hline_val is not None:
@@ -302,7 +306,9 @@ def plot_gradient_stats(
     _plt.close(fig)
 
 
-def plot_gradient_hists(gradients_data: GradientData, output_dir: str) -> None:
+def plot_gradient_hists(
+    gradients_data: GradientData, output_dir: str, run_nos: _Optional[_List[int]] = None
+) -> None:
     """
     Plot histograms of the gradients for a list of lambda windows.
     If equilibrated is True, only data after equilibration is used.
@@ -313,8 +319,8 @@ def plot_gradient_hists(gradients_data: GradientData, output_dir: str) -> None:
         GradientData object containing the gradient data.
     output_dir : str
         Directory to save the plot to.
-    equilibrated : bool
-        If True, only equilibrated data is used.
+    run_nos : List[int], Optional, default: None
+        The run numbers to use. If None, all runs will be used.
 
     Returns
     -------
@@ -332,7 +338,13 @@ def plot_gradient_hists(gradients_data: GradientData, output_dir: str) -> None:
         if i < n_lams:
             # One histogram for each simulation
             for j, gradients in enumerate(gradients_data.gradients[i]):
-                ax.hist(gradients, bins=50, density=True, alpha=0.5, label=f"Run {j+1}")
+                ax.hist(
+                    gradients,
+                    bins=50,
+                    density=True,
+                    alpha=0.5,
+                    label=f"Run {run_nos[j] if run_nos else j+1}",
+                )
             ax.legend()
             ax.set_title(f"$\lambda$ = {gradients_data.lam_vals[i]}")
             ax.set_xlabel(r"$\frac{\mathrm{d}h}{\mathrm{d}\lambda}$ / kcal mol$^{-1}$")
@@ -377,7 +389,9 @@ def plot_gradient_hists(gradients_data: GradientData, output_dir: str) -> None:
     _plt.close(fig)
 
 
-def plot_gradient_timeseries(gradients_data: GradientData, output_dir: str) -> None:
+def plot_gradient_timeseries(
+    gradients_data: GradientData, output_dir: str, run_nos: _Optional[_List[int]] = None
+) -> None:
     """
     Plot timeseries of the gradients for a list of lambda windows.
     If equilibrated is True, only data after equilibration is used.
@@ -388,8 +402,8 @@ def plot_gradient_timeseries(gradients_data: GradientData, output_dir: str) -> N
         GradientData object containing the gradient data.
     output_dir : str
         Directory to save the plot to.
-    equilibrated : bool
-        If True, only equilibrated data is used.
+    run_nos : List[int], Optional, default: None
+        The run numbers to use. If None, all runs will be used.
 
     Returns
     -------
@@ -405,7 +419,10 @@ def plot_gradient_timeseries(gradients_data: GradientData, output_dir: str) -> N
             # One histogram for each simulation
             for j, gradients in enumerate(gradients_data.gradients[i]):
                 ax.plot(
-                    gradients_data.times[i], gradients, alpha=0.5, label=f"Run {j+1}"
+                    gradients_data.times[i],
+                    gradients,
+                    alpha=0.5,
+                    label=f"Run {run_nos[j] if run_nos else j+1}",
                 )
             ax.legend()
             ax.set_title(f"$\lambda$ = {gradients_data.lam_vals[i]}")
@@ -526,6 +543,7 @@ def plot_overlap_mat(
 
 def plot_overlap_mats(
     output_dir: str,
+    run_nos: _Optional[_List[int]] = None,
     mbar_outfiles: _Optional[_List[str]] = None,
     predicted: bool = False,
     gradient_data: _Optional[GradientData] = None,
@@ -537,6 +555,8 @@ def plot_overlap_mats(
     ----------
     output_dir : str
         The directory to save the plot to.
+    run_nos : Optional[List[int]], default=None
+        List of run numbers to use for MBAR. If None, all runs will be used.
     mbar_outfiles : Optional[List[str]], default=None
         List of MBAR outfiles. It is assumed that these are passed in the same
         order as the runs they correspond to. This is required if predicted
@@ -552,6 +572,8 @@ def plot_overlap_mats(
     -------
     None
     """
+    # Check that the passed mbar outfiles, run_nos, and gradient_data are consistent
+
     if predicted:
         if not gradient_data:
             raise ValueError("GradientData object required if predicted is True.")
@@ -589,7 +611,7 @@ def plot_convergence(
     tot_simtime: float,
     equil_time: float,
     output_dir: str,
-    ensemble_size: int,
+    n_runs: int,
 ) -> None:
     """
     Plot convergence of free energy estimate as a function of the total
@@ -603,16 +625,16 @@ def plot_convergence(
         Array of free energies at each fraction of the total equilibrated simulation time. This has
         ensemble size dimensions.
     tot_simtime : float
-        Total simulation time.
+        Total simulation time for the runs included.
     equil_time : float
-        Equilibration time.
+        Equilibration time (per run)
     output_dir : str
         Directory to save the plot to.
-    ensemble_size : int
-        Number of simulations in the ensemble.
+    n_runs : int
+        Number of runs used to calculate the free energy estimate.
     """
     # Convert fraction of the equilibrated simulation time to total simulation time in ns
-    tot_equil_time = equil_time * ensemble_size
+    tot_equil_time = equil_time * n_runs
     times = fracts * (tot_simtime - tot_equil_time) + tot_equil_time
     # Add zero time to the start
     times = _np.concatenate((_np.array([0]), times))

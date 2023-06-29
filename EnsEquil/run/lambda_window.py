@@ -197,12 +197,7 @@ class LamWindow(_SimulationRunner):
         -------
         None
         """
-        # Check that the supplied run numbers are valid, and generate run
-        # numbers if none are supplied
-        if run_nos is None:
-            run_nos = list(range(1, self.ensemble_size + 1))
-        else:
-            self._check_run_nos(run_nos)
+        run_nos = self._get_valid_run_nos(run_nos)
 
         # Run the simulations
         self._logger.info(f"Running simulations {run_nos} for {runtime:.3f} ns")
@@ -219,30 +214,52 @@ class LamWindow(_SimulationRunner):
                 sim.kill()
             self._running = False
 
-    @property
-    def equilibrated(self) -> bool:
+    def get_tot_simtime(self, run_nos: _Optional[_List[int]] = None) -> float:
         """
-        Check if the ensemble of simulations at the lambda window is
-        equilibrated, and update the equilibration time and status if
-        so.
+        Get the total simulation time for all specified runs, in ns.
+
+        Parameters
+        ----------
+        run_nos : List[int], Optional, default: None
+            The run numbers to use for MBAR. If None, all runs will be used.
 
         Returns
         -------
-        self._equilibrated : bool
+        tot_simtime : float
+            Total simulation time, in ns.
+        """
+        run_nos = self._get_valid_run_nos(run_nos)
+
+        return sum([self.sims[run_no - 1].get_tot_simtime() for run_no in run_nos])
+
+    def is_equilibrated(self, run_nos: _Optional[_List[int]] = None) -> bool:
+        """
+        Check if the ensemble of simulations at the lambda window is
+        equilibrated, based on the run numbers specified and the
+        equilibration detection method. Store the equilibration status
+        and time in private variables if so.
+
+        Parameters
+        ----------
+        run_nos : List[int], Optional, default: None
+            The run numbers to equilibration detection. If None, all runs will be used.
+
+        Returns
+        -------
+        equilibrated : bool
             True if the simulation is equilibrated, False otherwise.
         """
-        self._equilibrated, self._equil_time = self.check_equil(self)
+        self._equilibrated, self._equil_time = self.check_equil(self, run_nos=run_nos)
         return self._equilibrated
 
     @property
-    def equil_time(self) -> float:
-        # Avoid calling expensive self.check_equil() function if we don't have to
-        if not self._equilibrated:
-            self._equilibrated, self._equil_time = self.check_equil(self)
-        if self._equil_time is None:
-            raise RuntimeError(
-                "Equilibration is not complete so equilibration time cannot be determined"
-            )
+    def equilibrated(self) -> bool:
+        """Whether equilibration has been achieved."""
+        return self._equilibrated
+
+    @property
+    def equil_time(self) -> _Union[float, None]:
+        """The equilibration time in ns, per run."""
         return self._equil_time  # ns
 
     @property

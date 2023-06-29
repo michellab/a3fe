@@ -980,7 +980,7 @@ class Leg(_SimulationRunner):
 
     def run(
         self,
-        run_nos: _Optional[_List[int]],
+        run_nos: _Optional[_List[int]] = None,
         adaptive: bool = True,
         runtime: _Optional[float] = None,
         parallel: bool = True,
@@ -1004,10 +1004,7 @@ class Leg(_SimulationRunner):
         -------
         None
         """
-        if run_nos is not None:
-            self._check_run_nos(run_nos)
-        else:
-            run_nos = list(range(1, self.ensemble_size + 1))
+        run_nos = self._get_valid_run_nos(run_nos)
 
         self._logger.info(
             f"Running run numbers {run_nos} for {self.__class__.__name__}..."
@@ -1017,7 +1014,9 @@ class Leg(_SimulationRunner):
             if not parallel:
                 stage.wait()
 
-    def analyse(self, subsampling=False) -> _Tuple[_np.ndarray, _np.ndarray]:
+    def analyse(
+        self, run_nos: _Optional[_List[int]], subsampling=False
+    ) -> _Tuple[_np.ndarray, _np.ndarray]:
         f"""
         Analyse the leg and any sub-simulations, and
         return the overall free energy change.
@@ -1037,14 +1036,18 @@ class Leg(_SimulationRunner):
             The overall error for each of the ensemble size
             repeats.
         """
-        dg_overall, er_overall = super().analyse(subsampling=subsampling)
+        run_nos = self._get_valid_run_nos(run_nos)
+
+        dg_overall, er_overall = super().analyse(
+            run_nos=run_nos, subsampling=subsampling
+        )
 
         if self.leg_type == _LegType.BOUND:
             # We need to add on the restraint corrections. There are no errors associated with these.
             rest_corrs = _np.array(
                 [
-                    self.restraints[i].getCorrection().value()
-                    for i in range(self.ensemble_size)
+                    self.restraints[run_no - 1].getCorrection().value()
+                    for run_no in run_nos
                 ]
             )
             self._logger.info(f"Restraint corrections: {rest_corrs}")
@@ -1055,11 +1058,18 @@ class Leg(_SimulationRunner):
 
         return dg_overall, er_overall
 
-    def analyse_convergence(self) -> _Tuple[_np.ndarray, _np.ndarray]:
+    def analyse_convergence(
+        self, run_nos: _Optional[_List[int]] = None
+    ) -> _Tuple[_np.ndarray, _np.ndarray]:
         f"""
         Get a timeseries of the total free energy change of the
         {self.__class__.__name__} against total simulation time. Also plot this.
         Keep this separate from analyse as it is expensive to run.
+
+        Parameters
+        ----------
+        run_nos : Optional[List[int]], default=None
+            If specified, only analyse the specified runs. Otherwise, analyse all runs.
 
         Returns
         -------
@@ -1069,17 +1079,19 @@ class Leg(_SimulationRunner):
             The overall free energy change for the {self.__class__.__name__} for
             each value of total equilibrated simtime for each of the ensemble size repeats.
         """
+        run_nos = self._get_valid_run_nos(run_nos)
+
         self._logger.info(f"Analysing convergence of {self.__class__.__name__}...")
 
         # Get the dg_overall in terms of fraction of the total simulation time
         # Use steps of 5 % of the total simulation time
         fracts = _np.arange(0.05, 1.05, 0.05)
         # Create an array to store the overall free energy change
-        dg_overall = _np.zeros((self.ensemble_size, len(fracts)))
+        dg_overall = _np.zeros((len(run_nos), len(fracts)))
 
         # Now add up the data for each of the sub-simulation runners
         for sub_sim_runner in self._sub_sim_runners:
-            _, dgs = sub_sim_runner.analyse_convergence()
+            _, dgs = sub_sim_runner.analyse_convergence(run_nos=run_nos)
             # Decide if the component should be added or subtracted
             # according to the dg_multiplier attribute
             dg_overall += dgs * sub_sim_runner.dg_multiplier
@@ -1088,8 +1100,8 @@ class Leg(_SimulationRunner):
             # We need to add on the restraint corrections. There are no errors associated with these.
             rest_corrs = _np.array(
                 [
-                    self.restraints[i].getCorrection().value()
-                    for i in range(self.ensemble_size)
+                    self.restraints[run_no - 1].getCorrection().value()
+                    for run_no in run_nos
                 ]
             )
             self._logger.info(
@@ -1106,10 +1118,10 @@ class Leg(_SimulationRunner):
         _plot_convergence(
             fracts,
             dg_overall,
-            self.tot_simtime,
+            self.get_tot_simtime(run_nos=run_nos),
             self.equil_time,
             self.output_dir,
-            self.ensemble_size,
+            len(run_nos),
         )
 
         return fracts, dg_overall
@@ -1119,7 +1131,7 @@ class Leg(_SimulationRunner):
         and lightening all sub-simulation runners"""
         # Remove the ensemble equilibration directories
         for direct in _pathlib.Path(self.base_dir).glob("ensemble_equilibration*"):
-            print("DIRECTOIRY TO REMOVE", direct)
+            print("DIRECTORY TO REMOVE", direct)
             self._logger.info(f"Deleting {direct}")
             _subprocess.run(["rm", "-rf", direct])
 

@@ -226,11 +226,8 @@ class Stage(_SimulationRunner):
         -------
         None
         """
-        # Check run numbers
-        if run_nos is not None:
-            self._check_run_nos(run_nos)
-        else:
-            run_nos = list(range(1, self.ensemble_size + 1))
+        run_nos = self._get_valid_run_nos(run_nos)
+
         if not adaptive and runtime is None:
             raise ValueError(
                 "If adaptive equilibration detection is disabled, a runtime must be supplied."
@@ -393,6 +390,7 @@ class Stage(_SimulationRunner):
         max_runtime : float, Optional, default: 30
             The maximum runtime for a single simulation during an adaptive simulation, in ns.
         """
+        n_runs = len(run_nos)
 
         while self.running_wins:
             _sleep(cycle_pause)  # Check every 60 seconds
@@ -408,14 +406,14 @@ class Stage(_SimulationRunner):
                 # Check if the window has now finished - calling win.running updates the win._running attribute
                 if not win.running:
                     # If we are in adaptive mode, check if the simulation has equilibrated and if not, resubmit
-                    if win.equilibrated:
+                    if win.is_equilibrated(run_nos=run_nos):
                         self._logger.info(
                             f"{win} has equilibrated at {win.equil_time:.3f} ns"
                         )
                         self.running_wins.remove(win)
                     else:
                         # Check that we haven't exceeded the maximum runtime for any simulations
-                        if win.tot_simtime / win.ensemble_size >= max_runtime:
+                        if win.get_tot_simtime(run_nos=run_nos) / n_runs >= max_runtime:
                             self._logger.info(
                                 f"{win} has not equilibrated but simulations have exceeded the maximum runtime of "
                                 f"{max_runtime} ns. Terminating simulations"
@@ -491,7 +489,7 @@ class Stage(_SimulationRunner):
                 predicted_run_time_max_eff = (
                     1 / _np.sqrt(self.runtime_constant)
                 ) * normalised_sem_dg
-                actual_run_time = win.tot_simtime
+                actual_run_time = win.get_tot_simtime(run_nos=run_nos)
                 win._logger.info(
                     f"Predicted maximum efficiency run time for is {predicted_run_time_max_eff:.3f} ns"
                 )
@@ -570,7 +568,7 @@ class Stage(_SimulationRunner):
             )
 
         # Assumes that we have not already equilibrated
-        while not self.equilibrated:
+        while not self.is_equilibrated(run_nos=run_nos):
             if self.kill_thread:
                 # Check if we've requested to kill the thread
                 self._logger.info(f"Kill thread requested: exiting run loop")
@@ -582,10 +580,10 @@ class Stage(_SimulationRunner):
                 "Checking for equilibration with the check_equil_multiwindow algorithm..."
             )
             equilibrated, fractional_equil_time = _check_equil_multiwindow_kpss(
-                self.lam_windows, output_dir=self.output_dir
+                self.lam_windows, output_dir=self.output_dir, run_nos=run_nos
             )
             if equilibrated:
-                total_simtime = self.tot_simtime
+                total_simtime = self.get_tot_simtime(run_nos=run_nos)
                 tot_equil_time = total_simtime * fractional_equil_time  # type: ignore
                 self._logger.info("Equilibration achieved")
                 self._logger.info(
@@ -688,13 +686,18 @@ class Stage(_SimulationRunner):
         return lam_vals
 
     def analyse(
-        self, get_frnrg: bool = True, subsampling=False
+        self,
+        run_nos: _Optional[_List[int]] = None,
+        get_frnrg: bool = True,
+        subsampling=False,
     ) -> _Union[_Tuple[float, float], _Tuple[None, None]]:
         r"""Analyse the results of the ensemble of simulations. Requires that
         all lambda windows have equilibrated.
 
         Parameters
         ----------
+        run_nos : List[int], Optional, default: None
+            The run numbers to analyse. If None, all runs will be analysed.
         get_frnrg : bool, optional, default=True
             If True, the free energy will be calculated with MBAR, otherwise
             this will be skipped.
@@ -712,6 +715,8 @@ class Stage(_SimulationRunner):
             for each of the ensemble size runs, in kcal mol-1.  If get_frnrg is
             False, this is None.
         """
+        run_nos = self._get_valid_run_nos(run_nos)
+
         # Check that this is not still running
         if self.running:
             raise RuntimeError(f"Cannot perform analysis as the Stage is still running")
@@ -731,8 +736,7 @@ class Stage(_SimulationRunner):
 
         # Check that all simulations have equilibrated
         for win in self.lam_windows:
-            # Avoid checking win.equilibrated as this causes expensive equilibration detection to be run
-            if not win._equilibrated:
+            if not win.equilibrated:
                 raise RuntimeError(
                     "Not all lambda windows have equilibrated. Analysis cannot be performed."
                 )
@@ -742,7 +746,9 @@ class Stage(_SimulationRunner):
                 )
 
         if get_frnrg:
-            self._logger.info("Computing free energy changes using the MBAR")
+            self._logger.info(
+                f"Computing free energy changes using the MBAR for runs {run_nos}"
+            )
 
             # Remove unequilibrated data from the equilibrated output directory
             for win in self.lam_windows:
@@ -751,13 +757,15 @@ class Stage(_SimulationRunner):
                 equil_index = (
                     int(equil_time / (win.sims[0].timestep * win.sims[0].nrg_freq)) - 1
                 )
-                for sim in win.sims:
+                for run_no in run_nos:
+                    sim = win.sims[run_no - 1]
                     in_simfile = sim.output_dir + "/simfile.dat"
                     out_simfile = sim.output_dir + "/simfile_equilibrated.dat"
                     self._write_equilibrated_data(in_simfile, out_simfile, equil_index)
 
             # Run MBAR and compute mean and 95 % C.I. of free energy
             free_energies, errors, mbar_outfiles = _run_mbar(
+                run_nos=run_nos,
                 output_dir=self.output_dir,
                 ensemble_size=self.ensemble_size,
                 percentage=100,
@@ -784,13 +792,14 @@ class Stage(_SimulationRunner):
                     ofile.write(
                         f"Mean free energy: {mean_free_energy: .3f} + /- {conf_int:.3f} kcal/mol\n"
                     )
-                    for i in range(self.ensemble_size):
+                    for i in range(len(free_energies)):
                         ofile.write(
                             f"Free energy from run {i+1}: {free_energies[i]: .3f} +/- {errors[i]:.3f} kcal/mol\n"
                         )
                     ofile.write(
                         "Errors are 95 % C.I.s based on the assumption of a Gaussian distribution of free energies\n"
                     )
+                    ofile.write(f"Runs analysed: {run_nos}\n")
 
             # Plot overlap matrices and PMFs
             _plot_overlap_mats(output_dir=self.output_dir, mbar_outfiles=mbar_outfiles)
@@ -813,7 +822,7 @@ class Stage(_SimulationRunner):
         # Analyse the gradient data and make plots
         self._logger.info("Plotting gradients data")
         equilibrated_gradient_data = _GradientData(
-            lam_winds=self.lam_windows, equilibrated=True
+            lam_winds=self.lam_windows, equilibrated=True, run_nos=run_nos
         )
         for plot_type in [
             "mean",
@@ -831,10 +840,14 @@ class Stage(_SimulationRunner):
                 plot_type=plot_type,
             )
         _plot_gradient_hists(
-            gradients_data=equilibrated_gradient_data, output_dir=self.output_dir
+            gradients_data=equilibrated_gradient_data,
+            output_dir=self.output_dir,
+            run_nos=run_nos,
         )
         _plot_gradient_timeseries(
-            gradients_data=equilibrated_gradient_data, output_dir=self.output_dir
+            gradients_data=equilibrated_gradient_data,
+            output_dir=self.output_dir,
+            run_nos=run_nos,
         )
 
         # Make plots of equilibration time
@@ -856,6 +869,7 @@ class Stage(_SimulationRunner):
         if get_frnrg:
             self._logger.info(f"Overall free energy changes: {free_energies} kcal mol-1")  # type: ignore
             self._logger.info(f"Overall errors: {errors} kcal mol-1")  # type: ignore
+            self._logger.info(f"Analysed runs: {run_nos}")
             # Update the interally-stored results
             self._delta_g = free_energies
             self._delta_g_er = errors
@@ -863,12 +877,20 @@ class Stage(_SimulationRunner):
         else:
             return None, None
 
-    def analyse_convergence(self) -> _Tuple[_np.ndarray, _np.ndarray]:
+    def analyse_convergence(
+        self,
+        run_nos: _Optional[_List[int]] = None,
+    ) -> _Tuple[_np.ndarray, _np.ndarray]:
         """
         Get a timeseries of the total free energy change of the
         stage against total simulation time. Also plot this.
         This is kept separate from the analyse method as it is
         expensive to run.
+
+        Parameters
+        ----------
+        run_nos : List[int], Optional, default: None
+            The run numbers to analyse. If None, all runs will be analysed.
 
         Returns
         -------
@@ -878,6 +900,8 @@ class Stage(_SimulationRunner):
             The overall free energy change for the stage for each value of total equilibrated
             simtime for each of the ensemble size repeats.
         """
+        run_nos = self._get_valid_run_nos(run_nos)
+
         self._logger.info("Analysing convergence...")
 
         # Get the dg_overall in terms of fraction of the total simulation time
@@ -891,7 +915,15 @@ class Stage(_SimulationRunner):
             results = pool.starmap(
                 _run_mbar,
                 [
-                    (self.output_dir, self.ensemble_size, percent, False, 298, True)
+                    (
+                        self.output_dir,
+                        self.ensemble_size,
+                        run_nos,
+                        percent,
+                        False,
+                        298,
+                        True,
+                    )
                     for percent in percents
                 ],
             )
@@ -906,10 +938,10 @@ class Stage(_SimulationRunner):
         _plot_convergence(
             fracts,
             dg_overall,
-            self.tot_simtime,
+            self.get_tot_simtime(run_nos=run_nos),
             self.equil_time,
             self.output_dir,
-            self.ensemble_size,
+            len(run_nos),
         )
 
         return fracts, dg_overall
@@ -958,6 +990,35 @@ class Stage(_SimulationRunner):
 
     def setup(self) -> None:
         raise NotImplementedError("Stages are set up when they are created")
+
+    def get_tot_simtime(self, run_nos: _Optional[_List[int]] = None) -> float:
+        """
+        Get the total simulation time for the stage, in ns.
+
+        Parameters
+        ----------
+        run_nos : List[int], Optional, default: None
+            The run numbers to analyse. If None, all runs will be analysed.
+
+        Returns
+        -------
+        tot_simtime : float
+            The total simulation time for the stage, in ns.
+        """
+        # Use multiprocessing at the level of stages to speed this us - this is a good place as stages
+        # have lots of windows, so we benefit the most from parallelisation here.
+        run_nos = self._get_valid_run_nos(run_nos)
+        with _Pool() as pool:
+            tot_simtime = sum(
+                pool.starmap(
+                    _get_simtime,
+                    [
+                        (sub_sim_runner, run_nos)
+                        for sub_sim_runner in self._sub_sim_runners
+                    ],
+                )
+            )
+        return tot_simtime
 
     @property
     def tot_simtime(self) -> float:

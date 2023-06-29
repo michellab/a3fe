@@ -244,10 +244,7 @@ class SimulationRunner(ABC):
             Any additional arguments to pass to the run method of the
             sub-simulation runners.
         """
-        if run_nos is not None:
-            self._check_run_nos(run_nos)
-        else:
-            run_nos = list(range(1, self.ensemble_size + 1))
+        run_nos = self._get_valid_run_nos(run_nos)
 
         self._logger.info(
             f"Running run numbers {run_nos} for {self.__class__.__name__}..."
@@ -255,23 +252,41 @@ class SimulationRunner(ABC):
         for sub_sim_runner in self._sub_sim_runners:
             sub_sim_runner.run(run_nos=run_nos, *args, **kwargs)
 
-    def _check_run_nos(self, run_nos: _List[int]) -> None:
-        """Check the requested run numbers are valid."""
-        # Check that the run numbers correspond to valid runs
-        if any([run_no > self.ensemble_size for run_no in run_nos]):
-            raise ValueError(
-                f"Invalid run numbers {run_nos}. All run numbers must be less than or equal to {self.ensemble_size}"
-            )
-        # Check that no run numbers are repeated
-        if len(run_nos) != len(set(run_nos)):
-            raise ValueError(
-                f"Invalid run numbers {run_nos}. All run numbers must be unique"
-            )
-        # Check that the run numbers are greater than 0
-        if any([run_no < 1 for run_no in run_nos]):
-            raise ValueError(
-                f"Invalid run numbers {run_nos}. All run numbers must be greater than 0"
-            )
+    def _get_valid_run_nos(self, run_nos: _Optional[_List[int]] = None) -> _List[int]:
+        """
+        Check the requested run numbers are valid, and return
+        a list of all run numbers if None was passed.
+
+        Parameters
+        ----------
+        run_nos : List[int], Optional, default=None
+            A list of the run numbers to run. If None, all runs are run.
+
+        Returns
+        -------
+        run_nos : List[int]
+            A list of valid run numbers.
+        """
+        if run_nos is not None:
+            # Check that the run numbers correspond to valid runs
+            if any([run_no > self.ensemble_size for run_no in run_nos]):
+                raise ValueError(
+                    f"Invalid run numbers {run_nos}. All run numbers must be less than or equal to {self.ensemble_size}"
+                )
+            # Check that no run numbers are repeated
+            if len(run_nos) != len(set(run_nos)):
+                raise ValueError(
+                    f"Invalid run numbers {run_nos}. All run numbers must be unique"
+                )
+            # Check that the run numbers are greater than 0
+            if any([run_no < 1 for run_no in run_nos]):
+                raise ValueError(
+                    f"Invalid run numbers {run_nos}. All run numbers must be greater than 0"
+                )
+        else:
+            run_nos = list(range(1, self.ensemble_size + 1))
+
+        return run_nos
 
     def kill(self) -> None:
         f"""Kill the {self.__class__.__name__}"""
@@ -285,7 +300,9 @@ class SimulationRunner(ABC):
         for sub_sim_runner in self._sub_sim_runners:
             sub_sim_runner.setup()
 
-    def analyse(self, subsampling=False) -> _Tuple[_np.ndarray, _np.ndarray]:
+    def analyse(
+        self, run_nos: _Optional[_List[int]] = None, subsampling=False
+    ) -> _Tuple[_np.ndarray, _np.ndarray]:
         f"""
         Analyse the {self.__class__.__name__} and any
         sub-simulations, and return the overall free energy
@@ -293,6 +310,8 @@ class SimulationRunner(ABC):
 
         Parameters
         ----------
+        run_nos : List[int], Optional, default=None
+            A list of the run numbers to analyse. If None, all runs are analysed.
         subsampling: bool, optional, default=False
             If True, the free energy will be calculated by subsampling using
             the methods contained within pymbar.
@@ -306,9 +325,11 @@ class SimulationRunner(ABC):
             The overall error for each of the ensemble size
             repeats.
         """
-        self._logger.info(f"Analysing {self.__class__.__name__}...")
-        dg_overall = _np.zeros(self.ensemble_size)
-        er_overall = _np.zeros(self.ensemble_size)
+        run_nos = self._get_valid_run_nos(run_nos)
+
+        self._logger.info(f"Analysing runs {run_nos} for {self.__class__.__name__}...")
+        dg_overall = _np.zeros(len(run_nos))
+        er_overall = _np.zeros(len(run_nos))
 
         # Check that this is not still running
         if self.running:
@@ -331,7 +352,7 @@ class SimulationRunner(ABC):
 
         # Analyse the sub-simulation runners
         for sub_sim_runner in self._sub_sim_runners:
-            dg, er = sub_sim_runner.analyse(subsampling=subsampling)
+            dg, er = sub_sim_runner.analyse(run_nos=run_nos, subsampling=subsampling)
             # Decide if the component should be added or subtracted
             # according to the dg_multiplier attribute
             dg_overall += dg * sub_sim_runner.dg_multiplier
@@ -376,11 +397,18 @@ class SimulationRunner(ABC):
 
         return dg_overall, er_overall
 
-    def analyse_convergence(self) -> _Tuple[_np.ndarray, _np.ndarray]:
+    def analyse_convergence(
+        self, run_nos: _Optional[_List[int]]
+    ) -> _Tuple[_np.ndarray, _np.ndarray]:
         f"""
         Get a timeseries of the total free energy change of the
         {self.__class__.__name__} against total simulation time. Also plot this.
         Keep this separate from analyse as it is expensive to run.
+
+        Parameters
+        ----------
+        run_nos : List[int], Optional, default=None
+            A list of the run numbers to analyse. If None, all runs are analysed.
 
         Returns
         -------
@@ -390,17 +418,21 @@ class SimulationRunner(ABC):
             The overall free energy change for the {self.__class__.__name__} for
             each value of total equilibrated simtime for each of the ensemble size repeats.
         """
-        self._logger.info(f"Analysing convergence of {self.__class__.__name__}...")
+        run_nos = self._get_valid_run_nos(run_nos)
+
+        self._logger.info(
+            f"Analysing convergence of {self.__class__.__name__} for runs {run_nos}..."
+        )
 
         # Get the dg_overall in terms of fraction of the total simulation time
         # Use steps of 5 % of the total simulation time
         fracts = _np.arange(0.05, 1.05, 0.05)
         # Create an array to store the overall free energy change
-        dg_overall = _np.zeros((self.ensemble_size, len(fracts)))
+        dg_overall = _np.zeros((len(run_nos), len(fracts)))
 
         # Now add up the data for each of the sub-simulation runners
         for sub_sim_runner in self._sub_sim_runners:
-            _, dgs = sub_sim_runner.analyse_convergence()
+            _, dgs = sub_sim_runner.analyse_convergence(run_nos=run_nos)
             # Decide if the component should be added or subtracted
             # according to the dg_multiplier attribute
             dg_overall += dgs * sub_sim_runner.dg_multiplier
@@ -432,11 +464,37 @@ class SimulationRunner(ABC):
         while self.running:
             _sleep(30)  # Check every 30 seconds
 
+    def get_tot_simtime(self, run_nos: _Optional[_List[int]] = None) -> float:
+        f"""
+        Get the total simulation time in ns for the {self.__class__.__name__}.
+        and any sub-simulation runners.
+
+        Parameters
+        ----------
+        run_nos : List[int], Optional, default=None
+            A list of the run numbers to analyse. If None, all runs are analysed.
+
+        Returns
+        -------
+        tot_simtime : float
+            The total simulation time in ns.
+        """
+        run_nos = self._get_valid_run_nos(run_nos)
+        return sum(
+            [
+                sub_sim_runner.get_tot_simtime(run_nos=run_nos)
+                for sub_sim_runner in self._sub_sim_runners
+            ]
+        )  # ns
+
     @property
     def tot_simtime(self) -> float:
         f"""The total simulation time in ns for the {self.__class__.__name__} and any sub-simulation runners."""
         return sum(
-            [sub_sim_runner.tot_simtime for sub_sim_runner in self._sub_sim_runners]
+            [
+                sub_sim_runner.get_tot_simtime()
+                for sub_sim_runner in self._sub_sim_runners
+            ]
         )  # ns
 
     @property
@@ -454,6 +512,30 @@ class SimulationRunner(ABC):
             for sub_sim_runner in self._sub_sim_runners
             for failure in sub_sim_runner.failed_simulations
         ]
+
+    def is_equilibrated(self, run_nos: _Optional[_List[int]] = None) -> bool:
+        f"""
+        Whether the {self.__class__.__name__} is equilibrated. This updates
+        the _equilibrated and _equil_time attributes of the lambda windows,
+        which are accessed by the equilibrated and equil_time properties.
+
+        Parameters
+        ----------
+        run_nos : List[int], Optional, default=None
+            A list of the run numbers to check for equilibration. If None, all runs are analysed.
+
+        Returns
+        -------
+        equilibrated : bool
+            Whether the {self.__class__.__name__} is equilibrated.
+        """
+        run_nos = self._get_valid_run_nos(run_nos)
+        return all(
+            [
+                sub_sim_runner.is_equilibrated(run_nos=run_nos)
+                for sub_sim_runner in self._sub_sim_runners
+            ]
+        )
 
     @property
     def equilibrated(self) -> float:
