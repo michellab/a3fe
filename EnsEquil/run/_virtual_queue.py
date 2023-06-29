@@ -56,13 +56,13 @@ class VirtualQueue():
     when there are few enough jobs queued. This gets round slurm
     queue limits."""
 
-    def __init__(self, queue_len_lim: int = 20, log_dir: str = "./output") -> None:
+    def __init__(self, queue_len_lim: int = 2000, log_dir: str = "./output") -> None:
         """ 
         Initialise the virtual queue.
 
         Parameters
         ----------
-        queue_len_lim : int, Optional, default: 20
+        queue_len_lim : int, Optional, default: 2000
             The maximum number of jobs to queue in the real queue.
         log_dir : str, Optional, default: "./output"
             The directory to write the log to.
