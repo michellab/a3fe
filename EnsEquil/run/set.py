@@ -25,20 +25,24 @@ from ._simulation_runner import SimulationRunner as _SimulationRunner
 
 from ._utils import TmpWorkingDir as _TmpWorkingDir
 
+
 class Set(_SimulationRunner):
-    """ 
+    """
     Class to set up, run, and analyse sets of ABFE calculations
     (each represented by Calculation objects). This runs calculations
     sequentially to avoid overloading the system.
     """
-    def __init__(self,
-                 calc_paths: _Optional[_List] = None,
-                 calc_args: _Optional[_Dict[str,_Dict]] = None,
-                 base_dir: _Optional[str] = None,
-                 input_dir: _Optional[str] = None,
-                 output_dir: _Optional[str] = None,
-                 stream_log_level: int = _logging.INFO,
-                 update_paths: bool = True) -> None:
+
+    def __init__(
+        self,
+        calc_paths: _Optional[_List] = None,
+        calc_args: _Optional[_Dict[str, _Dict]] = None,
+        base_dir: _Optional[str] = None,
+        input_dir: _Optional[str] = None,
+        output_dir: _Optional[str] = None,
+        stream_log_level: int = _logging.INFO,
+        update_paths: bool = True,
+    ) -> None:
         """
         Instantiate a calculation based on files in the input dir. If calculation.pkl exists in the
         base directory, the calculation will be loaded from this file and any arguments
@@ -56,7 +60,7 @@ class Set(_SimulationRunner):
             Path to the base directory which contains all the Calculations. If None,
             this is set to the current working directory.
         input_dir : str, Optional, default: None
-            Path to directory containing input files for example experimental free 
+            Path to directory containing input files for example experimental free
             energy changes. If None, this is set to `current_working_directory/input`.
         output_dir : str, Optional, default: None
             Path to directory containing output files. If None, this
@@ -72,22 +76,32 @@ class Set(_SimulationRunner):
         -------
         None
         """
-        super().__init__(base_dir=base_dir,
-                         input_dir=input_dir,
-                         output_dir=output_dir,
-                         stream_log_level=stream_log_level,
-                         update_paths=update_paths)
-        
+        super().__init__(
+            base_dir=base_dir,
+            input_dir=input_dir,
+            output_dir=output_dir,
+            stream_log_level=stream_log_level,
+            update_paths=update_paths,
+        )
+
         if not self.loaded_from_pickle:
             # Load/ create the Calculations - temporarily shift to the Calculation base dir
-            if not calc_paths: # If not supplied, assume that every sub-directory is a calculation base dir
-                calc_paths = [directory for directory in _os.listdir() if _os.path.isdir(directory)]
+            if (
+                not calc_paths
+            ):  # If not supplied, assume that every sub-directory is a calculation base dir
+                calc_paths = [
+                    directory
+                    for directory in _os.listdir()
+                    if _os.path.isdir(directory)
+                ]
             self.calc_paths = calc_paths
             for calc_path in calc_paths:
                 # Temporarily move to the calculation base directory
                 with _TmpWorkingDir(calc_path) as _:
                     if calc_args:
-                        calc = _Calculation(**calc_args, stream_log_level=stream_log_level)
+                        calc = _Calculation(
+                            **calc_args, stream_log_level=stream_log_level
+                        )
                     else:
                         calc = _Calculation(stream_log_level=stream_log_level)
                     # Save the calculation to a pickle before unloading from memory
@@ -104,7 +118,6 @@ class Set(_SimulationRunner):
         # because it is lost upon dumping to a pickle (can't pickle generator objects)
         self._sub_sim_runners = self.calcs
 
-    
     @property
     def calcs(self) -> _Iterable[_Calculation]:
         """Generator to avoid loading all calculations into memory at once"""
@@ -114,14 +127,18 @@ class Set(_SimulationRunner):
     @calcs.setter
     def calcs(self, value: _Calculation) -> None:
         """Take the Calculation and add its base directory to the calc_paths list"""
-        self._logger.info(f"Adding base directory {value.base_dir} to list of stored calculation base dirs")
+        self._logger.info(
+            f"Adding base directory {value.base_dir} to list of stored calculation base dirs"
+        )
         self.calc_paths.append(value.base_dir)
 
     def setup(self) -> None:
-        """ Set up all calculations sequentially.  """
+        """Set up all calculations sequentially."""
         for calc in self.calcs:
             if calc.setup_complete:
-                self._logger.info(f"Calculation in {calc.base_dir} is already set up. Skipping...")
+                self._logger.info(
+                    f"Calculation in {calc.base_dir} is already set up. Skipping..."
+                )
                 continue
             try:
                 self._logger.info(f"Setting up calculation in {calc.base_dir}")
@@ -129,16 +146,20 @@ class Set(_SimulationRunner):
                 self._logger.info(f"Calculation in {calc.base_dir} successfully set up")
             except Exception as e:
                 # TODO: Add more specific exception handling
-                self._logger.error(f"Error setting up calculation in {calc.base_dir}: {e}")
+                self._logger.error(
+                    f"Error setting up calculation in {calc.base_dir}: {e}"
+                )
             finally:
                 calc._close_logging_handlers()
                 del calc
 
-    def run(self, 
-            adaptive:bool=True, 
-            runtime:_Optional[float]=None,
-            run_stages_parallel: bool=False,
-            protocol: _SetProtocol = _SetProtocol.STANDARD) -> None:
+    def run(
+        self,
+        adaptive: bool = True,
+        runtime: _Optional[float] = None,
+        run_stages_parallel: bool = False,
+        protocol: _SetProtocol = _SetProtocol.STANDARD,
+    ) -> None:
         """
         Run all calculations. Analysis is not performed by default.
 
@@ -148,9 +169,9 @@ class Set(_SimulationRunner):
             If True, the stages will run until the simulations are equilibrated and perform analysis afterwards.
             If False, the stages will run for the specified runtime and analysis will not be performed.
         runtime : float, Optional, default: None
-            If adaptive is False, runtime must be supplied and stage will run for this number of nanoseconds. 
+            If adaptive is False, runtime must be supplied and stage will run for this number of nanoseconds.
         run_stages_parallel: bool, Optional, default: False
-            If True, the stages for each individual calculation will be run in parallel. Can casuse issues with 
+            If True, the stages for each individual calculation will be run in parallel. Can casuse issues with
             QOS limits on HPC clusters as each stage might try to submit jobs at the same time, resulting in
             oversubmission of jobs. Each calculation will still be run sequentially.
         protocol: SetProtocol: Optional, default: SetProtocol.STANDARD
@@ -162,22 +183,30 @@ class Set(_SimulationRunner):
         """
         self._logger.info(f"Running calculations with protocol {protocol}")
         if protocol == _SetProtocol.NONADAPTIVE_OPT:
-            self._logger.warning("Running calculations in with non-adaptive optimised protocol. As a result, "
-                                "the runtime, adaptive and parallel arguments will be ignored.")
+            self._logger.warning(
+                "Running calculations in with non-adaptive optimised protocol. As a result, "
+                "the runtime, adaptive and parallel arguments will be ignored."
+            )
 
         # Run each calculation sqeuentially.
         for calc in self.calcs:
             if calc.is_complete:
-                self._logger.info(f"Calculation in {calc.base_dir} is already complete. Skipping...")
+                self._logger.info(
+                    f"Calculation in {calc.base_dir} is already complete. Skipping..."
+                )
                 continue
             try:
                 self._logger.info(f"Running calculation in {calc.base_dir}")
                 if protocol == _SetProtocol.STANDARD:
-                    calc.run(adaptive=adaptive, runtime=runtime, parallel=run_stages_parallel)
+                    calc.run(
+                        adaptive=adaptive, runtime=runtime, parallel=run_stages_parallel
+                    )
                     calc.wait()
                 if protocol == _SetProtocol.NONADAPTIVE_OPT:
                     self._run_calc_non_adaptive_opt(calc)
-                self._logger.info(f"Calculation in {calc.base_dir} completed successfully")
+                self._logger.info(
+                    f"Calculation in {calc.base_dir} completed successfully"
+                )
             except Exception as e:
                 # TODO: Add more specific exception handling
                 self._logger.error(f"Error running calculation in {calc.base_dir}: {e}")
@@ -188,7 +217,7 @@ class Set(_SimulationRunner):
     def _run_calc_non_adaptive_opt(self, calc: _Calculation) -> None:
         """
         Run a calculation using the non-adaptive optimised protocol.
-        This involves running all stages for 6 ns and discarding the 
+        This involves running all stages for 6 ns and discarding the
         first ns, other than for bound vanish, which is run for 8 ns
         and the first 3 ns are discarded. Stages are run sequentially
         and not directly through the Calculation object.
@@ -197,37 +226,41 @@ class Set(_SimulationRunner):
         ----------
         calc : _Calculation
             The calculation to run.
-        
+
         Returns
         -------
         None
         """
-        for leg in calc.legs: 
-            for stage in leg.stages: 
-                if leg.leg_type.value == 1 and stage.stage_type.value == 3: # Bound (1) vanish (3) 
+        for leg in calc.legs:
+            for stage in leg.stages:
+                if (
+                    leg.leg_type.value == 1 and stage.stage_type.value == 3
+                ):  # Bound (1) vanish (3)
                     stage.run(adaptive=False, runtime=8)
                     stage.wait()
-                else: 
+                else:
                     stage.run(adaptive=False, runtime=6)
                     stage.wait()
         calc.wait()
         # Set the equilibration time to 1 ns unless bound vanish, in which case 3 ns
-        for leg in calc.legs: 
-            for stage in leg.stages: 
-                if leg.leg_type.value == 1 and stage.stage_type.value == 3: # Bound (1) vanish (3)
-                    for lam in stage.lam_windows: 
-                        lam._equilibrated = True 
-                        lam._equil_time=3
+        for leg in calc.legs:
+            for stage in leg.stages:
+                if (
+                    leg.leg_type.value == 1 and stage.stage_type.value == 3
+                ):  # Bound (1) vanish (3)
+                    for lam in stage.lam_windows:
+                        lam._equilibrated = True
+                        lam._equil_time = 3
                 else:
-                    for lam in stage.lam_windows:  
-                        lam._equilibrated = True  
-                        lam._equil_time=1
+                    for lam in stage.lam_windows:
+                        lam._equilibrated = True
+                        lam._equil_time = 1
         calc._dump()
         calc.analyse()
-        
+
     def analyse(self, exp_dgs_path: str, offset: bool) -> None:
         """
-        Analyse all calculations in the set and plot the 
+        Analyse all calculations in the set and plot the
         free energy changes with respect to experiment.
 
         Parameters
@@ -241,7 +274,7 @@ class Set(_SimulationRunner):
             If True, the calculated dGs will be offset to match the average
             experimental free energies.
         """
-        # Read the experimental dGs into a pandas dataframe and add the extra 
+        # Read the experimental dGs into a pandas dataframe and add the extra
         # columns needed for the calculated values
         all_dgs = _read_exp_dgs(exp_dgs_path)
         all_dgs["calc_dg"] = _np.nan
@@ -250,7 +283,9 @@ class Set(_SimulationRunner):
         # Get the calculated dGs
         for calc in self.calcs:
             # For now, just pull the results from the output files
-            with open(_os.path.join(calc.output_dir, "overall_stats.dat"), "rt") as ifile:
+            with open(
+                _os.path.join(calc.output_dir, "overall_stats.dat"), "rt"
+            ) as ifile:
                 lines = ifile.readlines()
                 dg = float(lines[1].split(" ")[3])
                 conf_int = float(lines[1].split(" ")[-2])
@@ -276,20 +311,21 @@ class Set(_SimulationRunner):
         # Offset the results if required
         if offset:
             shift = all_dgs["exp_dg"].mean() - all_dgs["calc_dg"].mean()
-            all_dgs["calc_dg"]+=shift
+            all_dgs["calc_dg"] += shift
 
         # Calculate statistics and save results
         stats = _compute_stats(all_dgs)
         name = "overall_stats_offset.txt" if offset else "overall_stats.txt"
         with open(_os.path.join(self.output_dir, name), "wt") as ofile:
             for stat in stats:
-                ofile.write(f"{stat}: {stats[stat][0]:.2f} ({stats[stat][1]:.2f}, {stats[stat][2]:.2f})\n")
+                ofile.write(
+                    f"{stat}: {stats[stat][0]:.2f} ({stats[stat][1]:.2f}, {stats[stat][2]:.2f})\n"
+                )
 
         # Plot
-        _plt_against_exp(all_results=all_dgs, 
-                         output_dir=self.output_dir, 
-                         offset=offset,
-                         stats = stats)
+        _plt_against_exp(
+            all_results=all_dgs, output_dir=self.output_dir, offset=offset, stats=stats
+        )
 
     @property
     def _picklable_copy(self) -> _SimulationRunner:

@@ -11,9 +11,10 @@ import subprocess as _subprocess
 from tempfile import TemporaryDirectory as _TemporaryDirectory
 from typing import List as _List, Tuple as _Tuple
 
-def get_rmsd(input_dirs: _List[str],
-                 selection: str,
-                 tot_simtime: float) -> _Tuple[_np.ndarray, _np.ndarray]:
+
+def get_rmsd(
+    input_dirs: _List[str], selection: str, tot_simtime: float
+) -> _Tuple[_np.ndarray, _np.ndarray]:
     """
     Return the RMSD for a given MDAnalysis selection. Reference frame taken as
     the first frame, regardless of whether the total equilibration time is 0 or not.
@@ -38,19 +39,19 @@ def get_rmsd(input_dirs: _List[str],
 
     # Iterate through the runs and collect results
     for i, input_dir in enumerate(input_dirs):
-
         # Get the topology and trajectory files
         # Need to copy the topology file to a parm7 extension so that this is recognised by MDAnanlysis
         with _TemporaryDirectory() as tmpdir:
             top_file = _os.path.join(tmpdir, "somd.parm7")
-            _subprocess.run(["cp", f"{input_dir}/somd.prm7" , top_file],
-                             check=True)
+            _subprocess.run(["cp", f"{input_dir}/somd.prm7", top_file], check=True)
 
             # Convert to .gro file
-            sys = _BSS.IO.readMolecules([top_file, _os.path.join(input_dir, "somd.rst7")])
+            sys = _BSS.IO.readMolecules(
+                [top_file, _os.path.join(input_dir, "somd.rst7")]
+            )
             _BSS.IO.saveMolecules(_os.path.join(tmpdir, "somd"), sys, "grotop")
             top_file = _os.path.join(tmpdir, "somd.gro")
-            
+
             # There could be multiple trajectory files if the simulation has been restarted
             traj_files = _glob.glob(_os.path.join(input_dir, "*.dcd"))
 
@@ -58,7 +59,9 @@ def get_rmsd(input_dirs: _List[str],
             rmsds_run = []
             for traj_file in traj_files:
                 mobile = _Universe(top_file, traj_file)
-                R = _RMSD(mobile, select=selection, groupselections=[selection], ref_frame=0) 
+                R = _RMSD(
+                    mobile, select=selection, groupselections=[selection], ref_frame=0
+                )
                 R.run()
                 rmsd_results = R.results.rmsd.T
                 rmsds_run.extend(rmsd_results[3])

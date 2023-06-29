@@ -3,16 +3,20 @@
 from enum import Enum as _Enum
 from typing import List as _List
 
+
 class JobStatus(_Enum):
     """An enumeration of the possible job statuses"""
+
     NONE = 0
     QUEUED = 1
     FINISHED = 2
     FAILED = 3
     KILLED = 4
 
+
 class StageType(_Enum):
     """Enumeration of the types of stage."""
+
     RESTRAIN = 1
     DISCHARGE = 2
     VANISH = 3
@@ -29,13 +33,17 @@ class StageType(_Enum):
         else:
             raise ValueError("Unknown stage type.")
 
+
 class LegType(_Enum):
     """The type of leg in the calculation."""
+
     BOUND = 1
     FREE = 2
 
+
 class PreparationStage(_Enum):
     """The stage of preparation of the input files."""
+
     STRUCTURES_ONLY = 1
     PARAMETERISED = 2
     SOLVATED = 3
@@ -57,18 +65,26 @@ class PreparationStage(_Enum):
             return "_preequil"
         else:
             raise ValueError(f"Unknown preparation stage: {self}")
-        
+
     def get_simulation_input_files(self, leg_type: LegType) -> _List[str]:
         """Return the input files required for the simulation in this stage."""
         if self == PreparationStage.STRUCTURES_ONLY:
             if leg_type == LegType.BOUND:
-                return ["protein.pdb", "ligand.sdf"] # Need sdf for parameterisation of lig
+                return [
+                    "protein.pdb",
+                    "ligand.sdf",
+                ]  # Need sdf for parameterisation of lig
             elif leg_type == LegType.FREE:
                 return ["ligand.sdf"]
         else:
-            return [f"{leg_type.name.lower()}{self.file_suffix}.{file_type}" for file_type in ["prm7", "rst7"]]
+            return [
+                f"{leg_type.name.lower()}{self.file_suffix}.{file_type}"
+                for file_type in ["prm7", "rst7"]
+            ]
+
 
 class SetProtocol(_Enum):
     """The protocol to use for running the set of calculations."""
+
     STANDARD = 1
     NONADAPTIVE_OPT = 2

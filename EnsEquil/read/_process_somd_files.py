@@ -1,7 +1,14 @@
 """Functionality to manipulate SOMD files."""
 
 import numpy as _np
-from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
+from typing import (
+    Dict as _Dict,
+    List as _List,
+    Tuple as _Tuple,
+    Any as _Any,
+    Optional as _Optional,
+)
+
 
 def read_simfile_option(simfile: str, option: str) -> str:
     """Read an option from a SOMD simfile.
@@ -17,13 +24,14 @@ def read_simfile_option(simfile: str, option: str) -> str:
     value : str
         The value of the option.
     """
-    with open(simfile, 'r') as f:
+    with open(simfile, "r") as f:
         lines = f.readlines()
     for line in lines:
         if line.split("=")[0].strip() == option:
             value = line.split("=")[1].strip()
             return value
     raise ValueError(f"Option {option} not found in simfile {simfile}")
+
 
 def write_simfile_option(simfile: str, option: str, value: str) -> None:
     """Write an option to a SOMD simfile.
@@ -41,13 +49,13 @@ def write_simfile_option(simfile: str, option: str, value: str) -> None:
     None
     """
     # Read the simfile and check if the option is already present
-    with open(simfile, 'r') as f:
+    with open(simfile, "r") as f:
         lines = f.readlines()
     option_line_idx = None
     for i, line in enumerate(lines):
         if line.split("=")[0].strip() == option:
-                option_line_idx = i
-                break
+            option_line_idx = i
+            break
 
     # If the option is not present, append it to the end of the file
     if option_line_idx is None:
@@ -57,11 +65,12 @@ def write_simfile_option(simfile: str, option: str, value: str) -> None:
         lines[option_line_idx] = f"{option} = {value}\n"
 
     # Write the updated simfile
-    with open(simfile, 'w') as f:
+    with open(simfile, "w") as f:
         f.writelines(lines)
 
+
 def read_mbar_result(outfile: str) -> _Tuple[float, float]:
-    """ 
+    """
     Read the output file from MBAR, and return the free energy and error.
 
     Parameters
@@ -76,7 +85,7 @@ def read_mbar_result(outfile: str) -> _Tuple[float, float]:
     free_energy_err : float
         The error on the free energy in kcal/mol.
     """
-    with open(outfile, 'r') as f:
+    with open(outfile, "r") as f:
         lines = f.readlines()
     # The free energy is the 5th last line of the file
     free_energy = float(lines[-4].split(",")[0])
@@ -84,8 +93,9 @@ def read_mbar_result(outfile: str) -> _Tuple[float, float]:
 
     return free_energy, free_energy_err
 
+
 def read_overlap_mat(outfile: str) -> _np.ndarray:
-    """ 
+    """
     Read the overlap matrix from the mbar outfile.
 
     Parameters
@@ -98,7 +108,7 @@ def read_overlap_mat(outfile: str) -> _np.ndarray:
     overlap_mat : np.ndarray
         The overlap matrix.
     """
-    with open(outfile, 'r') as f:
+    with open(outfile, "r") as f:
         lines = f.readlines()
     overlap_mat = []
     in_overlap_mat = False
@@ -114,8 +124,9 @@ def read_overlap_mat(outfile: str) -> _np.ndarray:
 
     return _np.array(overlap_mat)
 
+
 def read_mbar_pmf(outfile: str) -> _Tuple[_np.ndarray, _np.ndarray, _np.ndarray]:
-    """ 
+    """
     Read the PMF from the mbar outfile.
 
     Parameters
@@ -132,7 +143,7 @@ def read_mbar_pmf(outfile: str) -> _Tuple[_np.ndarray, _np.ndarray, _np.ndarray]
     pmf_err : np.ndarray
         The MBAR error in the PMF in kcal/mol.
     """
-    with open(outfile, 'r') as f:
+    with open(outfile, "r") as f:
         lines = f.readlines()
     lam = []
     pmf = []
@@ -152,8 +163,9 @@ def read_mbar_pmf(outfile: str) -> _Tuple[_np.ndarray, _np.ndarray, _np.ndarray]
 
     return _np.array(lam), _np.array(pmf), _np.array(pmf_err)
 
+
 def write_truncated_sim_datafile(simfile: str, outfile: str, fraction: float) -> None:
-    """ 
+    """
     Write a truncated simfile, with a certain percentage of the final number of steps
     discarded.
 
@@ -170,11 +182,11 @@ def write_truncated_sim_datafile(simfile: str, outfile: str, fraction: float) ->
     -------
     None
     """
-    with open(simfile, 'r') as f:
+    with open(simfile, "r") as f:
         lines = f.readlines()
 
     # Find the start of the data, the end of the data, and the number of steps
-    with open(outfile, 'w') as f:
+    with open(outfile, "w") as f:
         n_lines = len(lines)
         start_data_idx = None
         end_data_idx = None
@@ -182,7 +194,11 @@ def write_truncated_sim_datafile(simfile: str, outfile: str, fraction: float) ->
             if start_data_idx is None:
                 if not line.startswith("#"):
                     start_data_idx = lines.index(line)
-                    end_data_idx = round((n_lines - start_data_idx) * fraction) + start_data_idx + 1 # +1 as no data written at t = 0
+                    end_data_idx = (
+                        round((n_lines - start_data_idx) * fraction)
+                        + start_data_idx
+                        + 1
+                    )  # +1 as no data written at t = 0
             else:
                 if i == end_data_idx:
                     break

@@ -14,10 +14,18 @@ import scipy.stats as _stats
 import subprocess as _subprocess
 from threading import Thread as _Thread
 from time import sleep as _sleep
-from typing import Optional as _Optional, Tuple as _Tuple, Dict as _Dict, Any as _Any, List as _List, Union as _Union
+from typing import (
+    Optional as _Optional,
+    Tuple as _Tuple,
+    Dict as _Dict,
+    Any as _Any,
+    List as _List,
+    Union as _Union,
+)
 import logging as _logging
 
 from ..analyse.plot import plot_convergence as _plot_convergence
+
 
 class SimulationRunner(ABC):
     """An abstract base class for simulation runners. Note that
@@ -29,34 +37,35 @@ class SimulationRunner(ABC):
     # for each instance
     class_count = _count()
     # Create list of files to be deleted by self.clean()
-    run_files = ["*.png",
-                 "overall_stats.dat"]
+    run_files = ["*.png", "overall_stats.dat"]
 
-    def __init__(self,
-                 base_dir: _Optional[str] = None,
-                 input_dir: _Optional[str] = None,
-                 output_dir: _Optional[str] = None,
-                 stream_log_level: int = _logging.INFO,
-                 dg_multiplier: int = 1,
-                 ensemble_size: int = 5,
-                 update_paths: bool =True) -> None:
+    def __init__(
+        self,
+        base_dir: _Optional[str] = None,
+        input_dir: _Optional[str] = None,
+        output_dir: _Optional[str] = None,
+        stream_log_level: int = _logging.INFO,
+        dg_multiplier: int = 1,
+        ensemble_size: int = 5,
+        update_paths: bool = True,
+    ) -> None:
         """
         base_dir : str, Optional, default: None
             Path to the base directory for the simulation runner.
             If None, this is set to the current working directory.
         input_dir : str, Optional, default: None
-            Path to directory containing input files for the 
+            Path to directory containing input files for the
             simulation runner. If None, this is set to
             `base_directory/input`.
         output_dir : str, Optional, default: None
             Path to the output directory in which to store the
-            output from the simulation. If None, this is set 
+            output from the simulation. If None, this is set
             to `base_directory/output`.
         stream_log_level : int, Optional, default: logging.INFO
             Logging level to use for the steam file handlers for the
             calculation object and its child objects.
         dg_multiplier : int, Optional, default: 1
-            +1 or -1. Records whether the free energy change should 
+            +1 or -1. Records whether the free energy change should
             be multiplied by +1 or -1 when being added to the total
             free energy change for the super simulation-runner.
         ensemble_size : int, Optional, default: 5
@@ -65,7 +74,7 @@ class SimulationRunner(ABC):
             If True, if the simulation runner is loaded by unpickling, then
             update_paths() is called.
         """
-        # Set up the directories (which may be overwritten if the 
+        # Set up the directories (which may be overwritten if the
         # simulation runner is subsequently loaded from a pickle file)
         # Make sure that we always use absolute paths
         if base_dir is None:
@@ -91,7 +100,9 @@ class SimulationRunner(ABC):
         # Check if we are starting from a previous simulation runner
         self.loaded_from_pickle = False
         if _pathlib.Path(f"{base_dir}/{self.__class__.__name__}.pkl").is_file():
-            self._load(update_paths=update_paths) # May overwrite the above attributes and options
+            self._load(
+                update_paths=update_paths
+            )  # May overwrite the above attributes and options
 
         else:
             # Initialise sub-simulation runners with an empty list
@@ -99,7 +110,9 @@ class SimulationRunner(ABC):
 
             # Add the dg_multiplier
             if dg_multiplier not in [-1, 1]:
-                raise ValueError(f"dg_multiplier must be either +1 or -1, not {dg_multiplier}.")
+                raise ValueError(
+                    f"dg_multiplier must be either +1 or -1, not {dg_multiplier}."
+                )
             self.dg_multiplier = dg_multiplier
 
             # Create attributes to store the free energy
@@ -125,23 +138,30 @@ class SimulationRunner(ABC):
             for handler in handlers:
                 self._logger.removeHandler(handler)
                 handler.close()
-            del(self._logger)
+            del self._logger
         # Name each logger individually to avoid clashes
-        self._logger = _logging.getLogger(f"{str(self)}_{next(self.__class__.class_count)}")
+        self._logger = _logging.getLogger(
+            f"{str(self)}_{next(self.__class__.class_count)}"
+        )
         self._logger.setLevel(_logging.DEBUG)
         self._logger.propagate = False
         # For the file handler, we want to log everything
-        file_handler = _logging.FileHandler(f"{self.base_dir}/{self.__class__.__name__}.log")
-        file_handler.setFormatter(_logging.Formatter("%(levelname)s - %(asctime)s - %(name)s - %(message)s"))
+        file_handler = _logging.FileHandler(
+            f"{self.base_dir}/{self.__class__.__name__}.log"
+        )
+        file_handler.setFormatter(
+            _logging.Formatter("%(levelname)s - %(asctime)s - %(name)s - %(message)s")
+        )
         file_handler.setLevel(_logging.DEBUG)
         # For the stream handler, we want to log at the user-specified level
         stream_handler = _logging.StreamHandler()
-        stream_handler.setFormatter(_logging.Formatter("%(levelname)s - %(asctime)s - %(name)s - %(message)s"))
+        stream_handler.setFormatter(
+            _logging.Formatter("%(levelname)s - %(asctime)s - %(name)s - %(message)s")
+        )
         stream_handler.setLevel(self._stream_log_level)
         # Add the handlers to the logger
         self._logger.addHandler(file_handler)
         self._logger.addHandler(stream_handler)
-
 
     @property
     def input_dir(self) -> str:
@@ -161,34 +181,38 @@ class SimulationRunner(ABC):
         if not _pathlib.Path(self._output_dir).is_dir():
             _pathlib.Path(self._output_dir).mkdir(parents=True)
         return self._output_dir
-    
+
     @output_dir.setter
     def output_dir(self, value: str) -> None:
         f"""Set the output directory for the {self.__class__.__name__}."""
         self._output_dir = value
 
     @property
-    def delta_g(self) -> _np.ndarray :
-        f"""The overall free energy change for the {self.__class__.__name__} 
+    def delta_g(self) -> _np.ndarray:
+        f"""The overall free energy change for the {self.__class__.__name__}
         for each of the ensemble size replicates"""
         # We haven't yet performed analysis, so analyse
         if not self._delta_g:
             self.analyse()
             # Check that the analysis actually updated the delta_g attribute
             if self._delta_g is None:
-                raise ValueError("Analysis failed to update the internal _delta_g attribute")
+                raise ValueError(
+                    "Analysis failed to update the internal _delta_g attribute"
+                )
         return self._delta_g
 
     @property
-    def delta_g_er(self) -> _np.ndarray :
-        f"""The overall uncertainties in the free energy changes for the {self.__class__.__name__} 
+    def delta_g_er(self) -> _np.ndarray:
+        f"""The overall uncertainties in the free energy changes for the {self.__class__.__name__}
         for each of the ensemble size replicates"""
         # We haven't yet performed analysis, so analyse
         if not self._delta_g_er:
             self.analyse()
             # Check that the analysis actually updated the delta_g_er attribute
             if self._delta_g_er is None:
-                raise ValueError("Analysis failed to update the internal _delta_g attribute")
+                raise ValueError(
+                    "Analysis failed to update the internal _delta_g attribute"
+                )
 
         return self._delta_g_er
 
@@ -204,8 +228,8 @@ class SimulationRunner(ABC):
     def __str__(self) -> str:
         return self.__class__.__name__
 
-    #def __del__(self) -> None:
-        #self._dump() # Save the state to the pickle file before deletion
+    # def __del__(self) -> None:
+    # self._dump() # Save the state to the pickle file before deletion
 
     def run(self, *args, **kwargs) -> None:
         f"""Run the {self.__class__.__name__}"""
@@ -240,7 +264,7 @@ class SimulationRunner(ABC):
         Returns
         -------
         dg_overall : np.ndarray
-            The overall free energy change for each of the 
+            The overall free energy change for each of the
             ensemble size repeats.
         er_overall : np.ndarray
             The overall error for each of the ensemble size
@@ -252,17 +276,22 @@ class SimulationRunner(ABC):
 
         # Check that this is not still running
         if self.running:
-            raise RuntimeError(f"Cannot perform analysis as {self.__class__.__name__} is still running")
+            raise RuntimeError(
+                f"Cannot perform analysis as {self.__class__.__name__} is still running"
+            )
 
         # Check that none of the simulations have failed
         failed_sims_list = self.failed_simulations
         if failed_sims_list:
-            self._logger.error("Unable to perform analysis as several simulations did not complete successfully")
+            self._logger.error(
+                "Unable to perform analysis as several simulations did not complete successfully"
+            )
             self._logger.error("Please check the output in the following directories:")
             for failed_sim in failed_sims_list:
                 self._logger.error(failed_sim.base_dir)
-            raise RuntimeError("Unable to perform analysis as several simulations did not complete successfully")
-
+            raise RuntimeError(
+                "Unable to perform analysis as several simulations did not complete successfully"
+            )
 
         # Analyse the sub-simulation runners
         for sub_sim_runner in self._sub_sim_runners:
@@ -279,18 +308,31 @@ class SimulationRunner(ABC):
         # Calculate the 95 % confidence interval assuming Gaussian errors
         mean_free_energy = _np.mean(dg_overall)
         # Gaussian 95 % C.I.
-        conf_int = _stats.t.interval(0.95,
-                                    len(dg_overall)-1,
-                                    mean_free_energy,
-                                    scale=_stats.sem(dg_overall))[1] - mean_free_energy  # 95 % C.I.
+        conf_int = (
+            _stats.t.interval(
+                0.95,
+                len(dg_overall) - 1,
+                mean_free_energy,
+                scale=_stats.sem(dg_overall),
+            )[1]
+            - mean_free_energy
+        )  # 95 % C.I.
 
         # Write overall MBAR stats to file
         with open(f"{self.output_dir}/overall_stats.dat", "a") as ofile:
-            ofile.write("###################################### Free Energies ########################################\n")
-            ofile.write(f"Mean free energy: {mean_free_energy: .3f} + /- {conf_int:.3f} kcal/mol\n")
+            ofile.write(
+                "###################################### Free Energies ########################################\n"
+            )
+            ofile.write(
+                f"Mean free energy: {mean_free_energy: .3f} + /- {conf_int:.3f} kcal/mol\n"
+            )
             for i in range(self.ensemble_size):
-                ofile.write(f"Free energy from run {i+1}: {dg_overall[i]: .3f} +/- {er_overall[i]:.3f} kcal/mol\n")
-            ofile.write("Errors are 95 % C.I.s based on the assumption of a Gaussian distribution of free energies\n")
+                ofile.write(
+                    f"Free energy from run {i+1}: {dg_overall[i]: .3f} +/- {er_overall[i]:.3f} kcal/mol\n"
+                )
+            ofile.write(
+                "Errors are 95 % C.I.s based on the assumption of a Gaussian distribution of free energies\n"
+            )
 
         # Update internal state with result
         self._delta_g = dg_overall
@@ -303,17 +345,17 @@ class SimulationRunner(ABC):
         Get a timeseries of the total free energy change of the
         {self.__class__.__name__} against total simulation time. Also plot this.
         Keep this separate from analyse as it is expensive to run.
-        
+
         Returns
         -------
         fracts : np.ndarray
             The fraction of the total equilibrated simulation time for each value of dg_overall.
         dg_overall : np.ndarray
             The overall free energy change for the {self.__class__.__name__} for
-            each value of total equilibrated simtime for each of the ensemble size repeats. 
+            each value of total equilibrated simtime for each of the ensemble size repeats.
         """
         self._logger.info(f"Analysing convergence of {self.__class__.__name__}...")
-        
+
         # Get the dg_overall in terms of fraction of the total simulation time
         # Use steps of 5 % of the total simulation time
         fracts = _np.arange(0.05, 1.05, 0.05)
@@ -331,7 +373,14 @@ class SimulationRunner(ABC):
         self._logger.info(f"Fractions of equilibrated simulation time: {fracts}")
 
         # Plot the overall convergence
-        _plot_convergence(fracts, dg_overall, self.tot_simtime, self.equil_time, self.output_dir, self.ensemble_size)
+        _plot_convergence(
+            fracts,
+            dg_overall,
+            self.tot_simtime,
+            self.equil_time,
+            self.output_dir,
+            self.ensemble_size,
+        )
 
         return fracts, dg_overall
 
@@ -339,38 +388,50 @@ class SimulationRunner(ABC):
     def running(self) -> bool:
         f"""Check if the {self.__class__.__name__} is running."""
         return any([sub_sim_runner.running for sub_sim_runner in self._sub_sim_runners])
-    
+
     def wait(self) -> None:
         f"""Wait for the {self.__class__.__name__} to finish running."""
         # Give the simulation runner a chance to start
         _sleep(30)
         while self.running:
-            _sleep(30) # Check every 30 seconds
+            _sleep(30)  # Check every 30 seconds
 
     @property
     def tot_simtime(self) -> float:
         f"""The total simulation time in ns for the {self.__class__.__name__} and any sub-simulation runners."""
-        return sum([sub_sim_runner.tot_simtime for sub_sim_runner in self._sub_sim_runners]) # ns
+        return sum(
+            [sub_sim_runner.tot_simtime for sub_sim_runner in self._sub_sim_runners]
+        )  # ns
 
     @property
     def tot_gpu_time(self) -> float:
         f"""The total simulation time in GPU hours for the {self.__class__.__name__} and any sub-simulation runners."""
-        return sum([sub_sim_runner.tot_gpu_time for sub_sim_runner in self._sub_sim_runners]) # GPU hours
+        return sum(
+            [sub_sim_runner.tot_gpu_time for sub_sim_runner in self._sub_sim_runners]
+        )  # GPU hours
 
     @property
     def failed_simulations(self) -> _List[SimulationRunner]:
         """The failed sub-simulation runners"""
-        return [failure for sub_sim_runner in self._sub_sim_runners for failure in sub_sim_runner.failed_simulations]
+        return [
+            failure
+            for sub_sim_runner in self._sub_sim_runners
+            for failure in sub_sim_runner.failed_simulations
+        ]
 
     @property
     def equilibrated(self) -> float:
         f"""Whether the {self.__class__.__name__} is equilibrated."""
-        return all([sub_sim_runner.equilibrated for sub_sim_runner in self._sub_sim_runners])
+        return all(
+            [sub_sim_runner.equilibrated for sub_sim_runner in self._sub_sim_runners]
+        )
 
     @property
     def equil_time(self) -> float:
         f"""The equilibration time in ns for the {self.__class__.__name__} and any sub-simulation runners."""
-        return sum([sub_sim_runner.equil_time for sub_sim_runner in self._sub_sim_runners]) # ns
+        return sum(
+            [sub_sim_runner.equil_time for sub_sim_runner in self._sub_sim_runners]
+        )  # ns
 
     def _refresh_logging(self) -> None:
         """Refresh the logging for the simulation runner and all sub-simulation runners."""
@@ -379,7 +440,7 @@ class SimulationRunner(ABC):
             sub_sim_runner._refresh_logging()
 
     def update_paths(self, old_sub_path: str, new_sub_path: str) -> None:
-        """ 
+        """
         Replace the old sub-path with the new sub-path in the base, input, and output directory
         paths.
 
@@ -401,9 +462,9 @@ class SimulationRunner(ABC):
         # Also update the loggers of any virtual queues
         if hasattr(self, "virtual_queue"):
             # Virtual queue may have already been updated
-            if new_sub_path not in self.virtual_queue.log_dir: # type: ignore
-                self.virtual_queue.log_dir = self.virtual_queue.log_dir.replace(old_sub_path, new_sub_path) # type: ignore
-                self.virtual_queue._set_up_logging() # type: ignore
+            if new_sub_path not in self.virtual_queue.log_dir:  # type: ignore
+                self.virtual_queue.log_dir = self.virtual_queue.log_dir.replace(old_sub_path, new_sub_path)  # type: ignore
+                self.virtual_queue._set_up_logging()  # type: ignore
 
         # Update the paths of any sub-simulation runners
         for sub_sim_runner in self._sub_sim_runners:
@@ -418,7 +479,7 @@ class SimulationRunner(ABC):
     def stream_log_level(self) -> int:
         """The log level for the stream handler."""
         return self._stream_log_level
-    
+
     @stream_log_level.setter
     def stream_log_level(self, value: int) -> None:
         """Set the log level for the stream handler."""
@@ -433,7 +494,7 @@ class SimulationRunner(ABC):
     def clean(self, clean_logs=False) -> None:
         f"""
         Clean the {self.__class__.__name__} by deleting all files
-        with extensions matching {self.__class__.run_files} in the 
+        with extensions matching {self.__class__.run_files} in the
         base and output dirs, and resetting the total runtime to 0.
 
         Parameters
@@ -462,7 +523,7 @@ class SimulationRunner(ABC):
                 sub_sim_runner.clean(clean_logs=clean_logs)
 
     def lighten(self, clean_logs=False) -> None:
-        f""" Lighten the {self.__class__.__name__} by deleting all restart 
+        f"""Lighten the {self.__class__.__name__} by deleting all restart
         and trajectory files."""
         # The function which does the work is defined in Simulation - here
         # we just need to pass the command down
@@ -483,7 +544,7 @@ class SimulationRunner(ABC):
             sub_sim_runner._close_logging_handlers()
 
     def _update_log(self) -> None:
-        f""" Update the status log file with the current status of the {self.__class__.__name__}."""
+        f"""Update the status log file with the current status of the {self.__class__.__name__}."""
         self._logger.info("##############################################")
         for var in vars(self):
             self._logger.info(f"{var}: {getattr(self, var)}")
@@ -502,11 +563,13 @@ class SimulationRunner(ABC):
             if isinstance(val, _List):
                 if len(val) > 0:
                     if isinstance(val[0], SimulationRunner):
-                        picklable_copy.__dict__[key] = [sim_runner._picklable_copy for sim_runner in val]
+                        picklable_copy.__dict__[key] = [
+                            sim_runner._picklable_copy for sim_runner in val
+                        ]
         return picklable_copy
-        
+
     def _dump(self) -> None:
-        """ Dump the current state of the simulation object to a pickle file, and do
+        """Dump the current state of the simulation object to a pickle file, and do
         the same for any sub-simulations."""
         with open(f"{self.base_dir}/{self.__class__.__name__}.pkl", "wb") as ofile:
             _pkl.dump(self._picklable_copy.__dict__, ofile)
@@ -516,7 +579,7 @@ class SimulationRunner(ABC):
     def _load(self, update_paths: bool = True) -> None:
         """Load the state of the simulation object from a pickle file, and do
         the same for any sub-simulations.
-        
+
         Parameters
         ----------
         update_paths : bool, default=True
@@ -527,20 +590,27 @@ class SimulationRunner(ABC):
         # Note that we cannot recursively call _load on the sub-simulations
         # because this results in the creation of different virtual queues for the
         # stages and sub-lam-windows and simulations
-        if not _pathlib.Path(f"{self.base_dir}/{self.__class__.__name__}.pkl").is_file():
-            raise FileNotFoundError(f"Could not find {self.__class__.__name__}.pkl in {self.base_dir}")
+        if not _pathlib.Path(
+            f"{self.base_dir}/{self.__class__.__name__}.pkl"
+        ).is_file():
+            raise FileNotFoundError(
+                f"Could not find {self.__class__.__name__}.pkl in {self.base_dir}"
+            )
 
         # Store previous value of base dir before it is potentially overwritten below
         suppliied_base_dir = self.base_dir
 
         # Load the SimulationRunner, possibly overwriting directories
-        print(f"Loading previous {self.__class__.__name__}. Any arguments will be overwritten...")
+        print(
+            f"Loading previous {self.__class__.__name__}. Any arguments will be overwritten..."
+        )
         with open(f"{self.base_dir}/{self.__class__.__name__}.pkl", "rb") as file:
             self.__dict__ = _pkl.load(file)
 
         if update_paths:
-            self.update_paths(old_sub_path=self.base_dir,
-                                new_sub_path=suppliied_base_dir)
+            self.update_paths(
+                old_sub_path=self.base_dir, new_sub_path=suppliied_base_dir
+            )
 
         # Refresh logging
         print("Setting up logging...")

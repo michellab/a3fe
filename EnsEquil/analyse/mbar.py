@@ -7,19 +7,28 @@ import numpy as _np
 import os as _os
 import glob as _glob
 import subprocess as _subprocess
-from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
-
-from ..read._process_somd_files import (
-    read_mbar_result as _read_mbar_result, 
-    write_truncated_sim_datafile as _write_truncated_sim_datafile
+from typing import (
+    Dict as _Dict,
+    List as _List,
+    Tuple as _Tuple,
+    Any as _Any,
+    Optional as _Optional,
 )
 
-def run_mbar(output_dir: str,
-             ensemble_size: int,
-             percentage: float = 100,
-             subsampling: bool = False,
-             temperature: float = 298,
-             delete_outfiles = False) -> _Tuple[_np.ndarray, _np.ndarray, _List[str]]:
+from ..read._process_somd_files import (
+    read_mbar_result as _read_mbar_result,
+    write_truncated_sim_datafile as _write_truncated_sim_datafile,
+)
+
+
+def run_mbar(
+    output_dir: str,
+    ensemble_size: int,
+    percentage: float = 100,
+    subsampling: bool = False,
+    temperature: float = 298,
+    delete_outfiles=False,
+) -> _Tuple[_np.ndarray, _np.ndarray, _List[str]]:
     """
     Run MBAR on SOMD output files.
 
@@ -30,7 +39,7 @@ def run_mbar(output_dir: str,
     ensemble_size : int
         The number of simulations in the ensemble
     percentage : float, Optional, default: 100
-        The percentage of the data to use for MBAR, starting from 
+        The percentage of the data to use for MBAR, starting from
         the start of the simulation. If this is less than 100,
         data will be discarded from the end of the simulation.
         data will be discarded from the start of the simulation.
@@ -54,15 +63,20 @@ def run_mbar(output_dir: str,
     # Check that the simfiles actually exist
     simfiles = _glob.glob(f"{output_dir}/lambda*/run_*/simfile_equilibrated.dat")
     if len(simfiles) == 0:
-        raise FileNotFoundError("No equilibrated simfiles found. Have you run the simulations "
-                                 "and checked for equilibration?")
+        raise FileNotFoundError(
+            "No equilibrated simfiles found. Have you run the simulations "
+            "and checked for equilibration?"
+        )
 
     # Create temporary truncated simfiles
-    tmp_simfiles = [] # Clean these up afterwards
+    tmp_simfiles = []  # Clean these up afterwards
     for simfile in simfiles:
-        tmp_simfile = _os.path.join(_os.path.dirname(simfile), f"simfile_truncated_{round(percentage)}_percent.dat")
+        tmp_simfile = _os.path.join(
+            _os.path.dirname(simfile),
+            f"simfile_truncated_{round(percentage)}_percent.dat",
+        )
         tmp_simfiles.append(tmp_simfile)
-        _write_truncated_sim_datafile(simfile, tmp_simfile, percentage/100)
+        _write_truncated_sim_datafile(simfile, tmp_simfile, percentage / 100)
 
     # Run MBAR using pymbar through SOMD
     mbar_out_files = []
@@ -70,17 +84,22 @@ def run_mbar(output_dir: str,
         outfile = f"{output_dir}/freenrg-MBAR-run_{str(run).zfill(2)}_{round(percentage)}_percent.dat"
         mbar_out_files.append(outfile)
         with open(outfile, "w") as ofile:
-            cmd_list = ["analyse_freenrg",
-                         "mbar", 
-                         "-i", f"{output_dir}/lambda*/run_{str(run).zfill(2)}/simfile_truncated_{round(percentage)}_percent.dat",
-                         "-p", "100", 
-                         "--overlap", 
-                         "--temperature", f"{temperature}"]
+            cmd_list = [
+                "analyse_freenrg",
+                "mbar",
+                "-i",
+                f"{output_dir}/lambda*/run_{str(run).zfill(2)}/simfile_truncated_{round(percentage)}_percent.dat",
+                "-p",
+                "100",
+                "--overlap",
+                "--temperature",
+                f"{temperature}",
+            ]
             if subsampling:
                 cmd_list.append("--subsampling")
             _subprocess.run(cmd_list, stdout=ofile)
 
-    free_energies = _np.array([_read_mbar_result(ofile)[0] for ofile in mbar_out_files]) 
+    free_energies = _np.array([_read_mbar_result(ofile)[0] for ofile in mbar_out_files])
     errors = _np.array([_read_mbar_result(ofile)[1] for ofile in mbar_out_files])
 
     if delete_outfiles:

@@ -1,16 +1,29 @@
 """Functionality to process the gradient data."""
 
 import numpy as _np
-from typing import List as _List, Tuple as _Tuple, Optional as _Optional, Dict as _Dict, Union as _Union
+from typing import (
+    List as _List,
+    Tuple as _Tuple,
+    Optional as _Optional,
+    Dict as _Dict,
+    Union as _Union,
+)
 from scipy.constants import gas_constant as _R
 
-from .autocorrelation import get_statistical_inefficiency as _get_statistical_inefficiency
+from .autocorrelation import (
+    get_statistical_inefficiency as _get_statistical_inefficiency,
+)
 
-class GradientData():
+
+class GradientData:
     """A class to store and process gradient data."""
 
-    def __init__(self, lam_winds: _List["LamWindow"], equilibrated: bool, )-> None: # type: ignore
-        """ 
+    def __init__(
+        self,
+        lam_winds: _List["LamWindow"],
+        equilibrated: bool,
+    ) -> None:  # type: ignore
+        """
         Calculate the gradients, means, and variances of the gradients for each lambda
         window of a list of LamWindows.
 
@@ -25,7 +38,7 @@ class GradientData():
 
         # Get mean and variance of gradients, including both intra-run and inter-run components
         # Note that sems/ vars generally refer to the sems/ vars of the gradients, and not the
-        # free energy changes. 
+        # free energy changes.
         lam_vals = []
         gradients_all_winds = []
         gradients_subsampled_all_winds = []
@@ -54,7 +67,7 @@ class GradientData():
                 stat_ineff = _get_statistical_inefficiency(gradients)
                 mean = _np.mean(gradients)
                 # Subsample the gradients to remove autocorrelation
-                subsampled_grads = gradients[::int(stat_ineff)]
+                subsampled_grads = gradients[:: int(stat_ineff)]
                 # Get the variance and squared SEM of the gradients
                 var = _np.var(subsampled_grads)
                 squared_sem = var / len(subsampled_grads)
@@ -68,7 +81,7 @@ class GradientData():
 
             # Get overall intra-run quantities
             var_intra = _np.mean(vars_intra)
-            squared_sem_intra = _np.mean(squared_sems_intra) / len(lam.sims) 
+            squared_sem_intra = _np.mean(squared_sems_intra) / len(lam.sims)
             stat_ineff = _np.mean(stat_ineffs_wind)
 
             # Get inter-run quantities
@@ -76,7 +89,9 @@ class GradientData():
             mean_overall = _np.mean(means_intra)
 
             # Store the final results, converting to arrays for consistency.
-            tot_sem = _np.sqrt(squared_sem_inter + squared_sem_intra)  # This isn't really a meaningful quantity
+            tot_sem = _np.sqrt(
+                squared_sem_inter + squared_sem_intra
+            )  # This isn't really a meaningful quantity
             sem_intra = _np.sqrt(squared_sem_intra)
             sem_inter = _np.sqrt(squared_sem_inter)
             gradients_all_winds.append(_np.array(gradients_wind))
@@ -89,7 +104,9 @@ class GradientData():
             stat_ineffs_all_winds.append(stat_ineff)
 
         # Get the statistical inefficiencies in units of simulation time
-        stat_ineffs_all_winds = _np.array(stat_ineffs_all_winds) * lam_winds[0].sims[0].timestep # Timestep should be same for all sims
+        stat_ineffs_all_winds = (
+            _np.array(stat_ineffs_all_winds) * lam_winds[0].sims[0].timestep
+        )  # Timestep should be same for all sims
 
         # Get the SEMs of the free energy changes from the inter-run SEMs of the gradients
         lam_weights = _np.array([lam.lam_val_weight for lam in lam_winds])
@@ -100,8 +117,15 @@ class GradientData():
             start_times = _np.array([win._equil_time for win in lam_winds])
         else:
             start_times = _np.array([0 for win in lam_winds])
-        end_times = _np.array([win.sims[0].tot_simtime for win in lam_winds]) # All sims at given lam run for same time
-        times = [_np.linspace(start, end, len(gradients[0]) + 1)[1:] for start, end, gradients in zip(start_times, end_times, gradients_all_winds)]
+        end_times = _np.array(
+            [win.sims[0].tot_simtime for win in lam_winds]
+        )  # All sims at given lam run for same time
+        times = [
+            _np.linspace(start, end, len(gradients[0]) + 1)[1:]
+            for start, end, gradients in zip(
+                start_times, end_times, gradients_all_winds
+            )
+        ]
 
         # Get the total sampling time per window
         sampling_times = end_times - start_times
@@ -121,19 +145,17 @@ class GradientData():
         self.vars_intra = vars_intra_all_winds
         self.stat_ineffs = stat_ineffs_all_winds
         self.sems_inter_delta_g = sems_inter_delta_g
-        self.runtime_constant = lam_winds[0].runtime_constant # Assume all the same
+        self.runtime_constant = lam_winds[0].runtime_constant  # Assume all the same
 
-    def get_sems(self,
-                 origin: str = "inter",
-                 smoothen: bool = True)-> _np.ndarray:
+    def get_sems(self, origin: str = "inter", smoothen: bool = True) -> _np.ndarray:
         """
         Return the standardised standard error of the mean of the gradients, optionally
         smoothened by a block average over 3 points.
-        
+
         Parameters
         ----------
         origin: str, optional, default="inter"
-            Can be "inter", "intra", or "inter_delta_g". Whether to use the 
+            Can be "inter", "intra", or "inter_delta_g". Whether to use the
             inter-run or intra-run standard error of the mean, or the
             inter-run standard error of the mean of the free energy changes,
             respectively.
@@ -148,40 +170,45 @@ class GradientData():
         """
         # Check options are valid
         if origin not in ["inter", "intra", "inter_delta_g"]:
-            raise ValueError("origin must be either 'inter' or 'intra' or 'inter_delta_g'")
+            raise ValueError(
+                "origin must be either 'inter' or 'intra' or 'inter_delta_g'"
+            )
 
-        origins = {"inter": self.sems_inter,
-                   "intra": self.sems_intra,
-                   "inter_delta_g": self.sems_inter_delta_g}
+        origins = {
+            "inter": self.sems_inter,
+            "intra": self.sems_intra,
+            "inter_delta_g": self.sems_inter_delta_g,
+        }
         sems = origins[origin]
 
         # Standardise the SEMs according to the total simulation time
-        sems *= _np.sqrt(self.total_times) # type: ignore
+        sems *= _np.sqrt(self.total_times)  # type: ignore
 
         if not smoothen:
-            return sems # type: ignore
+            return sems  # type: ignore
 
         # Smoothen the standard error of the mean by a block average over 3 points
         smoothened_sems = []
-        max_ind = len(sems) - 1 # type: ignore
-        for i, sem in enumerate(sems): # type: ignore
+        max_ind = len(sems) - 1  # type: ignore
+        for i, sem in enumerate(sems):  # type: ignore
             # Calculate the block average for each point
             if i == 0:
-                sem_smooth = (sem + self.sems_overall[i+1]) /2
+                sem_smooth = (sem + self.sems_overall[i + 1]) / 2
             elif i == max_ind:
-                sem_smooth = (sem + self.sems_overall[i-1]) /2
+                sem_smooth = (sem + self.sems_overall[i - 1]) / 2
             else:
-                sem_smooth = (sem + self.sems_overall[i+1] + self.sems_overall[i-1]) / 3 
+                sem_smooth = (
+                    sem + self.sems_overall[i + 1] + self.sems_overall[i - 1]
+                ) / 3
             smoothened_sems.append(sem_smooth)
-            
+
         smoothened_sems = _np.array(smoothened_sems)
         self._smoothened_sems = smoothened_sems
         return smoothened_sems
 
-    def get_integrated_error(self,
-                             er_type: str = "sem",
-                             origin: str = "inter",
-                             smoothen: bool = True)-> _np.ndarray:
+    def get_integrated_error(
+        self, er_type: str = "sem", origin: str = "inter", smoothen: bool = True
+    ) -> _np.ndarray:
         """
         Calculate the integrated standard error of the mean or root variance of the gradients
         as a function of lambda, using the trapezoidal rule.
@@ -189,7 +216,7 @@ class GradientData():
         Parameters
         ----------
         er_type: str, optional, default="sem"
-            Whether to integrate the standard error of the mean ("sem") or root 
+            Whether to integrate the standard error of the mean ("sem") or root
             variance of the gradients ("root_var").
         origin: str, optional, default="inter"
             The origin of the SEM to integrate - this is ignore if er_type == "root_var".
@@ -222,18 +249,20 @@ class GradientData():
         for i in range(n_vals):
             # No need to worry about indexing off the end of the array with numpy
             # Note that _np.trapz(y_vals[:1], x_vals[:1]) gives 0, as required
-            integrated_errors.append(_np.trapz(y_vals[:i+1], x_vals[:i+1])) #type: ignore
-        
+            integrated_errors.append(_np.trapz(y_vals[: i + 1], x_vals[: i + 1]))  # type: ignore
+
         integrated_errors = _np.array(integrated_errors)
         self._integrated_sems = integrated_errors
         return integrated_errors
-    
-    def calculate_optimal_lam_vals(self, 
-                                   er_type: str = "sem",
-                                   delta_er: _Optional[float] = None, 
-                                   n_lam_vals: _Optional[int] = None,
-                                   sem_origin: str = "inter",
-                                   smoothen_sems: bool = True)-> _np.ndarray:
+
+    def calculate_optimal_lam_vals(
+        self,
+        er_type: str = "sem",
+        delta_er: _Optional[float] = None,
+        n_lam_vals: _Optional[int] = None,
+        sem_origin: str = "inter",
+        smoothen_sems: bool = True,
+    ) -> _np.ndarray:
         """
         Calculate the optimal lambda values for a given number of lambda values
         to sample, using the integrated standard error of the mean of the gradients
@@ -249,7 +278,7 @@ class GradientData():
             between each lambda value, in kcal mol^(-1). If er_type == "sem", the
             desired integrated standard error of the mean of the gradients between each lambda
             value, in kcal mol^(-1) ns^(1/2). If not provided, the number of lambda
-            windows must be provided with n_lam_vals.    
+            windows must be provided with n_lam_vals.
         n_lam_vals : int, optional
             The number of lambda values to sample. If not provided, delta_er must be provided.
         sem_origin: str, optional, default="inter"
@@ -273,10 +302,10 @@ class GradientData():
 
         # Calculate the integrated standard error of the mean of the gradients
         # as a function of lambda, using the trapezoidal rule.
-        integrated_errors = self.get_integrated_error(er_type=er_type, 
-                                                      origin=sem_origin,
-                                                      smoothen=smoothen_sems)
-        
+        integrated_errors = self.get_integrated_error(
+            er_type=er_type, origin=sem_origin, smoothen=smoothen_sems
+        )
+
         total_error = integrated_errors[-1]
 
         # If the number of lambda values is not provided, calculate it from the
@@ -290,7 +319,9 @@ class GradientData():
         # For each desired SEM value, map it to a lambda value
         optimal_lam_vals = []
         for requested_sem in requested_sem_vals:
-            optimal_lam_val = _np.interp(requested_sem, integrated_errors, self.lam_vals)
+            optimal_lam_val = _np.interp(
+                requested_sem, integrated_errors, self.lam_vals
+            )
             optimal_lam_val = _np.round(optimal_lam_val, 3)
             optimal_lam_vals.append(optimal_lam_val)
 
@@ -302,7 +333,7 @@ class GradientData():
         """
         Calculate the predicted overlap matrix for the lambda windows
         based on the intra-run variances alone. The relationship is
-        var_ij = beta^-2 
+        var_ij = beta^-2
 
         Parameters
         ----------
@@ -323,14 +354,22 @@ class GradientData():
             unnormalised_overlap = 1
             for i in range(self.n_lam - base_index):
                 if i != 0:
-                    delta_lam = self.lam_vals[base_index + i] - self.lam_vals[base_index + i - 1]
-                    av_var = (self.vars_intra[base_index + i] + self.vars_intra[base_index + i - 1]) / 2
+                    delta_lam = (
+                        self.lam_vals[base_index + i]
+                        - self.lam_vals[base_index + i - 1]
+                    )
+                    av_var = (
+                        self.vars_intra[base_index + i]
+                        + self.vars_intra[base_index + i - 1]
+                    ) / 2
                     unnormalised_overlap /= beta * delta_lam * _np.sqrt(av_var)
                 predicted_overlap_mat[base_index, base_index + i] = unnormalised_overlap
 
         # Copy the upper triangle to get the lower triangle, making sure not to duplicate the diagonal
-        predicted_overlap_mat += predicted_overlap_mat.T - _np.diag(_np.diag(predicted_overlap_mat))
-    
+        predicted_overlap_mat += predicted_overlap_mat.T - _np.diag(
+            _np.diag(predicted_overlap_mat)
+        )
+
         # Normalise by row
         for i in range(self.n_lam):
             predicted_overlap_mat[i, :] /= predicted_overlap_mat[i, :].sum()

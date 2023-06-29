@@ -4,6 +4,7 @@ from ..run._virtual_queue import Job, VirtualQueue
 from tempfile import TemporaryDirectory
 import os
 
+
 def test_job():
     """Test that the Job class works correctly"""
     job = Job(1, "echo hello")
@@ -13,10 +14,11 @@ def test_job():
     job.slurm_job_id = 1234
     assert job.slurm_job_id == 1234
 
+
 def test_virtual_queue():
     """Check that the virtual queue works correctly. Note that we
-     can't test submit, kill, or update as these require a slurm queue to
-      submit to, which we don't have on the CI server. """
+    can't test submit, kill, or update as these require a slurm queue to
+     submit to, which we don't have on the CI server."""
     with TemporaryDirectory() as dirname:
         # Set up the virtual queue and mess around with queues
         v_queue = VirtualQueue(queue_len_lim=30, log_dir=dirname)

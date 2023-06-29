@@ -2,10 +2,11 @@
 
 import os as _os
 
+
 def get_slurm_file_base(slurm_file: str) -> str:
     """
     Find out what the slurm output file will be called.
-    
+
     Parameters
     ----------
     slurm_file : str
@@ -27,10 +28,9 @@ def get_slurm_file_base(slurm_file: str) -> str:
                     slurm_pattern = split_line[2]
                     if "%" in slurm_pattern:
                         file_base = slurm_pattern.split("%")[0]
-                        return  _os.path.join(base_dir, file_base)
+                        return _os.path.join(base_dir, file_base)
                     else:
                         return _os.path.join(base_dir, slurm_pattern)
 
     # We haven't returned - raise an error
     raise RuntimeError(f"Could not find slurm output file name in {slurm_file}")
-

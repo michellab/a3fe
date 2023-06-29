@@ -23,9 +23,21 @@ License along with this software. If not, see <http://www.gnu.org/licenses/>.
 """
 
 import numpy as _np
-from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any, Optional as _Optional
+from typing import (
+    Dict as _Dict,
+    List as _List,
+    Tuple as _Tuple,
+    Any as _Any,
+    Optional as _Optional,
+)
 
-def get_statistical_inefficiency(A_n:_np.ndarray, B_n:_Optional[_np.ndarray]=None, fast:bool=False, mintime:int=3)->float:
+
+def get_statistical_inefficiency(
+    A_n: _np.ndarray,
+    B_n: _Optional[_np.ndarray] = None,
+    fast: bool = False,
+    mintime: int = 3,
+) -> float:
     """
     Compute the (cross) statistical inefficiency of (two) timeseries using multiscale method from Chodera.
     Parameters
@@ -72,8 +84,8 @@ def get_statistical_inefficiency(A_n:_np.ndarray, B_n:_Optional[_np.ndarray]=Non
     N = A_n.size
 
     # Be sure A_n and B_n have the same dimensions.
-    if(A_n.shape != B_n.shape):
-        raise Exception('A_n and B_n must have same dimensions.')
+    if A_n.shape != B_n.shape:
+        raise Exception("A_n and B_n must have same dimensions.")
 
     # Initialize statistical inefficiency estimate with uncorrelated value.
     g = 1.0
@@ -90,8 +102,10 @@ def get_statistical_inefficiency(A_n:_np.ndarray, B_n:_Optional[_np.ndarray]=Non
     sigma2_AB = (dA_n * dB_n).mean()  # standard estimator to ensure C(0) = 1
 
     # Trap the case where this covariance is zero, and we cannot proceed.
-    if(sigma2_AB == 0):
-        raise ValueError('Sample covariance sigma_AB^2 = 0 -- cannot compute statistical inefficiency')
+    if sigma2_AB == 0:
+        raise ValueError(
+            "Sample covariance sigma_AB^2 = 0 -- cannot compute statistical inefficiency"
+        )
 
     # Accumulate the integrated correlation time by computing the normalized correlation time at
     # increasing values of t.  Stop accumulating if the correlation function goes negative, since
@@ -99,10 +113,11 @@ def get_statistical_inefficiency(A_n:_np.ndarray, B_n:_Optional[_np.ndarray]=Non
     # is dominated by noise and indistinguishable from zero.
     t = 1
     increment = 1
-    while (t < N - 1):
-
+    while t < N - 1:
         # compute normalized fluctuation correlation function at time t
-        C = _np.sum(dA_n[0:(N - t)] * dB_n[t:N] + dB_n[0:(N - t)] * dA_n[t:N]) / (2.0 * float(N - t) * sigma2_AB)
+        C = _np.sum(dA_n[0 : (N - t)] * dB_n[t:N] + dB_n[0 : (N - t)] * dA_n[t:N]) / (
+            2.0 * float(N - t) * sigma2_AB
+        )
         # Terminate if the correlation function has crossed zero and we've computed the correlation
         # function at least out to 'mintime'.
         if (C <= 0.0) and (t > mintime):
@@ -119,7 +134,7 @@ def get_statistical_inefficiency(A_n:_np.ndarray, B_n:_Optional[_np.ndarray]=Non
             increment += 1
 
     # g must be at least unity
-    if (g < 1.0):
+    if g < 1.0:
         g = 1.0
 
     # Return the computed statistical inefficiency.

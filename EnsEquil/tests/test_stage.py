@@ -9,18 +9,28 @@ from tempfile import TemporaryDirectory
 
 import EnsEquil as ee
 
+
 def test_dirs_created():
     """Check that all expected directories are created"""
     with TemporaryDirectory() as dirname:
         # Store current working directory to change back to later
         cwd = os.getcwd()
-        subprocess.run(["cp", "-r", "EnsEquil/data/example_run_dir/free/discharge/input", f"{dirname}/input"])
+        subprocess.run(
+            [
+                "cp",
+                "-r",
+                "EnsEquil/data/example_run_dir/free/discharge/input",
+                f"{dirname}/input",
+            ]
+        )
         # This should create output directories
-        ee.Stage(stage_type=ee.StageType.DISCHARGE, 
-                       input_dir=f"{dirname}/input",
-                       base_dir=dirname,
-                       output_dir=f"{dirname}/output",
-                       stream_log_level=logging.WARNING)
+        ee.Stage(
+            stage_type=ee.StageType.DISCHARGE,
+            input_dir=f"{dirname}/input",
+            base_dir=dirname,
+            output_dir=f"{dirname}/output",
+            stream_log_level=logging.WARNING,
+        )
 
         lam_dir_names = ["lambda_0.000", "lambda_0.252", "lambda_0.593", "lambda_1.000"]
         run_names = [f"run_0{i}" for i in range(1, 6)]
@@ -28,4 +38,3 @@ def test_dirs_created():
         for lam_dir in lam_dir_names:
             for run in run_names:
                 assert os.path.isdir(os.path.join(dirname, "output", lam_dir, run))
-
