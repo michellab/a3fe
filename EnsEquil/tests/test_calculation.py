@@ -52,7 +52,7 @@ def test_calculation_loading(calc):
 
 def test_calculation_logging(calc):
     """Check that the calculation logging is set up correctly"""
-    assert calc._logger.name == "Calculation_0"
+    assert calc._logger.name == "Calculation_74"
     assert type(calc._logger.handlers[0]) == logging.FileHandler  # type: ignore
     assert calc._logger.handlers[0].baseFilename == os.path.join(calc.base_dir, "Calculation.log")  # type: ignore
     assert calc._logger.handlers[0].level == logging.DEBUG  # type: ignore
