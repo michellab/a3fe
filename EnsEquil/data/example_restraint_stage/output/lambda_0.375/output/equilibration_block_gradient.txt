@@ -1,3 +1,0 @@
-Equilibrated: True
-Equilibration time: 0.0063999999999999994 ns
-Block size: 0.09 ns
