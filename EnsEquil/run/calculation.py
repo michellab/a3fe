@@ -208,8 +208,8 @@ class Calculation(_SimulationRunner):
     def get_optimal_lam_vals(
         self,
         simtime: float = 0.1,
-        er_type: str = "sem",
-        delta_er: float = 0.1,
+        er_type: str = "root_var",
+        delta_er: float = 1,
         run_nos: _List[int] = [1],
     ) -> None:
         """
@@ -228,8 +228,8 @@ class Calculation(_SimulationRunner):
             If er_type == "root_var", the desired integrated root variance of the gradients
             between each lambda value, in kcal mol^(-1). If er_type == "sem", the
             desired integrated standard error of the mean of the gradients between each lambda
-            value, in kcal mol^(-1) ns^(1/2). A sensible default for root_var is 1 kcal mol-1.
-            If not provided, the number of lambda windows must be provided with n_lam_vals.
+            value, in kcal mol^(-1) ns^(1/2). A sensible default for root_var is 1 kcal mol-1,
+            and 0,1 kcal mol-1 ns^(1/2) for sem.
         run_nos : List[int], optional, default=[1]
             The run numbers to use for the calculation. Only 1 is run by default, so by default
             we only analyse 1.

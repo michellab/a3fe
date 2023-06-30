@@ -609,10 +609,10 @@ class Stage(_SimulationRunner):
 
     def get_optimal_lam_vals(
         self,
-        er_type: str = "sem",
+        er_type: str = "root_var",
         delta_er: _Optional[float] = None,
         n_lam_vals: _Optional[int] = None,
-        run_nos : _List[int] = [1]
+        run_nos: _List[int] = [1],
     ) -> _np.ndarray:
         """
         Get the optimal lambda values for the stage, based on the
@@ -620,7 +620,7 @@ class Stage(_SimulationRunner):
 
         Parameters
         ----------
-        er_type: str, optional, default="sem"
+        er_type: str, optional, default="root_var"
             Whether to integrate the standard error of the mean ("sem") or root
             variance of the gradients ("root_var") to calculate the optimal
             lambda values.
