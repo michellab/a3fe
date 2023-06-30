@@ -612,6 +612,7 @@ class Stage(_SimulationRunner):
         er_type: str = "sem",
         delta_er: _Optional[float] = None,
         n_lam_vals: _Optional[int] = None,
+        run_nos : _List[int] = [1]
     ) -> _np.ndarray:
         """
         Get the optimal lambda values for the stage, based on the
@@ -632,6 +633,9 @@ class Stage(_SimulationRunner):
             provided with n_lam_vals.
         n_lam_vals : int, optional, default=None
             The number of lambda values to sample. If not provided, delta_er must be provided.
+        run_nos : List[int], optional, default=[1]
+            The run numbers to use for the calculation. Only 1 is run by default, so by default
+            we only analyse 1.
         Returns
         -------
         optimal_lam_vals : np.ndarray
@@ -641,7 +645,7 @@ class Stage(_SimulationRunner):
             f"Calculating optimal lambda values with er_type = {er_type} and delta_er = {delta_er}..."
         )
         unequilibrated_gradient_data = _GradientData(
-            lam_winds=self.lam_windows, equilibrated=False
+            lam_winds=self.lam_windows, equilibrated=False, run_nos=run_nos
         )
         for plot_type in [
             "mean",

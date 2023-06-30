@@ -391,10 +391,12 @@ class Leg(_SimulationRunner):
         simtime: _Optional[float] = 0.1,
         er_type: str = "sem",
         delta_er: float = 0.1,
+        run_nos: _List[int] = [1],
     ) -> None:
         """
         Determine the optimal lambda windows for each stage of the leg
-        by running short simulations at each lambda value and analysing them.
+        by running short simulations at each lambda value and analysing them,
+        using only a single run.
 
         Parameters
         ----------
@@ -412,6 +414,9 @@ class Leg(_SimulationRunner):
             desired integrated standard error of the mean of the gradients between each lambda
             value, in kcal mol^(-1) ns^(1/2). A sensible default for root_var is 1 kcal mol-1.
             If not provided, the number of lambda windows must be provided with n_lam_vals.
+        run_nos : List[int], optional, default=[1]
+            The run numbers to use for the calculation. Only 1 is run by default, so by default
+            we only analyse 1.
 
         Returns
         -------
@@ -428,7 +433,7 @@ class Leg(_SimulationRunner):
             self._logger.info(
                 f"Running short simulations for {simtime} ns to determine optimal lambda windows..."
             )
-            self.run(adaptive=False, runtime=simtime)
+            self.run(adaptive=False, runtime=simtime, run_nos=run_nos)
             self.wait()
         else:
             self._logger.info(
@@ -443,7 +448,7 @@ class Leg(_SimulationRunner):
         for stage in self.stages:
             self._logger.info(f"Determining optimal lambda windows for {stage}...")
             optimal_lam_vals = stage.get_optimal_lam_vals(
-                er_type=er_type, delta_er=delta_er
+                er_type=er_type, delta_er=delta_er, run_nos=[1]
             )
             # Create new LamWindow objects with the optimal lambda values, then save data
             stage.lam_vals = list(optimal_lam_vals)
@@ -1050,10 +1055,12 @@ class Leg(_SimulationRunner):
                     for run_no in run_nos
                 ]
             )
-            # Write out restraint 
+            # Write out restraint
             with open(f"{self.output_dir}/restraint_corrections.txt", "w") as ofile:
                 for run_no in run_nos:
-                    ofile.write(f"{run_no} {self.restraints[run_no - 1].getCorrection().value()} kcal / mol\n")
+                    ofile.write(
+                        f"{run_no} {self.restraints[run_no - 1].getCorrection().value()} kcal / mol\n"
+                    )
             self._logger.info(f"Restraint corrections: {rest_corrs} kcal / mol")
 
             # Correct overall DG

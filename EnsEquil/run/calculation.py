@@ -206,7 +206,11 @@ class Calculation(_SimulationRunner):
         self._dump()
 
     def get_optimal_lam_vals(
-        self, simtime: float = 0.1, er_type: str = "sem", delta_er: float = 0.1
+        self,
+        simtime: float = 0.1,
+        er_type: str = "sem",
+        delta_er: float = 0.1,
+        run_nos: _List[int] = [1],
     ) -> None:
         """
         Determine the optimal lambda windows for each stage of the calculation
@@ -226,6 +230,9 @@ class Calculation(_SimulationRunner):
             desired integrated standard error of the mean of the gradients between each lambda
             value, in kcal mol^(-1) ns^(1/2). A sensible default for root_var is 1 kcal mol-1.
             If not provided, the number of lambda windows must be provided with n_lam_vals.
+        run_nos : List[int], optional, default=[1]
+            The run numbers to use for the calculation. Only 1 is run by default, so by default
+            we only analyse 1.
 
         Returns
         -------
@@ -235,7 +242,7 @@ class Calculation(_SimulationRunner):
         self._logger.info(
             f"Running simulations for {simtime} ns to determine optimal lambda values..."
         )
-        self.run(adaptive=False, runtime=simtime)
+        self.run(adaptive=False, runtime=simtime, run_nos=run_nos)
         self.wait()
 
         # Then, determine the optimal lambda windows
@@ -244,7 +251,9 @@ class Calculation(_SimulationRunner):
         )
         for leg in self.legs:
             # Set simtime = None to avoid running any more simulations
-            leg.get_optimal_lam_vals(simtime=None, er_type=er_type, delta_er=delta_er)
+            leg.get_optimal_lam_vals(
+                simtime=None, er_type=er_type, delta_er=delta_er, run_nos=run_nos
+            )
 
         # Save state
         self._dump()
