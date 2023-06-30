@@ -399,7 +399,7 @@ class SimulationRunner(ABC):
         return dg_overall, er_overall
 
     def analyse_convergence(
-        self, run_nos: _Optional[_List[int]]
+        self, run_nos: _Optional[_List[int]] = None
     ) -> _Tuple[_np.ndarray, _np.ndarray]:
         f"""
         Get a timeseries of the total free energy change of the

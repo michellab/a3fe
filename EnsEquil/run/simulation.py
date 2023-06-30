@@ -374,6 +374,11 @@ class Simulation(_SimulationRunner):
             return step * self.timestep  # ns
 
     @property
+    def tot_simtime(self) -> float:
+        """Get the total simulation time in ns"""
+        return self.get_tot_simtime()
+
+    @property
     def tot_gpu_time(self) -> float:
         """Get the total simulation time in GPU hours"""
         # Get output files
