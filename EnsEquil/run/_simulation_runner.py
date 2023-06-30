@@ -23,6 +23,7 @@ from typing import (
     Union as _Union,
 )
 import logging as _logging
+from warnings import warn as _warn
 
 from ..analyse.plot import plot_convergence as _plot_convergence
 
@@ -556,6 +557,62 @@ class SimulationRunner(ABC):
         self._set_up_logging()
         for sub_sim_runner in self._sub_sim_runners:
             sub_sim_runner._refresh_logging()
+
+    def get_attr_values(self, attr: str) -> _Dict[SimulationRunner, _Any]:
+        f"""
+        Get the values of the attribute for the {self.__class__.__name__} and any sub-simulation runners.
+        If the attribute is not present for a sub-simulation runner, None is returned.
+
+        Parameters
+        ----------
+        attr : str
+            The name of the attribute to get the values of.
+
+        Returns
+        -------
+        attr_values : Dict[SimulationRunner, Any]
+            A dictionary of the attribute values for the {self.__class__.__name__} and any sub-simulation runners.
+        """
+        attrs_dict = {}
+        attrs_dict[attr] = getattr(self, attr, None)
+        if self._sub_sim_runners:
+            attrs_dict["sub_sim_runners"] = {}
+            for sub_sim_runner in self._sub_sim_runners:
+                attrs_dict["sub_sim_runners"][
+                    sub_sim_runner
+                ] = sub_sim_runner.get_attr_values(attr=attr)
+
+        return attrs_dict
+
+    def set_attr_values(self, attr: str, value: _Any, force: bool = False) -> None:
+        f"""
+        Set the attribute to the value for the {self.__class__.__name__} and any sub-simulation runners.
+
+        Parameters
+        ----------
+        attr : str
+            The name of the attribute to set the values of.
+        value : Any
+            The value to set the attribute to.
+        force : bool, default=False
+            If True, set the attribute even if it doesn't exist.
+        """
+        # Don't set the attribute if it doesn't exist
+        if not hasattr(self, attr):
+            if not force:
+                self._logger.warning(
+                    f"The {self.__class__.__name__} does not have the attribute {attr} and this will not be created."
+                )
+            if force:
+                self._logger.info(
+                    f"Setting the attribute {attr} to {value} even though it does not exist."
+                )
+                setattr(self, attr, value)
+        else:
+            self._logger.info(f"Setting the attribute {attr} to {value}.")
+            setattr(self, attr, value)
+        for sub_sim_runner in self._sub_sim_runners:
+            sub_sim_runner.set_attr_values(attr=attr, value=value)
 
     def update_paths(self, old_sub_path: str, new_sub_path: str) -> None:
         """
