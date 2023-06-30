@@ -1050,7 +1050,13 @@ class Leg(_SimulationRunner):
                     for run_no in run_nos
                 ]
             )
-            self._logger.info(f"Restraint corrections: {rest_corrs}")
+            # Write out restraint 
+            with open(f"{self.output_dir}/restraint_corrections.txt", "w") as ofile:
+                for run_no in run_nos:
+                    ofile.write(f"{run_no} {self.restraints[run_no - 1].getCorrection().value()} kcal / mol\n")
+            self._logger.info(f"Restraint corrections: {rest_corrs} kcal / mol")
+
+            # Correct overall DG
             dg_overall += rest_corrs
 
             # Update the internally stored dGs after the restraint corrections
