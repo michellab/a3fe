@@ -567,7 +567,6 @@ def check_equil_multiwindow_kpss(
         # Discard the first percentage_discard % of the data
         overall_dgs_discarded = overall_dgs.mean(axis=0)[percentage_discard:]
         # KPSS test
-        print(overall_dgs_discarded)
         _, p_value, *_ = _kpss(overall_dgs_discarded, regression="c", nlags="auto")
         # Decide if we have equilibrated based on the p value
         if p_value > 0.05:
@@ -622,7 +621,7 @@ def check_equil_multiwindow_modified_geweke(
     first_frac: float = 0.1,
     last_frac: float = 0.5,
     intervals: int = 4,
-    p_cutoff: float = 0.4,
+    p_cutoff: float = 0.2,
 ) -> _Tuple[bool, _Optional[float]]:  # type: ignore
     """
     Check if a set of lambda windows are equilibrated based on a modified version of the Geweke
@@ -634,12 +633,9 @@ def check_equil_multiwindow_modified_geweke(
 
     =============================================================
     Acknowledgement
-    This code was adapted from the now removed implementation of
+    Some of this code was adapted from the now removed implementation of
     the Geweke test in Arviz (https://github.com/arviz-devs/arviz)
     =============================================================
-
-    DETAILS
-    Note that to increase the power of the test, we
 
     Parameters
     ----------
@@ -661,7 +657,7 @@ def check_equil_multiwindow_modified_geweke(
     intervals : int, default: 4
         The number of equidistant starting fractions between 0 and 1 - last_frac for which to perform the Geweke test,
         discarding the starting fraction of the data.
-    p_cutoff : float, default: 0.4
+    p_cutoff : float, default: 0.2
         The p value cutoff for the Geweke test. If the p value is greater than this, the null hypothesis that the data
         is stationary is accepted and the data is considered equilibrated. A conservative value of 0.4 is used to increase
         the power of the test, at the expense of a higher false positive rate.
@@ -705,15 +701,12 @@ def check_equil_multiwindow_modified_geweke(
         last_slice_start_idx = round((1 - last_frac) * len(overall_dgs[0]))
 
         # Get the slices
-        print(f"{overall_dgs.shape=}")
         first_slice = overall_dgs[:, :first_slice_end_idx]
         last_slice = overall_dgs[:, last_slice_start_idx:]
 
         # Calculate means and variances
         first_slice_means = first_slice.mean(axis=1)
         last_slice_means = last_slice.mean(axis=1)
-        print(f"{first_slice_means=}")
-        print(f"{last_slice_means=}")
 
         # Calculate the p value for the differences between the means
         p_value = _stats.ttest_ind(
@@ -721,7 +714,9 @@ def check_equil_multiwindow_modified_geweke(
             last_slice_means,
             equal_var=False,  # Welches t-test
             alternative="two-sided",
-        )[1]
+        )[
+            1
+        ]  # First value is the t statistic - we want p
 
         # Store results - note that time is the per-run time
         p_vals_and_times.append(

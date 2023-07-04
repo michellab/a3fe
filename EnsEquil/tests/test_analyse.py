@@ -180,7 +180,7 @@ def test_geweke(restrain_stage):
             fractional_equil_time,
         ) = check_equil_multiwindow_modified_geweke(
             lambda_windows=restrain_stage.lam_windows,
-            output_dir="/home/users/finlayclark/software/EnsEquil",
+            output_dir=tmpdir,
             intervals=10,
             p_cutoff=0.4,
         )
