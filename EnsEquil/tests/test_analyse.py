@@ -3,8 +3,12 @@
 import os
 import numpy as np
 import pytest
+from tempfile import TemporaryDirectory
 
 import EnsEquil as ee
+
+from ..analyse.process_grads import get_time_series_multiwindow
+from ..analyse.detect_equil import check_equil_multiwindow_modified_geweke
 
 from .fixtures import restrain_stage
 
@@ -144,3 +148,42 @@ def test_convergence_analysis(restrain_stage):
     stage = restrain_stage
     _, free_energies = stage.analyse_convergence()
     assert np.allclose(free_energies, expected_results, atol=1e-2)
+
+
+def test_get_time_series_multiwindow(restrain_stage):
+    """Check that the time series are correctly extracted/ combined."""
+    # Check that this fails if we haven't set equil times
+    overall_dgs, overall_times = get_time_series_multiwindow(
+        lambda_windows=restrain_stage.lam_windows,
+        equilibrated=True,
+        run_nos=[1, 2],
+    )
+
+    # Check that the output has the correct shape
+    assert overall_dgs.shape == (2, 100)
+    assert overall_times.shape == (2, 100)
+
+    # Check that the total time is what we expect
+    tot_simtime = restrain_stage.get_tot_simtime(run_nos=[1])
+    assert overall_times[0][-1] == pytest.approx(tot_simtime, abs=1e-2)
+
+    # Check that the output values are correct
+    assert overall_dgs.mean(axis=0)[-1] == pytest.approx(1.7751, abs=1e-2)
+    assert overall_times.sum(axis=0)[-1] == pytest.approx(2.4, abs=1e-2)
+
+
+def test_geweke(restrain_stage):
+    """Test the modified Geweke equilibration analysis."""
+    with TemporaryDirectory() as tmpdir:
+        (
+            equilibrated,
+            fractional_equil_time,
+        ) = check_equil_multiwindow_modified_geweke(
+            lambda_windows=restrain_stage.lam_windows,
+            output_dir="/home/users/finlayclark/software/EnsEquil",
+            intervals=10,
+            p_cutoff=0.4,
+        )
+
+        assert equilibrated
+        assert fractional_equil_time == pytest.approx(0.0048, abs=1e-2)

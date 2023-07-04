@@ -39,6 +39,11 @@ class GradientData:
         """
         self.equilibrated = equilibrated
 
+        # Get the overall timeseries
+        self.overall_dgs, self.overall_times = get_time_series_multiwindow(
+            lam_winds, equilibrated=equilibrated, run_nos=run_nos
+        )
+
         # Get mean and variance of gradients, including both intra-run and inter-run components
         # Note that sems/ vars generally refer to the sems/ vars of the gradients, and not the
         # free energy changes.
@@ -380,3 +385,123 @@ class GradientData:
             predicted_overlap_mat[i, :] /= predicted_overlap_mat[i, :].sum()
 
         return predicted_overlap_mat
+
+
+def get_time_series_multiwindow(
+    lambda_windows: _List["LamWindow"],
+    equilibrated: bool = False,
+    run_nos: _Optional[_List[int]] = None,
+    start_frac: float = 0.0,
+    end_frac: float = 1.0,
+) -> _Tuple[_np.ndarray, _np.ndarray]:
+    """
+    Get a combined timeseries of free energy changes against simulation time,
+    based on the gradients from each lambda window. The contributions from each
+    lambda window are combined so that at a given fraction of total simulation
+    time, each lambda window contributes the same fraction of its data. Because
+    the simulations at different lambda windows are assumed to have run for
+    different amounts of simulation times, the data is combined by block averaging
+    each lambda window's data into 100 blocks, then combining these blocks over
+    runs.
+
+    Parameters
+    ----------
+    lambda_windows : List[LamWindow]
+        The lambda windows to combine.
+    equilibrated : bool, optional, default=False
+        Whether or not to discard data before the equilibration time. This
+        can only be True if _equilibrated and _equil_time are set for
+        all lambda windows.
+    run_nos : List[int], optional, default=None
+        The run numbers to use for each lambda window. If None, all runs are
+        used.
+    start_frac : float, optional, default=0.
+        The fraction of the total simulation time to start the combined timeseries
+        from.
+    end_frac : float, optional, default=1
+        The fraction of the total simulation time to end the combined timeseries
+        at.
+
+    Returns
+    -------
+    overall_dgs : np.ndarray
+        The free energy changes at each increment of total simulation time.
+    overall_times : np.ndarray
+        The total simulation times (per run).
+    """
+    # Check that weights are defined for all windows
+    if any([not lam_win.lam_val_weight for lam_win in lambda_windows]):
+        raise ValueError(
+            "Lambda value weight not set for all windows. Please set the lambda value weight to "
+            "use get_time_series_multiwindow."
+        )
+
+    # Check that equilibration stats have been set for all lambda windows if equilibrated is True
+    if equilibrated and any([not lam_win._equilibrated for lam_win in lambda_windows]):
+        raise ValueError(
+            "_equilibrated must be set for all windows to use get_time_series_multiwindow"
+        )
+
+    # Make sure that the required equilibrated simfiles exist if equilibrated is True
+    if equilibrated:
+        for lam_win in lambda_windows:
+            lam_win._write_equilibrated_simfiles()
+
+    # Check the run numbers
+    run_nos = lambda_windows[0]._get_valid_run_nos(run_nos)
+
+    # Combine all gradients to get the change in free energy with increasing simulation time.
+    # Do this so that the total simulation time for each window is spread evenly over the total
+    # simulation time for the whole calculation
+    n_runs = len(run_nos)
+    overall_dgs = _np.zeros(
+        [n_runs, 100]
+    )  # One point for each % of the total simulation time
+    overall_times = _np.zeros([n_runs, 100])
+    for lam_win in lambda_windows:
+        for i, run_no in enumerate(run_nos):  # type: ignore
+            sim = lam_win.sims[run_no - 1]
+            times, grads = sim.read_gradients()
+            dgs = [grad * lam_win.lam_val_weight for grad in grads]
+            # Truncate here if necessary
+            start_idx = 0 if start_frac is None else round(start_frac * len(dgs))
+            end_idx = len(dgs) if end_frac is None else round(end_frac * len(dgs))
+            # Make sure we have enough data for our block averaging
+            if end_idx - start_idx < 100:
+                raise ValueError(
+                    "Not enough data to combine windows. Please use a larger fraction of the "
+                    "total simulation time or run the simulations for longer."
+                )
+            times, dgs = times[start_idx:end_idx], dgs[start_idx:end_idx]
+            # Convert times and dgs to arrays of length 100. Do this with block averaging
+            # so that we don't lose any information
+            times_resized = _np.linspace(times[0], times[-1], 100)
+            dgs_resized = _np.zeros(100)
+            # Average the gradients over 100 evenly-sized blocks. We have enough data so
+            # that small issues with indexing should not cause problems
+            indices = _np.array(list(round(x) for x in _np.linspace(0, len(dgs), 101)))
+            for j in range(100):
+                dgs_resized[j] = _np.mean(dgs[indices[j] : indices[j + 1]])
+            overall_dgs[i] += dgs_resized
+            overall_times[i] += times_resized
+
+        # Check that we have the same total times for each run
+        if not all(
+            [
+                _np.isclose(overall_times[i, -1], overall_times[0, -1])
+                for i in range(n_runs)
+            ]
+        ):
+            raise ValueError(
+                "Total simulation times are not the same for all runs. Please ensure that "
+                "the total simulation times are the same for all runs."
+            )
+
+        # Check that we didn't get any NaNs
+        if _np.isnan(overall_dgs).any():
+            raise ValueError(
+                "NaNs found in the free energy change. Please check that the simulation "
+                "has run correctly."
+            )
+
+    return overall_dgs, overall_times

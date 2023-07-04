@@ -12,7 +12,10 @@ from pymbar import timeseries as _timeseries
 import scipy.stats as _stats
 from statsmodels.tsa.stattools import kpss as _kpss
 
-from .plot import general_plot as _general_plot
+from .process_grads import (
+    get_time_series_multiwindow as _get_time_series_multiwindow,
+)
+from .plot import general_plot as _general_plot, geweke_plot as _geweke_plot
 
 
 def check_equil_block_gradient(lam_win: "LamWindow", run_nos: _Optional[_List[int]]) -> _Tuple[bool, _Optional[float]]:  # type: ignore
@@ -133,307 +136,6 @@ def check_equil_block_gradient(lam_win: "LamWindow", run_nos: _Optional[_List[in
     )
 
     return equilibrated, equil_time
-
-
-def check_equil_multiwindow(
-    lambda_windows: _List["LamWindow"],
-    output_dir: str,
-    run_nos: _Optional[_List[int]] = None,
-) -> _Tuple[bool, _Optional[float]]:  # type: ignore
-    """
-    Check if a set of lambda windows are equilibrated based on the ensemble gradient
-    of the free energy change. This is done by block averaging the free energy
-    change over a variety of block sizes, starting from the largest possible. The
-    stage is marked as equilibrated if the absolute gradient is significantly below
-    the gradient threshold, giving the fractional equilibration time. The fractional
-    equilibration time is then multiplied by the total simulation time for each
-    simulation to obtain the per simulation equilibration times.
-
-    Parameters
-    ----------
-    lambda_windows : List[LamWindow]
-        List of lambda windows to check for equilibration.
-    output_dir : str
-        Directory to write output files to.
-    run_nos : List[int], Optional, default: None
-        The run numbers to use. If None, all runs will be used.
-
-    Returns
-    -------
-    equilibrated : bool
-        True if the set of lambda windows is equilibrated, False otherwise.
-    fractional_equil_time : float
-        Time taken to equilibrate, as a fraction of the total simulation time.
-    """
-    run_nos = lambda_windows[0]._get_valid_run_nos(run_nos)
-
-    if any([not lam_win.lam_val_weight for lam_win in lambda_windows]):
-        raise ValueError(
-            "Lambda value weight not set for all windows. Please set the lambda value weight to "
-            "use check_equil_multiwindow for equilibration detection."
-        )
-
-    # Combine all gradients to get the change in free energy with increasing simulation time.
-    # Do this so that the total simulation time for each window is spread evenly over the total
-    # simulation time for the whole calculation
-    n_runs = len(run_nos)
-    overall_dgs = _np.zeros(
-        [n_runs, 100]
-    )  # One point for each % of the total simulation time
-    overall_times = _np.zeros([n_runs, 100])
-    for lam_win in lambda_windows:
-        for i, run in enumerate(run_nos):
-            sim = lam_win.sims[run - 1]
-            times, grads = sim.read_gradients()
-            dgs = [grad * lam_win.lam_val_weight for grad in grads]
-            # Convert times and dgs to arrays of length 100. Do this with block averaging
-            # so that we don't lose any information
-            times_resized = _np.linspace(0, times[-1], 100)
-            dgs_resized = _np.zeros(100)
-            # Average the gradients over 100 evenly-sized blocks. We have enough data so
-            # that small issues with indexing should not cause problems
-            indices = _np.array(list(round(x) for x in _np.linspace(0, len(dgs), 101)))
-            for j in range(100):
-                dgs_resized[j] = _np.mean(dgs[indices[j] : indices[j + 1]])
-            overall_dgs[i] += dgs_resized
-            overall_times[i] += times_resized
-    # Check that we have the same total times for each run
-    if not all(
-        [_np.isclose(overall_times[i, -1], overall_times[0, -1]) for i in range(n_runs)]
-    ):
-        raise ValueError(
-            "Total simulation times are not the same for all runs. Please ensure that "
-            "the total simulation times are the same for all runs."
-        )
-
-    # Block average the gradients and check that the absolute mean gradient of the gradient
-    # is significantly below some cut-off. This cut-off should be related to the threshold set
-    # in the optimal efficiency loop
-    equilibrated = False
-    fractional_equil_time = None
-    equil_time = None
-    for percentage_discard in [0, 10, 30, 60]:
-        # Discard the first percentage_discard % of the data
-        overall_dgs_discarded = overall_dgs[:, percentage_discard:]
-        overall_times_discarded = overall_times[:, percentage_discard:]
-        # Average the first and last halves of the data and calculate the gradient
-        middle_index = round(overall_dgs_discarded.shape[1] / 2)
-        # Grad below in kcal mol^-1 ns^-1
-        overall_grads_dg = _np.array(
-            overall_dgs_discarded[:, middle_index:].mean(axis=1)
-            - overall_dgs_discarded[:, :middle_index].mean(axis=1)
-        ) / (overall_times_discarded[0][middle_index] - overall_times_discarded[0][0])
-        # Calculate the mean gradient and 95 % confidence intervals
-        overall_grad_dg = _np.mean(overall_grads_dg)
-        conf_int = _stats.t.interval(
-            0.95,
-            len(overall_grads_dg) - 1,
-            loc=_np.mean(overall_grads_dg),
-            scale=_stats.sem(overall_grads_dg),
-        )
-        # Check that the gradient is not significantly different from zero
-        if conf_int[0] < 0 and 0 < conf_int[1]:
-            equilibrated = True
-            fractional_equil_time = percentage_discard / 100
-            equil_time = (
-                _np.sum(
-                    [
-                        lam_win.get_total_simtime(run_nos=run_nos)
-                        for lam_win in lambda_windows
-                    ]
-                )
-                * fractional_equil_time
-            )
-            break
-
-    # Directly set the _equilibrated and _equil_time attributes of the lambda windows
-    if equilibrated:
-        for lam_win in lambda_windows:
-            lam_win._equilibrated = True
-            # Equilibration time is per-simulation
-            lam_win._equil_time = (
-                fractional_equil_time
-                * lam_win.get_total_simtime(run_nos=run_nos)
-                / lam_win.ensemble_size
-            )  # ns
-
-    # Write out data
-    with open(f"{output_dir}/check_equil_multiwindow.txt", "w") as ofile:
-        ofile.write(f"Equilibrated: {equilibrated}\n")
-        ofile.write(f"Overall gradient {overall_grad_dg} +/- {conf_int[1] - overall_grad_dg} kcal mol^-1 ns^-1\n")  # type: ignore
-        ofile.write(f"Fractional equilibration time: {fractional_equil_time} \n")
-        ofile.write(f"Equilibration time: {equil_time} ns\n")
-        ofile.write(f"Run numbers: {run_nos}\n")
-
-    # Create plots of the overall gradients
-    _general_plot(
-        x_vals=overall_times[0],
-        y_vals=overall_dgs,
-        x_label="Total Simulation Time / ns",
-        y_label=r"$\Delta G$ / kcal mol$^{-1}$",
-        outfile=f"{output_dir}/check_equil_multiwindow.png",
-        run_nos=run_nos,
-    )
-
-    return equilibrated, fractional_equil_time
-
-
-def check_equil_multiwindow_kpss(
-    lambda_windows: _List["LamWindow"],
-    output_dir: str,
-    run_nos: _Optional[_List[int]] = None,
-) -> _Tuple[bool, _Optional[float]]:  # type: ignore
-    """
-    Check if a set of lambda windows are equilibrated based on the KPSS test for stationarity.
-    The overall timeseries of dG against simulation time is obtained by block averaging the free
-    energy changes for each window over 100 blocks, then combining. The KPSS test is applied to
-    this overall timeseries to check for equilibration. This is repeated discarding 0, 10, 30 and
-    50 % of the data. The first time p > 0.05 is found, the simulation is considered equilibrated.
-    The fractional equilibration time is then multiplied by the total simulation time for each
-    simulation to obtain the per simulation equilibration times. We should maybe be correcting for
-    multiple testing.
-
-    Parameters
-    ----------
-    lambda_windows : List[LamWindow]
-        List of lambda windows to check for equilibration.
-    output_dir : str
-        Directory to write output files to.
-    run_nos : List[int], Optional, default: None
-        The run numbers to use. If None, all runs will be used.
-
-    Returns
-    -------
-    equilibrated : bool
-        True if the set of lambda windows is equilibrated, False otherwise.
-    fractional_equil_time : float
-        Time taken to equilibrate, as a fraction of the total simulation time.
-    """
-    run_nos = lambda_windows[0]._get_valid_run_nos(run_nos)
-
-    if any([not lam_win.lam_val_weight for lam_win in lambda_windows]):
-        raise ValueError(
-            "Lambda value weight not set for all windows. Please set the lambda value weight to "
-            "use check_equil_multiwindow for equilibration detection."
-        )
-
-    # Combine all gradients to get the change in free energy with increasing simulation time.
-    # Do this so that the total simulation time for each window is spread evenly over the total
-    # simulation time for the whole calculation
-    n_runs = len(run_nos)
-    overall_dgs = _np.zeros(
-        [n_runs, 100]
-    )  # One point for each % of the total simulation time
-    overall_times = _np.zeros([n_runs, 100])
-    for lam_win in lambda_windows:
-        for i, run_no in enumerate(run_nos):
-            sim = lam_win.sims[run_no - 1]
-            times, grads = sim.read_gradients()
-            dgs = [grad * lam_win.lam_val_weight for grad in grads]
-            # Convert times and dgs to arrays of length 100. Do this with block averaging
-            # so that we don't lose any information
-            times_resized = _np.linspace(0, times[-1], 100)
-            dgs_resized = _np.zeros(100)
-            # Average the gradients over 100 evenly-sized blocks. We have enough data so
-            # that small issues with indexing should not cause problems
-            indices = _np.array(list(round(x) for x in _np.linspace(0, len(dgs), 101)))
-            for j in range(100):
-                dgs_resized[j] = _np.mean(dgs[indices[j] : indices[j + 1]])
-            overall_dgs[i] += dgs_resized
-            overall_times[i] += times_resized
-    # Check that we have the same total times for each run
-    if not all(
-        [_np.isclose(overall_times[i, -1], overall_times[0, -1]) for i in range(n_runs)]
-    ):
-        raise ValueError(
-            "Total simulation times are not the same for all runs. Please ensure that "
-            "the total simulation times are the same for all runs."
-        )
-
-    # Block average the gradients and check that the absolute mean gradient of the gradient
-    # is significantly below some cut-off. This cut-off should be related to the threshold set
-    # in the optimal efficiency loop
-    equilibrated = False
-    fractional_equil_time = None
-    equil_time = None
-    for percentage_discard in [0, 10, 30, 50]:
-        # Discard the first percentage_discard % of the data
-        overall_dgs_discarded = overall_dgs.mean(axis=0)[percentage_discard:]
-        # KPSS test
-        print(overall_dgs_discarded)
-        _, p_value, *_ = _kpss(overall_dgs_discarded, regression="c", nlags="auto")
-        # Decide if we have equilibrated based on the p value
-        if p_value > 0.05:
-            equilibrated = True
-            fractional_equil_time = percentage_discard / 100
-            equil_time = (
-                _np.sum(
-                    [
-                        lam_win.get_tot_simtime(run_nos=run_nos)
-                        for lam_win in lambda_windows
-                    ]
-                )
-                * fractional_equil_time
-            )
-            break
-
-    # Directly set the _equilibrated and _equil_time attributes of the lambda windows
-    if equilibrated:
-        for lam_win in lambda_windows:
-            lam_win._equilibrated = True
-            # Equilibration time is per-simulation
-            lam_win._equil_time = (
-                fractional_equil_time
-                * lam_win.get_tot_simtime(run_nos=run_nos)
-                / lam_win.ensemble_size
-            )  # ns
-
-    # Write out data
-    with open(f"{output_dir}/check_equil_multiwindow_kpss.txt", "w") as ofile:
-        ofile.write(f"Equilibrated: {equilibrated}\n")
-        ofile.write(f"p value: {p_value}\n")
-        ofile.write(f"Fractional equilibration time: {fractional_equil_time} \n")
-        ofile.write(f"Equilibration time: {equil_time} ns\n")
-        ofile.write(f"Run numbers: {run_nos}\n")
-
-    # Create plots of the overall gradients
-    _general_plot(
-        x_vals=overall_times[0],
-        y_vals=overall_dgs,
-        x_label="Total Simulation Time / ns",
-        y_label=r"$\Delta G$ / kcal mol$^{-1}$",
-        outfile=f"{output_dir}/check_equil_multiwindow_kpss.png",
-        vline_val=equil_time,
-        run_nos=run_nos,
-    )
-
-    return equilibrated, fractional_equil_time
-
-
-def dummy_check_equil_multiwindow(
-    lam_win: "LamWindow", run_nos: _Optional[_List[int]] = None
-) -> _Tuple[bool, _Optional[float]]:  # type: ignore
-    """
-    Becuse "check_equil_multiwindow" checks multiple windows at once and sets the _equilibrated
-    and _equil_time attributes of the lambda windows, but EnsEquil was written based on per-window
-    checks, we need a dummy function which just reads the attributes of the lambda window and
-    assumes that they have already been set by "check_equil_multiwindow".
-
-    Parameters
-    ----------
-    lam_win : LamWindow
-        Lambda window to check for equilibration (ignored in practice)
-    run_nos : List[int], Optional, default: None
-        Ignored in practice, but included for consistency.
-
-    Returns
-    -------
-    equilibrated : bool
-        True if the simulation is equilibrated, False otherwise.
-    equil_time : float
-        Time taken to equilibrate per simulation, in ns.
-    """
-    return lam_win._equilibrated, lam_win._equil_time
 
 
 def check_equil_shrinking_block_gradient(
@@ -698,3 +400,409 @@ def check_equil_chodera(lam_win: "LamWindow", run_nos: _Optional[_List[int]] = N
     )
 
     return equilibrated, equil_time
+
+
+####################### Multiwindow Equilibration Detection ##########################
+# These check for equilibration based on the cumulative free energy change accross all
+# windows, which reduces the noise which can cause issues with single window equilibration
+# detection.
+
+
+def check_equil_multiwindow(
+    lambda_windows: _List["LamWindow"],
+    output_dir: str,
+    run_nos: _Optional[_List[int]] = None,
+) -> _Tuple[bool, _Optional[float]]:  # type: ignore
+    """
+    Check if a set of lambda windows are equilibrated based on the ensemble gradient
+    of the free energy change. This is done by block averaging the free energy
+    change over a variety of block sizes, starting from the largest possible. The
+    stage is marked as equilibrated if the absolute gradient is significantly below
+    the gradient threshold, giving the fractional equilibration time. The fractional
+    equilibration time is then multiplied by the total simulation time for each
+    simulation to obtain the per simulation equilibration times.
+
+    Parameters
+    ----------
+    lambda_windows : List[LamWindow]
+        List of lambda windows to check for equilibration.
+    output_dir : str
+        Directory to write output files to.
+    run_nos : List[int], Optional, default: None
+        The run numbers to use. If None, all runs will be used.
+
+    Returns
+    -------
+    equilibrated : bool
+        True if the set of lambda windows is equilibrated, False otherwise.
+    fractional_equil_time : float
+        Time taken to equilibrate, as a fraction of the total simulation time.
+    """
+    run_nos = lambda_windows[0]._get_valid_run_nos(run_nos)
+
+    if any([not lam_win.lam_val_weight for lam_win in lambda_windows]):
+        raise ValueError(
+            "Lambda value weight not set for all windows. Please set the lambda value weight to "
+            "use check_equil_multiwindow for equilibration detection."
+        )
+
+    overall_dgs, overall_times = _get_time_series_multiwindow(
+        lambda_windows=lambda_windows, run_nos=run_nos
+    )
+
+    # Block average the gradients and check that the absolute mean gradient of the gradient
+    # is significantly below some cut-off. This cut-off should be related to the threshold set
+    # in the optimal efficiency loop
+    equilibrated = False
+    fractional_equil_time = None
+    equil_time = None
+    for percentage_discard in [0, 10, 30, 60]:
+        # Discard the first percentage_discard % of the data
+        overall_dgs_discarded = overall_dgs[:, percentage_discard:]
+        overall_times_discarded = overall_times[:, percentage_discard:]
+        # Average the first and last halves of the data and calculate the gradient
+        middle_index = round(overall_dgs_discarded.shape[1] / 2)
+        # Grad below in kcal mol^-1 ns^-1
+        overall_grads_dg = _np.array(
+            overall_dgs_discarded[:, middle_index:].mean(axis=1)
+            - overall_dgs_discarded[:, :middle_index].mean(axis=1)
+        ) / (overall_times_discarded[0][middle_index] - overall_times_discarded[0][0])
+        # Calculate the mean gradient and 95 % confidence intervals
+        overall_grad_dg = _np.mean(overall_grads_dg)
+        conf_int = _stats.t.interval(
+            0.95,
+            len(overall_grads_dg) - 1,
+            loc=_np.mean(overall_grads_dg),
+            scale=_stats.sem(overall_grads_dg),
+        )
+        # Check that the gradient is not significantly different from zero
+        if conf_int[0] < 0 and 0 < conf_int[1]:
+            equilibrated = True
+            fractional_equil_time = percentage_discard / 100
+            equil_time = (
+                _np.sum(
+                    [
+                        lam_win.get_total_simtime(run_nos=run_nos)
+                        for lam_win in lambda_windows
+                    ]
+                )
+                * fractional_equil_time
+            )
+            break
+
+    # Directly set the _equilibrated and _equil_time attributes of the lambda windows
+    if equilibrated:
+        for lam_win in lambda_windows:
+            lam_win._equilibrated = True
+            # Equilibration time is per-simulation
+            lam_win._equil_time = fractional_equil_time * lam_win.get_tot_simtime(
+                run_nos=[1]
+            )  # ns
+
+    # Write out data
+    with open(f"{output_dir}/check_equil_multiwindow.txt", "w") as ofile:
+        ofile.write(f"Equilibrated: {equilibrated}\n")
+        ofile.write(f"Overall gradient {overall_grad_dg} +/- {conf_int[1] - overall_grad_dg} kcal mol^-1 ns^-1\n")  # type: ignore
+        ofile.write(f"Fractional equilibration time: {fractional_equil_time} \n")
+        ofile.write(f"Equilibration time: {equil_time} ns\n")
+        ofile.write(f"Run numbers: {run_nos}\n")
+
+    # Create plots of the overall gradients
+    _general_plot(
+        x_vals=overall_times[0],
+        y_vals=overall_dgs,
+        x_label="Total Simulation Time / ns",
+        y_label=r"$\Delta G$ / kcal mol$^{-1}$",
+        outfile=f"{output_dir}/check_equil_multiwindow.png",
+        run_nos=run_nos,
+    )
+
+    return equilibrated, fractional_equil_time
+
+
+def check_equil_multiwindow_kpss(
+    lambda_windows: _List["LamWindow"],
+    output_dir: str,
+    run_nos: _Optional[_List[int]] = None,
+) -> _Tuple[bool, _Optional[float]]:  # type: ignore
+    """
+    Check if a set of lambda windows are equilibrated based on the KPSS test for stationarity.
+    The overall timeseries of dG against simulation time is obtained by block averaging the free
+    energy changes for each window over 100 blocks, then combining. The KPSS test is applied to
+    this overall timeseries to check for equilibration. This is repeated discarding 0, 10, 30 and
+    50 % of the data. The first time p > 0.05 is found, the simulation is considered equilibrated.
+    The fractional equilibration time is then multiplied by the total simulation time for each
+    simulation to obtain the per simulation equilibration times. We should maybe be correcting for
+    multiple testing.
+
+    Parameters
+    ----------
+    lambda_windows : List[LamWindow]
+        List of lambda windows to check for equilibration.
+    output_dir : str
+        Directory to write output files to.
+    run_nos : List[int], Optional, default: None
+        The run numbers to use. If None, all runs will be used.
+
+    Returns
+    -------
+    equilibrated : bool
+        True if the set of lambda windows is equilibrated, False otherwise.
+    fractional_equil_time : float
+        Time taken to equilibrate, as a fraction of the total simulation time.
+    """
+    run_nos = lambda_windows[0]._get_valid_run_nos(run_nos)
+
+    overall_dgs, overall_times = _get_time_series_multiwindow(
+        lambda_windows=lambda_windows, run_nos=run_nos
+    )
+
+    # Block average the gradients and check that the absolute mean gradient of the gradient
+    # is significantly below some cut-off. This cut-off should be related to the threshold set
+    # in the optimal efficiency loop
+    equilibrated = False
+    fractional_equil_time = None
+    equil_time = None
+    for percentage_discard in [0, 10, 30, 50]:
+        # Discard the first percentage_discard % of the data
+        overall_dgs_discarded = overall_dgs.mean(axis=0)[percentage_discard:]
+        # KPSS test
+        print(overall_dgs_discarded)
+        _, p_value, *_ = _kpss(overall_dgs_discarded, regression="c", nlags="auto")
+        # Decide if we have equilibrated based on the p value
+        if p_value > 0.05:
+            equilibrated = True
+            fractional_equil_time = percentage_discard / 100
+            equil_time = (
+                _np.sum(
+                    [
+                        lam_win.get_tot_simtime(run_nos=run_nos)
+                        for lam_win in lambda_windows
+                    ]
+                )
+                * fractional_equil_time
+            )
+            break
+
+    # Directly set the _equilibrated and _equil_time attributes of the lambda windows
+    if equilibrated:
+        for lam_win in lambda_windows:
+            lam_win._equilibrated = True
+            # Equilibration time is per-simulation
+            lam_win._equil_time = fractional_equil_time * lam_win.get_tot_simtime(
+                run_nos=[1]
+            )  # ns
+
+    # Write out data
+    with open(f"{output_dir}/check_equil_multiwindow_kpss.txt", "w") as ofile:
+        ofile.write(f"Equilibrated: {equilibrated}\n")
+        ofile.write(f"p value: {p_value}\n")
+        ofile.write(f"Fractional equilibration time: {fractional_equil_time} \n")
+        ofile.write(f"Equilibration time: {equil_time} ns\n")
+        ofile.write(f"Run numbers: {run_nos}\n")
+
+    # Create plots of the overall gradients
+    _general_plot(
+        x_vals=overall_times[0],
+        y_vals=overall_dgs,
+        x_label="Total Simulation Time / ns",
+        y_label=r"$\Delta G$ / kcal mol$^{-1}$",
+        outfile=f"{output_dir}/check_equil_multiwindow_kpss.png",
+        vline_val=equil_time,
+        run_nos=run_nos,
+    )
+
+    return equilibrated, fractional_equil_time
+
+
+def check_equil_multiwindow_modified_geweke(
+    lambda_windows: _List["LamWindow"],
+    output_dir: str,
+    run_nos: _Optional[_List[int]] = None,
+    first_frac: float = 0.1,
+    last_frac: float = 0.5,
+    intervals: int = 4,
+    p_cutoff: float = 0.4,
+) -> _Tuple[bool, _Optional[float]]:  # type: ignore
+    """
+    Check if a set of lambda windows are equilibrated based on a modified version of the Geweke
+    test (https://ideas.repec.org/p/fip/fedmsr/148.html). Instead of using the original Geweke
+    test on the cumulative timeseries of the free energy change where the variances are derived from
+    spectral variance estimates from the single trace, we apply the Geweke test to the cumulative
+    timeseries of the free energy change where the variances are derived from the inter-run uncertainties,
+    assuming Gaussian distributions.
+
+    =============================================================
+    Acknowledgement
+    This code was adapted from the now removed implementation of
+    the Geweke test in Arviz (https://github.com/arviz-devs/arviz)
+    =============================================================
+
+    DETAILS
+    Note that to increase the power of the test, we
+
+    Parameters
+    ----------
+    lambda_windows : List[LamWindow]
+        List of lambda windows to check for equilibration.
+    output_dir : str
+        Directory to write output files to.
+    run_nos : List[int], Optional, default: None
+        The run numbers to use. If None, all runs will be used.
+    first_frac : float, default: 0.1
+        The fraction of the simulation to use for the first part of the Geweke test. Defaults
+        to original recommendation of using the first 10% of the data.
+    last_frac : float, default: 0.5
+        The fraction of the simulation to use for the last part of the Geweke test. Defaults
+        to original recommendation of using the last 50% of the data. This is taken as backwards
+        from the end of the simulation, e.g. if last_frac = 0.3, the last 30% of the simulation
+        will be used. This is also gives the maximum fraction of the simulation to discard when
+        repeatedly discarding data from the start of the simulation and checking for convergence.
+    intervals : int, default: 4
+        The number of equidistant starting fractions between 0 and 1 - last_frac for which to perform the Geweke test,
+        discarding the starting fraction of the data.
+    p_cutoff : float, default: 0.4
+        The p value cutoff for the Geweke test. If the p value is greater than this, the null hypothesis that the data
+        is stationary is accepted and the data is considered equilibrated. A conservative value of 0.4 is used to increase
+        the power of the test, at the expense of a higher false positive rate.
+
+    Returns
+    -------
+    equilibrated : bool
+        True if the set of lambda windows is equilibrated, False otherwise.
+    fractional_equil_time : float
+        Time taken to equilibrate, as a fraction of the total simulation time.
+    """
+    run_nos = lambda_windows[0]._get_valid_run_nos(run_nos)
+
+    # Filter out invalid intervals
+    for interval in (first_frac, last_frac):
+        if interval <= 0 or interval >= 1:
+            raise ValueError(
+                "Invalid intervals for Geweke convergence analysis",
+                (first_frac, last_frac),
+            )
+    if first_frac + last_frac >= 1:
+        raise ValueError(
+            "Invalid intervals for Geweke convergence analysis", (first_frac, last_frac)
+        )
+
+    # Initialize list of p values and times
+    p_vals_and_times = []
+    equilibrated = False
+    fractional_equil_time = None
+    equil_time = None
+
+    # Calculate the z score for each interval
+    start_fracs = _np.linspace(0, 1 - last_frac, num=intervals)
+    for start_frac in start_fracs:
+        # Generate the data
+        overall_dgs, overall_times = _get_time_series_multiwindow(
+            lambda_windows=lambda_windows, run_nos=run_nos, start_frac=start_frac
+        )
+        # Get the indices of the end of the first slice and the start of the last slice
+        first_slice_end_idx = round(first_frac * len(overall_dgs[0]))
+        last_slice_start_idx = round((1 - last_frac) * len(overall_dgs[0]))
+
+        # Get the slices
+        print(f"{overall_dgs.shape=}")
+        first_slice = overall_dgs[:, :first_slice_end_idx]
+        last_slice = overall_dgs[:, last_slice_start_idx:]
+
+        # Calculate means and variances
+        first_slice_means = first_slice.mean(axis=1)
+        last_slice_means = last_slice.mean(axis=1)
+        print(f"{first_slice_means=}")
+        print(f"{last_slice_means=}")
+
+        # Calculate the p value for the differences between the means
+        p_value = _stats.ttest_ind(
+            first_slice_means,
+            last_slice_means,
+            equal_var=False,  # Welches t-test
+            alternative="two-sided",
+        )[1]
+
+        # Store results - note that time is the per-run time
+        p_vals_and_times.append(
+            (p_value, overall_times[0][0])
+        )  # second value is the equilibration time
+
+        # Check if the p-value is greater than the cutoff
+        if p_value > p_cutoff:
+            # No evidence to reject the null hypothesis that the data is stationary at current p cutoff
+            if (
+                equilibrated == False
+            ):  #  Make sure we haven't already detected equilibration
+                equilibrated = True
+                fractional_equil_time = start_frac
+                equil_time = overall_times[0][0]
+
+    # Directly set the _equilibrated and _equil_time attributes of the lambda windows
+    if equilibrated:
+        for lam_win in lambda_windows:
+            lam_win._equilibrated = True
+            # Equilibration time is per-simulation
+            lam_win._equil_time = fractional_equil_time * lam_win.get_tot_simtime(
+                run_nos=[1]
+            )  # ns
+
+    # Write out data
+    with open(
+        f"{output_dir}/check_equil_multiwindow_modified_geweke.txt", "w"
+    ) as ofile:
+        ofile.write(f"Equilibrated: {equilibrated}\n")
+        ofile.write(f"p values and times: {p_vals_and_times}\n")
+        ofile.write(f"Fractional equilibration time: {fractional_equil_time} \n")
+        ofile.write(f"Equilibration time: {equil_time} ns\n")
+        ofile.write(f"Run numbers: {run_nos}\n")
+
+    # Create plots of the overall gradients using all data
+    overall_dgs, overall_times = _get_time_series_multiwindow(
+        lambda_windows=lambda_windows, run_nos=run_nos
+    )
+    _general_plot(
+        x_vals=overall_times[0],
+        y_vals=overall_dgs,
+        x_label="Total Simulation Time / ns",
+        y_label=r"$\Delta G$ / kcal mol$^{-1}$",
+        outfile=f"{output_dir}/check_equil_multiwindow_geweke.png",
+        vline_val=equil_time,
+        run_nos=run_nos,
+    )
+
+    # Create Geweke plot
+    p_vals, times = zip(*p_vals_and_times)
+    _geweke_plot(
+        times=_np.array(times),
+        p_vals=_np.array(p_vals),
+        outfile=f"{output_dir}/check_equil_multiwindow_modified_geweke.png",
+    )
+
+    return equilibrated, fractional_equil_time
+
+
+def dummy_check_equil_multiwindow(
+    lam_win: "LamWindow", run_nos: _Optional[_List[int]] = None
+) -> _Tuple[bool, _Optional[float]]:  # type: ignore
+    """
+    Becuse "check_equil_multiwindow" checks multiple windows at once and sets the _equilibrated
+    and _equil_time attributes of the lambda windows, but EnsEquil was written based on per-window
+    checks, we need a dummy function which just reads the attributes of the lambda window and
+    assumes that they have already been set by "check_equil_multiwindow".
+
+    Parameters
+    ----------
+    lam_win : LamWindow
+        Lambda window to check for equilibration (ignored in practice)
+    run_nos : List[int], Optional, default: None
+        Ignored in practice, but included for consistency.
+
+    Returns
+    -------
+    equilibrated : bool
+        True if the simulation is equilibrated, False otherwise.
+    equil_time : float
+        Time taken to equilibrate per simulation, in ns.
+    """
+    return lam_win._equilibrated, lam_win._equil_time

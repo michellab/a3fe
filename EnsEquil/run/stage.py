@@ -756,16 +756,7 @@ class Stage(_SimulationRunner):
 
             # Remove unequilibrated data from the equilibrated output directory
             for win in self.lam_windows:
-                equil_time = win.equil_time
-                # Minus 1 because first energy is only written after the first nrg_freq steps
-                equil_index = (
-                    int(equil_time / (win.sims[0].timestep * win.sims[0].nrg_freq)) - 1
-                )
-                for run_no in run_nos:
-                    sim = win.sims[run_no - 1]
-                    in_simfile = sim.output_dir + "/simfile.dat"
-                    out_simfile = sim.output_dir + "/simfile_equilibrated.dat"
-                    self._write_equilibrated_data(in_simfile, out_simfile, equil_index)
+                win._write_equilibrated_simfiles()
 
             # Run MBAR and compute mean and 95 % C.I. of free energy
             free_energies, errors, mbar_outfiles = _run_mbar(
@@ -949,48 +940,6 @@ class Stage(_SimulationRunner):
         )
 
         return fracts, dg_overall
-
-    def _write_equilibrated_data(
-        self, in_simfile: str, out_simfile: str, equil_index: int
-    ) -> None:
-        """
-        Remove unequilibrated data from a simulation file and write a new
-        file containing only the equilibrated data.
-
-        Parameters
-        ----------
-        in_simfile : str
-            Path to simulation file.
-        out_simfile : str
-            Path to new simulation file, containing only the equilibrated data
-            from the original file.
-        equil_index : int
-            Index of the first equilibrated frame, given by
-            equil_time / (timestep * nrg_freq)
-
-        Returns
-        -------
-        None
-        """
-        with open(in_simfile, "r") as ifile:
-            lines = ifile.readlines()
-
-        # Figure out how many lines come before the data
-        non_data_lines = 0
-        for line in lines:
-            if line.startswith("#"):
-                non_data_lines += 1
-            else:
-                break
-
-        # Overwrite the original file with one containing only the equilibrated data
-        with open(out_simfile, "w") as ofile:
-            # First, write the header
-            for line in lines[:non_data_lines]:
-                ofile.write(line)
-            # Now write the data, skipping the non-equilibrated portion
-            for line in lines[equil_index + non_data_lines :]:
-                ofile.write(line)
 
     def setup(self) -> None:
         raise NotImplementedError("Stages are set up when they are created")

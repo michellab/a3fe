@@ -267,6 +267,51 @@ class LamWindow(_SimulationRunner):
         """The failed simulations"""
         return [sim for sim in self.sims if sim.failed]
 
+    def _write_equilibrated_simfiles(self) -> None:
+        """
+        Remove unequilibrated data from simulation files for all simulations
+        at the lambda window, and write a new simulation file containing only
+        the equilibrated data. This is the natural place for this function
+        because the equilibration time is stored at the lambda window level.
+        """
+        # Check that we have the required equilibration data
+        if self.equil_time is None:
+            raise ValueError(
+                "Equilibration time not set. "
+                "Please run is_equilibrated() before calling this function."
+            )
+
+        # Get the index of the first equilibrated data point
+        # Minus 1 because first energy is only written after the first nrg_freq steps
+        equil_index = (
+            int(self._equil_time / (self.sims[0].timestep * self.sims[0].nrg_freq)) - 1  # type: ignore
+        )
+
+        # Write the equilibrated data for each simulation
+        for sim in self.sims:
+            in_simfile = sim.output_dir + "/simfile.dat"
+            out_simfile = sim.output_dir + "/simfile_equilibrated.dat"
+
+            with open(in_simfile, "r") as ifile:
+                lines = ifile.readlines()
+
+            # Figure out how many lines come before the data
+            non_data_lines = 0
+            for line in lines:
+                if line.startswith("#"):
+                    non_data_lines += 1
+                else:
+                    break
+
+            # Overwrite the original file with one containing only the equilibrated data
+            with open(out_simfile, "w") as ofile:
+                # First, write the header
+                for line in lines[:non_data_lines]:
+                    ofile.write(line)
+                # Now write the data, skipping the non-equilibrated portion
+                for line in lines[equil_index + non_data_lines :]:
+                    ofile.write(line)
+
     def _get_rolling_average(
         self, data: _np.ndarray, idx_block_size: int
     ) -> _np.ndarray:

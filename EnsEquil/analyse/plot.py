@@ -86,6 +86,45 @@ def general_plot(
     _plt.close(fig)
 
 
+def geweke_plot(
+    times: _np.ndarray,
+    p_vals: _np.ndarray,
+    outfile: str,
+    p_cutoff: float = 0.4,
+) -> None:
+    """
+    Plot the Geweke p value against time discarded from the start of the simulation.
+
+    Parameters
+    ----------
+    times : np.ndarray
+        1D array of times discarded from the start of the simulation. This is per
+        run.
+    p_vals : np.ndarray
+        1D array of Geweke p values.
+    outfile : str
+        Name of the output file.
+    p_cutoff : float, optional
+        p value cutoff for significance. Default is 0.4. A horizontal line is
+        drawn at this value.
+
+    Returns
+    -------
+    None
+    """
+    fig, ax = _plt.subplots(figsize=(8, 6))
+    ax.scatter(times, p_vals, s=10)
+    ax.axhline(y=p_cutoff, color="red", linestyle="dashed")
+    ax.axhline(y=-p_cutoff, color="red", linestyle="dashed")
+    ax.set_xlabel("Time discarded from start of simulation per run / ns")
+    ax.set_ylabel("Geweke p value")
+    fig.savefig(
+        outfile, dpi=300, bbox_inches="tight", facecolor="white", transparent=False
+    )
+    # Close the figure to avoid memory leaks
+    _plt.close(fig)
+
+
 def plot_gradient_stats(
     gradients_data: GradientData, output_dir: str, plot_type: str
 ) -> None:
