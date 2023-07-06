@@ -243,14 +243,14 @@ class Simulation(_SimulationRunner):
         else:
             self._logger.info("Only one rst7 file found - not renaming")
 
+        # Deal with restraints. Get the name of the restraint file for this run
+        old_restr_file = _os.path.join(self.input_dir, f"restraint_{self.run_no}.txt")
+
         # If we already have a restraints.txt file, continue,
         if _os.path.isfile(_os.path.join(self.input_dir, "restraint.txt")):
             self._logger.info("restraint.txt file found")
-        # Otherwise rename the appropriate file
-        else:
-            old_restr_file = _os.path.join(
-                self.input_dir, f"restraint_{self.run_no}.txt"
-            )
+        elif _os.path.isfile(old_restr_file):
+            self._logger.info("restraint.txt file found - renaming")
             target_restr_file = _os.path.join(self.input_dir, "restraint.txt")
             self._logger.info(f"Renaming {old_restr_file} to {target_restr_file}")
             _subprocess.run(["mv", old_restr_file, target_restr_file])
@@ -259,6 +259,8 @@ class Simulation(_SimulationRunner):
             )
             for file in unwanted_rest_files:
                 _subprocess.run(["rm", file])
+        else:
+            self._logger.info("No restraint file found")
 
     def _update_simfile(self) -> None:
         """Set the lambda value in the simulation file, as well as some
