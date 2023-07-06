@@ -17,9 +17,14 @@
       ~Calculation.analyse
       ~Calculation.analyse_convergence
       ~Calculation.clean
+      ~Calculation.get_attr_values
       ~Calculation.get_optimal_lam_vals
+      ~Calculation.get_tot_simtime
+      ~Calculation.is_equilibrated
       ~Calculation.kill
+      ~Calculation.lighten
       ~Calculation.run
+      ~Calculation.set_attr_values
       ~Calculation.set_simfile_option
       ~Calculation.setup
       ~Calculation.update_paths
@@ -35,10 +40,13 @@
    .. autosummary::
    
       ~Calculation.class_count
+      ~Calculation.delta_g
+      ~Calculation.delta_g_er
       ~Calculation.equil_time
       ~Calculation.equilibrated
       ~Calculation.failed_simulations
       ~Calculation.input_dir
+      ~Calculation.is_complete
       ~Calculation.legs
       ~Calculation.output_dir
       ~Calculation.required_input_files

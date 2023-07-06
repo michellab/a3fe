@@ -17,9 +17,15 @@
       ~SimulationRunner.analyse
       ~SimulationRunner.analyse_convergence
       ~SimulationRunner.clean
+      ~SimulationRunner.get_attr_values
+      ~SimulationRunner.get_tot_simtime
+      ~SimulationRunner.is_equilibrated
       ~SimulationRunner.kill
+      ~SimulationRunner.lighten
       ~SimulationRunner.run
+      ~SimulationRunner.set_attr_values
       ~SimulationRunner.set_simfile_option
+      ~SimulationRunner.setup
       ~SimulationRunner.update_paths
       ~SimulationRunner.wait
    
@@ -32,10 +38,13 @@
    .. autosummary::
    
       ~SimulationRunner.class_count
+      ~SimulationRunner.delta_g
+      ~SimulationRunner.delta_g_er
       ~SimulationRunner.equil_time
       ~SimulationRunner.equilibrated
       ~SimulationRunner.failed_simulations
       ~SimulationRunner.input_dir
+      ~SimulationRunner.is_complete
       ~SimulationRunner.output_dir
       ~SimulationRunner.run_files
       ~SimulationRunner.running

@@ -39,7 +39,7 @@ class LamWindow(_SimulationRunner):
         virtual_queue: _VirtualQueue,
         lam_val_weight: _Optional[float] = None,
         block_size: float = 1,
-        equil_detection: str = "block_gradient",
+        equil_detection: str = "multiwindow",
         gradient_threshold: _Optional[float] = None,
         runtime_constant: _Optional[float] = 0.0001,
         ensemble_size: int = 5,
