@@ -104,6 +104,7 @@ def test_set_and_get_attributes(restrain_stage):
     assert attr_dict["ensemble_size"] == 7
 
 
+@pytest.mark.skipif(not GROMACS_PRESENT, reason="GROMACS not present")
 def test_setup_no_slurm():
     """Test short setup stages without SLURM"""
     with TemporaryDirectory() as dirname:
