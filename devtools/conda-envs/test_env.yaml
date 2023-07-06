@@ -15,6 +15,7 @@ dependencies:
   - pip
   - numpy
   - matplotlib
+  - pyarrow
   - scipy
   - ipython
   - pymbar<4

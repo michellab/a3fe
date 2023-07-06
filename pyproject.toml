@@ -25,6 +25,7 @@ dependencies = [
      "alchemlyb",
      "arviz",
      "numpy",
+     "pyarrow",
      "pytest>=6.1.2",
      "pytest-runner",
      "matplotlib",
