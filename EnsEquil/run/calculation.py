@@ -270,9 +270,9 @@ class Calculation(_SimulationRunner):
 
         # Set the relative simulation cost for the free leg simulations
         self._logger.info("Setting relative simulation costs...")
-        free_rel_simulation_cost = costs[LegType.FREE] / costs[LegType.BOUND]
+        free_rel_simulation_cost = costs[_LegType.FREE] / costs[_LegType.BOUND]
         for leg in self.legs:
-            if leg.leg_type == LegType.FREE:
+            if leg.leg_type == _LegType.FREE:
                 leg.set_attr_values(
                     "relative_simulation_cost", free_rel_simulation_cost
                 )
