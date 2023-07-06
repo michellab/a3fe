@@ -11,7 +11,7 @@ from tempfile import TemporaryDirectory
 
 import EnsEquil as ee
 
-from . import RUN_SLURM_TESTS, SLURM_PRESENT
+from . import RUN_SLURM_TESTS, SLURM_PRESENT, GROMACS_PRESENT
 from .fixtures import calc, restrain_stage
 
 LEGS_WITH_STAGES = {"bound": ["discharge", "vanish"], "free": ["discharge", "vanish"]}
