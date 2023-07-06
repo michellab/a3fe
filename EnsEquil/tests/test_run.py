@@ -36,7 +36,7 @@ def test_calculation_loading(calc):
 
 def test_calculation_logging(calc):
     """Check that the calculation logging is set up correctly"""
-    assert calc._logger.name == "Calculation_74"
+    assert calc._logger.name == "Calculation_0"
     assert type(calc._logger.handlers[0]) == logging.FileHandler  # type: ignore
     assert calc._logger.handlers[0].baseFilename == os.path.join(calc.base_dir, "Calculation.log")  # type: ignore
     assert calc._logger.handlers[0].level == logging.DEBUG  # type: ignore
@@ -103,6 +103,37 @@ def test_set_and_get_attributes(restrain_stage):
     restrain_stage.set_attr_values("ensemble_size", 7)
     attr_dict = restrain_stage.get_attr_values("ensemble_size")
     assert attr_dict["ensemble_size"] == 7
+
+
+def test_setup_no_slurm():
+    """Test short setup stages without SLURM"""
+    with TemporaryDirectory() as dirname:
+        # Copy the example input directory to the temporary directory
+        # as we'll create some new files there
+        dirname = "/export/users/finlayclark/software/EnsEquil/temp_test"
+        subprocess.run(
+            ["cp", "-r", "EnsEquil/data/example_run_dir/input", f"{dirname}/input"]
+        )
+        free_leg = ee.Leg(
+            base_dir=dirname,
+            input_dir=f"{dirname}/input",
+            ensemble_size=1,
+            stream_log_level=logging.CRITICAL,  # Silence the logging
+            leg_type=ee.run.enums.LegType.FREE,
+        )
+        # Test that the preparation stages work for the free leg to avoid wasting time
+        # running the complex
+        assert free_leg.leg_type == ee.run.enums.LegType.FREE
+        assert free_leg.prep_stage == ee.run.enums.PreparationStage.PARAMETERISED
+        free_leg.setup(slurm=False, short_ensemble_equil=True)
+        assert free_leg.prep_stage == ee.run.enums.PreparationStage.PREEQUILIBRATED
+        # Check that the required output files exist
+        for file in ["free_preequil.prm7", "free_preequil.rst7"]:
+            assert os.path.exists(os.path.join(free_leg.input_dir, file))
+        for file in ["somd_1.rst7", "somd.prm7", "somd.pert"]:
+            assert os.path.exists(
+                os.path.join(free_leg.base_dir, "discharge", "input", file)
+            )
 
 
 ######################## Tests Requiring SLURM ########################

@@ -22,6 +22,7 @@ requires-python = ">=3.8, <3.10"
 # Declare any run-time dependencies that should be installed with the package.
 dependencies = [
 #    "importlib-resources;python_version<'3.10'",
+     "arviz",
      "numpy",
      "pytest>=6.1.2",
      "pytest-runner",
