@@ -1,7 +1,6 @@
 """Functions for running free energy calculations with SOMD with automated
  equilibration detection based on an ensemble of simulations."""
 
-from enum import Enum as _Enum
 import os as _os
 import threading as _threading
 import logging as _logging
@@ -9,11 +8,10 @@ from math import ceil as _ceil
 from multiprocessing import Pool as _Pool
 import numpy as _np
 import pathlib as _pathlib
-import pickle as _pkl
-import subprocess as _subprocess
 import scipy.stats as _stats
 from time import sleep as _sleep
 from typing import (
+    Callable as _Callable,
     Dict as _Dict,
     List as _List,
     Tuple as _Tuple,
@@ -36,8 +34,9 @@ from ..analyse.plot import (
     plot_rmsds as _plot_rmsds,
 )
 from ..analyse.detect_equil import (
-    check_equil_multiwindow_kpss as _check_equil_multiwindow_kpss,
     dummy_check_equil_multiwindow as _dummy_check_equil_multiwindow,
+    check_equil_multiwindow_modified_geweke as _check_equil_multiwindow_modified_geweke,
+    check_equil_multiwindow_gelman_rubin as _check_equil_multiwindow_gelman_rubin,
 )
 from ..analyse.mbar import run_mbar as _run_mbar
 from ..analyse.process_grads import GradientData as _GradientData
@@ -536,8 +535,11 @@ class Stage(_SimulationRunner):
         run_nos: _List[int],
         cycle_pause: int = 60,
         max_runtime: float = 30,  # seconds  # ns
+        check_equil_fn: _Callable = _check_equil_multiwindow_modified_geweke,
+        check_equil_kwargs: _Dict[str, _Any] = {},
     ) -> None:
-        """Run loop which detects equilibration using the check_equil_multiwindow method.
+        """
+        Run loop which detects equilibration using the check_equil_multiwindow_modified_geweke method.
         This checks if equilibration has been achieved over the whole stage, and if not,
         halves the runtime of the simulations and using the adaptive efficiency loop before
         re-checking for equilibration.
@@ -550,6 +552,13 @@ class Stage(_SimulationRunner):
             The number of seconds to wait between checking the status of the simulations.
         max_runtime : float, Optional, default: 30
             The maximum runtime for a single simulation during an adaptive simulation, in ns.
+        check_equil_fn : Callable, Optional, default: dummy_check_equil_multiwindow
+            The function to use to check for equilibration. This should be a function which
+            takes a list of lambda windows and returns a boolen to indicate if equilibration
+            over all lambda windows has been achieved. This should also set the _equilibrated and
+            _equil_time attributes of each lambda window.
+        check_equil_kwargs : Dict[str, Any], Optional, default: {}
+            Any keyword arguments to pass to the check_equil_fn function.
         """
         # Check that all lambda windows have the correct equilibration detection method
         if any(
@@ -579,8 +588,11 @@ class Stage(_SimulationRunner):
             self._logger.info(
                 "Checking for equilibration with the check_equil_multiwindow algorithm..."
             )
-            equilibrated, fractional_equil_time = _check_equil_multiwindow_kpss(
-                self.lam_windows, output_dir=self.output_dir, run_nos=run_nos
+            equilibrated, fractional_equil_time = check_equil_fn(
+                self.lam_windows,
+                output_dir=self.output_dir,
+                run_nos=run_nos,
+                **check_equil_kwargs,
             )
             if equilibrated:
                 total_simtime = self.get_tot_simtime(run_nos=run_nos)
@@ -850,6 +862,19 @@ class Stage(_SimulationRunner):
         _plot_equilibration_time(
             lam_windows=self.lam_windows, output_dir=self.output_dir
         )
+
+        # Check and plot the Gelman-Rubin stat
+        rhat_dict = _check_equil_multiwindow_gelman_rubin(
+            lambda_windows=self.lam_windows, output_dir=self.output_dir
+        )
+        rhat_equil = {lam: rhat < 1.1 for lam, rhat in rhat_dict.items()}
+        for lam, equil in rhat_equil.items():
+            if not equil:
+                self._logger.warning(
+                    f"The Gelman-Rubin statistic for lambda = {lam} is greater than 1.1. "
+                    "This suggests that the repeat simulations have not converged to the "
+                    "same distirbution and there is a sampling issue."
+                )
 
         # Write out stats
         with open(f"{self.output_dir}/overall_stats.dat", "a") as ofile:

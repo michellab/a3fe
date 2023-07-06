@@ -8,6 +8,7 @@ channels:
   - defaults
 dependencies:
     # Base depends
+  - alchemlyb
   - arviz
   - "gromacs>=2022"
   - python

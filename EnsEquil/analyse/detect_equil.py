@@ -1,5 +1,6 @@
 """Functions for detecting equilibration based on an ensemble of simulations."""
 
+import arviz as _az
 import numpy as _np
 from typing import (
     Dict as _Dict,
@@ -15,7 +16,11 @@ from statsmodels.tsa.stattools import kpss as _kpss
 from .process_grads import (
     get_time_series_multiwindow as _get_time_series_multiwindow,
 )
-from .plot import general_plot as _general_plot, geweke_plot as _geweke_plot
+from .plot import (
+    general_plot as _general_plot,
+    geweke_plot as _geweke_plot,
+    plot_gelman_rubin_rhat as _plot_gelman_rubin_rhat,
+)
 
 
 def check_equil_block_gradient(lam_win: "LamWindow", run_nos: _Optional[_List[int]]) -> _Tuple[bool, _Optional[float]]:  # type: ignore
@@ -772,6 +777,7 @@ def check_equil_multiwindow_modified_geweke(
         times=_np.array(times),
         p_vals=_np.array(p_vals),
         outfile=f"{output_dir}/check_equil_multiwindow_modified_geweke.png",
+        p_cutoff=p_cutoff,
     )
 
     return equilibrated, fractional_equil_time
@@ -801,3 +807,116 @@ def dummy_check_equil_multiwindow(
         Time taken to equilibrate per simulation, in ns.
     """
     return lam_win._equilibrated, lam_win._equil_time
+
+
+####################### Post-Simulation Tests ##########################
+# The following tests are less suitable for deciding whether to stop the
+# simulation, but are useful for checking the quality of the simulation
+# after it has finished. They therefore do not set the _equilibrated
+# and _equil_time attributes of the lambda windows.
+
+
+def get_gelman_rubin_rhat(
+    lambda_window: "LamWindow",
+    discard_frac: float = 0.1,
+    run_nos: _Optional[_List[int]] = None,
+) -> float:
+    """
+    Run the Gelman-Rubin test, as implemented in Arviz, to check for convergence
+    (https://python.arviz.org/en/stable/api/generated/arviz.rhat.html). Note that this
+    test should not be used on block-averaged results, as Rhat is related to the
+    effective sample size, which is affected by block averaging. See references given
+    in Arviz documentation for more details (link above).
+
+    Parameters
+    ----------
+    lambda_window : LamWindow
+        Lambda window to check for equilibration.
+    discard_frac : float, default: 0.1
+        Fraction of the simulation to discard as burn-in.
+    run_nos : List[int], Optional, default: None
+        The run numbers to use. If None, all runs will be used.
+
+    Returns
+    -------
+    rhat : float
+        Gelman-Rubin statistic.
+    """
+    run_nos = lambda_window._get_valid_run_nos(run_nos=run_nos)
+
+    # Check that discard_frac is valid
+    if discard_frac is not None:
+        if discard_frac < 0 or discard_frac >= 1:
+            raise ValueError("discard_frac must be above 0 and below 1")
+
+    # Get the data for each run
+    all_grads = []
+    for run_no in run_nos:  # type: ignore
+        _, grads = lambda_window.sims[run_no - 1].read_gradients()
+        # Get the index from which to truncate
+        truncate_index = round(len(grads) * discard_frac)
+        all_grads.append(grads[truncate_index:])
+
+    # Run the Gelman-Rubin test
+    return _az.rhat(_np.array(all_grads))
+
+
+def check_equil_multiwindow_gelman_rubin(
+    lambda_windows: _List["LamWindow"],
+    output_dir: str,
+    cutoff: float = 1.1,
+    run_nos: _Optional[_List[int]] = None,
+    discard_frac: _Optional[float] = None,
+) -> _Dict[float, bool]:
+    """
+    Run the Gelman-Rubin test individually on each lambda window
+    to check for convergence and plot the results. Note that this
+    test should not be used on block-averaged results, as Rhat is
+    related to the effective sample size, which is affected by block
+    averaging. See references given in Arviz documentation for more
+    details (https://python.arviz.org/en/stable/api/generated/arviz.rhat.html).
+
+    Parameters
+    ----------
+    lambda_windows : List[LamWindow]
+        List of lambda windows to check for equilibration.
+    output_dir : str
+        Directory to output the plots to.
+    cutoff : float, default: 1.1
+        Cutoff value for the Gelman-Rubin statistic to use
+        in the plots. The common empirical value of 1.1 is used.
+    run_nos : List[int], Optional, default: None
+        The run numbers to use. If None, all runs will be used.
+    discard_frac : float, Optional, default: None
+        Fraction of data to discard from the start of the simulation. If none,
+        the _equil_time attribute of the lambda window will be used to discard
+        the non-equilibrated data from the start of the simulation.
+
+    Returns
+    -------
+    rhat_dict: Dict[bool]
+        Dictionary of lambda window numbers and rhat values.
+    """
+
+    # Check that if discard_frac is not set, the equil_time attribute is set
+    if discard_frac is None:
+        for lam_win in lambda_windows:
+            if lam_win._equil_time is None:
+                raise ValueError(
+                    "discard_frac is not set and _equil_time is not set for all lambda windows. "
+                    "Please set either discard_frac or ensure that _equil_time is set for all "
+                    "lambda windows."
+                )
+
+    rhat_dict = {}
+    for lam_win in lambda_windows:
+        # Get the discard fraction if it is not set
+        if discard_frac is None:
+            discard_frac = lam_win._equil_time / lam_win.sims[0].tot_simtime
+        # Get rhat
+        rhat_dict[lam_win.lam] = get_gelman_rubin_rhat(lam_win, discard_frac, run_nos)  # type: ignore
+
+    # Plot the results
+    _plot_gelman_rubin_rhat(rhat_dict=rhat_dict, output_dir=output_dir, cutoff=cutoff)
+
+    return rhat_dict

@@ -8,8 +8,10 @@ from tempfile import TemporaryDirectory
 import EnsEquil as ee
 
 from ..analyse.process_grads import get_time_series_multiwindow
-from ..analyse.detect_equil import check_equil_multiwindow_modified_geweke
-
+from ..analyse.detect_equil import (
+    check_equil_multiwindow_modified_geweke,
+    check_equil_multiwindow_gelman_rubin,
+)
 from .fixtures import restrain_stage
 
 
@@ -187,3 +189,22 @@ def test_geweke(restrain_stage):
 
         assert equilibrated
         assert fractional_equil_time == pytest.approx(0.0048, abs=1e-2)
+
+
+def test_gelman_rubin(restrain_stage):
+    """Test the Gelman-Rubin convergence analysis."""
+    with TemporaryDirectory() as tmpdir:
+        rhat_dict = check_equil_multiwindow_gelman_rubin(
+            lambda_windows=restrain_stage.lam_windows,
+            output_dir=tmpdir,
+        )
+
+        expected_rhat_dict = {
+            0.0: 1.0496660104040842,
+            0.125: 1.0122689789813877,
+            0.25: 1.0129155249894615,
+            0.375: 1.0088598498180925,
+            0.5: 1.020819039702674,
+            1.0: 1.0095474751197715,
+        }
+        assert rhat_dict == expected_rhat_dict

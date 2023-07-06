@@ -115,7 +115,6 @@ def geweke_plot(
     fig, ax = _plt.subplots(figsize=(8, 6))
     ax.scatter(times, p_vals, s=10)
     ax.axhline(y=p_cutoff, color="red", linestyle="dashed")
-    ax.axhline(y=-p_cutoff, color="red", linestyle="dashed")
     ax.set_xlabel("Time discarded from start of simulation per run / ns")
     ax.set_ylabel("Geweke p value")
     fig.savefig(
@@ -883,6 +882,49 @@ def plot_against_exp(
         name = f"{output_dir}/overall_results_offset.png"
     else:
         name = f"{output_dir}/overall_results.png"
+    fig.savefig(
+        name, dpi=300, bbox_inches="tight", facecolor="white", transparent=False
+    )
+    _plt.close(fig)
+
+
+def plot_gelman_rubin_rhat(
+    rhat_dict: _Dict[str, float],
+    output_dir: str,
+    cutoff: float = 1.1,
+) -> None:
+    """
+    Plot the Gelman-Rubin Rhat statistic for each lambda window.
+
+    Parameters
+    ----------
+    rhat_dict : Dict[str, float]
+        A dictionary of the Rhat statistic for each lambda window.
+    output_dir : str
+        Directory to save the plot to.
+    cutoff : float, Optional, Default = 1.1
+        The cutoff for the Rhat statistic. The empirical 1.1 is default.
+
+    Returns
+    -------
+    None
+    """
+    fig, ax = _plt.subplots(figsize=(8, 6))
+
+    ax.bar(
+        rhat_dict.keys(),
+        rhat_dict.values(),
+        width=0.02,
+        edgecolor="black",
+    )
+
+    # Set a horizontal line at the cutoff value
+    ax.axhline(y=cutoff, color="red", linestyle="dashed")
+
+    ax.set_ylabel(r"$\hat{R}$")
+    ax.set_xlabel(r"$\lambda$")
+
+    name = f"{output_dir}/gelman_rubin_rhat.png"
     fig.savefig(
         name, dpi=300, bbox_inches="tight", facecolor="white", transparent=False
     )

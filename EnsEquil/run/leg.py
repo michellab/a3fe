@@ -522,6 +522,7 @@ class Leg(_SimulationRunner):
         # Update the preparation stage
         self.prep_stage = _PreparationStage.PARAMETERISED
 
+    # TODO: Reduce massive amount of code duplication below
     def solvate_input(self, slurm: bool = True) -> None:
         """
         Determine an appropriate (rhombic dodecahedron)
