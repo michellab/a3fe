@@ -457,9 +457,9 @@ class Leg(_SimulationRunner):
         )
 
         # Get the total simulation cost for the leg
-        mean_simulation_cost = self.get_tot_simtime(
+        mean_simulation_cost = self.get_tot_gpu_time(
             run_nos=run_nos
-        ) / self.get_tot_gpu_time(run_nos=run_nos)
+        ) / self.get_tot_simtime(run_nos=run_nos)
 
         for stage in self.stages:
             self._logger.info(f"Determining optimal lambda windows for {stage}...")
