@@ -375,14 +375,15 @@ class Simulation(_SimulationRunner):
             )
             return step * self.timestep  # ns
 
-    @property
-    def tot_simtime(self) -> float:
-        """Get the total simulation time in ns"""
-        return self.get_tot_simtime()
+    def get_tot_gpu_time(self) -> float:
+        """
+        Get the total simulation time in GPU hours
 
-    @property
-    def tot_gpu_time(self) -> float:
-        """Get the total simulation time in GPU hours"""
+        Returns
+        -------
+        tot_gpu_time : float
+            Total simulation time in GPU hours.
+        """
         # Get output files
         slurm_output_files = self.slurm_output_files
 
@@ -400,6 +401,17 @@ class Simulation(_SimulationRunner):
 
         # And convert to GPU hours
         return tot_gpu_time / 3600
+
+    @property
+    def tot_simtime(self) -> float:
+        """Get the total simulation time in ns"""
+        return self.get_tot_simtime()
+
+    @property
+    def tot_gpu_time(self) -> float:
+        """Get the total simulation time in GPU hours"""
+        # Get output files
+        return self.get_tot_gpu_time()
 
     @property
     def failed(self) -> bool:

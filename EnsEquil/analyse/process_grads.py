@@ -156,8 +156,11 @@ class GradientData:
         self.stat_ineffs = stat_ineffs_all_winds
         self.sems_inter_delta_g = sems_inter_delta_g
         self.runtime_constant = lam_winds[0].runtime_constant  # Assume all the same
+        self.run_nos = run_nos
 
-    def get_sems(self, origin: str = "inter", smoothen: bool = True) -> _np.ndarray:
+    def get_time_normalised_sems(
+        self, origin: str = "inter", smoothen: bool = True
+    ) -> _np.ndarray:
         """
         Return the standardised standard error of the mean of the gradients, optionally
         smoothened by a block average over 3 points.
@@ -191,8 +194,10 @@ class GradientData:
         }
         sems = origins[origin]
 
-        # Standardise the SEMs according to the total simulation time
-        sems *= _np.sqrt(self.total_times)  # type: ignore
+        # Standardise the SEMs according to the total simulation time. Because total times are
+        # stored on a per-run basis, multiply them by the total number of runs.
+        total_times_all_runs = _np.array(self.total_times) * len(self.run_nos)  # type: ignore
+        sems *= _np.sqrt(total_times_all_runs)  # type: ignore
 
         if not smoothen:
             return sems  # type: ignore
@@ -251,7 +256,7 @@ class GradientData:
         # Note that the trapezoidal rule results in some smoothing between neighbours
         # even without smoothening
         if er_type == "sem":
-            y_vals = self.get_sems(origin=origin, smoothen=smoothen)
+            y_vals = self.get_time_normalised_sems(origin=origin, smoothen=smoothen)
         elif er_type == "root_var":
             y_vals = _np.sqrt(self.vars_intra)
         n_vals = len(x_vals)

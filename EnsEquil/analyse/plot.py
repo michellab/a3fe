@@ -219,7 +219,7 @@ def plot_gradient_stats(
     elif plot_type == "integrated_sem":
         handle1, *_ = ax.bar(
             gradients_data.lam_vals,
-            gradients_data.get_sems(origin="inter", smoothen=True),
+            gradients_data.get_time_normalised_sems(origin="inter", smoothen=True),
             label="SEMs",
             width=0.02,
             edgecolor="black",
@@ -278,7 +278,9 @@ def plot_gradient_stats(
     elif plot_type == "pred_best_simtime":
         ax.bar(
             gradients_data.lam_vals,
-            gradients_data.get_sems(origin="inter_delta_g", smoothen=False)
+            gradients_data.get_time_normalised_sems(
+                origin="inter_delta_g", smoothen=False
+            )
             / _np.sqrt(gradients_data.runtime_constant),
             width=0.02,
             edgecolor="black",

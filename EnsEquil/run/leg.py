@@ -167,7 +167,8 @@ class Leg(_SimulationRunner):
         block_size: float = 1,
         equil_detection: str = "block_gradient",
         gradient_threshold: _Optional[float] = None,
-        runtime_constant: _Optional[float] = 0.0001,
+        runtime_constant: _Optional[float] = 0.001,
+        relative_simulation_cost: float = 1,
         ensemble_size: int = 5,
         base_dir: _Optional[str] = None,
         input_dir: _Optional[str] = None,
@@ -192,10 +193,15 @@ class Leg(_SimulationRunner):
             below which the simulation is considered equilibrated. If None, no theshold is
             set and the simulation is equilibrated when the gradient passes through 0. A
             sensible value appears to be 0.5 kcal mol-1 ns-1.
-        runtime_constant : float, Optional, default: 0.0001
+        runtime_constant : float, Optional, default: 0.001
             The runtime constant to use for the calculation, in kcal^2 mol^-2 ns^-1.
             This must be supplied if running adaptively. Each window is run until the
             SEM**2 / runtime >= runtime_constant.
+        relative_simlation_cost : float, Optional, default: 1
+            The relative cost of the simulation for a given runtime. This is used to calculate the
+            predicted optimal runtime during adaptive simulations. The recommended use
+            is to set this to 1 for the bound leg and to (speed of bound leg / speed of free leg)
+            for the free leg.
         ensemble_size : int, Optional, default: 5
             Number of simulations to run in the ensemble.
         base_dir : str, Optional, default: None
@@ -232,6 +238,7 @@ class Leg(_SimulationRunner):
             self.equil_detection = equil_detection
             self.gradient_threshold = gradient_threshold
             self.runtime_constant = runtime_constant
+            self.relative_simulation_cost = relative_simulation_cost
             self._running: bool = False
             self.jobs: _List[_Job] = []
 
@@ -372,6 +379,7 @@ class Leg(_SimulationRunner):
                     equil_detection=self.equil_detection,
                     gradient_threshold=self.gradient_threshold,
                     runtime_constant=self.runtime_constant,
+                    relative_simulation_cost=self.relative_simulation_cost,
                     ensemble_size=self.ensemble_size,
                     lambda_values=Leg.default_lambda_values[self.leg_type][stage_type],
                     base_dir=self.stage_input_dirs[stage_type].replace("/input", ""),
@@ -393,7 +401,7 @@ class Leg(_SimulationRunner):
         er_type: str = "root_var",
         delta_er: float = 1,
         run_nos: _List[int] = [1],
-    ) -> None:
+    ) -> float:
         """
         Determine the optimal lambda windows for each stage of the leg
         by running short simulations at each lambda value and analysing them,
@@ -421,7 +429,8 @@ class Leg(_SimulationRunner):
 
         Returns
         -------
-        None
+        mean_simulation_cost: float
+            The mean cost of a simulation for the leg, in hr / ns.
         """
         # Check that the leg has been set up
         if not hasattr(self, "stages"):
@@ -446,6 +455,12 @@ class Leg(_SimulationRunner):
         self._logger.info(
             f"Determining optimal lambda windows for each stage with er_type = {er_type} and delta_er = {delta_er}..."
         )
+
+        # Get the total simulation cost for the leg
+        mean_simulation_cost = self.get_tot_simtime(
+            run_nos=run_nos
+        ) / self.get_tot_gpu_time(run_nos=run_nos)
+
         for stage in self.stages:
             self._logger.info(f"Determining optimal lambda windows for {stage}...")
             optimal_lam_vals = stage.get_optimal_lam_vals(
@@ -459,6 +474,8 @@ class Leg(_SimulationRunner):
 
         # Save state
         self._dump()
+
+        return mean_simulation_cost
 
     def create_stage_input_dirs(self) -> _Dict[_StageType, str]:
         """

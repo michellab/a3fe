@@ -488,6 +488,29 @@ class SimulationRunner(ABC):
             ]
         )  # ns
 
+    def get_tot_gpu_time(self, run_nos: _Optional[_List[int]] = None) -> float:
+        f"""
+        Get the total simulation time in GPU hours for the {self.__class__.__name__}.
+        and any sub-simulation runners.
+
+        Parameters
+        ----------
+        run_nos : List[int], Optional, default=None
+            A list of the run numbers to analyse. If None, all runs are analysed.
+
+        Returns
+        -------
+        tot_gpu_time : float
+            The total simulation time in GPU hours.
+        """
+        run_nos = self._get_valid_run_nos(run_nos)
+        return sum(
+            [
+                sub_sim_runner.get_tot_gpu_time(run_nos=run_nos)
+                for sub_sim_runner in self._sub_sim_runners
+            ]
+        )
+
     @property
     def tot_simtime(self) -> float:
         f"""The total simulation time in ns for the {self.__class__.__name__} and any sub-simulation runners."""
@@ -502,7 +525,10 @@ class SimulationRunner(ABC):
     def tot_gpu_time(self) -> float:
         f"""The total simulation time in GPU hours for the {self.__class__.__name__} and any sub-simulation runners."""
         return sum(
-            [sub_sim_runner.tot_gpu_time for sub_sim_runner in self._sub_sim_runners]
+            [
+                sub_sim_runner.get_tot_gpu_time()
+                for sub_sim_runner in self._sub_sim_runners
+            ]
         )  # GPU hours
 
     @property

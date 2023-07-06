@@ -61,7 +61,8 @@ class Stage(_SimulationRunner):
         block_size: float = 1,
         equil_detection: str = "block_gradient",
         gradient_threshold: _Optional[float] = None,
-        runtime_constant: _Optional[float] = 0.0001,
+        runtime_constant: _Optional[float] = 0.001,
+        relative_simulation_cost: float = 1,
         ensemble_size: int = 5,
         lambda_values: _Optional[_List[float]] = None,
         base_dir: _Optional[str] = None,
@@ -90,10 +91,15 @@ class Stage(_SimulationRunner):
             below which the simulation is considered equilibrated. If None, no theshold is
             set and the simulation is equilibrated when the gradient passes through 0. A
             sensible value appears to be 0.5 kcal mol-1 ns-1.
-        runtime_constant : float, Optional, default: 0.0001
+        runtime_constant : float, Optional, default: 0.001
             The runtime constant to use for the calculation, in kcal^2 mol^-2 ns^-1.
             This must be supplied if running adaptively. Each window is run until the
             SEM**2 / runtime >= runtime_constant.
+        relative_simlation_cost : float, Optional, default: 1
+            The relative cost of the simulation for a given runtime. This is used to calculate the
+            predicted optimal runtime during adaptive simulations. The recommended use
+            is to set this to 1 for the bound leg and to (speed of bound leg / speed of free leg)
+            for the free leg.
         ensemble_size : int, Optional, default: 5
             Number of simulations to run in the ensemble.
         lambda_values : List[float], Optional, default: None
@@ -141,6 +147,7 @@ class Stage(_SimulationRunner):
             self.equil_detection = equil_detection
             self.gradient_threshold = gradient_threshold
             self.runtime_constant = runtime_constant
+            self.relative_simulation_cost = relative_simulation_cost
             self._maximally_efficient = False  # Set to True if the stage has been run so as to reach max efficieny
             self._running: bool = False
             self.run_thread: _Optional[_threading.Thread] = None
@@ -161,6 +168,7 @@ class Stage(_SimulationRunner):
                         equil_detection=self.equil_detection,
                         gradient_threshold=self.gradient_threshold,
                         runtime_constant=self.runtime_constant,
+                        relative_simulation_cost=self.relative_simulation_cost,
                         ensemble_size=self.ensemble_size,
                         base_dir=lam_base_dir,
                         input_dir=self.input_dir,
@@ -478,17 +486,20 @@ class Stage(_SimulationRunner):
             gradient_data = _GradientData(
                 lam_winds=self.lam_windows, equilibrated=False
             )
-            smooth_dg_sems = gradient_data.get_sems(
+            smooth_dg_sems = gradient_data.get_time_normalised_sems(
                 origin="inter_delta_g", smoothen=True
             )
 
             # For each window, calculate the predicted most efficient run time. See if we have reached this
             # and if not, resubmit for more simulation time
             for i, win in enumerate(self.lam_windows):
+                # Note that normalised_sem_dg has already been multiplied by sqrt(tot_simtime)
                 normalised_sem_dg = smooth_dg_sems[i]
                 predicted_run_time_max_eff = (
-                    1 / _np.sqrt(self.runtime_constant)
-                ) * normalised_sem_dg
+                    (1 / _np.sqrt(self.runtime_constant))
+                    * normalised_sem_dg
+                    / self.relative_simulation_cost
+                )
                 actual_run_time = win.get_tot_simtime(run_nos=run_nos)
                 win._logger.info(
                     f"Predicted maximum efficiency run time for is {predicted_run_time_max_eff:.3f} ns"

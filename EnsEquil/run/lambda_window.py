@@ -41,7 +41,8 @@ class LamWindow(_SimulationRunner):
         block_size: float = 1,
         equil_detection: str = "multiwindow",
         gradient_threshold: _Optional[float] = None,
-        runtime_constant: _Optional[float] = 0.0001,
+        runtime_constant: _Optional[float] = 0.001,
+        relative_simulation_cost: float = 1,
         ensemble_size: int = 5,
         base_dir: _Optional[str] = None,
         input_dir: _Optional[str] = None,
@@ -75,10 +76,15 @@ class LamWindow(_SimulationRunner):
             below which the simulation is considered equilibrated. If None, no theshold is
             set and the simulation is equilibrated when the gradient passes through 0. A
             sensible value appears to be 0.5 kcal mol-1 ns-1.
-        runtime_constant : float, Optional, default: 0.0001
+        runtime_constant : float, Optional, default: 0.001
             The runtime constant to use for the calculation, in kcal^2 mol^-2 ns^-1.
             This must be supplied if running adaptively. Each window is run until the
             SEM**2 / runtime >= runtime_constant.
+        relative_simlation_cost : float, Optional, default: 1
+            The relative cost of the simulation for a given runtime. This is used to calculate the
+            predicted optimal runtime during adaptive simulations. The recommended use
+            is to set this to 1 for the bound leg and to (speed of bound leg / speed of free leg)
+            for the free leg.
         ensemble_size : int, Optional, default: 5
             Number of simulations to run at this lambda value.
         base_dir : str, Optional, default: None
@@ -131,6 +137,7 @@ class LamWindow(_SimulationRunner):
                 )
             self.gradient_threshold = gradient_threshold
             self.runtime_constant = runtime_constant
+            self.relative_simulation_cost = relative_simulation_cost
             self._equilibrated: bool = False
             self._running: bool = False
 
@@ -230,8 +237,24 @@ class LamWindow(_SimulationRunner):
             Total simulation time, in ns.
         """
         run_nos = self._get_valid_run_nos(run_nos)
-
         return sum([self.sims[run_no - 1].get_tot_simtime() for run_no in run_nos])
+
+    def get_tot_gpu_time(self, run_nos: _Optional[_List[int]] = None) -> float:
+        """
+        Get the total GPU time for all specified runs, in GPU hours.
+
+        Parameters
+        ----------
+        run_nos : List[int], Optional, default: None
+            The run numbers to use for MBAR. If None, all runs will be used.
+
+        Returns
+        -------
+        tot_gpu_time : float
+            Total GPU time, in GPU hours.
+        """
+        run_nos = self._get_valid_run_nos(run_nos)
+        return sum([self.sims[run_no - 1].get_tot_gpu_time() for run_no in run_nos])
 
     def is_equilibrated(self, run_nos: _Optional[_List[int]] = None) -> bool:
         """
