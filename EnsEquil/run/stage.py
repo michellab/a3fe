@@ -442,9 +442,10 @@ class Stage(_SimulationRunner):
         self,
         run_nos: _List[int],
         cycle_pause: int = 60,
-        max_runtime: float = 30,  # seconds  # ns
+        max_runtime: float = 30,  # ns
     ) -> None:
-        """Run loop which allocates sampling time in order to achieve maximal estimation
+        """
+        Run loop which allocates sampling time in order to achieve maximal estimation
         efficiency of the free energy difference.
 
         Parameters
