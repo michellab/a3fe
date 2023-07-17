@@ -705,7 +705,8 @@ class SimulationRunner(ABC):
         """
         delete_files = self.__class__.run_files
         if clean_logs:
-            delete_files.append(self.__class__.__name__ + ".log")
+            # Delete log file contents without deleting the log files
+            _subprocess.run(["truncate", "-s", "0", self.__class__.__name__ + ".log"])
 
         for del_file in delete_files:
             # Delete files in base directory
