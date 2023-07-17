@@ -274,7 +274,7 @@ class Calculation(_SimulationRunner):
         for leg in self.legs:
             if leg.leg_type == _LegType.FREE:
                 leg.set_attr_values(
-                    "relative_simulation_cost", free_rel_simulation_cost
+                    "relative_simulation_cost", free_rel_simulation_cost, force=True
                 )
 
         # Save state
