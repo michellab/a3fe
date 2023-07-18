@@ -30,6 +30,7 @@ dependencies = [
      "scipy",
      "ipython",
      "pymbar<4",
+     "importlib-resources==3.0.0;python_version<'3.9'",
 ]
 
 # Update the urls once the hosting is set up.
@@ -41,7 +42,6 @@ dependencies = [
 test = [
   "pytest>=6.1.2",
   "pytest-runner",
-  "numpy"
 ]
 
 [tool.setuptools]
