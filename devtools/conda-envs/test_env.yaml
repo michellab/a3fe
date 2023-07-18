@@ -19,12 +19,16 @@ dependencies:
   - ambertools
   - biosimspace
   - numpydoc
-  - importlib-resources
 
     # Testing
   - pytest
   - pytest-cov
   - codecov
+
+    # Documentation
+  - "sphinx<7.0.0"
+  - sphinx_rtd_theme
+  - numpydoc
 
     # Pip-only installs
   #- pip:
