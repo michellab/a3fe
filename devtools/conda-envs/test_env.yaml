@@ -2,8 +2,8 @@ name: test
 channels:
 
   - conda-forge
-  - "openbiosim/label/dev"
   - "openbiosim"
+  - "openbiosim/label/dev"
 
   - defaults
 dependencies:
