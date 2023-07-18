@@ -19,7 +19,7 @@ dependencies:
   - ambertools
   - biosimspace
   - numpydoc
-  - "importlib-resources==3.0.0",
+  - importlib-resources
 
     # Testing
   - pytest
