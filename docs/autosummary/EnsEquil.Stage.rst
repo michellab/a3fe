@@ -19,6 +19,7 @@
       ~Stage.clean
       ~Stage.get_attr_values
       ~Stage.get_optimal_lam_vals
+      ~Stage.get_tot_gpu_time
       ~Stage.get_tot_simtime
       ~Stage.is_equilibrated
       ~Stage.kill

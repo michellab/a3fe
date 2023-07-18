@@ -20,6 +20,7 @@
       ~Leg.create_stage_input_dirs
       ~Leg.get_attr_values
       ~Leg.get_optimal_lam_vals
+      ~Leg.get_tot_gpu_time
       ~Leg.get_tot_simtime
       ~Leg.heat_and_preequil_input
       ~Leg.is_equilibrated

@@ -11,6 +11,4 @@ API Documentation
    EnsEquil.LamWindow
    EnsEquil.Simulation
    EnsEquil.run._simulation_runner.SimulationRunner
-   EnsEquil.PreparationStage
-   EnsEquil.LegType
-   EnsEquil.stage_type
+   EnsEquil.enums

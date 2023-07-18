@@ -19,6 +19,7 @@
       ~Calculation.clean
       ~Calculation.get_attr_values
       ~Calculation.get_optimal_lam_vals
+      ~Calculation.get_tot_gpu_time
       ~Calculation.get_tot_simtime
       ~Calculation.is_equilibrated
       ~Calculation.kill

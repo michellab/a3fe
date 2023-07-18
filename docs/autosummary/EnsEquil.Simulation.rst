@@ -18,6 +18,7 @@
       ~Simulation.analyse_convergence
       ~Simulation.clean
       ~Simulation.get_attr_values
+      ~Simulation.get_tot_gpu_time
       ~Simulation.get_tot_simtime
       ~Simulation.is_equilibrated
       ~Simulation.kill

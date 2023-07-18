@@ -20,6 +20,7 @@
       JobStatus
       LegType
       PreparationStage
+      SetProtocol
       StageType
    
    

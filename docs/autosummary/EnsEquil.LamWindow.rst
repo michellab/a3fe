@@ -18,6 +18,7 @@
       ~LamWindow.analyse_convergence
       ~LamWindow.clean
       ~LamWindow.get_attr_values
+      ~LamWindow.get_tot_gpu_time
       ~LamWindow.get_tot_simtime
       ~LamWindow.is_equilibrated
       ~LamWindow.kill

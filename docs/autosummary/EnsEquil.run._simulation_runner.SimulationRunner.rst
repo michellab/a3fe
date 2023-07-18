@@ -18,6 +18,7 @@
       ~SimulationRunner.analyse_convergence
       ~SimulationRunner.clean
       ~SimulationRunner.get_attr_values
+      ~SimulationRunner.get_tot_gpu_time
       ~SimulationRunner.get_tot_simtime
       ~SimulationRunner.is_equilibrated
       ~SimulationRunner.kill
