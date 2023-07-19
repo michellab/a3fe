@@ -1039,6 +1039,17 @@ class Stage(_SimulationRunner):
         _write_simfile_option(simfile, option, value)
         super().set_simfile_option(option, value)
 
+    def wait(self) -> None:
+        """Wait for the stage to finish running."""
+        # Override the base class method so that we can update the
+        # virtual queue
+        # Give the simulations a chance to start
+        _sleep(30)
+        self.virtual_queue.update()
+        while self.running:
+            _sleep(30)  # Check every 30 seconds
+            self.virtual_queue.update()
+
     def update(self, save_name: str = "output_saved") -> None:
         """
         Delete the current set of lamda windows and simulations, and
