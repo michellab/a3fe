@@ -462,7 +462,7 @@ class SimulationRunner(ABC):
             "dg / kcal mol-1": round(mean_free_energy, 2),
             "dg_95_ci / kcal mol-1": round(conf_int, 2),
             "tot_simtime / ns": round(self.tot_simtime),
-            "tot_gpu_time / GPU hours": round(self.tot_gpu_time, 2),
+            "tot_gpu_time / GPU hours": round(self.tot_gpu_time),
         }
 
         # Get the index name
