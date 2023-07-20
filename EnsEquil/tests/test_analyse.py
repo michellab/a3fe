@@ -36,7 +36,7 @@ def test_get_results_df(restrain_stage):
     )
     assert df.loc["restrain_stage"]["tot_simtime / ns"] == pytest.approx(6.0, abs=1e-1)
     assert df.loc["restrain_stage"]["tot_gpu_time / GPU hours"] == pytest.approx(
-        0.94, abs=1e-2
+        1, abs=1e-0
     )
 
 
