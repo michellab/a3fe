@@ -8,6 +8,7 @@ import glob as _glob
 from itertools import count as _count
 import numpy as _np
 import os as _os
+import pandas as _pd
 import pathlib as _pathlib
 import pickle as _pkl
 import scipy.stats as _stats
@@ -25,6 +26,7 @@ from typing import (
 import logging as _logging
 from warnings import warn as _warn
 
+from ..analyse.exceptions import AnalysisError as _AnalysisError
 from ..analyse.plot import plot_convergence as _plot_convergence
 
 
@@ -38,7 +40,7 @@ class SimulationRunner(ABC):
     # for each instance
     class_count = _count()
     # Create list of files to be deleted by self.clean()
-    run_files = ["*.png", "overall_stats.dat"]
+    run_files = ["*.png", "overall_stats.dat", "results.csv"]
 
     def __init__(
         self,
@@ -397,6 +399,85 @@ class SimulationRunner(ABC):
         self._delta_g_er = er_overall
 
         return dg_overall, er_overall
+
+    def get_results_df(
+        self, save_csv: bool = True, add_sub_sim_runners: bool = True
+    ) -> _pd.DataFrame:
+        """
+        Return the results in dataframe format
+
+        Parameters
+        ----------
+        save_csv : bool, optional, default=True
+            Whether to save the results as a csv file
+
+        add_sub_sim_runners : bool, optional, default=True
+            Whether to show the results from the sub-simulation runners.
+
+        Returns
+        -------
+        results_df : pd.DataFrame
+            A dataframe containing the results
+        """
+        # Create a dataframe to store the results
+        headers = [
+            "dg / kcal mol-1",
+            "dg_95_ci / kcal mol-1",
+            "tot_simtime / ns",
+            "tot_gpu_time / GPU hours",
+        ]
+        results_df = _pd.DataFrame(columns=headers)
+
+        if add_sub_sim_runners:
+            # Add the results for each of the sub-simulation runners
+            for sub_sim_runner in self._sub_sim_runners:
+                sub_results_df = sub_sim_runner.get_results_df(save_csv=save_csv)
+                results_df = results_df.append(sub_results_df)
+
+        try:  # To extract the overall free energy changes from a previous call of analyse()
+            dgs = self._delta_g
+            ers = self._delta_g_er
+        except AttributeError:
+            raise _AnalysisError(
+                f"Analysis has not been performed for {self.__class__.__name__}. Please call analyse() first."
+            )
+        if dgs is None or ers is None:
+            raise _AnalysisError(
+                f"Analysis has not been performed for {self.__class__.__name__}. Please call analyse() first."
+            )
+
+        # Calculate the 95 % confidence interval assuming Gaussian errors
+        mean_free_energy = _np.mean(dgs)
+        conf_int = (
+            _stats.t.interval(
+                0.95,
+                len(dgs) - 1,  # type: ignore
+                mean_free_energy,
+                scale=_stats.sem(dgs),
+            )[1]
+            - mean_free_energy
+        )  # 95 % C.I.
+
+        new_row = {
+            "dg / kcal mol-1": round(mean_free_energy, 2),
+            "dg_95_ci / kcal mol-1": round(conf_int, 2),
+            "tot_simtime / ns": round(self.tot_simtime),
+            "tot_gpu_time / GPU hours": round(self.tot_gpu_time, 2),
+        }
+
+        # Get the index name
+        if hasattr(self, "stage_type"):
+            index_prefix = f"{self.stage_type.name.lower()}_"
+        elif hasattr(self, "leg_type"):
+            index_prefix = f"{self.leg_type.name.lower()}_"
+        else:
+            index_prefix = ""
+        results_df.loc[index_prefix + self.__class__.__name__.lower()] = new_row
+
+        if save_csv:
+            results_df.to_csv(f"{self.output_dir}/results.csv")
+
+        return results_df
 
     def analyse_convergence(
         self, run_nos: _Optional[_List[int]] = None

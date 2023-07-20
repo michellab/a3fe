@@ -24,6 +24,7 @@ dependencies = [
 #    "importlib-resources;python_version<'3.10'",
      "arviz",
      "numpy",
+     "pandas",
      "pytest>=6.1.2",
      "pytest-runner",
      "matplotlib",

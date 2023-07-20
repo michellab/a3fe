@@ -4,6 +4,7 @@ consisting of two legs (bound and unbound) and multiple stages."""
 import logging as _logging
 import multiprocessing as _mp
 import os as _os
+import pandas as _pd
 import shutil as _shutil
 from typing import (
     Dict as _Dict,
@@ -14,6 +15,7 @@ from typing import (
     Callable as _Callable,
 )
 
+from ..analyse.exceptions import AnalysisError as _AnalysisError
 from .enums import LegType as _LegType, PreparationStage as _PreparationStage
 from .leg import Leg as _Leg
 from ._simulation_runner import SimulationRunner as _SimulationRunner

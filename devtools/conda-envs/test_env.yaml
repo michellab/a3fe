@@ -9,6 +9,7 @@ channels:
 dependencies:
     # Base depends
   - arviz
+  - pandas
   - python
   - pip
   - numpy

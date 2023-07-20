@@ -7,6 +7,7 @@ import logging as _logging
 from math import ceil as _ceil
 from multiprocessing import Pool as _Pool
 import numpy as _np
+import pandas as _pd
 import pathlib as _pathlib
 import scipy.stats as _stats
 from time import sleep as _sleep
@@ -38,6 +39,7 @@ from ..analyse.detect_equil import (
     check_equil_multiwindow_modified_geweke as _check_equil_multiwindow_modified_geweke,
     check_equil_multiwindow_gelman_rubin as _check_equil_multiwindow_gelman_rubin,
 )
+from ..analyse.exceptions import AnalysisError as _AnalysisError
 from ..analyse.mbar import run_mbar as _run_mbar
 from ..analyse.process_grads import GradientData as _GradientData
 from .enums import StageType as _StageType
@@ -909,6 +911,24 @@ class Stage(_SimulationRunner):
             return free_energies, errors  # type: ignore
         else:
             return None, None
+
+    def get_results_df(self, save_csv: bool = True) -> _pd.DataFrame:
+        """
+        Return the results in dataframe format
+
+        Parameters
+        ----------
+        save_csv : bool, optional, default=True
+            Whether to save the results as a csv file
+
+        Returns
+        -------
+        results_df : pd.DataFrame
+            A dataframe containing the results
+        """
+        # Call the superclass method but avoid trying to get results from
+        # the sub_sim_runners, which do not have calculated free energy changes
+        return super().get_results_df(save_csv=save_csv, add_sub_sim_runners=False)
 
     def analyse_convergence(
         self,

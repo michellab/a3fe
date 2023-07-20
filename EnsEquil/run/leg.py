@@ -6,6 +6,7 @@ from functools import partial as _partial
 import logging as _logging
 import numpy as _np
 import os as _os
+import pandas as _pd
 import pathlib as _pathlib
 import shutil as _shutil
 from time import sleep as _sleep
@@ -1085,10 +1086,53 @@ class Leg(_SimulationRunner):
             # Correct overall DG
             dg_overall += rest_corrs
 
-            # Update the internally stored dGs after the restraint corrections
+            # Update the internally stored dGs after the restraint corrections and save the restraint corrections
             self._delta_g = dg_overall
+            self._restratint_corrections = rest_corrs
 
         return dg_overall, er_overall
+
+    def get_results_df(
+        self, save_csv: bool = True, add_sub_sim_runners: bool = True
+    ) -> _pd.DataFrame:
+        """
+        Return the results in dataframe format
+
+        Parameters
+        ----------
+        save_csv : bool, optional, default=True
+            Whether to save the results as a csv file
+
+        add_sub_sim_runners : bool, optional, default=True
+            Whether to show the results from the sub-simulation runners.
+
+        Returns
+        -------
+        results_df : pd.DataFrame
+            A dataframe containing the results
+        """
+        results_df = super().get_results_df(
+            save_csv=save_csv, add_sub_sim_runners=add_sub_sim_runners
+        )
+        # Add the restraint corrections if this is the bound leg
+        if self.leg_type == _LegType.BOUND:
+            if not hasattr(self, "_restratint_corrections"):
+                raise AttributeError(
+                    "No restraint corrections have been calculated. Please run analyse first."
+                )
+            new_row = {
+                "dg / kcal mol-1": round(self._restratint_corrections.mean(), 2),
+                "dg_95_ci / kcal mol-1": 0,
+                "tot_simtime / ns": 0,
+                "tot_gpu_time / GPU hours": 0,
+            }
+            results_df.loc["restraint_corr"] = new_row
+
+            self._logger.warning(
+                "Remember to add in any required symmetry corrections."
+            )
+
+        return results_df
 
     def analyse_convergence(
         self, run_nos: _Optional[_List[int]] = None

@@ -17,16 +17,32 @@ from .fixtures import restrain_stage
 
 def test_analysis_all_runs(restrain_stage):
     """Check that the analysis works on all runs."""
-    stage = restrain_stage
-    res, err = stage.analyse()
+    res, err = restrain_stage.analyse()
     assert res.mean() == pytest.approx(1.5978, abs=1e-2)
     assert err.mean() == pytest.approx(0.0254, abs=1e-3)
 
 
+def test_get_results_df(restrain_stage):
+    """Check that the results dataframe is correctly generated."""
+    # Re-analyse to ensure that the order of the tests doesn't matter
+    res, err = restrain_stage.analyse()
+    df = restrain_stage.get_results_df()
+    # Check that the csv has been output
+    assert os.path.exists(os.path.join(restrain_stage.output_dir, "results.csv"))
+    # Check that the results are correct
+    assert df.loc["restrain_stage"]["dg / kcal mol-1"] == pytest.approx(1.6, abs=1e-1)
+    assert df.loc["restrain_stage"]["dg_95_ci / kcal mol-1"] == pytest.approx(
+        0.21, abs=1e-2
+    )
+    assert df.loc["restrain_stage"]["tot_simtime / ns"] == pytest.approx(6.0, abs=1e-1)
+    assert df.loc["restrain_stage"]["tot_gpu_time / GPU hours"] == pytest.approx(
+        0.94, abs=1e-2
+    )
+
+
 def test_analysis_subselection_runs(restrain_stage):
     """Check that the analysis works on a subselection of runs."""
-    stage = restrain_stage
-    res, err = stage.analyse(run_nos=[1, 2, 4])
+    res, err = restrain_stage.analyse(run_nos=[1, 2, 4])
     assert res.mean() == pytest.approx(1.6154, abs=1e-2)
     assert err.mean() == pytest.approx(0.0257, abs=1e-3)
 
