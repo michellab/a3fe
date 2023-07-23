@@ -806,6 +806,12 @@ def dummy_check_equil_multiwindow(
     equil_time : float
         Time taken to equilibrate per simulation, in ns.
     """
+    # Set _equilibrated to False and _equil_time to None if they are not set
+    if not hasattr(lam_win, "_equilibrated"):
+        lam_win._equilibrated = False
+    if not hasattr(lam_win, "_equil_time"):
+        lam_win._equil_time = None
+
     return lam_win._equilibrated, lam_win._equil_time
 
 
