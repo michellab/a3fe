@@ -544,6 +544,10 @@ class Stage(_SimulationRunner):
             # If there are no running lambda windows, we must have reached the maximum efficiency
             if not self.running_wins:
                 self._maximally_efficient = True
+                self._logger.info(
+                    "Maximum efficiency for given runtime constant of "
+                    f"{self.runtime_constant} kcal**2 mol**2 ns**-1 achieved"
+                )
 
     def _run_loop_adaptive_equilibration_multiwindow(
         self,
