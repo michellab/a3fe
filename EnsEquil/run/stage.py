@@ -1,6 +1,8 @@
 """Functions for running free energy calculations with SOMD with automated
  equilibration detection based on an ensemble of simulations."""
 
+__all__ = ["Stage"]
+
 import os as _os
 import threading as _threading
 import logging as _logging

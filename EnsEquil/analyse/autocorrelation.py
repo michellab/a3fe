@@ -22,6 +22,8 @@ You should have received a copy of the GNU Lesser General Public
 License along with this software. If not, see <http://www.gnu.org/licenses/>.
 """
 
+__all__ = ["get_statistical_inefficiency"]
+
 import numpy as _np
 from typing import (
     Dict as _Dict,

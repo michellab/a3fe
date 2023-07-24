@@ -1,5 +1,7 @@
 """Functionality for manipulating sets of Calculations"""
 
+__all__ = ["Set"]
+
 import copy as _copy
 import logging as _logging
 import numpy as _np

@@ -1,5 +1,7 @@
 """Functionality to run a single SOMD simulation."""
 
+__all__ = ["Simulation"]
+
 from decimal import Decimal as _Decimal
 import glob as _glob
 import os as _os

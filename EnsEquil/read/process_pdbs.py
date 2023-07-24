@@ -1,5 +1,7 @@
 """Some helpful functionality for processing PDB files."""
 
+__all__ = ["remove_alt_states"]
+
 import os as _os
 
 

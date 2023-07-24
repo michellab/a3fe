@@ -1,5 +1,7 @@
 """Functionality for managing legs of the calculation."""
 
+__all__ = ["Leg"]
+
 import glob as _glob
 import BioSimSpace.Sandpit.Exscientia as _BSS
 from functools import partial as _partial

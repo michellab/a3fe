@@ -1,5 +1,7 @@
 """Functionality to process the gradient data."""
 
+__all__ = ["GradientData"]
+
 import numpy as _np
 from typing import (
     List as _List,

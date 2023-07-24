@@ -1,5 +1,18 @@
 """Plotting functions"""
 
+__all__ = [
+    "general_plot",
+    "geweke_plot",
+    "plot_gradient_stats",
+    "plot_gradient_hists",
+    "plot_gradient_timeseries",
+    "plot_equilibration_time",
+    "plot_overlap_mat",
+    "plot_mbar_pmf",
+    "plot_against_exp",
+    "plot_gelman_rubin_rhat",
+]
+
 import matplotlib.pyplot as _plt
 from math import ceil as _ceil
 import numpy as _np

@@ -1,5 +1,11 @@
 """Functionality to analyse a set of calculations and compare the result with experiment"""
 
+__all__ = [
+    "compute_stats",
+    "get_bootstrapped_results",
+    "compute_statistic",
+]
+
 from ensurepip import bootstrap
 import numpy as _np
 import pandas as _pd

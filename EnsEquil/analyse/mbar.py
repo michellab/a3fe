@@ -3,6 +3,8 @@ Functionality for running mbar on SOMD output files. This uses
 pymbar through SOMD
 """
 
+__all__ = ["run_mbar"]
+
 import numpy as _np
 import os as _os
 import glob as _glob

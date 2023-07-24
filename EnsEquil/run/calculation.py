@@ -1,6 +1,8 @@
 """Functionality for setting up and running an entire ABFE calculation,
 consisting of two legs (bound and unbound) and multiple stages."""
 
+__all__ = ["Calculation"]
+
 import logging as _logging
 import multiprocessing as _mp
 import os as _os

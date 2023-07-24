@@ -1,5 +1,7 @@
 """Functionality to compute RMSDs"""
 
+__all__ = ["get_rmsd"]
+
 import BioSimSpace as _BSS
 import glob as _glob
 from MDAnalysis.analysis import align as _align

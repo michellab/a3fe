@@ -3,6 +3,14 @@
 from enum import Enum as _Enum
 from typing import List as _List
 
+__all__ = [
+    "JobStatus",
+    "StageType",
+    "LegType",
+    "PreparationStage",
+    "SetProtocol",
+]
+
 
 class JobStatus(_Enum):
     """An enumeration of the possible job statuses"""

@@ -1,5 +1,13 @@
 """Functions for detecting equilibration based on an ensemble of simulations."""
 
+# Inlcude only recommended algorithms
+__all__ = [
+    "check_equil_block_gradient",
+    "check_equil_multiwindow_modified_geweke",
+    "dummy_check_equil_multiwindow",
+    "get_gelman_rubin_rhat",
+]
+
 import arviz as _az
 import numpy as _np
 from typing import (
