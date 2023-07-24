@@ -401,7 +401,10 @@ class SimulationRunner(ABC):
         return dg_overall, er_overall
 
     def get_results_df(
-        self, save_csv: bool = True, add_sub_sim_runners: bool = True
+        self,
+        save_csv: bool = True,
+        get_normalised_costs: bool = False,
+        add_sub_sim_runners: bool = True,
     ) -> _pd.DataFrame:
         """
         Return the results in dataframe format
@@ -473,6 +476,15 @@ class SimulationRunner(ABC):
         else:
             index_prefix = ""
         results_df.loc[index_prefix + self.__class__.__name__.lower()] = new_row
+
+        # Get the normalised GPU time
+        results_df["normalised_gpu_time"] = (
+            results_df["tot_gpu_time / GPU hours"] / self.tot_gpu_time
+        )
+        # Round to 3 s.f.
+        results_df["normalised_gpu_time"] = results_df["normalised_gpu_time"].apply(
+            lambda x: round(x, 3)
+        )
 
         if save_csv:
             results_df.to_csv(f"{self.output_dir}/results.csv")
