@@ -46,6 +46,20 @@ class GradientData:
             lam_winds, equilibrated=equilibrated, run_nos=run_nos
         )
 
+        # Store the relative cost of the windows
+        self.relative_simulation_cost = lam_winds[0].relative_simulation_cost
+        # Make sure that this is the same for all windows
+        if not all(
+            [
+                win.relative_simulation_cost == self.relative_simulation_cost
+                for win in lam_winds
+            ]
+        ):
+            raise ValueError(
+                "Relative simulation cost is not the same for all windows. Please ensure that "
+                "the relative simulation cost is the same for all windows."
+            )
+
         # Get mean and variance of gradients, including both intra-run and inter-run components
         # Note that sems/ vars generally refer to the sems/ vars of the gradients, and not the
         # free energy changes.
@@ -62,7 +76,7 @@ class GradientData:
         for lam in lam_winds:
             # Record the lambda value and get sensible run numbers
             lam_vals.append(lam.lam)
-            run_nos = lam._get_valid_run_nos(run_nos=run_nos)
+            run_nos: _List[int] = lam._get_valid_run_nos(run_nos=run_nos)
 
             # Get all gradients and statistical inefficiencies
             gradients_wind = []
@@ -210,13 +224,11 @@ class GradientData:
         for i, sem in enumerate(sems):  # type: ignore
             # Calculate the block average for each point
             if i == 0:
-                sem_smooth = (sem + self.sems_overall[i + 1]) / 2
+                sem_smooth = (sem + sems[i + 1]) / 2
             elif i == max_ind:
-                sem_smooth = (sem + self.sems_overall[i - 1]) / 2
+                sem_smooth = (sem + sems[i - 1]) / 2
             else:
-                sem_smooth = (
-                    sem + self.sems_overall[i + 1] + self.sems_overall[i - 1]
-                ) / 3
+                sem_smooth = (sem + sems[i + 1] + sems[i - 1]) / 3
             smoothened_sems.append(sem_smooth)
 
         smoothened_sems = _np.array(smoothened_sems)

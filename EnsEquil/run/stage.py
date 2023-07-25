@@ -502,10 +502,8 @@ class Stage(_SimulationRunner):
                 # Note that normalised_sem_dg has already been multiplied by sqrt(tot_simtime)
                 normalised_sem_dg = smooth_dg_sems[i]
                 predicted_run_time_max_eff = (
-                    (1 / _np.sqrt(self.runtime_constant))
-                    * normalised_sem_dg
-                    / self.relative_simulation_cost
-                )
+                    1 / _np.sqrt(self.runtime_constant * self.relative_simulation_cost)  # type: ignore
+                ) * normalised_sem_dg
                 actual_run_time = win.get_tot_simtime(run_nos=run_nos)
                 win._logger.info(
                     f"Predicted maximum efficiency run time for is {predicted_run_time_max_eff:.3f} ns"
@@ -861,7 +859,7 @@ class Stage(_SimulationRunner):
             "integrated_sem",
             "integrated_var",
             "sq_sem_sim_time",
-            # "pred_best_simtime",
+            "pred_best_simtime",
         ]:
             _plot_gradient_stats(
                 gradients_data=equilibrated_gradient_data,

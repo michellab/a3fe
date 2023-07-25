@@ -279,7 +279,8 @@ def plot_gradient_stats(
     elif plot_type == "sq_sem_sim_time":
         ax.bar(
             gradients_data.lam_vals,
-            gradients_data.sems_inter_delta_g**2 / gradients_data.total_times,
+            gradients_data.sems_inter_delta_g**2
+            / (gradients_data.total_times * len(gradients_data.run_nos)),
             width=0.02,
             edgecolor="black",
         )
@@ -289,16 +290,26 @@ def plot_gradient_stats(
         ax.legend()
 
     elif plot_type == "pred_best_simtime":
+        # Calculate the predicted optimum simulation time
+        relative_cost = gradients_data.relative_simulation_cost
+        runtime_constant = gradients_data.runtime_constant
+        n_runs = len(gradients_data.run_nos)
+        time_normalised_sems = gradients_data.get_time_normalised_sems(
+            origin="inter_delta_g", smoothen=False
+        )
+        pred_opt_simtime = (
+            time_normalised_sems * 1 / _np.sqrt(runtime_constant * relative_cost)
+        )
+        # Get this as a per-run quantity
+        pred_opt_simtime = pred_opt_simtime / n_runs
+
         ax.bar(
             gradients_data.lam_vals,
-            gradients_data.get_time_normalised_sems(
-                origin="inter_delta_g", smoothen=False
-            )
-            / _np.sqrt(gradients_data.runtime_constant),
+            pred_opt_simtime,
             width=0.02,
             edgecolor="black",
         )
-        ax.set_ylabel(r"Predicted most efficient runtimes /  ns"),
+        ax.set_ylabel(r"Predicted most efficient runtimes per run /  ns"),
         ax.legend()
 
     elif plot_type == "integrated_var":
@@ -932,6 +943,8 @@ def plot_gelman_rubin_rhat(
         width=0.02,
         edgecolor="black",
     )
+    # This shouldn't be below 1, so don't show values below 1
+    ax.set_ylim(bottom=0.98)
 
     # Set a horizontal line at the cutoff value
     ax.axhline(y=cutoff, color="red", linestyle="dashed")
