@@ -33,6 +33,7 @@ from ..analyse.plot import (
     plot_equilibration_time as _plot_equilibration_time,
     plot_overlap_mats as _plot_overlap_mats,
     plot_convergence as _plot_convergence,
+    plot_sq_sem_convergence as _plot_sq_sem_convergence,
     plot_mbar_pmf as _plot_mbar_pmf,
     plot_rmsds as _plot_rmsds,
 )
@@ -992,15 +993,16 @@ class Stage(_SimulationRunner):
         self._logger.info(f"Overall free energy changes: {dg_overall} kcal mol-1")
         self._logger.info(f"Fractions of equilibrated simulation time: {fracts}")
 
-        # Plot the overall convergence
-        _plot_convergence(
-            fracts,
-            dg_overall,
-            self.get_tot_simtime(run_nos=run_nos),
-            self.equil_time,
-            self.output_dir,
-            len(run_nos),
-        )
+        # Plot the overall convergence and the squared SEM of the free energy change
+        for plot in [_plot_convergence, _plot_sq_sem_convergence]:
+            plot(
+                fracts,
+                dg_overall,
+                self.get_tot_simtime(run_nos=run_nos),
+                self.equil_time,  # Already per member of the ensemble
+                self.output_dir,
+                len(run_nos),
+            )
 
         return fracts, dg_overall
 

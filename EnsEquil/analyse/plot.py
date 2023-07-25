@@ -73,10 +73,16 @@ def general_plot(
         List of of the numbers of the runs supplied. If None, the runs are
         numbered in the order supplied from 1.
     """
+    # If the y values are 1D, add another axis so that the normal logic works
+    y_vals_1d = True if len(y_vals.shape) == 1 else False
+    if y_vals_1d:
+        y_vals = y_vals[_np.newaxis, :]
+
+    # Compute the mean and 95% confidence intervals
     y_avg = _np.mean(y_vals, axis=0)
     conf_int = _stats.t.interval(
         0.95, len(y_vals[:, 0]) - 1, loc=y_avg, scale=_stats.sem(y_vals, axis=0)
-    )  # 95 % C.I.
+    )
 
     fig, ax = _plt.subplots(figsize=(8, 6))
     ax.plot(x_vals, y_avg, label="Mean", linewidth=2)
@@ -90,7 +96,9 @@ def general_plot(
     ax.fill_between(x_vals, conf_int[0], conf_int[1], alpha=0.5, facecolor="#ffa500")
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
-    ax.legend()
+    # No point in adding a legend if there is only one set of data
+    if not y_vals_1d:
+        ax.legend()
 
     fig.savefig(
         outfile, dpi=300, bbox_inches="tight", facecolor="white", transparent=False
@@ -715,6 +723,59 @@ def plot_convergence(
         dgs,
         "Total Simulation Time / ns",
         "Free energy / kcal mol$^{-1}$",
+        outfile,
+    )
+
+
+def plot_sq_sem_convergence(
+    fracts: _np.ndarray,
+    dgs: _np.ndarray,
+    tot_simtime: float,
+    equil_time: float,
+    output_dir: str,
+    n_runs: int,
+) -> None:
+    """
+    Plot convergence of the squared standard error of the mean of the free energy
+    estimate as a function of the total simulation time.
+
+    Parameters
+    ----------
+    fracts : np.ndarray
+        Array of fractions of the total equilibrated simulation time at which the dgs were calculated.
+    dgs : np.ndarray
+        Array of free energies at each fraction of the total equilibrated simulation time. This has
+        ensemble size dimensions.
+    tot_simtime : float
+        Total simulation time for the runs included.
+    equil_time : float
+        Equilibration time (per run)
+    output_dir : str
+        Directory to save the plot to.
+    n_runs : int
+        Number of runs used to calculate the free energy estimate.
+    """
+    # Convert fraction of the equilibrated simulation time to total simulation time in ns
+    tot_equil_time = equil_time * n_runs
+    times = fracts * (tot_simtime - tot_equil_time) + tot_equil_time
+    # Add zero time to the start
+    times = _np.concatenate((_np.array([0]), times))
+
+    # Add single Nan to correspond to zero time
+    nans = _np.empty((dgs.shape[0], 1))
+    nans[:] = _np.nan
+    dgs = _np.hstack((nans, dgs))
+
+    # Get the squared standard error of the mean
+    sq_sems = _np.square(_np.std(dgs, axis=0)) / dgs.shape[0]
+
+    # Plot the free energy estimate as a function of the total simulation time
+    outfile = _os.path.join(output_dir, "convergence_sq_sem.png")
+    general_plot(
+        times,
+        sq_sems,
+        "Total Simulation Time / ns",
+        r"$\mathrm{SEM}^2$ / kcal$^{2}$ mol$^{-2}$",
         outfile,
     )
 

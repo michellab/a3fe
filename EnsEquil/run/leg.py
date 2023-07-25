@@ -22,7 +22,10 @@ from typing import (
     Callable as _Callable,
 )
 
-from ..analyse.plot import plot_convergence as _plot_convergence
+from ..analyse.plot import (
+    plot_convergence as _plot_convergence,
+    plot_sq_sem_convergence as _plot_sq_sem_convergence,
+)
 from .enums import (
     LegType as _LegType,
     PreparationStage as _PreparationStage,
@@ -1139,10 +1142,10 @@ class Leg(_SimulationRunner):
     def analyse_convergence(
         self, run_nos: _Optional[_List[int]] = None
     ) -> _Tuple[_np.ndarray, _np.ndarray]:
-        f"""
+        """
         Get a timeseries of the total free energy change of the
-        {self.__class__.__name__} against total simulation time. Also plot this.
-        Keep this separate from analyse as it is expensive to run.
+        Leg against total simulation time. Also plot this. Keep
+        this separate from analyse as it is expensive to run.
 
         Parameters
         ----------
@@ -1192,15 +1195,16 @@ class Leg(_SimulationRunner):
         self._logger.info(f"Overall free energy changes: {dg_overall} kcal mol-1")
         self._logger.info(f"Fractions of equilibrated simulation time: {fracts}")
 
-        # Plot the overall convergence
-        _plot_convergence(
-            fracts,
-            dg_overall,
-            self.get_tot_simtime(run_nos=run_nos),
-            self.equil_time,
-            self.output_dir,
-            len(run_nos),
-        )
+        # Plot the overall convergence and the squared SEM of the free energy change
+        for plot in [_plot_convergence, _plot_sq_sem_convergence]:
+            plot(
+                fracts,
+                dg_overall,
+                self.get_tot_simtime(run_nos=run_nos),
+                self.equil_time,  # Already per member of the ensemble
+                self.output_dir,
+                len(run_nos),
+            )
 
         return fracts, dg_overall
 

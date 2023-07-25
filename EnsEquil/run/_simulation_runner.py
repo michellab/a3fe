@@ -27,7 +27,10 @@ import logging as _logging
 from warnings import warn as _warn
 
 from ..analyse.exceptions import AnalysisError as _AnalysisError
-from ..analyse.plot import plot_convergence as _plot_convergence
+from ..analyse.plot import (
+    plot_convergence as _plot_convergence,
+    plot_sq_sem_convergence as _plot_sq_sem_convergence,
+)
 
 
 class SimulationRunner(ABC):
@@ -263,7 +266,7 @@ class SimulationRunner(ABC):
         Parameters
         ----------
         run_nos : List[int], Optional, default=None
-            A list of the run numbers to run. If None, all runs are run.
+            A list of the run numbers to run. If None, all runs are returned.
 
         Returns
         -------
@@ -534,15 +537,16 @@ class SimulationRunner(ABC):
         self._logger.info(f"Overall free energy changes: {dg_overall} kcal mol-1")
         self._logger.info(f"Fractions of equilibrated simulation time: {fracts}")
 
-        # Plot the overall convergence
-        _plot_convergence(
-            fracts,
-            dg_overall,
-            self.tot_simtime,
-            self.equil_time,
-            self.output_dir,
-            self.ensemble_size,
-        )
+        # Plot the overall convergence and the squared SEM of the free energy change
+        for plot in [_plot_convergence, _plot_sq_sem_convergence]:
+            plot(
+                fracts,
+                dg_overall,
+                self.get_tot_simtime(run_nos=run_nos),
+                self.equil_time,  # Already per member of the ensemble
+                self.output_dir,
+                len(run_nos),
+            )
 
         return fracts, dg_overall
 
@@ -666,7 +670,10 @@ class SimulationRunner(ABC):
 
     @property
     def equil_time(self) -> float:
-        f"""The equilibration time in ns for the {self.__class__.__name__} and any sub-simulation runners."""
+        """
+        The equilibration time, per member of the ensemble, in ns, for the and
+        any sub-simulation runners.
+        """
         return sum(
             [sub_sim_runner.equil_time for sub_sim_runner in self._sub_sim_runners]
         )  # ns
