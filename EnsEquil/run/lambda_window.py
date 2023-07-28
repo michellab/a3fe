@@ -5,6 +5,7 @@ import logging as _logging
 import numpy as _np
 import os as _os
 import subprocess as _subprocess
+from copy import deepcopy as _deepcopy
 from typing import (
     Dict as _Dict,
     List as _List,
@@ -32,6 +33,10 @@ class LamWindow(_SimulationRunner):
         "block_gradient": _check_equil_block_gradient,
         "chodera": _check_equil_chodera,
     }
+
+    runtime_attributes = _deepcopy(_SimulationRunner.runtime_attributes)
+    runtime_attributes["_equilibrated"] = False
+    runtime_attributes["_equil_time"] = None
 
     def __init__(
         self,
@@ -138,7 +143,6 @@ class LamWindow(_SimulationRunner):
             self.gradient_threshold = gradient_threshold
             self.runtime_constant = runtime_constant
             self.relative_simulation_cost = relative_simulation_cost
-            self._equilibrated: bool = False
             self._running: bool = False
 
             # Create the required simulations for this lambda value

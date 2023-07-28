@@ -83,7 +83,6 @@ def test_set_and_get_attributes(restrain_stage):
     """Check that the calculation attributes can be set and obtained correctly."""
     attr_dict = restrain_stage.get_attr_values("ensemble_size")
     assert attr_dict["ensemble_size"] == 5
-    print(attr_dict)
     assert (
         attr_dict["sub_sim_runners"][list(attr_dict["sub_sim_runners"].keys())[0]][
             "ensemble_size"
@@ -102,6 +101,23 @@ def test_set_and_get_attributes(restrain_stage):
     restrain_stage.set_attr_values("ensemble_size", 7)
     attr_dict = restrain_stage.get_attr_values("ensemble_size")
     assert attr_dict["ensemble_size"] == 7
+
+
+def test_reset(restrain_stage):
+    """Test that runtime attributes are reset correctly"""
+    # First, check that they're consistent with having run the stage
+    equilibrated = all([lam._equilibrated for lam in restrain_stage.lam_windows])
+    equil_times = [lam._equil_time for lam in restrain_stage.lam_windows]
+    assert equilibrated == True
+    assert None not in equil_times
+    # Now reset the stage and recheck
+    restrain_stage.reset()
+    print([lam._equilibrated for lam in restrain_stage.lam_windows])
+    equilibrated = any([lam._equilibrated for lam in restrain_stage.lam_windows])
+    equil_times = [lam._equil_time for lam in restrain_stage.lam_windows]
+    equil_times_none = all([time is None for time in equil_times])
+    assert not equilibrated
+    assert equil_times_none
 
 
 @pytest.mark.skipif(not GROMACS_PRESENT, reason="GROMACS not present")

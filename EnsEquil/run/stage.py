@@ -12,6 +12,7 @@ import numpy as _np
 import pandas as _pd
 import pathlib as _pathlib
 import scipy.stats as _stats
+from copy import deepcopy as _deepcopy
 from time import sleep as _sleep
 from typing import (
     Callable as _Callable,
@@ -62,6 +63,9 @@ class Stage(_SimulationRunner):
         "check_equil_multiwindow*.txt",
         "freenrg-MBAR*.dat",
     ]
+
+    runtime_attributes = _deepcopy(_SimulationRunner.runtime_attributes)
+    runtime_attributes["_maximally_efficient"] = False
 
     def __init__(
         self,

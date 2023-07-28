@@ -42,8 +42,14 @@ class SimulationRunner(ABC):
     # Count the number of instances so we can name things uniquely
     # for each instance
     class_count = _count()
+
     # Create list of files to be deleted by self.clean()
     run_files = ["*.png", "overall_stats.dat", "results.csv"]
+
+    # Create a dict of attributes which can be modified by algorithms when
+    # running the simulation, but which should be reset if the user wants to
+    # re-run. This takes the form {attribute_name: reset_value}
+    runtime_attributes = {}
 
     def __init__(
         self,
@@ -120,6 +126,10 @@ class SimulationRunner(ABC):
                     f"dg_multiplier must be either +1 or -1, not {dg_multiplier}."
                 )
             self.dg_multiplier = dg_multiplier
+
+            # Initialise runtime attributes with default values
+            for attribute, value in self.runtime_attributes.items():
+                setattr(self, attribute, value)
 
             # Create attributes to store the free energy
             self._delta_g: _Union[None, _np.ndarray] = None
@@ -816,6 +826,9 @@ class SimulationRunner(ABC):
                 self._logger.info(f"Deleting {file}")
                 _subprocess.run(["rm", file])
 
+        # Reset the runtime attributes
+        self.reset(reset_sub_sims=False)
+
         if clean_logs:
             # Delete log file contents without deleting the log files
             _subprocess.run(
@@ -840,6 +853,25 @@ class SimulationRunner(ABC):
         if hasattr(self, "_sub_sim_runners"):
             for sub_sim_runner in self._sub_sim_runners:
                 sub_sim_runner.lighten()
+
+    def reset(self, reset_sub_sims: bool = True) -> None:
+        """
+        Reset all attributes changed by the runtime
+        algorithms to their default values.
+
+        Parameters
+        ----------
+        reset_sub_sims : bool, default=True
+            If True, also reset any sub-simulation runners.
+        """
+        for attr, value in self.__class__.runtime_attributes.items():
+            self._logger.info(f"Resetting the attribute {attr} to {value}.")
+            setattr(self, attr, value)
+
+        if reset_sub_sims:
+            if hasattr(self, "_sub_sim_runners"):
+                for sub_sim_runner in self._sub_sim_runners:
+                    sub_sim_runner.reset()
 
     def _close_logging_handlers(self) -> None:
         """Close the logging file handlers. This can be
