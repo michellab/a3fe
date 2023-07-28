@@ -10,6 +10,7 @@ import EnsEquil as ee
 from ..analyse.process_grads import get_time_series_multiwindow
 from ..analyse.detect_equil import (
     check_equil_multiwindow_modified_geweke,
+    check_equil_multiwindow_paired_t,
     check_equil_multiwindow_gelman_rubin,
 )
 from .fixtures import restrain_stage
@@ -201,6 +202,23 @@ def test_geweke(restrain_stage):
             output_dir=tmpdir,
             intervals=10,
             p_cutoff=0.4,
+        )
+
+        assert equilibrated
+        assert fractional_equil_time == pytest.approx(0.0048, abs=1e-2)
+
+
+def test_paired_t(restrain_stage):
+    """Test the paired t-test equilibration analysis."""
+    with TemporaryDirectory() as tmpdir:
+        (
+            equilibrated,
+            fractional_equil_time,
+        ) = check_equil_multiwindow_paired_t(
+            lambda_windows=restrain_stage.lam_windows,
+            output_dir=tmpdir,
+            intervals=10,
+            p_cutoff=0.05,
         )
 
         assert equilibrated

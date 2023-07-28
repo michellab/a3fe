@@ -4,6 +4,7 @@
 __all__ = [
     "check_equil_block_gradient",
     "check_equil_multiwindow_modified_geweke",
+    "check_equil_multiwindow_paired_t",
     "dummy_check_equil_multiwindow",
     "get_gelman_rubin_rhat",
 ]
@@ -785,6 +786,158 @@ def check_equil_multiwindow_modified_geweke(
         times=_np.array(times),
         p_vals=_np.array(p_vals),
         outfile=f"{output_dir}/check_equil_multiwindow_modified_geweke.png",
+        p_cutoff=p_cutoff,
+    )
+
+    return equilibrated, fractional_equil_time
+
+
+def check_equil_multiwindow_paired_t(
+    lambda_windows: _List["LamWindow"],
+    output_dir: str,
+    run_nos: _Optional[_List[int]] = None,
+    first_frac: float = 0.1,
+    last_frac: float = 0.5,
+    intervals: int = 4,
+    p_cutoff: float = 0.05,
+) -> _Tuple[bool, _Optional[float]]:  # type: ignore
+    """
+    Check if a set of lambda windows are equilibrated based on a paired t-test between the average of
+    each run over the first 10 % and last 50 % of the data.
+
+    Parameters
+    ----------
+    lambda_windows : List[LamWindow]
+        List of lambda windows to check for equilibration.
+    output_dir : str
+        Directory to write output files to.
+    run_nos : List[int], Optional, default: None
+        The run numbers to use. If None, all runs will be used.
+    first_frac : float, default: 0.1
+        The fraction of the simulation to use for the first part of the t-test. Defaults
+        to original recommendation of using the first 10% of the data.
+    last_frac : float, default: 0.5
+        The fraction of the simulation to use for the last part of the t-test. Defaults
+        to original recommendation of using the last 50% of the data. This is taken as backwards
+        from the end of the simulation, e.g. if last_frac = 0.3, the last 30% of the simulation
+        will be used. This is also gives the maximum fraction of the simulation to discard when
+        repeatedly discarding data from the start of the simulation and checking for convergence.
+    intervals : int, default: 4
+        The number of equidistant starting fractions between 0 and 1 - last_frac for which to perform the paired t-test,
+        discarding the starting fraction of the data.
+    p_cutoff : float, default: 0.05
+        The p value cutoff for the test. If the p value is greater than this, the null hypothesis that the data
+        is stationary is accepted and the data is considered equilibrated. A conservative value of 0.4 is used to increase
+        the power of the test, at the expense of a higher false positive rate.
+
+    Returns
+    -------
+    equilibrated : bool
+        True if the set of lambda windows is equilibrated, False otherwise.
+    fractional_equil_time : float
+        Time taken to equilibrate, as a fraction of the total simulation time.
+    """
+    run_nos = lambda_windows[0]._get_valid_run_nos(run_nos)
+
+    # Filter out invalid intervals
+    for interval in (first_frac, last_frac):
+        if interval <= 0 or interval >= 1:
+            raise ValueError(
+                "Invalid intervals for paired t-test convergence analysis",
+                (first_frac, last_frac),
+            )
+    if first_frac + last_frac >= 1:
+        raise ValueError(
+            "Invalid intervals for paired t-test convergence analysis",
+            (first_frac, last_frac),
+        )
+
+    # Initialize list of p values and times
+    p_vals_and_times = []
+    equilibrated = False
+    fractional_equil_time = None
+    equil_time = None
+
+    # Calculate the p value for each interval
+    start_fracs = _np.linspace(0, 1 - last_frac, num=intervals)
+    for start_frac in start_fracs:
+        # Generate the data
+        overall_dgs, overall_times = _get_time_series_multiwindow(
+            lambda_windows=lambda_windows, run_nos=run_nos, start_frac=start_frac
+        )
+        # Get the indices of the end of the first slice and the start of the last slice
+        first_slice_end_idx = round(first_frac * len(overall_dgs[0]))
+        last_slice_start_idx = round((1 - last_frac) * len(overall_dgs[0]))
+
+        # Get the slices
+        first_slice = overall_dgs[:, :first_slice_end_idx]
+        last_slice = overall_dgs[:, last_slice_start_idx:]
+
+        # Get the means over the samples from each run
+        first_slice_means = _np.mean(first_slice, axis=1)
+        last_slice_means = _np.mean(last_slice, axis=1)
+
+        # Calculate the paired t-test p value
+        p_value = _stats.ttest_rel(
+            first_slice_means,
+            last_slice_means,
+            alternative="two-sided",
+        )[
+            1
+        ]  # First value is the t statistic - we want p
+
+        # Store results - note that time is the per-run time
+        p_vals_and_times.append(
+            (p_value, overall_times[0][0])
+        )  # second value is the equilibration time
+
+        # Check if the p-value is greater than the cutoff
+        if p_value > p_cutoff:
+            # No evidence to reject the null hypothesis that the data is stationary at current p cutoff
+            if (
+                equilibrated == False
+            ):  #  Make sure we haven't already detected equilibration
+                equilibrated = True
+                fractional_equil_time = start_frac
+                equil_time = overall_times[0][0]
+
+    # Directly set the _equilibrated and _equil_time attributes of the lambda windows
+    if equilibrated:
+        for lam_win in lambda_windows:
+            lam_win._equilibrated = True
+            # Equilibration time is per-simulation
+            lam_win._equil_time = fractional_equil_time * lam_win.get_tot_simtime(
+                run_nos=[1]
+            )  # ns
+
+    # Write out data
+    with open(f"{output_dir}/check_equil_multiwindow_paired_t.txt", "w") as ofile:
+        ofile.write(f"Equilibrated: {equilibrated}\n")
+        ofile.write(f"p values and times: {p_vals_and_times}\n")
+        ofile.write(f"Fractional equilibration time: {fractional_equil_time} \n")
+        ofile.write(f"Equilibration time: {equil_time} ns\n")
+        ofile.write(f"Run numbers: {run_nos}\n")
+
+    # Create plots of the overall gradients using all data
+    overall_dgs, overall_times = _get_time_series_multiwindow(
+        lambda_windows=lambda_windows, run_nos=run_nos
+    )
+    _general_plot(
+        x_vals=overall_times[0],
+        y_vals=overall_dgs,
+        x_label="Total Simulation Time / ns",
+        y_label=r"$\Delta G$ / kcal mol$^{-1}$",
+        outfile=f"{output_dir}/check_equil_multiwindow_paired_t.png",
+        vline_val=equil_time,
+        run_nos=run_nos,
+    )
+
+    # Create plot of p values
+    p_vals, times = zip(*p_vals_and_times)
+    _geweke_plot(
+        times=_np.array(times),
+        p_vals=_np.array(p_vals),
+        outfile=f"{output_dir}/check_equil_multiwindow_paired_t.png",
         p_cutoff=p_cutoff,
     )
 

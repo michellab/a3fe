@@ -41,6 +41,7 @@ from ..analyse.plot import (
 from ..analyse.detect_equil import (
     dummy_check_equil_multiwindow as _dummy_check_equil_multiwindow,
     check_equil_multiwindow_modified_geweke as _check_equil_multiwindow_modified_geweke,
+    check_equil_multiwindow_paired_t as _check_equil_multiwindow_paired_t,
     check_equil_multiwindow_gelman_rubin as _check_equil_multiwindow_gelman_rubin,
 )
 from ..analyse.exceptions import AnalysisError as _AnalysisError
@@ -563,7 +564,7 @@ class Stage(_SimulationRunner):
         run_nos: _List[int],
         cycle_pause: int = 60,
         max_runtime: float = 30,  # seconds  # ns
-        check_equil_fn: _Callable = _check_equil_multiwindow_modified_geweke,
+        check_equil_fn: _Callable = _check_equil_multiwindow_paired_t,
         check_equil_kwargs: _Dict[str, _Any] = {},
     ) -> None:
         """
