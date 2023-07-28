@@ -58,7 +58,10 @@ class Stage(_SimulationRunner):
     """
 
     # Files to be cleaned by self.clean()
-    run_files = _SimulationRunner.run_files + ["check_equil_multiwindow.txt"]
+    run_files = _SimulationRunner.run_files + [
+        "check_equil_multiwindow*.txt",
+        "freenrg-MBAR*.dat",
+    ]
 
     def __init__(
         self,

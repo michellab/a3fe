@@ -804,9 +804,6 @@ class SimulationRunner(ABC):
             If True, also delete the log files.
         """
         delete_files = self.__class__.run_files
-        if clean_logs:
-            # Delete log file contents without deleting the log files
-            _subprocess.run(["truncate", "-s", "0", self.__class__.__name__ + ".log"])
 
         for del_file in delete_files:
             # Delete files in base directory
@@ -818,6 +815,17 @@ class SimulationRunner(ABC):
             for file in _pathlib.Path(self.output_dir).glob(del_file):
                 self._logger.info(f"Deleting {file}")
                 _subprocess.run(["rm", file])
+
+        if clean_logs:
+            # Delete log file contents without deleting the log files
+            _subprocess.run(
+                [
+                    "truncate",
+                    "-s",
+                    "0",
+                    _os.path.join(self.base_dir, self.__class__.__name__ + ".log"),
+                ]
+            )
 
         # Clean any sub-simulation runners
         if hasattr(self, "_sub_sim_runners"):
