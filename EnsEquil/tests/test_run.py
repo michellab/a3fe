@@ -3,6 +3,7 @@
 from asyncio import subprocess
 from glob import glob
 import logging
+import numpy as np
 import os
 import pathlib
 import pytest
@@ -118,6 +119,21 @@ def test_reset(restrain_stage):
     equil_times_none = all([time is None for time in equil_times])
     assert not equilibrated
     assert equil_times_none
+
+
+def test_update(restrain_stage):
+    """Check that the stage update method works"""
+    # Change the positions of the lambda windows and ensemble size
+    # and ensure that this is reflected in the lambda windows
+    # after updating
+    new_lam_vals = list(np.arange(0.0, 1.1, 0.1))
+    restrain_stage.lam_vals = new_lam_vals
+    restrain_stage.ensemble_size = 2
+    restrain_stage.update()
+    assert len(restrain_stage.lam_windows) == 11
+    for lam, lam_val in zip(restrain_stage.lam_windows, new_lam_vals):
+        assert lam.lam == lam_val
+        assert lam.ensemble_size == 2
 
 
 @pytest.mark.skipif(not GROMACS_PRESENT, reason="GROMACS not present")

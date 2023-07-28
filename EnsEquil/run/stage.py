@@ -1106,26 +1106,28 @@ class Stage(_SimulationRunner):
             option="lambda array",
             value=", ".join([str(lam) for lam in self.lam_vals]),
         )
+        # Store the previous lambda window attributes that we want to preserve
+        old_lam_vals_attrs = self.lam_windows[0].__dict__
         self._logger.info("Deleting old lambda windows and creating new ones...")
         self._sub_sim_runners = []
         lam_val_weights = self.lam_val_weights
         for i, lam_val in enumerate(self.lam_vals):
             lam_base_dir = _os.path.join(self.output_dir, f"lambda_{lam_val:.3f}")
-            self.lam_windows.append(
-                _LamWindow(
-                    lam=lam_val,
-                    lam_val_weight=lam_val_weights[i],
-                    virtual_queue=self.virtual_queue,
-                    block_size=self.block_size,
-                    equil_detection=self.equil_detection,
-                    gradient_threshold=self.gradient_threshold,
-                    runtime_constant=self.runtime_constant,
-                    ensemble_size=self.ensemble_size,
-                    base_dir=lam_base_dir,
-                    input_dir=self.input_dir,
-                    stream_log_level=self.stream_log_level,
-                )
+            new_lam_win = _LamWindow(
+                lam=lam_val,
+                lam_val_weight=lam_val_weights[i],
+                virtual_queue=self.virtual_queue,
+                block_size=self.block_size,
+                gradient_threshold=self.gradient_threshold,
+                runtime_constant=self.runtime_constant,
+                ensemble_size=self.ensemble_size,
+                base_dir=lam_base_dir,
+                input_dir=self.input_dir,
+                stream_log_level=self.stream_log_level,
             )
+            # Overwrite the default equilibration detection algorithm
+            new_lam_win.check_equil = old_lam_vals_attrs["check_equil"]
+            self.lam_windows.append(new_lam_win)
 
 
 class StageContextManager:
