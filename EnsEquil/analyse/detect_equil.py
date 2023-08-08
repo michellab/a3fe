@@ -27,7 +27,7 @@ from .process_grads import (
 )
 from .plot import (
     general_plot as _general_plot,
-    geweke_plot as _geweke_plot,
+    p_plot as _p_plot,
     plot_gelman_rubin_rhat as _plot_gelman_rubin_rhat,
 )
 
@@ -782,7 +782,7 @@ def check_equil_multiwindow_modified_geweke(
 
     # Create Geweke plot
     p_vals, times = zip(*p_vals_and_times)
-    _geweke_plot(
+    _p_plot(
         times=_np.array(times),
         p_vals=_np.array(p_vals),
         outfile=f"{output_dir}/check_equil_multiwindow_modified_geweke.png",
@@ -934,10 +934,10 @@ def check_equil_multiwindow_paired_t(
 
     # Create plot of p values
     p_vals, times = zip(*p_vals_and_times)
-    _geweke_plot(
+    _p_plot(
         times=_np.array(times),
         p_vals=_np.array(p_vals),
-        outfile=f"{output_dir}/check_equil_multiwindow_paired_t.png",
+        outfile=f"{output_dir}/check_equil_multiwindow_paired_t_p_vals.png",
         p_cutoff=p_cutoff,
     )
 

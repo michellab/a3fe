@@ -2,7 +2,7 @@
 
 __all__ = [
     "general_plot",
-    "geweke_plot",
+    "p_plot",
     "plot_gradient_stats",
     "plot_gradient_hists",
     "plot_gradient_timeseries",
@@ -107,14 +107,14 @@ def general_plot(
     _plt.close(fig)
 
 
-def geweke_plot(
+def p_plot(
     times: _np.ndarray,
     p_vals: _np.ndarray,
     outfile: str,
     p_cutoff: float = 0.4,
 ) -> None:
     """
-    Plot the Geweke p value against time discarded from the start of the simulation.
+    Plot the p value against time discarded from the start of the simulation.
 
     Parameters
     ----------
@@ -122,7 +122,7 @@ def geweke_plot(
         1D array of times discarded from the start of the simulation. This is per
         run.
     p_vals : np.ndarray
-        1D array of Geweke p values.
+        1D array of p values.
     outfile : str
         Name of the output file.
     p_cutoff : float, optional
