@@ -28,7 +28,6 @@ def run_mbar(
     percentage_end: float = 100,
     percentage_start: float = 0,
     subsampling: bool = False,
-    temperature: float = 298,
     delete_outfiles=False,
 ) -> _Tuple[_np.ndarray, _np.ndarray, _List[str]]:
     """
@@ -52,8 +51,6 @@ def run_mbar(
         the last 50% of the data will be used.
     subsampling : bool, Optional, default: False
         Whether to use subsampling for MBAR.
-    temperature : float, Optional, default: 298
-        The temperature of the simulations, in Kelvin.
     delete_outfiles : bool, Optional, default: False
         Whether to delete the MBAR analysis output files after the free
         energy change and errors have been extracted.
@@ -112,8 +109,6 @@ def run_mbar(
                 "-p",
                 "100",
                 "--overlap",
-                # "--temperature",
-                # f"{temperature}",
             ]
             if subsampling:
                 cmd_list.append("--subsampling")
