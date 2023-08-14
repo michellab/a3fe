@@ -24,8 +24,9 @@ from ..read._process_somd_files import \
 def run_mbar(
     output_dir: str,
     ensemble_size: int,
-    run_nos: _Optional[_List[int]] = None,
-    percentage: float = 100,
+    run_nos: _List[int],
+    percentage_end: float = 100,
+    percentage_start: float = 0,
     subsampling: bool = False,
     temperature: float = 298,
     delete_outfiles=False,
@@ -39,13 +40,16 @@ def run_mbar(
         The path to the output directory
     ensemble_size : int
         The number of simulations in the ensemble
-    run_nos : List[int], Optional, default: None
-        The run numbers to use for MBAR. If None, all runs will be used.
-    percentage : float, Optional, default: 100
-        The percentage of the data to use for MBAR, starting from
-        the start of the simulation. If this is less than 100,
-        data will be discarded from the end of the simulation.
-        data will be discarded from the start of the simulation.
+    run_nos : List[int]
+        The run numbers to use for MBAR.
+    percentage_end : float, Optional, default: 100
+        The percentage of data after which to truncate the datafiles.
+        For example, if 100, the full datafile will be used. If 50, only
+        the first 50% of the data will be used.
+    percentage_end : float, Optional, default: 0
+        The percentage of data before which to truncate the datafiles.
+        For example, if 0, the full datafile will be used. If 50, only
+        the last 50% of the data will be used.
     subsampling : bool, Optional, default: False
         Whether to use subsampling for MBAR.
     temperature : float, Optional, default: 298
@@ -84,27 +88,32 @@ def run_mbar(
     for simfile in simfiles:
         tmp_simfile = _os.path.join(
             _os.path.dirname(simfile),
-            f"simfile_truncated_{round(percentage)}_percent.dat",
+            f"simfile_truncated_{round(percentage_end)}_end_{round(percentage_start)}_start.dat",
         )
         tmp_simfiles.append(tmp_simfile)
-        _write_truncated_sim_datafile(simfile, tmp_simfile, percentage / 100)
+        _write_truncated_sim_datafile(
+            simfile,
+            tmp_simfile,
+            fraction_final=percentage_end / 100,
+            fraction_initial=percentage_start / 100,
+        )
 
     # Run MBAR using pymbar through SOMD
     mbar_out_files = []
     for run_no in run_nos:
-        outfile = f"{output_dir}/freenrg-MBAR-run_{str(run_no).zfill(2)}_{round(percentage)}_percent.dat"
+        outfile = f"{output_dir}/freenrg-MBAR-run_{str(run_no).zfill(2)}_{round(percentage_end)}_end_{round(percentage_start)}_start.dat"
         mbar_out_files.append(outfile)
         with open(outfile, "w") as ofile:
             cmd_list = [
                 "analyse_freenrg",
                 "mbar",
                 "-i",
-                f"{output_dir}/lambda*/run_{str(run_no).zfill(2)}/simfile_truncated_{round(percentage)}_percent.dat",
+                f"{output_dir}/lambda*/run_{str(run_no).zfill(2)}/simfile_truncated_{round(percentage_end)}_end_{round(percentage_start)}_start.dat",
                 "-p",
                 "100",
                 "--overlap",
-                "--temperature",
-                f"{temperature}",
+                # "--temperature",
+                # f"{temperature}",
             ]
             if subsampling:
                 cmd_list.append("--subsampling")

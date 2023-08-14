@@ -5,6 +5,7 @@ from typing import Dict as _Dict
 from typing import List as _List
 from typing import Optional as _Optional
 from typing import Tuple as _Tuple
+from warnings import warn as _warn
 
 import numpy as _np
 
@@ -163,10 +164,12 @@ def read_mbar_pmf(outfile: str) -> _Tuple[_np.ndarray, _np.ndarray, _np.ndarray]
     return _np.array(lam), _np.array(pmf), _np.array(pmf_err)
 
 
-def write_truncated_sim_datafile(simfile: str, outfile: str, fraction: float) -> None:
+def write_truncated_sim_datafile(
+    simfile: str, outfile: str, fraction_final: float, fraction_initial: float = 0
+) -> None:
     """
-    Write a truncated simfile, with a certain percentage of the final number of steps
-    discarded.
+    Write a truncated simfile, discarding the specified fraction of the initial
+    and final steps.
 
     Parameters
     ----------
@@ -174,31 +177,75 @@ def write_truncated_sim_datafile(simfile: str, outfile: str, fraction: float) ->
         The name of the input simfile.
     outfile : str
         The name of the output simfile.
-    fraction : float
-        The fraction of the final number of steps to discard.
+    fraction_final : float
+        The fraction of the data after which data should be discarded. For
+        example, if the simulation was run for 1000 steps, and fraction_final =
+        0.9, then the final 100 steps will be discarded.
+    fraction_initial : float, optional, default=0
+        The fraction of the initial number of steps to discard. For example, if
+        the simulation was run for 1000 steps, and fraction_initial = 0.1, then
+        the initial 100 steps will be discarded.
+
+    Notes
+    -----
+    No data is written at t = 0. Hence, if fraction initial = 0, then the
+    written truncated simfile will actually start from the time point closest
+    to zero.
 
     Returns
     -------
     None
     """
+    # Check that the fractions are valid
+    for frac in [fraction_final, fraction_initial]:
+        if frac < 0 or frac > 1:
+            raise ValueError(f"Invalid fraction: {frac}. Must be between 0 and 1.")
+    if fraction_final < fraction_initial:
+        raise ValueError(f"Invalid fractions: {fraction_final} < {fraction_initial}.")
+
+    # Read the data
     with open(simfile, "r") as f:
         lines = f.readlines()
+    final_idx = len([line for line in lines if line.strip() != ""]) - 1
 
-    # Find the start of the data, the end of the data, and the number of steps
+    # First, find the indices from which to start and stop reading
+    # The start data index is the first line which isn't a comment
+    start_data_idx = None
+    for i, line in enumerate(lines):
+        if not line.startswith("#"):
+            start_data_idx = i
+            break
+    if start_data_idx is None:
+        raise ValueError(f"No data found in simfile: {simfile}.")
+    start_reading_idx = (
+        # + 1 and -1 because no data is written at t = 0
+        round((final_idx - start_data_idx + 1) * fraction_initial)
+        + start_data_idx
+        - 1
+    )
+    end_reading_idx = (
+        round((final_idx - start_data_idx + 1) * fraction_final) + start_data_idx - 1
+    )
+    if start_reading_idx < start_data_idx:
+        # This can occur because no data is written at t = 0
+        start_reading_idx = start_data_idx
+
+    # Check that we have data to write and warm the user if not
+    if start_reading_idx == end_reading_idx:
+        raise ValueError(f"Insufficient data to write truncated simfile: {simfile}.")
+    if end_reading_idx - start_reading_idx < 50:
+        _warn(f"Very little data (< 50 lines) to write truncated simfile: {simfile}.")
+
+    # Write the output file
     with open(outfile, "w") as f:
-        n_lines = len(lines)
-        start_data_idx = None
-        end_data_idx = None
         for i, line in enumerate(lines):
-            if start_data_idx is None:
-                if not line.startswith("#"):
-                    start_data_idx = lines.index(line)
-                    end_data_idx = (
-                        round((n_lines - start_data_idx) * fraction)
-                        + start_data_idx
-                        + 1
-                    )  # +1 as no data written at t = 0
-            else:
-                if i == end_data_idx:
-                    break
-            f.write(line)
+            # Write header
+            if i < start_data_idx:
+                f.write(line)
+            # Write desired data
+            if i >= start_reading_idx:
+                f.write(line)
+            if i == end_reading_idx:
+                break
+        # Finish by writing an empty line
+        f.write("\n")

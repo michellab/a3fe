@@ -806,7 +806,7 @@ class Stage(_SimulationRunner):
                 run_nos=run_nos,
                 output_dir=self.output_dir,
                 ensemble_size=self.ensemble_size,
-                percentage=100,
+                percentage_end=100,
                 subsampling=subsampling,
             )
             mean_free_energy = _np.mean(free_energies)
@@ -976,7 +976,7 @@ class Stage(_SimulationRunner):
         # Get the dg_overall in terms of fraction of the total simulation time
         # Use steps of 5 % of the total simulation time
         fracts = _np.arange(0.05, 1.05, 0.05)
-        percents = fracts * 100
+        end_percents = fracts * 100
         dg_overall = _np.zeros(len(fracts))
 
         # Now run mbar with multiprocessing to speed things up
@@ -988,12 +988,12 @@ class Stage(_SimulationRunner):
                         self.output_dir,
                         self.ensemble_size,
                         run_nos,
-                        percent,
-                        False,
-                        298,
-                        True,
+                        end_percent,
+                        0,  # Start percent
+                        False,  # Subsample
+                        True,  # Delete output files
                     )
-                    for percent in percents
+                    for end_percent in end_percents
                 ],
             )
             dg_overall = _np.array(

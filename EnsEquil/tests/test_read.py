@@ -27,8 +27,11 @@ def test_read_overlap_mat():
     assert overlap_mat[-1, -1] == 0.1770
 
 
-def test_write_truncated_sim_datafile():
-    """Test that the write_truncated_sim_datafile function works correctly"""
+def test_write_truncated_sim_datafile_end():
+    """
+    Test that the write_truncated_sim_datafile function works correctly
+    when truncating the end of the data
+    """
     with TemporaryDirectory() as tmpdir:
         write_truncated_sim_datafile(
             "EnsEquil/data/example_output/simfile.dat",
@@ -37,6 +40,7 @@ def test_write_truncated_sim_datafile():
         )
         with open(os.path.join(tmpdir, "simfile.dat"), "r") as f:
             lines = f.readlines()
+        assert lines[13].split()[0] == "100"
         assert lines[-2].split()[0] == "1000"
         write_truncated_sim_datafile(
             "EnsEquil/data/example_output/simfile.dat",
@@ -46,3 +50,21 @@ def test_write_truncated_sim_datafile():
         with open(os.path.join(tmpdir, "simfile_2.dat"), "r") as f:
             lines = f.readlines()
         assert lines[-2].split()[0] == "10000"
+
+
+def test_write_truncated_sim_datafile_end_and_start():
+    """
+    Test that the write_truncated_sim_datafile function works correctly
+    when truncating the end of the data and the start of the data.
+    """
+    with TemporaryDirectory() as tmpdir:
+        write_truncated_sim_datafile(
+            "EnsEquil/data/example_output/simfile.dat",
+            os.path.join(tmpdir, "simfile_start_trunc.dat"),
+            fraction_final=0.9,
+            fraction_initial=0.5,
+        )
+        with open(os.path.join(tmpdir, "simfile_start_trunc.dat"), "r") as f:
+            lines = f.readlines()
+        assert lines[13].split()[0] == "5000"
+        assert lines[-2].split()[0] == "9000"
