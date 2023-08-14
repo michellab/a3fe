@@ -8,9 +8,11 @@ import pytest
 
 import EnsEquil as ee
 
-from ..analyse.detect_equil import (check_equil_multiwindow_gelman_rubin,
-                                    check_equil_multiwindow_modified_geweke,
-                                    check_equil_multiwindow_paired_t)
+from ..analyse.detect_equil import (
+    check_equil_multiwindow_gelman_rubin,
+    check_equil_multiwindow_modified_geweke,
+    check_equil_multiwindow_paired_t,
+)
 from ..analyse.process_grads import get_time_series_multiwindow
 from .fixtures import restrain_stage
 
@@ -20,6 +22,13 @@ def test_analysis_all_runs(restrain_stage):
     res, err = restrain_stage.analyse()
     assert res.mean() == pytest.approx(1.5978, abs=1e-2)
     assert err.mean() == pytest.approx(0.0254, abs=1e-3)
+
+
+def test_analysis_all_runs_fraction(restrain_stage):
+    """Check that the analysis works on all runs."""
+    res, err = restrain_stage.analyse(fraction=0.5)
+    assert res.mean() == pytest.approx(1.6252, abs=1e-2)
+    assert err.mean() == pytest.approx(0.0366, abs=1e-3)
 
 
 def test_get_results_df(restrain_stage):
