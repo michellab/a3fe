@@ -4,7 +4,6 @@ import logging
 import os
 import pathlib
 import subprocess
-from asyncio import subprocess
 from glob import glob
 from tempfile import TemporaryDirectory
 
