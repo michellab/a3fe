@@ -7,11 +7,14 @@ __all__ = [
 ]
 
 from ensurepip import bootstrap
+from typing import Dict as _Dict
+from typing import List as _List
+from typing import Tuple as _Tuple
+
 import numpy as _np
 import pandas as _pd
 from scipy import stats as _stats
 from sklearn import metrics as _metrics
-from typing import Dict as _Dict, Tuple as _Tuple, List as _List
 
 
 def compute_stats(all_results: _pd.DataFrame) -> _Dict[str, _List[float]]:

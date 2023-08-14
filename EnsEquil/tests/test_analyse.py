@@ -1,18 +1,17 @@
 """Testing the analysis module."""
 
 import os
+from tempfile import TemporaryDirectory
+
 import numpy as np
 import pytest
-from tempfile import TemporaryDirectory
 
 import EnsEquil as ee
 
+from ..analyse.detect_equil import (check_equil_multiwindow_gelman_rubin,
+                                    check_equil_multiwindow_modified_geweke,
+                                    check_equil_multiwindow_paired_t)
 from ..analyse.process_grads import get_time_series_multiwindow
-from ..analyse.detect_equil import (
-    check_equil_multiwindow_modified_geweke,
-    check_equil_multiwindow_paired_t,
-    check_equil_multiwindow_gelman_rubin,
-)
 from .fixtures import restrain_stage
 
 

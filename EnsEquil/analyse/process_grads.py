@@ -2,19 +2,17 @@
 
 __all__ = ["GradientData"]
 
+from typing import Dict as _Dict
+from typing import List as _List
+from typing import Optional as _Optional
+from typing import Tuple as _Tuple
+from typing import Union as _Union
+
 import numpy as _np
-from typing import (
-    List as _List,
-    Tuple as _Tuple,
-    Optional as _Optional,
-    Dict as _Dict,
-    Union as _Union,
-)
 from scipy.constants import gas_constant as _R
 
-from .autocorrelation import (
-    get_statistical_inefficiency as _get_statistical_inefficiency,
-)
+from .autocorrelation import \
+    get_statistical_inefficiency as _get_statistical_inefficiency
 
 
 class GradientData:

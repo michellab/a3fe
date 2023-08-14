@@ -2,30 +2,31 @@
 
 __all__ = ["Simulation"]
 
-from decimal import Decimal as _Decimal
 import glob as _glob
+import logging as _logging
 import os as _os
 import pathlib as _pathlib
-import logging as _logging
+import subprocess as _subprocess
+from decimal import Decimal as _Decimal
+from typing import Any as _Any
+from typing import Dict as _Dict
+from typing import List as _List
+from typing import Optional as _Optional
+from typing import Tuple as _Tuple
+
 import numpy as _np
 from sire.units import k_boltz as _k_boltz
-import subprocess as _subprocess
-from typing import (
-    Dict as _Dict,
-    List as _List,
-    Tuple as _Tuple,
-    Any as _Any,
-    Optional as _Optional,
-)
 
-from .enums import JobStatus as _JobStatus
-from ..read._process_slurm_files import get_slurm_file_base as _get_slurm_file_base
-from ..read._process_somd_files import (
-    read_simfile_option as _read_simfile_option,
-    write_simfile_option as _write_simfile_option,
-)
+from ..read._process_slurm_files import \
+    get_slurm_file_base as _get_slurm_file_base
+from ..read._process_somd_files import \
+    read_simfile_option as _read_simfile_option
+from ..read._process_somd_files import \
+    write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
-from ._virtual_queue import Job as _Job, VirtualQueue as _VirtualQueue
+from ._virtual_queue import Job as _Job
+from ._virtual_queue import VirtualQueue as _VirtualQueue
+from .enums import JobStatus as _JobStatus
 
 
 class Simulation(_SimulationRunner):

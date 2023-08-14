@@ -4,28 +4,25 @@ __all__ = ["Set"]
 
 import copy as _copy
 import logging as _logging
-import numpy as _np
 import os as _os
+from typing import Any as _Any
+from typing import Callable as _Callable
+from typing import Dict as _Dict
+from typing import Iterable as _Iterable
+from typing import List as _List
+from typing import Optional as _Optional
+from typing import Tuple as _Tuple
+
+import numpy as _np
 import scipy.stats as _stats
-from typing import (
-    Dict as _Dict,
-    List as _List,
-    Tuple as _Tuple,
-    Any as _Any,
-    Optional as _Optional,
-    Callable as _Callable,
-    Iterable as _Iterable,
-)
 
 from ..analyse.analyse_set import compute_stats as _compute_stats
 from ..analyse.plot import plot_against_exp as _plt_against_exp
-from .calculation import Calculation as _Calculation
-from .enums import SetProtocol as _SetProtocol
 from ..read._read_exp_dgs import read_exp_dgs as _read_exp_dgs
 from ._simulation_runner import SimulationRunner as _SimulationRunner
-
-
 from ._utils import TmpWorkingDir as _TmpWorkingDir
+from .calculation import Calculation as _Calculation
+from .enums import SetProtocol as _SetProtocol
 
 
 class Set(_SimulationRunner):

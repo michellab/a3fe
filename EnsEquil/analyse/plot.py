@@ -13,27 +13,24 @@ __all__ = [
     "plot_gelman_rubin_rhat",
 ]
 
-import matplotlib.pyplot as _plt
-from math import ceil as _ceil
-import numpy as _np
 import os as _os
+from math import ceil as _ceil
+from typing import Any as _Any
+from typing import Dict as _Dict
+from typing import List as _List
+from typing import Optional as _Optional
+from typing import Tuple as _Tuple
+
+import matplotlib.pyplot as _plt
+import numpy as _np
 import pandas as _pd
 import scipy.stats as _stats
-from scipy.stats import kruskal as _kruskal
 import seaborn as _sns
-from typing import (
-    Dict as _Dict,
-    List as _List,
-    Tuple as _Tuple,
-    Any as _Any,
-    Optional as _Optional,
-)
+from scipy.stats import kruskal as _kruskal
 
+from ..read._process_somd_files import read_mbar_pmf as _read_mbar_pmf
+from ..read._process_somd_files import read_overlap_mat as _read_overlap_mat
 from .process_grads import GradientData
-from ..read._process_somd_files import (
-    read_overlap_mat as _read_overlap_mat,
-    read_mbar_pmf as _read_mbar_pmf,
-)
 from .rmsd import get_rmsd as _get_rmsd
 
 

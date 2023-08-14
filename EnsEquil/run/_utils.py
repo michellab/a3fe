@@ -1,16 +1,15 @@
 """"Utilities for SimulationRunners."""
 
-import BioSimSpace.Sandpit.Exscientia as _BSS
 import contextlib as _contextlib
-from logging import Logger as _Logger
 import os as _os
+from logging import Logger as _Logger
 from time import sleep as _sleep
-from typing import (
-    Callable as _Callable,
-    Tuple as _Tuple,
-    Optional as _Optional,
-    List as _List,
-)
+from typing import Callable as _Callable
+from typing import List as _List
+from typing import Optional as _Optional
+from typing import Tuple as _Tuple
+
+import BioSimSpace.Sandpit.Exscientia as _BSS
 
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 

@@ -3,54 +3,56 @@
 
 __all__ = ["Stage"]
 
-import os as _os
-import threading as _threading
 import logging as _logging
+import os as _os
+import pathlib as _pathlib
+import threading as _threading
+from copy import deepcopy as _deepcopy
 from math import ceil as _ceil
 from multiprocessing import Pool as _Pool
+from time import sleep as _sleep
+from typing import Any as _Any
+from typing import Callable as _Callable
+from typing import Dict as _Dict
+from typing import List as _List
+from typing import Optional as _Optional
+from typing import Tuple as _Tuple
+from typing import Union as _Union
+
 import numpy as _np
 import pandas as _pd
-import pathlib as _pathlib
 import scipy.stats as _stats
-from copy import deepcopy as _deepcopy
-from time import sleep as _sleep
-from typing import (
-    Callable as _Callable,
-    Dict as _Dict,
-    List as _List,
-    Tuple as _Tuple,
-    Any as _Any,
-    Optional as _Optional,
-    Union as _Union,
-)
 
-from ._virtual_queue import VirtualQueue as _VirtualQueue
-from ..read._process_somd_files import write_simfile_option as _write_simfile_option
-from .lambda_window import LamWindow as _LamWindow
-from ..analyse.plot import (
-    plot_gradient_stats as _plot_gradient_stats,
-    plot_gradient_hists as _plot_gradient_hists,
-    plot_gradient_timeseries as _plot_gradient_timeseries,
-    plot_equilibration_time as _plot_equilibration_time,
-    plot_overlap_mats as _plot_overlap_mats,
-    plot_convergence as _plot_convergence,
-    plot_sq_sem_convergence as _plot_sq_sem_convergence,
-    plot_mbar_pmf as _plot_mbar_pmf,
-    plot_rmsds as _plot_rmsds,
-)
-from ..analyse.detect_equil import (
-    dummy_check_equil_multiwindow as _dummy_check_equil_multiwindow,
-    check_equil_multiwindow_modified_geweke as _check_equil_multiwindow_modified_geweke,
-    check_equil_multiwindow_paired_t as _check_equil_multiwindow_paired_t,
-    check_equil_multiwindow_gelman_rubin as _check_equil_multiwindow_gelman_rubin,
-)
+from ..analyse.detect_equil import \
+    check_equil_multiwindow_gelman_rubin as \
+    _check_equil_multiwindow_gelman_rubin
+from ..analyse.detect_equil import \
+    check_equil_multiwindow_modified_geweke as \
+    _check_equil_multiwindow_modified_geweke
+from ..analyse.detect_equil import \
+    check_equil_multiwindow_paired_t as _check_equil_multiwindow_paired_t
+from ..analyse.detect_equil import \
+    dummy_check_equil_multiwindow as _dummy_check_equil_multiwindow
 from ..analyse.exceptions import AnalysisError as _AnalysisError
 from ..analyse.mbar import run_mbar as _run_mbar
+from ..analyse.plot import plot_convergence as _plot_convergence
+from ..analyse.plot import plot_equilibration_time as _plot_equilibration_time
+from ..analyse.plot import plot_gradient_hists as _plot_gradient_hists
+from ..analyse.plot import plot_gradient_stats as _plot_gradient_stats
+from ..analyse.plot import \
+    plot_gradient_timeseries as _plot_gradient_timeseries
+from ..analyse.plot import plot_mbar_pmf as _plot_mbar_pmf
+from ..analyse.plot import plot_overlap_mats as _plot_overlap_mats
+from ..analyse.plot import plot_rmsds as _plot_rmsds
+from ..analyse.plot import plot_sq_sem_convergence as _plot_sq_sem_convergence
 from ..analyse.process_grads import GradientData as _GradientData
-from .enums import StageType as _StageType
-from ..read._process_somd_files import write_simfile_option as _write_simfile_option
+from ..read._process_somd_files import \
+    write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._utils import get_simtime as _get_simtime
+from ._virtual_queue import VirtualQueue as _VirtualQueue
+from .enums import StageType as _StageType
+from .lambda_window import LamWindow as _LamWindow
 
 
 class Stage(_SimulationRunner):

@@ -2,27 +2,26 @@
 
 import glob as _glob
 import logging as _logging
-import numpy as _np
 import os as _os
 import subprocess as _subprocess
 from copy import deepcopy as _deepcopy
-from typing import (
-    Dict as _Dict,
-    List as _List,
-    Tuple as _Tuple,
-    Any as _Any,
-    Optional as _Optional,
-    Union as _Union,
-)
+from typing import Any as _Any
+from typing import Dict as _Dict
+from typing import List as _List
+from typing import Optional as _Optional
+from typing import Tuple as _Tuple
+from typing import Union as _Union
 
-from ..analyse.detect_equil import (
-    check_equil_block_gradient as _check_equil_block_gradient,
-    check_equil_chodera as _check_equil_chodera,
-    dummy_check_equil_multiwindow as _dummy_check_equil_multiwindow,
-)
-from .simulation import Simulation as _Simulation
+import numpy as _np
+
+from ..analyse.detect_equil import \
+    check_equil_block_gradient as _check_equil_block_gradient
+from ..analyse.detect_equil import check_equil_chodera as _check_equil_chodera
+from ..analyse.detect_equil import \
+    dummy_check_equil_multiwindow as _dummy_check_equil_multiwindow
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._virtual_queue import VirtualQueue as _VirtualQueue
+from .simulation import Simulation as _Simulation
 
 
 class LamWindow(_SimulationRunner):

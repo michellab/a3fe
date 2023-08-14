@@ -5,22 +5,20 @@ pymbar through SOMD
 
 __all__ = ["run_mbar"]
 
-import numpy as _np
-import os as _os
 import glob as _glob
+import os as _os
 import subprocess as _subprocess
-from typing import (
-    Dict as _Dict,
-    List as _List,
-    Tuple as _Tuple,
-    Any as _Any,
-    Optional as _Optional,
-)
+from typing import Any as _Any
+from typing import Dict as _Dict
+from typing import List as _List
+from typing import Optional as _Optional
+from typing import Tuple as _Tuple
 
-from ..read._process_somd_files import (
-    read_mbar_result as _read_mbar_result,
-    write_truncated_sim_datafile as _write_truncated_sim_datafile,
-)
+import numpy as _np
+
+from ..read._process_somd_files import read_mbar_result as _read_mbar_result
+from ..read._process_somd_files import \
+    write_truncated_sim_datafile as _write_truncated_sim_datafile
 
 
 def run_mbar(

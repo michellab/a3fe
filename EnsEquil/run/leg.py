@@ -3,62 +3,67 @@
 __all__ = ["Leg"]
 
 import glob as _glob
-import BioSimSpace.Sandpit.Exscientia as _BSS
-from functools import partial as _partial
 import logging as _logging
-import numpy as _np
 import os as _os
-import pandas as _pd
 import pathlib as _pathlib
 import shutil as _shutil
-from time import sleep as _sleep
 import subprocess as _subprocess
-from typing import (
-    Dict as _Dict,
-    List as _List,
-    Tuple as _Tuple,
-    Any as _Any,
-    Optional as _Optional,
-    Callable as _Callable,
-)
+from functools import partial as _partial
+from time import sleep as _sleep
+from typing import Any as _Any
+from typing import Callable as _Callable
+from typing import Dict as _Dict
+from typing import List as _List
+from typing import Optional as _Optional
+from typing import Tuple as _Tuple
 
-from ..analyse.plot import (
-    plot_convergence as _plot_convergence,
-    plot_sq_sem_convergence as _plot_sq_sem_convergence,
-)
-from .enums import (
-    LegType as _LegType,
-    PreparationStage as _PreparationStage,
-    StageType as _StageType,
-)
-from .stage import Stage as _Stage
-from .system_prep import (
-    parameterise_input as _sysprep_parameterise_input,
-    slurm_parameterise_bound as _slurm_parameterise_bound,
-    slurm_parameterise_free as _slurm_parameterise_free,
-    solvate_input as _sysprep_solvate_input,
-    slurm_solvate_bound as _slurm_solvate_bound,
-    slurm_solvate_free as _slurm_solvate_free,
-    minimise_input as _sysprep_minimise_input,
-    slurm_minimise_bound as _slurm_minimise_bound,
-    slurm_minimise_free as _slurm_minimise_free,
-    heat_and_preequil_input as _sysprep_heat_and_preequil_input,
-    slurm_heat_and_preequil_bound as _slurm_heat_and_preequil_bound,
-    slurm_heat_and_preequil_free as _slurm_heat_and_preequil_free,
-    run_ensemble_equilibration as _sysprep_run_ensemble_equilibration,
-    slurm_ensemble_equilibration_bound as _slurm_ensemble_equilibration_bound,
-    slurm_ensemble_equilibration_free as _slurm_ensemble_equilibration_free,
-    slurm_ensemble_equilibration_bound_short as _slurm_ensemble_equilibration_bound_short,
-    slurm_ensemble_equilibration_free_short as _slurm_ensemble_equilibration_free_short,
-)
-from ..read._process_slurm_files import get_slurm_file_base as _get_slurm_file_base
-from ..read._process_somd_files import (
-    read_simfile_option as _read_simfile_option,
-    write_simfile_option as _write_simfile_option,
-)
+import BioSimSpace.Sandpit.Exscientia as _BSS
+import numpy as _np
+import pandas as _pd
+
+from ..analyse.plot import plot_convergence as _plot_convergence
+from ..analyse.plot import plot_sq_sem_convergence as _plot_sq_sem_convergence
 from ..read._process_bss_systems import rename_lig as _rename_lig
+from ..read._process_slurm_files import \
+    get_slurm_file_base as _get_slurm_file_base
+from ..read._process_somd_files import \
+    read_simfile_option as _read_simfile_option
+from ..read._process_somd_files import \
+    write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
-from ._virtual_queue import VirtualQueue as _VirtualQueue, Job as _Job
+from ._virtual_queue import Job as _Job
+from ._virtual_queue import VirtualQueue as _VirtualQueue
+from .enums import LegType as _LegType
+from .enums import PreparationStage as _PreparationStage
+from .enums import StageType as _StageType
+from .stage import Stage as _Stage
+from .system_prep import \
+    heat_and_preequil_input as _sysprep_heat_and_preequil_input
+from .system_prep import minimise_input as _sysprep_minimise_input
+from .system_prep import parameterise_input as _sysprep_parameterise_input
+from .system_prep import \
+    run_ensemble_equilibration as _sysprep_run_ensemble_equilibration
+from .system_prep import \
+    slurm_ensemble_equilibration_bound as _slurm_ensemble_equilibration_bound
+from .system_prep import \
+    slurm_ensemble_equilibration_bound_short as \
+    _slurm_ensemble_equilibration_bound_short
+from .system_prep import \
+    slurm_ensemble_equilibration_free as _slurm_ensemble_equilibration_free
+from .system_prep import \
+    slurm_ensemble_equilibration_free_short as \
+    _slurm_ensemble_equilibration_free_short
+from .system_prep import \
+    slurm_heat_and_preequil_bound as _slurm_heat_and_preequil_bound
+from .system_prep import \
+    slurm_heat_and_preequil_free as _slurm_heat_and_preequil_free
+from .system_prep import slurm_minimise_bound as _slurm_minimise_bound
+from .system_prep import slurm_minimise_free as _slurm_minimise_free
+from .system_prep import slurm_parameterise_bound as _slurm_parameterise_bound
+from .system_prep import slurm_parameterise_free as _slurm_parameterise_free
+from .system_prep import slurm_solvate_bound as _slurm_solvate_bound
+from .system_prep import slurm_solvate_free as _slurm_solvate_free
+from .system_prep import solvate_input as _sysprep_solvate_input
 
 
 class Leg(_SimulationRunner):

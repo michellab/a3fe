@@ -1,8 +1,9 @@
 """Unit and regression tests for the _virtual_queue module."""
 
-from ..run._virtual_queue import Job, VirtualQueue
-from tempfile import TemporaryDirectory
 import os
+from tempfile import TemporaryDirectory
+
+from ..run._virtual_queue import Job, VirtualQueue
 
 
 def test_job():

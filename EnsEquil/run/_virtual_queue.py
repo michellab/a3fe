@@ -1,23 +1,22 @@
 """Utilities for the Ensemble, Window, and Simulation Classes"""
 
-from typing_extensions import Self
-from dataclasses import dataclass as _dataclass
 import glob as _glob
 import logging as _logging
 import os as _os
 import subprocess as _subprocess
+from dataclasses import dataclass as _dataclass
 from time import sleep as _sleep
-from typing import (
-    Dict as _Dict,
-    List as _List,
-    Tuple as _Tuple,
-    Any as _Any,
-    Optional as _Optional,
-)
+from typing import Any as _Any
+from typing import Dict as _Dict
+from typing import List as _List
+from typing import Optional as _Optional
+from typing import Tuple as _Tuple
 
-from .enums import JobStatus as _JobStatus
+from typing_extensions import Self
+
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._utils import retry as _retry
+from .enums import JobStatus as _JobStatus
 
 
 @_dataclass

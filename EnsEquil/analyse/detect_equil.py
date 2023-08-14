@@ -9,27 +9,23 @@ __all__ = [
     "get_gelman_rubin_rhat",
 ]
 
+from typing import Any as _Any
+from typing import Dict as _Dict
+from typing import List as _List
+from typing import Optional as _Optional
+from typing import Tuple as _Tuple
+
 import arviz as _az
 import numpy as _np
-from typing import (
-    Dict as _Dict,
-    List as _List,
-    Tuple as _Tuple,
-    Any as _Any,
-    Optional as _Optional,
-)
-from pymbar import timeseries as _timeseries
 import scipy.stats as _stats
+from pymbar import timeseries as _timeseries
 from statsmodels.tsa.stattools import kpss as _kpss
 
-from .process_grads import (
-    get_time_series_multiwindow as _get_time_series_multiwindow,
-)
-from .plot import (
-    general_plot as _general_plot,
-    p_plot as _p_plot,
-    plot_gelman_rubin_rhat as _plot_gelman_rubin_rhat,
-)
+from .plot import general_plot as _general_plot
+from .plot import p_plot as _p_plot
+from .plot import plot_gelman_rubin_rhat as _plot_gelman_rubin_rhat
+from .process_grads import \
+    get_time_series_multiwindow as _get_time_series_multiwindow
 
 
 def check_equil_block_gradient(lam_win: "LamWindow", run_nos: _Optional[_List[int]]) -> _Tuple[bool, _Optional[float]]:  # type: ignore

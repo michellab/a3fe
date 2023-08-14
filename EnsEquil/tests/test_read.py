@@ -4,11 +4,8 @@ Unit and regression test for functionality in the read module.
 import os
 from tempfile import TemporaryDirectory
 
-from ..read._process_somd_files import (
-    read_mbar_result,
-    read_overlap_mat,
-    write_truncated_sim_datafile,
-)
+from ..read._process_somd_files import (read_mbar_result, read_overlap_mat,
+                                        write_truncated_sim_datafile)
 
 
 def test_read_mbar_result():

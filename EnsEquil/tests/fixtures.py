@@ -1,10 +1,10 @@
 """Fixtures for tests"""
 
-import pytest
-
 import os
 import subprocess
 from tempfile import TemporaryDirectory
+
+import pytest
 
 import EnsEquil as ee
 

@@ -2,35 +2,32 @@
 
 from __future__ import annotations
 
-from abc import ABC
 import copy as _copy
 import glob as _glob
-from itertools import count as _count
-import numpy as _np
+import logging as _logging
 import os as _os
-import pandas as _pd
 import pathlib as _pathlib
 import pickle as _pkl
-import scipy.stats as _stats
 import subprocess as _subprocess
+from abc import ABC
+from itertools import count as _count
 from threading import Thread as _Thread
 from time import sleep as _sleep
-from typing import (
-    Optional as _Optional,
-    Tuple as _Tuple,
-    Dict as _Dict,
-    Any as _Any,
-    List as _List,
-    Union as _Union,
-)
-import logging as _logging
+from typing import Any as _Any
+from typing import Dict as _Dict
+from typing import List as _List
+from typing import Optional as _Optional
+from typing import Tuple as _Tuple
+from typing import Union as _Union
 from warnings import warn as _warn
 
+import numpy as _np
+import pandas as _pd
+import scipy.stats as _stats
+
 from ..analyse.exceptions import AnalysisError as _AnalysisError
-from ..analyse.plot import (
-    plot_convergence as _plot_convergence,
-    plot_sq_sem_convergence as _plot_sq_sem_convergence,
-)
+from ..analyse.plot import plot_convergence as _plot_convergence
+from ..analyse.plot import plot_sq_sem_convergence as _plot_sq_sem_convergence
 
 
 class SimulationRunner(ABC):

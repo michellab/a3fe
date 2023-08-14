@@ -2,16 +2,18 @@
 
 __all__ = ["get_rmsd"]
 
-import BioSimSpace as _BSS
 import glob as _glob
-from MDAnalysis.analysis import align as _align
-from MDAnalysis.analysis.rms import RMSD as _RMSD
-from MDAnalysis import Universe as _Universe
-import numpy as _np
 import os as _os
 import subprocess as _subprocess
 from tempfile import TemporaryDirectory as _TemporaryDirectory
-from typing import List as _List, Tuple as _Tuple
+from typing import List as _List
+from typing import Tuple as _Tuple
+
+import BioSimSpace as _BSS
+import numpy as _np
+from MDAnalysis import Universe as _Universe
+from MDAnalysis.analysis import align as _align
+from MDAnalysis.analysis.rms import RMSD as _RMSD
 
 
 def get_rmsd(

@@ -1,12 +1,14 @@
 """Functionality for running preparation simulations."""
 
-import BioSimSpace.Sandpit.Exscientia as _BSS
 import pathlib as _pathlib
 from typing import Optional as _Optional
 
-from .enums import LegType as _LegType, PreparationStage as _PreparationStage
+import BioSimSpace.Sandpit.Exscientia as _BSS
+
 from ..read._process_bss_systems import rename_lig as _rename_lig
 from ._utils import check_has_wat_and_box as _check_has_wat_and_box
+from .enums import LegType as _LegType
+from .enums import PreparationStage as _PreparationStage
 
 
 def parameterise_input(

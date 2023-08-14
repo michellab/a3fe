@@ -1,18 +1,19 @@
 """ Unit and regression test for the run module. """
 
-from asyncio import subprocess
-from glob import glob
 import logging
-import numpy as np
 import os
 import pathlib
-import pytest
 import subprocess
+from asyncio import subprocess
+from glob import glob
 from tempfile import TemporaryDirectory
+
+import numpy as np
+import pytest
 
 import EnsEquil as ee
 
-from . import RUN_SLURM_TESTS, SLURM_PRESENT, GROMACS_PRESENT
+from . import GROMACS_PRESENT, RUN_SLURM_TESTS, SLURM_PRESENT
 from .fixtures import calc, restrain_stage
 
 LEGS_WITH_STAGES = {"bound": ["discharge", "vanish"], "free": ["discharge", "vanish"]}
