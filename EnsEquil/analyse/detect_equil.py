@@ -24,10 +24,10 @@ from statsmodels.tsa.stattools import kpss as _kpss
 from .plot import general_plot as _general_plot
 from .plot import p_plot as _p_plot
 from .plot import plot_gelman_rubin_rhat as _plot_gelman_rubin_rhat
-from .process_grads import get_time_series_multiwindow as _get_time_series_multiwindow
-from .process_grads import (
-    get_time_series_multiwindow_mbar as _get_time_series_multiwindow_mbar,
-)
+from .process_grads import \
+    get_time_series_multiwindow as _get_time_series_multiwindow
+from .process_grads import \
+    get_time_series_multiwindow_mbar as _get_time_series_multiwindow_mbar
 
 
 def check_equil_block_gradient(lam_win: "LamWindow", run_nos: _Optional[_List[int]]) -> _Tuple[bool, _Optional[float]]:  # type: ignore

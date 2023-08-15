@@ -2,18 +2,18 @@
 
 __all__ = ["GradientData"]
 
+from multiprocessing import Pool as _Pool
 from typing import Dict as _Dict
 from typing import List as _List
 from typing import Optional as _Optional
 from typing import Tuple as _Tuple
 from typing import Union as _Union
-from multiprocessing import Pool as _Pool
+
 import numpy as _np
 from scipy.constants import gas_constant as _R
 
-from .autocorrelation import (
-    get_statistical_inefficiency as _get_statistical_inefficiency,
-)
+from .autocorrelation import \
+    get_statistical_inefficiency as _get_statistical_inefficiency
 from .mbar import run_mbar as _run_mbar
 
 

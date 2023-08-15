@@ -8,11 +8,9 @@ import pytest
 
 import EnsEquil as ee
 
-from ..analyse.detect_equil import (
-    check_equil_multiwindow_gelman_rubin,
-    check_equil_multiwindow_modified_geweke,
-    check_equil_multiwindow_paired_t,
-)
+from ..analyse.detect_equil import (check_equil_multiwindow_gelman_rubin,
+                                    check_equil_multiwindow_modified_geweke,
+                                    check_equil_multiwindow_paired_t)
 from ..analyse.process_grads import get_time_series_multiwindow
 from .fixtures import restrain_stage
 
