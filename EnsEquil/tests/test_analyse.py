@@ -27,8 +27,8 @@ def test_analysis_all_runs(restrain_stage):
 def test_analysis_all_runs_fraction(restrain_stage):
     """Check that the analysis works on all runs."""
     res, err = restrain_stage.analyse(fraction=0.5)
-    assert res.mean() == pytest.approx(1.6252, abs=1e-2)
-    assert err.mean() == pytest.approx(0.0366, abs=1e-3)
+    assert res.mean() == pytest.approx(1.5707, abs=1e-2)
+    assert err.mean() == pytest.approx(0.0351, abs=1e-3)
 
 
 def test_get_results_df(restrain_stage):
@@ -199,6 +199,28 @@ def test_get_time_series_multiwindow(restrain_stage):
     assert overall_times.sum(axis=0)[-1] == pytest.approx(2.4, abs=1e-2)
 
 
+def test_get_time_series_multiwindow_mbar(restrain_stage):
+    """Check that the time series are correctly extracted/ combined."""
+    # Check that this fails if we haven't set equil times
+    overall_dgs, overall_times = get_time_series_multiwindow(
+        lambda_windows=restrain_stage.lam_windows,
+        equilibrated=True,
+        run_nos=[1, 2],
+    )
+
+    # Check that the output has the correct shape
+    assert overall_dgs.shape == (2, 100)
+    assert overall_times.shape == (2, 100)
+
+    # Check that the total time is what we expect
+    tot_simtime = restrain_stage.get_tot_simtime(run_nos=[1])
+    assert overall_times[0][-1] == pytest.approx(tot_simtime, abs=1e-2)
+
+    # Check that the output values are correct
+    assert overall_dgs.mean(axis=0)[-1] == pytest.approx(1.7751, abs=1e-2)
+    assert overall_times.sum(axis=0)[-1] == pytest.approx(2.4, abs=1e-2)
+
+
 def test_geweke(restrain_stage):
     """Test the modified Geweke equilibration analysis."""
     with TemporaryDirectory() as tmpdir:
@@ -218,19 +240,18 @@ def test_geweke(restrain_stage):
 
 def test_paired_t(restrain_stage):
     """Test the paired t-test equilibration analysis."""
-    with TemporaryDirectory() as tmpdir:
-        (
-            equilibrated,
-            fractional_equil_time,
-        ) = check_equil_multiwindow_paired_t(
-            lambda_windows=restrain_stage.lam_windows,
-            output_dir=tmpdir,
-            intervals=10,
-            p_cutoff=0.05,
-        )
+    (
+        equilibrated,
+        fractional_equil_time,
+    ) = check_equil_multiwindow_paired_t(
+        lambda_windows=restrain_stage.lam_windows,
+        output_dir=restrain_stage.output_dir,
+        intervals=10,
+        p_cutoff=0.05,
+    )
 
-        assert equilibrated
-        assert fractional_equil_time == pytest.approx(0.0048, abs=1e-2)
+    assert equilibrated
+    assert fractional_equil_time == pytest.approx(0.0048, abs=1e-2)
 
 
 def test_gelman_rubin(restrain_stage):

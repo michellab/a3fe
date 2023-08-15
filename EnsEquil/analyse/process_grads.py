@@ -7,12 +7,14 @@ from typing import List as _List
 from typing import Optional as _Optional
 from typing import Tuple as _Tuple
 from typing import Union as _Union
-
+from multiprocessing import Pool as _Pool
 import numpy as _np
 from scipy.constants import gas_constant as _R
 
-from .autocorrelation import \
-    get_statistical_inefficiency as _get_statistical_inefficiency
+from .autocorrelation import (
+    get_statistical_inefficiency as _get_statistical_inefficiency,
+)
+from .mbar import run_mbar as _run_mbar
 
 
 class GradientData:
@@ -465,7 +467,7 @@ def get_time_series_multiwindow(
             lam_win._write_equilibrated_simfiles()
 
     # Check the run numbers
-    run_nos = lambda_windows[0]._get_valid_run_nos(run_nos)
+    run_nos: _List[int] = lambda_windows[0]._get_valid_run_nos(run_nos)
 
     # Combine all gradients to get the change in free energy with increasing simulation time.
     # Do this so that the total simulation time for each window is spread evenly over the total
@@ -522,3 +524,169 @@ def get_time_series_multiwindow(
             )
 
     return overall_dgs, overall_times
+
+
+def get_time_series_multiwindow_mbar(
+    lambda_windows: _List["LamWindow"],
+    output_dir: str,
+    equilibrated: bool = False,
+    run_nos: _Optional[_List[int]] = None,
+    start_frac: float = 0.0,
+    end_frac: float = 1.0,
+) -> _Tuple[_np.ndarray, _np.ndarray]:
+    """
+    Get a combined timeseries of free energy changes against simulation time,
+    based on the gradients from each lambda window. The contributions from each
+    lambda window are combined so that at a given fraction of total simulation
+    time, each lambda window contributes the same fraction of its data. Because
+    the simulations at different lambda windows are assumed to have run for
+    different amounts of simulation times, the data is combined by block averaging
+    each lambda window's data into 100 blocks, then combining these blocks over
+    runs. This version of the function is based on MBAR, in contrast to the original
+    version which is based on TI (faster but noisier).
+
+    Parameters
+    ----------
+    lambda_windows : List[LamWindow]
+        The lambda windows to combine.
+    output_dir : str
+        The stage output directory.
+    equilibrated : bool, optional, default=False
+        Whether or not to discard data before the equilibration time. This
+        can only be True if _equilibrated and _equil_time are set for
+        all lambda windows.
+    run_nos : List[int], optional, default=None
+        The run numbers to use for each lambda window. If None, all runs are
+        used.
+    start_frac : float, optional, default=0.
+        The fraction of the total simulation time to start the combined timeseries
+        from.
+    end_frac : float, optional, default=1
+        The fraction of the total simulation time to end the combined timeseries
+        at.
+
+    Returns
+    -------
+    overall_dgs : np.ndarray
+        The free energy changes at each increment of total simulation time.
+    overall_times : np.ndarray
+        The total simulation times (per run).
+    """
+    # Check that equilibration stats have been set for all lambda windows if equilibrated is True
+    if equilibrated and not all([lam.equilibrated for lam in lambda_windows]):
+        raise ValueError(
+            "The equilibration times and statistics have not been set for all lambda "
+            "windows in the stage. Please set these before running this function."
+        )
+
+    # Make sure that the required equilibrated simfiles exist if equilibrated is True
+    if equilibrated:
+        for lam_win in lambda_windows:
+            lam_win._write_equilibrated_simfiles()
+
+    # Check the run numbers
+    run_nos: _List[int] = lambda_windows[0]._get_valid_run_nos(run_nos)
+
+    # Combine all gradients to get the change in free energy with increasing simulation time.
+    # Do this so that the total simulation time for each window is spread evenly over the total
+    # simulation time for the whole calculation
+    n_runs = len(run_nos)
+    n_points = 100
+    overall_dgs = _np.zeros(
+        [n_runs, n_points]
+    )  # One point for each % of the total simulation time
+    overall_times = _np.zeros([n_runs, n_points])
+    start_and_end_fracs = [
+        (i, i + (end_frac - start_frac) / n_points)
+        for i in _np.linspace(start_frac, end_frac, n_points + 1)
+    ][
+        :-1
+    ]  # Throw away the last point as > 1
+    # Round the values to avoid floating point errors
+    start_and_end_fracs = [
+        (round(x[0], 5), round(x[1], 5)) for x in start_and_end_fracs
+    ]
+
+    # Run MBAR in parallel
+    with _Pool() as pool:
+        results = pool.starmap(
+            _compute_dg,
+            [
+                (run_no, start_frac, end_frac, output_dir, equilibrated)
+                for run_no in run_nos
+                for start_frac, end_frac in start_and_end_fracs
+            ],
+        )
+
+    # Reshape the results
+    for i, run_no in enumerate(run_nos):
+        for j, (start_frac, end_frac) in enumerate(start_and_end_fracs):
+            overall_dgs[i, j] = results[i * len(start_and_end_fracs) + j]
+
+    ## Run MBAR
+    # for i, run_no in enumerate(run_nos):
+    # for j, (start_frac, end_frac) in enumerate(start_and_end_fracs):
+    # free_energies, _, _ = _run_mbar(
+    # output_dir=output_dir,
+    # run_nos=[run_no],
+    # equilibrated=equilibrated,
+    # percentage_end=end_frac * 100,
+    # percentage_start=start_frac * 100,
+    # subsampling=False,
+    # delete_outfiles=True,
+    # )
+    # overall_dgs[i, j] = free_energies[0]
+
+    # Get times per run
+    for i, run_no in enumerate(run_nos):
+        total_time = sum(
+            [lam_win.get_tot_simtime([run_no]) for lam_win in lambda_windows]
+        )
+        equil_time = (
+            sum([lam_win.equil_time for lam_win in lambda_windows])
+            if equilibrated
+            else 0
+        )
+        times = [
+            (total_time - equil_time) * fracs[0] + equil_time
+            for fracs in start_and_end_fracs
+        ]
+        overall_times[i] = times
+
+    # Check that we have the same total times for each run
+    if not all(
+        [_np.isclose(overall_times[i, -1], overall_times[0, -1]) for i in range(n_runs)]
+    ):
+        raise ValueError(
+            "Total simulation times are not the same for all runs. Please ensure that "
+            "the total simulation times are the same for all runs."
+        )
+
+    # Check that we didn't get any NaNs
+    if _np.isnan(overall_dgs).any():
+        raise ValueError(
+            "NaNs found in the free energy change. Please check that the simulation "
+            "has run correctly."
+        )
+
+    return overall_dgs, overall_times
+
+
+def _compute_dg(
+    run_no: int, start_frac: float, end_frac: float, output_dir: str, equilibrated: bool
+) -> float:
+    """
+    Helper function to compute the free energy change for a single run. Arguments are as
+    defined in get_time_series_multiwindow_mbar. Defined at the module level so that it
+    can be used with multiprocessing.
+    """
+    free_energies, _, _ = _run_mbar(
+        output_dir=output_dir,
+        run_nos=[run_no],
+        equilibrated=equilibrated,
+        percentage_end=end_frac * 100,
+        percentage_start=start_frac * 100,
+        subsampling=False,
+        delete_outfiles=True,
+    )
+    return free_energies[0]

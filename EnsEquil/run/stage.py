@@ -811,9 +811,8 @@ class Stage(_SimulationRunner):
             free_energies, errors, mbar_outfiles = _run_mbar(
                 run_nos=run_nos,
                 output_dir=self.output_dir,
-                ensemble_size=self.ensemble_size,
-                percentage_end=100,
-                percentage_start=fraction * 100,
+                percentage_end=fraction * 100,
+                percentage_start=0,
                 subsampling=subsampling,
             )
             mean_free_energy = _np.mean(free_energies)
@@ -999,12 +998,12 @@ class Stage(_SimulationRunner):
                 [
                     (
                         self.output_dir,
-                        self.ensemble_size,
                         run_nos,
                         end_percent,
                         0,  # Start percent
                         False,  # Subsample
                         True,  # Delete output files
+                        True,  # Equilibrated
                     )
                     for end_percent in end_percents
                 ],

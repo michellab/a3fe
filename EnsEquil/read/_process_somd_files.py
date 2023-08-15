@@ -200,8 +200,8 @@ def write_truncated_sim_datafile(
     for frac in [fraction_final, fraction_initial]:
         if frac < 0 or frac > 1:
             raise ValueError(f"Invalid fraction: {frac}. Must be between 0 and 1.")
-    if fraction_final < fraction_initial:
-        raise ValueError(f"Invalid fractions: {fraction_final} < {fraction_initial}.")
+    if fraction_final <= fraction_initial:
+        raise ValueError(f"Invalid fractions: {fraction_final} <= {fraction_initial}.")
 
     # Read the data
     with open(simfile, "r") as f:

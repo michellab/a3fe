@@ -17,18 +17,19 @@ from typing import Tuple as _Tuple
 import numpy as _np
 
 from ..read._process_somd_files import read_mbar_result as _read_mbar_result
-from ..read._process_somd_files import \
-    write_truncated_sim_datafile as _write_truncated_sim_datafile
+from ..read._process_somd_files import (
+    write_truncated_sim_datafile as _write_truncated_sim_datafile,
+)
 
 
 def run_mbar(
     output_dir: str,
-    ensemble_size: int,
     run_nos: _List[int],
     percentage_end: float = 100,
     percentage_start: float = 0,
     subsampling: bool = False,
-    delete_outfiles=False,
+    delete_outfiles: bool = False,
+    equilibrated: bool = True,
 ) -> _Tuple[_np.ndarray, _np.ndarray, _List[str]]:
     """
     Run MBAR on SOMD output files.
@@ -37,15 +38,13 @@ def run_mbar(
     ----------
     output_dir : str
         The path to the output directory
-    ensemble_size : int
-        The number of simulations in the ensemble
     run_nos : List[int]
         The run numbers to use for MBAR.
     percentage_end : float, Optional, default: 100
         The percentage of data after which to truncate the datafiles.
         For example, if 100, the full datafile will be used. If 50, only
         the first 50% of the data will be used.
-    percentage_end : float, Optional, default: 0
+    percentage_start : float, Optional, default: 0
         The percentage of data before which to truncate the datafiles.
         For example, if 0, the full datafile will be used. If 50, only
         the last 50% of the data will be used.
@@ -54,6 +53,10 @@ def run_mbar(
     delete_outfiles : bool, Optional, default: False
         Whether to delete the MBAR analysis output files after the free
         energy change and errors have been extracted.
+    equilibrated : bool, Optional, default: True
+        Whether to use the equilibrated datafiles or the full datafiles.
+        If true, the files name simfile_equilibrated.dat will be used,
+        otherwise simfile.dat will be used.
 
     Returns
     -------
@@ -65,7 +68,8 @@ def run_mbar(
         The paths to the MBAR output files.
     """
     # Check that the simfiles actually exist
-    simfiles = _glob.glob(f"{output_dir}/lambda*/run_*/simfile_equilibrated.dat")
+    file_name = "simfile_equilibrated.dat" if equilibrated else "simfile.dat"
+    simfiles = _glob.glob(f"{output_dir}/lambda*/run_*/{file_name}")
     # Filter by run numbers
     if run_nos is not None:
         simfiles = [
@@ -85,7 +89,7 @@ def run_mbar(
     for simfile in simfiles:
         tmp_simfile = _os.path.join(
             _os.path.dirname(simfile),
-            f"simfile_truncated_{round(percentage_end)}_end_{round(percentage_start)}_start.dat",
+            f"simfile_truncated_{round(percentage_end, 3)}_end_{round(percentage_start, 3)}_start.dat",
         )
         tmp_simfiles.append(tmp_simfile)
         _write_truncated_sim_datafile(
@@ -98,14 +102,14 @@ def run_mbar(
     # Run MBAR using pymbar through SOMD
     mbar_out_files = []
     for run_no in run_nos:
-        outfile = f"{output_dir}/freenrg-MBAR-run_{str(run_no).zfill(2)}_{round(percentage_end)}_end_{round(percentage_start)}_start.dat"
+        outfile = f"{output_dir}/freenrg-MBAR-run_{str(run_no).zfill(2)}_{round(percentage_end, 3)}_end_{round(percentage_start, 3)}_start.dat"
         mbar_out_files.append(outfile)
         with open(outfile, "w") as ofile:
             cmd_list = [
                 "analyse_freenrg",
                 "mbar",
                 "-i",
-                f"{output_dir}/lambda*/run_{str(run_no).zfill(2)}/simfile_truncated_{round(percentage_end)}_end_{round(percentage_start)}_start.dat",
+                f"{output_dir}/lambda*/run_{str(run_no).zfill(2)}/simfile_truncated_{round(percentage_end, 3)}_end_{round(percentage_start, 3)}_start.dat",
                 "-p",
                 "100",
                 "--overlap",

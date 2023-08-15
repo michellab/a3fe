@@ -24,8 +24,10 @@ from statsmodels.tsa.stattools import kpss as _kpss
 from .plot import general_plot as _general_plot
 from .plot import p_plot as _p_plot
 from .plot import plot_gelman_rubin_rhat as _plot_gelman_rubin_rhat
-from .process_grads import \
-    get_time_series_multiwindow as _get_time_series_multiwindow
+from .process_grads import get_time_series_multiwindow as _get_time_series_multiwindow
+from .process_grads import (
+    get_time_series_multiwindow_mbar as _get_time_series_multiwindow_mbar,
+)
 
 
 def check_equil_block_gradient(lam_win: "LamWindow", run_nos: _Optional[_List[int]]) -> _Tuple[bool, _Optional[float]]:  # type: ignore
@@ -48,7 +50,7 @@ def check_equil_block_gradient(lam_win: "LamWindow", run_nos: _Optional[_List[in
     equil_time : float
         Time taken to equilibrate per simulation, in ns.
     """
-    run_nos = lam_win._get_valid_run_nos(run_nos)
+    run_nos: _List[int] = lam_win._get_valid_run_nos(run_nos)
 
     # Get the gradient threshold and complain if it does not exist
     gradient_threshold = lam_win.gradient_threshold
@@ -172,7 +174,7 @@ def check_equil_shrinking_block_gradient(
     equil_time : float
         Time taken to equilibrate per simulation, in ns.
     """
-    run_nos = lam_win._get_valid_run_nos(run_nos)
+    run_nos: _List[int] = lam_win._get_valid_run_nos(run_nos)
 
     # Get the gradient threshold and complain if it does not exist
     if not lam_win.gradient_threshold:
@@ -348,7 +350,7 @@ def check_equil_chodera(lam_win: "LamWindow", run_nos: _Optional[_List[int]] = N
     equil_time : float
         Time taken to equilibrate, in ns.
     """
-    run_nos = lam_win._get_valid_run_nos(run_nos)
+    run_nos: _List[int] = lam_win._get_valid_run_nos(run_nos)
 
     # Conversion between time and gradient indices.
     time_to_ind = 1 / (lam_win.sims[0].timestep * lam_win.sims[0].nrg_freq)
@@ -858,8 +860,11 @@ def check_equil_multiwindow_paired_t(
     start_fracs = _np.linspace(0, 1 - last_frac, num=intervals)
     for start_frac in start_fracs:
         # Generate the data
-        overall_dgs, overall_times = _get_time_series_multiwindow(
-            lambda_windows=lambda_windows, run_nos=run_nos, start_frac=start_frac
+        overall_dgs, overall_times = _get_time_series_multiwindow_mbar(
+            lambda_windows=lambda_windows,
+            run_nos=run_nos,
+            start_frac=start_frac,
+            output_dir=output_dir,
         )
         # Get the indices of the end of the first slice and the start of the last slice
         first_slice_end_idx = round(first_frac * len(overall_dgs[0]))
@@ -915,8 +920,8 @@ def check_equil_multiwindow_paired_t(
         ofile.write(f"Run numbers: {run_nos}\n")
 
     # Create plots of the overall gradients using all data
-    overall_dgs, overall_times = _get_time_series_multiwindow(
-        lambda_windows=lambda_windows, run_nos=run_nos
+    overall_dgs, overall_times = _get_time_series_multiwindow_mbar(
+        lambda_windows=lambda_windows, run_nos=run_nos, output_dir=output_dir
     )
     _general_plot(
         x_vals=overall_times[0],
