@@ -24,12 +24,9 @@ import pandas as _pd
 from ..analyse.plot import plot_convergence as _plot_convergence
 from ..analyse.plot import plot_sq_sem_convergence as _plot_sq_sem_convergence
 from ..read._process_bss_systems import rename_lig as _rename_lig
-from ..read._process_slurm_files import \
-    get_slurm_file_base as _get_slurm_file_base
-from ..read._process_somd_files import \
-    read_simfile_option as _read_simfile_option
-from ..read._process_somd_files import \
-    write_simfile_option as _write_simfile_option
+from ..read._process_slurm_files import get_slurm_file_base as _get_slurm_file_base
+from ..read._process_somd_files import read_simfile_option as _read_simfile_option
+from ..read._process_somd_files import write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._virtual_queue import Job as _Job
 from ._virtual_queue import VirtualQueue as _VirtualQueue
@@ -37,26 +34,26 @@ from .enums import LegType as _LegType
 from .enums import PreparationStage as _PreparationStage
 from .enums import StageType as _StageType
 from .stage import Stage as _Stage
-from .system_prep import \
-    heat_and_preequil_input as _sysprep_heat_and_preequil_input
+from .system_prep import heat_and_preequil_input as _sysprep_heat_and_preequil_input
 from .system_prep import minimise_input as _sysprep_minimise_input
 from .system_prep import parameterise_input as _sysprep_parameterise_input
-from .system_prep import \
-    run_ensemble_equilibration as _sysprep_run_ensemble_equilibration
-from .system_prep import \
-    slurm_ensemble_equilibration_bound as _slurm_ensemble_equilibration_bound
-from .system_prep import \
-    slurm_ensemble_equilibration_bound_short as \
-    _slurm_ensemble_equilibration_bound_short
-from .system_prep import \
-    slurm_ensemble_equilibration_free as _slurm_ensemble_equilibration_free
-from .system_prep import \
-    slurm_ensemble_equilibration_free_short as \
-    _slurm_ensemble_equilibration_free_short
-from .system_prep import \
-    slurm_heat_and_preequil_bound as _slurm_heat_and_preequil_bound
-from .system_prep import \
-    slurm_heat_and_preequil_free as _slurm_heat_and_preequil_free
+from .system_prep import (
+    run_ensemble_equilibration as _sysprep_run_ensemble_equilibration,
+)
+from .system_prep import (
+    slurm_ensemble_equilibration_bound as _slurm_ensemble_equilibration_bound,
+)
+from .system_prep import (
+    slurm_ensemble_equilibration_bound_short as _slurm_ensemble_equilibration_bound_short,
+)
+from .system_prep import (
+    slurm_ensemble_equilibration_free as _slurm_ensemble_equilibration_free,
+)
+from .system_prep import (
+    slurm_ensemble_equilibration_free_short as _slurm_ensemble_equilibration_free_short,
+)
+from .system_prep import slurm_heat_and_preequil_bound as _slurm_heat_and_preequil_bound
+from .system_prep import slurm_heat_and_preequil_free as _slurm_heat_and_preequil_free
 from .system_prep import slurm_minimise_bound as _slurm_minimise_bound
 from .system_prep import slurm_minimise_free as _slurm_minimise_free
 from .system_prep import slurm_parameterise_bound as _slurm_parameterise_bound
@@ -1050,7 +1047,10 @@ class Leg(_SimulationRunner):
                 stage.wait()
 
     def analyse(
-        self, run_nos: _Optional[_List[int]], subsampling=False
+        self,
+        run_nos: _Optional[_List[int]],
+        subsampling=False,
+        fraction: float = 1,
     ) -> _Tuple[_np.ndarray, _np.ndarray]:
         f"""
         Analyse the leg and any sub-simulations, and
@@ -1061,6 +1061,12 @@ class Leg(_SimulationRunner):
         subsampling: bool, optional, default=False
             If True, the free energy will be calculated by subsampling using
             the methods contained within pymbar.
+
+        fraction: float, optional, default=1
+            The fraction of the data to use for analysis. For example, if
+            fraction=0.5, only the first half of the data will be used for
+            analysis. If fraction=1, all data will be used. Note that unequilibrated
+            data is discarded from the beginning of simulations in all cases.
 
         Returns
         -------
@@ -1074,7 +1080,7 @@ class Leg(_SimulationRunner):
         run_nos = self._get_valid_run_nos(run_nos)
 
         dg_overall, er_overall = super().analyse(
-            run_nos=run_nos, subsampling=subsampling
+            run_nos=run_nos, subsampling=subsampling, fraction=fraction
         )
 
         if self.leg_type == _LegType.BOUND:
@@ -1145,7 +1151,7 @@ class Leg(_SimulationRunner):
         return results_df
 
     def analyse_convergence(
-        self, run_nos: _Optional[_List[int]] = None
+        self, run_nos: _Optional[_List[int]] = None, fraction: float = 1
     ) -> _Tuple[_np.ndarray, _np.ndarray]:
         """
         Get a timeseries of the total free energy change of the
@@ -1156,6 +1162,11 @@ class Leg(_SimulationRunner):
         ----------
         run_nos : Optional[List[int]], default=None
             If specified, only analyse the specified runs. Otherwise, analyse all runs.
+        fraction: float, optional, default=1
+            The fraction of the data to use for analysis. For example, if
+            fraction=0.5, only the first half of the data will be used for
+            analysis. If fraction=1, all data will be used. Note that unequilibrated
+            data is discarded from the beginning of simulations in all cases.
 
         Returns
         -------
@@ -1177,7 +1188,9 @@ class Leg(_SimulationRunner):
 
         # Now add up the data for each of the sub-simulation runners
         for sub_sim_runner in self._sub_sim_runners:
-            _, dgs = sub_sim_runner.analyse_convergence(run_nos=run_nos)
+            _, dgs = sub_sim_runner.analyse_convergence(
+                run_nos=run_nos, fraction=fraction
+            )
             # Decide if the component should be added or subtracted
             # according to the dg_multiplier attribute
             dg_overall += dgs * sub_sim_runner.dg_multiplier

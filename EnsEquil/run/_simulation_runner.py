@@ -314,7 +314,10 @@ class SimulationRunner(ABC):
             sub_sim_runner.setup()
 
     def analyse(
-        self, run_nos: _Optional[_List[int]] = None, subsampling=False
+        self,
+        run_nos: _Optional[_List[int]] = None,
+        subsampling=False,
+        fraction: float = 1,
     ) -> _Tuple[_np.ndarray, _np.ndarray]:
         f"""
         Analyse the {self.__class__.__name__} and any
@@ -328,6 +331,11 @@ class SimulationRunner(ABC):
         subsampling: bool, optional, default=False
             If True, the free energy will be calculated by subsampling using
             the methods contained within pymbar.
+        fraction: float, optional, default=1
+            The fraction of the data to use for analysis. For example, if
+            fraction=0.5, only the first half of the data will be used for
+            analysis. If fraction=1, all data will be used. Note that unequilibrated
+            data is discarded from the beginning of simulations in all cases.
 
         Returns
         -------
@@ -365,7 +373,9 @@ class SimulationRunner(ABC):
 
         # Analyse the sub-simulation runners
         for sub_sim_runner in self._sub_sim_runners:
-            dg, er = sub_sim_runner.analyse(run_nos=run_nos, subsampling=subsampling)
+            dg, er = sub_sim_runner.analyse(
+                run_nos=run_nos, subsampling=subsampling, fraction=fraction
+            )
             # Decide if the component should be added or subtracted
             # according to the dg_multiplier attribute
             dg_overall += dg * sub_sim_runner.dg_multiplier
@@ -502,7 +512,7 @@ class SimulationRunner(ABC):
         return results_df
 
     def analyse_convergence(
-        self, run_nos: _Optional[_List[int]] = None
+        self, run_nos: _Optional[_List[int]] = None, fraction: float = 1
     ) -> _Tuple[_np.ndarray, _np.ndarray]:
         f"""
         Get a timeseries of the total free energy change of the
@@ -513,6 +523,11 @@ class SimulationRunner(ABC):
         ----------
         run_nos : List[int], Optional, default=None
             A list of the run numbers to analyse. If None, all runs are analysed.
+        fraction: float, optional, default=1
+            The fraction of the data to use for analysis. For example, if
+            fraction=0.5, only the first half of the data will be used for
+            analysis. If fraction=1, all data will be used. Note that unequilibrated
+            data is discarded from the beginning of simulations in all cases.
 
         Returns
         -------
@@ -536,7 +551,9 @@ class SimulationRunner(ABC):
 
         # Now add up the data for each of the sub-simulation runners
         for sub_sim_runner in self._sub_sim_runners:
-            _, dgs = sub_sim_runner.analyse_convergence(run_nos=run_nos)
+            _, dgs = sub_sim_runner.analyse_convergence(
+                run_nos=run_nos, fraction=fraction
+            )
             # Decide if the component should be added or subtracted
             # according to the dg_multiplier attribute
             dg_overall += dgs * sub_sim_runner.dg_multiplier
