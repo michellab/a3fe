@@ -23,13 +23,9 @@ import pandas as _pd
 
 from ..analyse.plot import plot_convergence as _plot_convergence
 from ..analyse.plot import plot_sq_sem_convergence as _plot_sq_sem_convergence
-from ..read._process_bss_systems import rename_lig as _rename_lig
-from ..read._process_slurm_files import \
-    get_slurm_file_base as _get_slurm_file_base
-from ..read._process_somd_files import \
-    read_simfile_option as _read_simfile_option
-from ..read._process_somd_files import \
-    write_simfile_option as _write_simfile_option
+from ..read._process_slurm_files import get_slurm_file_base as _get_slurm_file_base
+from ..read._process_somd_files import read_simfile_option as _read_simfile_option
+from ..read._process_somd_files import write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._virtual_queue import Job as _Job
 from ._virtual_queue import VirtualQueue as _VirtualQueue
@@ -37,26 +33,26 @@ from .enums import LegType as _LegType
 from .enums import PreparationStage as _PreparationStage
 from .enums import StageType as _StageType
 from .stage import Stage as _Stage
-from .system_prep import \
-    heat_and_preequil_input as _sysprep_heat_and_preequil_input
+from .system_prep import heat_and_preequil_input as _sysprep_heat_and_preequil_input
 from .system_prep import minimise_input as _sysprep_minimise_input
 from .system_prep import parameterise_input as _sysprep_parameterise_input
-from .system_prep import \
-    run_ensemble_equilibration as _sysprep_run_ensemble_equilibration
-from .system_prep import \
-    slurm_ensemble_equilibration_bound as _slurm_ensemble_equilibration_bound
-from .system_prep import \
-    slurm_ensemble_equilibration_bound_short as \
-    _slurm_ensemble_equilibration_bound_short
-from .system_prep import \
-    slurm_ensemble_equilibration_free as _slurm_ensemble_equilibration_free
-from .system_prep import \
-    slurm_ensemble_equilibration_free_short as \
-    _slurm_ensemble_equilibration_free_short
-from .system_prep import \
-    slurm_heat_and_preequil_bound as _slurm_heat_and_preequil_bound
-from .system_prep import \
-    slurm_heat_and_preequil_free as _slurm_heat_and_preequil_free
+from .system_prep import (
+    run_ensemble_equilibration as _sysprep_run_ensemble_equilibration,
+)
+from .system_prep import (
+    slurm_ensemble_equilibration_bound as _slurm_ensemble_equilibration_bound,
+)
+from .system_prep import (
+    slurm_ensemble_equilibration_bound_short as _slurm_ensemble_equilibration_bound_short,
+)
+from .system_prep import (
+    slurm_ensemble_equilibration_free as _slurm_ensemble_equilibration_free,
+)
+from .system_prep import (
+    slurm_ensemble_equilibration_free_short as _slurm_ensemble_equilibration_free_short,
+)
+from .system_prep import slurm_heat_and_preequil_bound as _slurm_heat_and_preequil_bound
+from .system_prep import slurm_heat_and_preequil_free as _slurm_heat_and_preequil_free
 from .system_prep import slurm_minimise_bound as _slurm_minimise_bound
 from .system_prep import slurm_minimise_free as _slurm_minimise_free
 from .system_prep import slurm_parameterise_bound as _slurm_parameterise_bound
@@ -700,7 +696,15 @@ class Leg(_SimulationRunner):
             f"{self.base_dir}/ensemble_equilibration_{i+1}"
             for i in range(self.ensemble_size)
         ]
-        for outdir in outdirs:
+
+        # Check if we have already run any ensemble equilibration simulations
+        outdirs_to_run = [outdir for outdir in outdirs if not _os.path.isdir(outdir)]
+        outdirs_already_run = [outdir for outdir in outdirs if _os.path.isdir(outdir)]
+        self._logger.info(
+            f"Found {len(outdirs_already_run)} ensemble equilibration directories already run."
+        )
+
+        for outdir in outdirs_to_run:
             _subprocess.run(["mkdir", "-p", outdir], check=True)
             for input_file in [
                 f"{self.input_dir}/{ifile}"
@@ -728,18 +732,18 @@ class Leg(_SimulationRunner):
             else:
                 raise ValueError("Invalid leg type.")
 
-            # For each ensemble member, run a 5 ns simulation in a seperate directory
+            # For each ensemble member to be run, run a 5 ns simulation in a seperate directory
 
-            for i, outdir in enumerate(outdirs):
+            for i, outdir in enumerate(outdirs_to_run):
                 self._logger.info(
-                    f"Running ensemble equilibration for run {i+1}. Submitting through SLURM..."
+                    f"Running ensemble equilibration {i + 1} of {len(outdirs_to_run)}. Submitting through SLURM..."
                 )
                 self._run_slurm(fn, wait=False, run_dir=outdir, job_name=job_name)
 
             self.virtual_queue.wait()  # Wait for all jobs to finish
 
             # Check that the required input files have been produced, since slurm can fail silently
-            for i, outdir in enumerate(outdirs):
+            for i, outdir in enumerate(outdirs_to_run):
                 for (
                     file
                 ) in _PreparationStage.PREEQUILIBRATED.get_simulation_input_files(
@@ -752,14 +756,16 @@ class Leg(_SimulationRunner):
                         )
 
         else:  # Not slurm
-            for i, outdir in enumerate(outdirs):
-                self._logger.info(f"Running ensemble equilibration for run {i+1}.")
+            for i, outdir in enumerate(outdirs_to_run):
+                self._logger.info(
+                    f"Running ensemble equilibration {i + 1} of {len(outdirs_to_run)}..."
+                )
                 _sysprep_run_ensemble_equilibration(
                     self.leg_type, outdir, outdir, short_ensemble_equil
                 )
 
         # Give the output files unique names
-        for i, outdir in enumerate(outdirs):
+        for i, outdir in enumerate(outdirs_to_run):
             _subprocess.run(
                 ["mv", f"{outdir}/somd.rst7", f"{outdir}/somd_{i+1}.rst7"], check=True
             )
