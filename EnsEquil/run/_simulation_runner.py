@@ -1018,17 +1018,24 @@ class SimulationRunnerIterator:
 
     def __next__(self) -> SimulationRunner:
         if self.i < len(self.base_dir):
+        if self.i >= len(self.base_dir):
             # Tear down the current simulation runner
             if self.current_sim_runner is not None:
                 self.current_sim_runner._close_logging_handlers()
                 del self.current_sim_runner
-            # Set up the next simulation runner
-            self.current_sim_runner = self.subclass(
-                **self.kwargs, base_dir=self.base_dir[self.i]
-            )
-            self.i += 1
-            return self.current_sim_runner
-        else:
+                self.current_sim_runner = None
+            raise StopIteration
+
+        # Tear down the current simulation runner
+        if self.current_sim_runner is not None:
+            self.current_sim_runner._close_logging_handlers()
+            del self.current_sim_runner
+        # Set up the next simulation runner
+        self.current_sim_runner = self.subclass(
+            **self.kwargs, base_dir=self.base_dir[self.i]
+        )
+        self.i += 1
+        return self.current_sim_runner
             # Tear down the current simulation runner
             if self.current_sim_runner is not None:
                 self.current_sim_runner._close_logging_handlers()

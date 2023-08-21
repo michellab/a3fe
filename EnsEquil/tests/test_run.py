@@ -181,6 +181,10 @@ def test_simulation_runner_iterator(restrain_stage):
     for i, sim_runner in enumerate(sim_runner_iterator):
         assert sim_runner.base_dir == base_dirs[i]
 
+    # Cycle through the iterator again and check that it still works
+    for i, sim_runner in enumerate(sim_runner_iterator):
+        assert sim_runner.base_dir == base_dirs[i]
+
     # Check that we get a type error if we pass a non-subclass of SimulationRunner
     with pytest.raises(TypeError):
         ee.run._simulation_runner.SimulationRunnerIterator(
