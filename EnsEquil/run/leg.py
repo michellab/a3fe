@@ -471,7 +471,7 @@ class Leg(_SimulationRunner):
         for stage in self.stages:
             self._logger.info(f"Determining optimal lambda windows for {stage}...")
             optimal_lam_vals = stage.get_optimal_lam_vals(
-                er_type=er_type, delta_er=delta_er, run_nos=[1]
+                er_type=er_type, delta_er=delta_er, run_nos=run_nos
             )
             # Create new LamWindow objects with the optimal lambda values, then save data
             stage.lam_vals = list(optimal_lam_vals)
