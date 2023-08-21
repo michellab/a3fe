@@ -134,7 +134,7 @@ def p_plot(
     ax.scatter(times, p_vals, s=10)
     ax.axhline(y=p_cutoff, color="red", linestyle="dashed")
     ax.set_xlabel("Time discarded from start of simulation per run / ns")
-    ax.set_ylabel("Geweke p value")
+    ax.set_ylabel("p value")
     fig.savefig(
         outfile, dpi=300, bbox_inches="tight", facecolor="white", transparent=False
     )
