@@ -976,3 +976,61 @@ class SimulationRunner(ABC):
 
         # Record that the object was loaded from a pickle file
         self.loaded_from_pickle = True
+
+
+class SimulationRunnerIterator:
+    """
+    Iterator for SimulationRunners. This is required to avoid too many
+    open files, because each simulation runner opens its own loggers.
+    Hence, simulation runners are set up before being yielded, and then
+    deleted after being yielded.
+    """
+
+    def __init__(
+        self,
+        base_dirs: _List[str],
+        subclass: _Type[SimulationRunner],
+        **kwargs: _Any,
+    ) -> None:
+        """
+        Parameters
+        ----------
+        base_dirs : List[str]
+            A list of the base directories for the simulation runners.
+        subclass : Type[SimulationRunner]
+            The subclass of SimulationRunner to use.
+        **kwargs : Any
+            Any keyword arguments to pass to the subclass when initialising.
+        """
+        # Check that the simulation runner subclass is valid
+        if not issubclass(subclass, SimulationRunner):
+            raise TypeError(
+                f"subclass must be a subclass of SimulationRunner, but {subclass} is not"
+            )
+        self.base_dir = base_dirs
+        self.subclass = subclass
+        self.current_sim_runner = None
+        self.kwargs = kwargs
+        self.i = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self) -> SimulationRunner:
+        if self.i < len(self.base_dir):
+            # Tear down the current simulation runner
+            if self.current_sim_runner is not None:
+                self.current_sim_runner._close_logging_handlers()
+                del self.current_sim_runner
+            # Set up the next simulation runner
+            self.current_sim_runner = self.subclass(
+                **self.kwargs, base_dir=self.base_dir[self.i]
+            )
+            self.i += 1
+            return self.current_sim_runner
+        else:
+            # Tear down the current simulation runner
+            if self.current_sim_runner is not None:
+                self.current_sim_runner._close_logging_handlers()
+                del self.current_sim_runner
+            raise StopIteration
