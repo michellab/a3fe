@@ -1227,7 +1227,7 @@ class Leg(_SimulationRunner):
             plot(
                 fracts,
                 dg_overall,
-                self.get_tot_simtime(run_nos=run_nos) * fraction,
+                self.get_tot_simtime(run_nos=run_nos),
                 self.equil_time,  # Already per member of the ensemble
                 self.output_dir,
                 len(run_nos),
