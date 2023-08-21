@@ -25,7 +25,7 @@ from .calculation import Calculation as _Calculation
 from .enums import SetProtocol as _SetProtocol
 
 
-class Set(_SimulationRunner):
+class CalcSet(_SimulationRunner):
     """
     Class to set up, run, and analyse sets of ABFE calculations
     (each represented by Calculation objects). This runs calculations
