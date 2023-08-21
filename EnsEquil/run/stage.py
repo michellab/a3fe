@@ -985,9 +985,8 @@ class Stage(_SimulationRunner):
         # Get the dg_overall in terms of fraction of the total simulation time
         # Use steps of 5 % of the total simulation time
         fracts = _np.arange(0.05, 1.05, 0.05)
-        fracts = (
-            fracts * fraction
-        )  # Only analyse up to specified fraction of total simulation data
+        # Only analyse up to specified fraction of total simulation data
+        fracts = fracts * fraction
         end_percents = fracts * 100
         dg_overall = _np.zeros(len(fracts))
 
