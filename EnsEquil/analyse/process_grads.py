@@ -12,8 +12,9 @@ from typing import Union as _Union
 import numpy as _np
 from scipy.constants import gas_constant as _R
 
-from .autocorrelation import \
-    get_statistical_inefficiency as _get_statistical_inefficiency
+from .autocorrelation import (
+    get_statistical_inefficiency as _get_statistical_inefficiency,
+)
 from .mbar import run_mbar as _run_mbar
 
 
@@ -340,7 +341,9 @@ class GradientData:
         # If the number of lambda values is not provided, calculate it from the
         # desired integrated standard error of the mean between lam vals
         if n_lam_vals is None:
-            n_lam_vals = int(total_error / delta_er) + 1
+            n_lam_vals: int = round(total_error / delta_er) + 1
+        # Make sure that we have at least 2 windows
+        n_lam_vals = max(n_lam_vals, 2)
 
         # Convert the number of lambda values to an array of SEM values
         requested_sem_vals = _np.linspace(0, total_error, n_lam_vals)
