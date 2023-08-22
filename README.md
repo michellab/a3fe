@@ -50,6 +50,7 @@ Finally, download EnsEquil, install, and test:
 import EnsEquil as ee 
 calc = ee.Calculation()
 calc.setup()
+calc.get_optimal_lam_vals()
 calc.run()
 calc.wait()
 calc.analyse()
