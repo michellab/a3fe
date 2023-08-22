@@ -6,9 +6,7 @@ EnsEquil
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Documentation Status](https://readthedocs.org/projects/ensequil/badge/?version=latest)](https://ensequil.readthedocs.io/en/latest/?badge=latest)
       
-
-
-A package for running free energy calculations with SOMD with automated equilibration detection based on an ensemble of simulations. This requires the SLURM scheduling system.
+A package for running adaptive alchemical absolute binding free energy calculations with SOMD based on an ensemble of simulations. This requires the SLURM scheduling system.
 
 ### Installation
 
