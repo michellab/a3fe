@@ -996,8 +996,9 @@ class Stage(_SimulationRunner):
         dg_overall = _np.zeros(len(fracts))
 
         # Make sure to re-write the equilibrated simfiles
-        for win in self.lam_windows:
-            win._write_equilibrated_simfiles()
+        if equilibrated:
+            for win in self.lam_windows:
+                win._write_equilibrated_simfiles()
 
         # Now run mbar with multiprocessing to speed things up
         with _Pool() as pool:
