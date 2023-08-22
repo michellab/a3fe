@@ -4,7 +4,48 @@
 import numpy as _np
 from ..run._utils import SimulationRunnerIterator as _SimulationRunnerIterator
 
+from scipy.stats import levene as _levene
+
 from typing import List as _List, Tuple as _Tuple, Union as _Union
+
+__all__ = [
+    "get_comparitive_convergence_data",
+    "compare_variances_brown_forsythe",
+]
+
+
+def compare_variances_brown_forsythe(sim_runners: _SimulationRunnerIterator) -> float:
+    """
+    Compare the variances of the free energies of two simulation runners using the Brown-Forsythe test.
+
+    Parameters
+    ----------
+    sim_runners : SimulationRunnerIterator
+        An iterator of two simulation runners to compare.
+
+    Returns
+    -------
+    float
+        The p-value of the Brown-Forsythe test.
+    """
+    # Check that we have been given two simulation runners
+    if len(sim_runners) != 2:
+        raise ValueError(
+            "Must provide exactly two simulation runners to compare variances."
+        )
+    # Get the stored free energies for each simulation runner
+    free_energies = []
+    for sim_runner in sim_runners:
+        # Analyse the calculation if this has not been done already.
+        if not hasattr(sim_runner, "_delta_g"):
+            sim_runner.analyse()
+            sim_runner._dump()
+        free_energies.append(sim_runner._delta_g)
+
+    # Get the Brown-Forsythe test statistic and p-value
+    stat, p = _levene(*free_energies, center="median", proportiontocut=0.00)
+
+    return p
 
 
 def get_comparitive_convergence_data(
