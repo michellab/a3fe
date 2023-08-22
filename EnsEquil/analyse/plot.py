@@ -12,7 +12,7 @@ __all__ = [
     "plot_against_exp",
     "plot_gelman_rubin_rhat",
     "plot_comparitive_convergence",
-    "plot_comparitive_convergence_sq_sem",
+    "plot_comparitive_convergence_sem",
 ]
 
 import os as _os
@@ -1089,14 +1089,14 @@ def plot_comparitive_convergence(
     _plt.close(fig)
 
 
-def plot_comparitive_convergence_sq_sem(
+def plot_comparitive_convergence_sem(
     sim_runners: _SimulationRunnerIterator,
     output_dir: str = ".",
     name: _Optional[str] = None,
     color_indices: _Optional[_List[int]] = None,
 ) -> None:
     """
-    Plot the convergence of the squared SEM of the free energy changes
+    Plot the convergence of the SEM of the free energy changes
     for simulation runners against each other.
 
     Parameters
