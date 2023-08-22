@@ -12,6 +12,7 @@ __all__ = [
     "plot_against_exp",
     "plot_gelman_rubin_rhat",
     "plot_comparitive_convergence",
+    "plot_comparitive_convergence_sq_sem",
 ]
 
 import os as _os
@@ -1078,6 +1079,70 @@ def plot_comparitive_convergence(
     ax.set_ylabel(r"$\Delta G$ / kcal mol$^{-1}$")
     ax.legend(loc="best")
     name = name if name else "comparitive_convergence"
+    fig.savefig(
+        f"{output_dir}/{name}.png",
+        dpi=300,
+        bbox_inches="tight",
+        facecolor="white",
+        transparent=False,
+    )
+    _plt.close(fig)
+
+
+def plot_comparitive_convergence_sq_sem(
+    sim_runners: _SimulationRunnerIterator,
+    output_dir: str = ".",
+    name: _Optional[str] = None,
+    color_indices: _Optional[_List[int]] = None,
+) -> None:
+    """
+    Plot the convergence of the squared SEM of the free energy changes
+    for simulation runners against each other.
+
+    Parameters
+    ----------
+    sim_runners : List[sim_runner]
+        The simulation runners to compare.
+    output_dir : str, optional
+        The directory to save the plot to. Defaults to the current directory.
+    name : str, optional
+        The name of the plot. Defaults to "comparitive_convergence".
+    color_indices : List[int], optional
+        The color group to use for the simulation runners. If None, a
+        different color will be used for each simulation runner.
+
+    Returns
+    -------
+    None
+    """
+    if color_indices and len(color_indices) != len(sim_runners):
+        raise ValueError(
+            "If color_indices is supplied, it must have the same length as sim_runners."
+        )
+
+    # Get the convergence data for each simulation runner
+    convergence_data = _get_comparitive_convergence_data(sim_runners)
+
+    # Plot the convergence data
+    fig, ax = _plt.subplots(figsize=(8, 6))
+    for i, (times, dgs) in enumerate(convergence_data):
+        # Select a single colour for each simulation runner
+        color = (
+            _plt.cm.tab10(i) if not color_indices else _plt.cm.tab10(color_indices[i])
+        )
+        # Calculate the squared SEM at each time point
+        sq_sems = (_np.std(dgs, axis=0)) / _np.sqrt(dgs.shape[0])
+        ax.plot(
+            times,
+            sq_sems,
+            label=f"{sim_runners.base_dirs[i]}",
+            color=color,
+        )
+
+    ax.set_xlabel("Cumulative Total Sampling Time (Equilibration Ignored) / ns")
+    ax.set_ylabel(r"$\mathrm{SEM}$ / kcal mol$^{-1}$")
+    ax.legend(loc="best")
+    name = name if name else "comparitive_sem_convergence"
     fig.savefig(
         f"{output_dir}/{name}.png",
         dpi=300,
