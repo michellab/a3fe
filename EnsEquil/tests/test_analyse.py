@@ -6,13 +6,15 @@ from tempfile import TemporaryDirectory
 import numpy as np
 import pytest
 
-import EnsEquil as ee
-
-from ..analyse.detect_equil import (check_equil_multiwindow_gelman_rubin,
-                                    check_equil_multiwindow_modified_geweke,
-                                    check_equil_multiwindow_paired_t)
+from ..analyse.detect_equil import (
+    check_equil_multiwindow_gelman_rubin,
+    check_equil_multiwindow_modified_geweke,
+    check_equil_multiwindow_paired_t,
+)
 from ..analyse.process_grads import get_time_series_multiwindow
-from .fixtures import restrain_stage
+from ..analyse.compare import get_comparitive_convergence_data
+
+from .fixtures import restrain_stage, restrain_stage_iterator
 
 
 def test_analysis_all_runs(restrain_stage):
@@ -269,3 +271,19 @@ def test_gelman_rubin(restrain_stage):
             1.0: 1.0095474751197715,
         }
         assert rhat_dict == expected_rhat_dict
+
+
+def test_get_comparitive_convergence_data(restrain_stage_iterator):
+    """Test the get_comparitive_convergence_data function."""
+    results = get_comparitive_convergence_data(restrain_stage_iterator)
+    times1 = results[0][0]
+    times2 = results[1][0]
+    assert times1.shape == (20,)
+    # Check the arrays are the same with all
+    assert np.array_equal(times1, times2)
+    assert times1[-1] == pytest.approx(6.0, abs=1e-2)
+    dgs1 = results[0][1]
+    dgs2 = results[1][1]
+    assert dgs1.shape == (5, 20)
+    assert np.array_equal(dgs1, dgs2)
+    assert dgs1[-1][-1] == pytest.approx(1.716112, abs=1e-2)

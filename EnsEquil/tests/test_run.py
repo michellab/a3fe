@@ -171,7 +171,7 @@ def test_simulation_runner_iterator(restrain_stage):
     """Test that the simulation runner iterator works as expected."""
     # Take the first 3 lambda windows
     base_dirs = [window.base_dir for window in restrain_stage.lam_windows[:3]]
-    sim_runner_iterator = ee.run._simulation_runner.SimulationRunnerIterator(
+    sim_runner_iterator = ee.run._utils.SimulationRunnerIterator(
         base_dirs=base_dirs,
         subclass=ee.LamWindow,
         lam=0,  # Overwritten once pickle loaded
@@ -184,15 +184,6 @@ def test_simulation_runner_iterator(restrain_stage):
     # Cycle through the iterator again and check that it still works
     for i, sim_runner in enumerate(sim_runner_iterator):
         assert sim_runner.base_dir == base_dirs[i]
-
-    # Check that we get a type error if we pass a non-subclass of SimulationRunner
-    with pytest.raises(TypeError):
-        ee.run._simulation_runner.SimulationRunnerIterator(
-            base_dirs=base_dirs,
-            subclass=list,  # type: ignore
-            lam=0,  # Overwritten once pickle loaded
-            virtual_queue=restrain_stage.virtual_queue,
-        )
 
 
 ######################## Tests Requiring SLURM ########################

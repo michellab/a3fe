@@ -1,6 +1,6 @@
 """Functionality for manipulating sets of Calculations"""
 
-__all__ = ["Set"]
+__all__ = ["CalcSet"]
 
 import copy as _copy
 import logging as _logging
@@ -14,7 +14,6 @@ from typing import Optional as _Optional
 from typing import Tuple as _Tuple
 
 import numpy as _np
-import scipy.stats as _stats
 
 from ..analyse.analyse_set import compute_stats as _compute_stats
 from ..analyse.plot import plot_against_exp as _plt_against_exp

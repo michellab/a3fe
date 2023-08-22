@@ -1160,7 +1160,10 @@ class Leg(_SimulationRunner):
         return results_df
 
     def analyse_convergence(
-        self, run_nos: _Optional[_List[int]] = None, fraction: float = 1
+        self,
+        run_nos: _Optional[_List[int]] = None,
+        fraction: float = 1,
+        equilibrated: bool = True,
     ) -> _Tuple[_np.ndarray, _np.ndarray]:
         """
         Get a timeseries of the total free energy change of the
@@ -1176,14 +1179,16 @@ class Leg(_SimulationRunner):
             fraction=0.5, only the first half of the data will be used for
             analysis. If fraction=1, all data will be used. Note that unequilibrated
             data is discarded from the beginning of simulations in all cases.
+        equilibrated: bool, optional, default=True
+            Whether to analyse only the equilibrated data (True) or all data (False)
 
         Returns
         -------
         fracts : np.ndarray
-            The fraction of the total equilibrated simulation time for each value of dg_overall.
+            The fraction of the total (equilibrated) simulation time for each value of dg_overall.
         dg_overall : np.ndarray
             The overall free energy change for the {self.__class__.__name__} for
-            each value of total equilibrated simtime for each of the ensemble size repeats.
+            each value of total (equilibrated) simtime for each of the ensemble size repeats.
         """
         run_nos = self._get_valid_run_nos(run_nos)
 
@@ -1200,7 +1205,7 @@ class Leg(_SimulationRunner):
         # Now add up the data for each of the sub-simulation runners
         for sub_sim_runner in self._sub_sim_runners:
             _, dgs = sub_sim_runner.analyse_convergence(
-                run_nos=run_nos, fraction=fraction
+                run_nos=run_nos, fraction=fraction, equilibrated=equilibrated
             )
             # Decide if the component should be added or subtracted
             # according to the dg_multiplier attribute
@@ -1222,7 +1227,7 @@ class Leg(_SimulationRunner):
             dg_overall += rest_corrs
 
         self._logger.info(f"Overall free energy changes: {dg_overall} kcal mol-1")
-        self._logger.info(f"Fractions of equilibrated simulation time: {fracts}")
+        self._logger.info(f"Fractions of (equilibrated) simulation time: {fracts}")
 
         # Plot the overall convergence and the squared SEM of the free energy change
         for plot in [_plot_convergence, _plot_sq_sem_convergence]:
@@ -1230,7 +1235,9 @@ class Leg(_SimulationRunner):
                 fracts,
                 dg_overall,
                 self.get_tot_simtime(run_nos=run_nos),
-                self.equil_time,  # Already per member of the ensemble
+                self.equil_time
+                if equilibrated
+                else 0,  # Already per member of the ensemble
                 self.output_dir,
                 len(run_nos),
             )

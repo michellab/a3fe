@@ -19,7 +19,7 @@ from typing import List as _List
 from typing import Optional as _Optional
 from typing import Tuple as _Tuple
 from typing import Union as _Union
-from warnings import warn as _warn
+from typing import Type as _Type
 
 import numpy as _np
 import pandas as _pd
@@ -512,7 +512,10 @@ class SimulationRunner(ABC):
         return results_df
 
     def analyse_convergence(
-        self, run_nos: _Optional[_List[int]] = None, fraction: float = 1
+        self,
+        run_nos: _Optional[_List[int]] = None,
+        fraction: float = 1,
+        equilibrated: bool = True,
     ) -> _Tuple[_np.ndarray, _np.ndarray]:
         f"""
         Get a timeseries of the total free energy change of the
@@ -528,14 +531,16 @@ class SimulationRunner(ABC):
             fraction=0.5, only the first half of the data will be used for
             analysis. If fraction=1, all data will be used. Note that unequilibrated
             data is discarded from the beginning of simulations in all cases.
+        equilibrated: bool, optional, default=True
+            Whether to analyse only the equilibrated data (True) or all data (False)
 
         Returns
         -------
         fracts : np.ndarray
-            The fraction of the total equilibrated simulation time for each value of dg_overall.
+            The fraction of the total (equilibrated) simulation time for each value of dg_overall.
         dg_overall : np.ndarray
             The overall free energy change for the {self.__class__.__name__} for
-            each value of total equilibrated simtime for each of the ensemble size repeats.
+            each value of total (equilibrated) simtime for each of the ensemble size repeats.
         """
         run_nos = self._get_valid_run_nos(run_nos)
 
@@ -554,14 +559,14 @@ class SimulationRunner(ABC):
         # Now add up the data for each of the sub-simulation runners
         for sub_sim_runner in self._sub_sim_runners:
             _, dgs = sub_sim_runner.analyse_convergence(
-                run_nos=run_nos, fraction=fraction
+                run_nos=run_nos, fraction=fraction, equilibrated=equilibrated
             )
             # Decide if the component should be added or subtracted
             # according to the dg_multiplier attribute
             dg_overall += dgs * sub_sim_runner.dg_multiplier
 
         self._logger.info(f"Overall free energy changes: {dg_overall} kcal mol-1")
-        self._logger.info(f"Fractions of equilibrated simulation time: {fracts}")
+        self._logger.info(f"Fractions of (equilibrated) simulation time: {fracts}")
 
         # Plot the overall convergence and the squared SEM of the free energy change
         for plot in [_plot_convergence, _plot_sq_sem_convergence]:
@@ -569,7 +574,9 @@ class SimulationRunner(ABC):
                 fracts,
                 dg_overall,
                 self.get_tot_simtime(run_nos=run_nos),
-                self.equil_time,  # Already per member of the ensemble
+                self.equil_time
+                if equilibrated
+                else 0,  # Already per member of the ensemble
                 self.output_dir,
                 len(run_nos),
             )
@@ -976,68 +983,3 @@ class SimulationRunner(ABC):
 
         # Record that the object was loaded from a pickle file
         self.loaded_from_pickle = True
-
-
-class SimulationRunnerIterator:
-    """
-    Iterator for SimulationRunners. This is required to avoid too many
-    open files, because each simulation runner opens its own loggers.
-    Hence, simulation runners are set up before being yielded, and then
-    deleted after being yielded.
-    """
-
-    def __init__(
-        self,
-        base_dirs: _List[str],
-        subclass: _Type[SimulationRunner],
-        **kwargs: _Any,
-    ) -> None:
-        """
-        Parameters
-        ----------
-        base_dirs : List[str]
-            A list of the base directories for the simulation runners.
-        subclass : Type[SimulationRunner]
-            The subclass of SimulationRunner to use.
-        **kwargs : Any
-            Any keyword arguments to pass to the subclass when initialising.
-        """
-        # Check that the simulation runner subclass is valid
-        if not issubclass(subclass, SimulationRunner):
-            raise TypeError(
-                f"subclass must be a subclass of SimulationRunner, but {subclass} is not"
-            )
-        self.base_dir = base_dirs
-        self.subclass = subclass
-        self.current_sim_runner = None
-        self.kwargs = kwargs
-        self.i = 0
-
-    def __iter__(self):
-        return self
-
-    def __next__(self) -> SimulationRunner:
-        if self.i < len(self.base_dir):
-        if self.i >= len(self.base_dir):
-            # Tear down the current simulation runner
-            if self.current_sim_runner is not None:
-                self.current_sim_runner._close_logging_handlers()
-                del self.current_sim_runner
-                self.current_sim_runner = None
-            raise StopIteration
-
-        # Tear down the current simulation runner
-        if self.current_sim_runner is not None:
-            self.current_sim_runner._close_logging_handlers()
-            del self.current_sim_runner
-        # Set up the next simulation runner
-        self.current_sim_runner = self.subclass(
-            **self.kwargs, base_dir=self.base_dir[self.i]
-        )
-        self.i += 1
-        return self.current_sim_runner
-            # Tear down the current simulation runner
-            if self.current_sim_runner is not None:
-                self.current_sim_runner._close_logging_handlers()
-                del self.current_sim_runner
-            raise StopIteration

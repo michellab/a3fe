@@ -27,6 +27,17 @@ def restrain_stage():
 
 
 @pytest.fixture(scope="session")
+def restrain_stage_iterator(restrain_stage):
+    """Create a simulation runner iterator object with analysis data to use in tests"""
+    restrain_stage_iterator = ee.run._utils.SimulationRunnerIterator(
+        base_dirs=[restrain_stage.base_dir, restrain_stage.base_dir],
+        subclass=ee.Stage,
+        stage_type=ee.StageType.RESTRAIN,
+    )
+    yield restrain_stage_iterator
+
+
+@pytest.fixture(scope="session")
 def calc():
     """Create a calculation object to use in tests"""
     with TemporaryDirectory() as dirname:

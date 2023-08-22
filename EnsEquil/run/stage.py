@@ -953,7 +953,10 @@ class Stage(_SimulationRunner):
         return super().get_results_df(save_csv=save_csv, add_sub_sim_runners=False)
 
     def analyse_convergence(
-        self, run_nos: _Optional[_List[int]] = None, fraction: float = 1
+        self,
+        run_nos: _Optional[_List[int]] = None,
+        fraction: float = 1,
+        equilibrated: bool = True,
     ) -> _Tuple[_np.ndarray, _np.ndarray]:
         """
         Get a timeseries of the total free energy change of the
@@ -969,13 +972,15 @@ class Stage(_SimulationRunner):
             The fraction of the total simulation time to use for the analysis.
             For example, if fraction=0.5, only the first 50 % of the simulation
             time will be used for the analysis.
+        equilibrated: bool, optional, default=True
+            Whether to analyse only the equilibrated data (True) or all data (False)
 
         Returns
         -------
         fracts : np.ndarray
-            The fraction of the total equilibrated simulation time for each value of dg_overall.
+            The fraction of the total (equilibrated) simulation time for each value of dg_overall.
         dg_overall : np.ndarray
-            The overall free energy change for the stage for each value of total equilibrated
+            The overall free energy change for the stage for each value of total (equilibrated)
             simtime for each of the ensemble size repeats.
         """
         run_nos = self._get_valid_run_nos(run_nos)
@@ -1006,7 +1011,7 @@ class Stage(_SimulationRunner):
                         0,  # Start percent
                         False,  # Subsample
                         True,  # Delete output files
-                        True,  # Equilibrated
+                        equilibrated,  # Equilibrated
                     )
                     for end_percent in end_percents
                 ],
@@ -1016,7 +1021,7 @@ class Stage(_SimulationRunner):
             ).transpose()  # result[0] is a 2D array for a given percent
 
         self._logger.info(f"Overall free energy changes: {dg_overall} kcal mol-1")
-        self._logger.info(f"Fractions of equilibrated simulation time: {fracts}")
+        self._logger.info(f"Fractions of (equilibrated) simulation time: {fracts}")
 
         # Plot the overall convergence and the squared SEM of the free energy change
         for plot in [_plot_convergence, _plot_sq_sem_convergence]:
@@ -1024,7 +1029,9 @@ class Stage(_SimulationRunner):
                 fracts,
                 dg_overall,
                 self.get_tot_simtime(run_nos=run_nos),
-                self.equil_time,  # Already per member of the ensemble
+                self.equil_time
+                if equilibrated
+                else 0,  # Already per member of the ensemble
                 self.output_dir,
                 len(run_nos),
             )

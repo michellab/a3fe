@@ -8,10 +8,10 @@ from typing import Callable as _Callable
 from typing import List as _List
 from typing import Optional as _Optional
 from typing import Tuple as _Tuple
+from typing import Type as _Type
+from typing import Any as _Any
 
 import BioSimSpace.Sandpit.Exscientia as _BSS
-
-from ._simulation_runner import SimulationRunner as _SimulationRunner
 
 
 def check_has_wat_and_box(system: _BSS._SireWrappers._system.System) -> None:  # type: ignore
@@ -23,7 +23,7 @@ def check_has_wat_and_box(system: _BSS._SireWrappers._system.System) -> None:  #
 
 
 def get_simtime(
-    sim_runner: _SimulationRunner, run_nos: _Optional[_List[int]] = None
+    sim_runner: "SimulationRunner", run_nos: _Optional[_List[int]] = None
 ) -> float:
     """
     Get the simulation time of a sub simulation runner, in ns. This function
@@ -99,3 +99,61 @@ def TmpWorkingDir(path):
     finally:
         print(f"Changing directory to {old_cwd}")
         _os.chdir(old_cwd)
+
+
+class SimulationRunnerIterator:
+    """
+    Iterator for SimulationRunners. This is required to avoid too many
+    open files, because each simulation runner opens its own loggers.
+    Hence, simulation runners are set up before being yielded, and then
+    deleted after being yielded.
+    """
+
+    def __init__(
+        self,
+        base_dirs: _List[str],
+        subclass: _Type["SimulationRunner"],
+        **kwargs: _Any,
+    ) -> None:
+        """
+        Parameters
+        ----------
+        base_dirs : List[str]
+            A list of the base directories for the simulation runners.
+        subclass : Type[SimulationRunner]
+            The subclass of SimulationRunner to use.
+        **kwargs : Any
+            Any keyword arguments to pass to the subclass when initialising.
+        """
+        self.base_dirs = base_dirs
+        self.subclass = subclass
+        self.current_sim_runner = None
+        self.kwargs = kwargs
+        self.i = 0
+
+    def __iter__(self):
+        self.i = 0  # Reset the iterator so we can reuse it
+        return self
+
+    def __next__(self) -> "SimulationRunner":
+        if self.i >= len(self.base_dirs):
+            # Tear down the current simulation runner
+            if self.current_sim_runner is not None:
+                self.current_sim_runner._close_logging_handlers()
+                del self.current_sim_runner
+                self.current_sim_runner = None
+            raise StopIteration
+
+        # Tear down the current simulation runner
+        if self.current_sim_runner is not None:
+            self.current_sim_runner._close_logging_handlers()
+            del self.current_sim_runner
+        # Set up the next simulation runner
+        self.current_sim_runner = self.subclass(
+            **self.kwargs, base_dir=self.base_dirs[self.i]
+        )
+        self.i += 1
+        return self.current_sim_runner
+
+    def __len__(self) -> int:
+        return len(self.base_dirs)

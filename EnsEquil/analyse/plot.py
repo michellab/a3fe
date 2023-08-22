@@ -11,6 +11,7 @@ __all__ = [
     "plot_mbar_pmf",
     "plot_against_exp",
     "plot_gelman_rubin_rhat",
+    "plot_comparitive_convergence",
 ]
 
 import os as _os
@@ -32,6 +33,10 @@ from ..read._process_somd_files import read_mbar_pmf as _read_mbar_pmf
 from ..read._process_somd_files import read_overlap_mat as _read_overlap_mat
 from .process_grads import GradientData
 from .rmsd import get_rmsd as _get_rmsd
+from .compare import (
+    get_comparitive_convergence_data as _get_comparitive_convergence_data,
+)
+from ..run._utils import SimulationRunnerIterator as _SimulationRunnerIterator
 
 
 def general_plot(
@@ -1013,5 +1018,71 @@ def plot_gelman_rubin_rhat(
     name = f"{output_dir}/gelman_rubin_rhat.png"
     fig.savefig(
         name, dpi=300, bbox_inches="tight", facecolor="white", transparent=False
+    )
+    _plt.close(fig)
+
+
+def plot_comparitive_convergence(
+    sim_runners: _SimulationRunnerIterator,
+    output_dir: str = ".",
+    name: _Optional[str] = None,
+) -> None:
+    """
+    Plot the convergence of multiple simulation runners against each other.
+
+    Parameters
+    ----------
+    sim_runners : List[sim_runner]
+        The simulation runners to compare.
+    output_dir : str, optional
+        The directory to save the plot to. Defaults to the current directory.
+    name : str, optional
+        The name of the plot. Defaults to "comparitive_convergence".
+
+    Returns
+    -------
+    None
+    """
+    # Get the convergence data for each simulation runner
+    convergence_data = _get_comparitive_convergence_data(sim_runners)
+
+    # Plot the convergence data
+    fig, ax = _plt.subplots(figsize=(8, 6))
+    for i, (times, dgs) in enumerate(convergence_data):
+        # Select a single colour for each simulation runner
+        color = _plt.cm.tab10(i)
+        # For each of the replicates, plot the convergence data
+        for j in range(dgs.shape[0]):
+            ax.plot(times, dgs[j], color=color, alpha=0.5, linestyle="dashed")
+        # Add the mean and 95 % CI
+        y_avg = _np.mean(dgs, axis=0)
+        y_err = _stats.t.interval(
+            0.95, len(dgs) - 1, loc=y_avg, scale=_stats.sem(dgs, axis=0)
+        )
+        ax.plot(
+            times,
+            y_avg,
+            label=f"{sim_runners.base_dirs[i]} mean",
+            color=color,
+            linewidth=2,
+        )
+        ax.fill_between(
+            times,
+            y_err[0],
+            y_err[1],
+            alpha=0.2,
+            color=color,
+        )
+
+    ax.set_xlabel("Cumulative Total Sampling Time (Equilibration Ignored) / ns")
+    ax.set_ylabel(r"$\Delta G$ / kcal mol$^{-1}$")
+    ax.legend(loc="best")
+    name = name if name else "comparitive_convergence"
+    fig.savefig(
+        f"{output_dir}/{name}.png",
+        dpi=300,
+        bbox_inches="tight",
+        facecolor="white",
+        transparent=False,
     )
     _plt.close(fig)
