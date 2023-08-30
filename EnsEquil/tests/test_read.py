@@ -4,12 +4,14 @@ Unit and regression test for functionality in the read module.
 import os
 from tempfile import TemporaryDirectory
 
+import pytest
+
 from ..read._process_somd_files import (
     read_mbar_result,
     read_overlap_mat,
     write_truncated_sim_datafile,
     read_mbar_pmf,
-    read_mbar_dg_from_neighbours,
+    read_mbar_gradients,
 )
 
 
@@ -51,23 +53,23 @@ def test_read_pmf():
     assert len(pmf_err) == 44
 
 
-def test_neighbour_dgs():
-    """Test that the DGs from nieghbours (from MBAR) are read correctly"""
-    av_lams, inter_dgs, inter_dgs_err = read_mbar_dg_from_neighbours(
+def test_mbar_gradients():
+    """Test that the MBAR gradients are read correctly"""
+    av_lams, grads, grads_errs = read_mbar_gradients(
         "EnsEquil/data/example_output/freenrg-MBAR-run_01.dat"
     )
     assert av_lams[0] == 0.0045
     assert av_lams[-1] == 0.9900
     assert av_lams[20] == 0.326
     assert len(av_lams) == 43
-    assert inter_dgs[0] == -2.6387
-    assert inter_dgs[-1] == 0.5527
-    assert inter_dgs[20] == 0.5652
-    assert len(inter_dgs) == 43
-    assert inter_dgs_err[0] == 0.0028
-    assert inter_dgs_err[-1] == 0.0004
-    assert inter_dgs_err[20] == 0.0038
-    assert len(inter_dgs_err) == 43
+    assert pytest.approx(grads[0], 1e-3) == -293.088
+    assert pytest.approx(grads[-1], 1e-3) == 27.635
+    assert pytest.approx(grads[20], 1e-3) == 25.691
+    assert len(grads) == 43
+    assert pytest.approx(grads_errs[0], 1e-3) == 0.311
+    assert pytest.approx(grads_errs[-1], 1e-3) == 0.020
+    assert pytest.approx(grads_errs[20], 1e-3) == 0.1727
+    assert len(grads_errs) == 43
 
 
 def test_write_truncated_sim_datafile_end():
