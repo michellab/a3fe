@@ -1064,9 +1064,7 @@ class Stage(_SimulationRunner):
             simtime_per_run=self.get_tot_simtime(
                 run_nos=[1]
             ),  # Assumes all simulation times the same
-            equil_time_per_run=self.equil_time / self.ensemble_size
-            if equilibrated
-            else 0,
+            equil_time_per_run=self.equil_time if equilibrated else 0,
             output_dir=self.output_dir,
         )
 
