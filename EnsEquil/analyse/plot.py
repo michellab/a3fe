@@ -24,6 +24,8 @@ from typing import Optional as _Optional
 from typing import Tuple as _Tuple
 
 import matplotlib.pyplot as _plt
+import matplotlib.colors as _colors
+import matplotlib.cm as _cm
 import numpy as _np
 import pandas as _pd
 import scipy.stats as _stats
@@ -781,6 +783,129 @@ def plot_sq_sem_convergence(
         r"$\mathrm{SEM}^2$ / kcal$^{2}$ mol$^{-2}$",
         outfile,
     )
+
+
+def _plot_mbar_gradient_convergence_single_run(
+    ax: _plt.Axes,
+    fracts: _np.ndarray,
+    mbar_grads: _List[_Dict[str, _np.ndarray]],
+    simtime: float,
+    equil_time: float,
+    run_name: str,
+) -> _cm.ScalarMappable:
+    """
+    Plot the convergence of the gradients obtained from MBAR as a function of simulation
+    time, on the axis supplied. Note that final gradients are subtracted so that changes
+    are more obvious. Because of this, the integral of any given "PMF" gives the difference
+    in the free energy estimate between the current and final times.
+
+    Parameters
+    ----------
+    ax : matplotlib axis
+        Axis on which to plot.
+    fracts : np.ndarray
+        Array of fractions of the total simulation time at which the gradients were calculated.
+    mbar_grads : List[Dict[str, np.ndarray]]
+        List of Dictionary of gradients obtained from MBAR. Each list corresponds to a given
+        fraction of simulation time. The dict should contain the keys "lam_vals", "grads", and
+        "grad_errs".
+    simtime : float
+        Total simulation time in ns.
+    equil_time : float
+        Equilibration time in ns.
+    run_name: str
+        The name of the run.
+
+    Returns
+    -------
+    mapper : matplotlib.cm.ScalarMappable
+        Colour mapper used to map simulation time to colour.
+    """
+    # Subtract the final gradient from each gradient
+    final_grads = mbar_grads[-1]
+    for mbar_grad in mbar_grads:
+        mbar_grad["grads"] -= final_grads["grads"]
+
+    # Get a list of times sampled
+    times = fracts * (simtime - equil_time) + equil_time
+
+    # Get a colour mapper to map simulation time to colour
+    norm = _colors.Normalize(vmin=times[0], vmax=times[-1], clip=True)
+    mapper = _cm.ScalarMappable(norm=norm, cmap=_cm.brg)
+
+    # Plot the free energy estimate as a function of the total simulation time
+    for i, mbar_grad in enumerate(mbar_grads):
+        ax.plot(
+            mbar_grad["lam_vals"],
+            mbar_grad["grads"],
+            color=mapper.to_rgba(times[i]),
+        )
+
+    # Labels
+    ax.set_xlabel(r"$\lambda$")
+    ax.set_ylabel(
+        r"$\langle \frac{\mathrm{d}h}{\mathrm{d}\lambda}\rangle _{\lambda} $ / kcal mol$^{-1}$"
+    ),
+    ax.set_title(run_name)
+
+    # Return the colour mapper so we can add it to the plot
+    return mapper
+
+
+def plot_mbar_gradient_convergence(
+    fracts: _np.ndarray,
+    mbar_grads: _List[_Dict[str, _Dict[str, _np.ndarray]]],
+    simtime_per_run: float,
+    equil_time_per_run: float,
+    output_dir: str,
+) -> None:
+    """
+    Plot the convergence of the gradients obtained from MBAR as a function of simulation
+    time. Note that final gradients are subtracted so that changes are more obvious. Because
+    of this, the integral of any given "PMF" gives the difference in the free energy estimate
+    between the current and final times.
+
+    Parameters
+    ----------
+    fracts : np.ndarray
+        Array of fractions of the total simulation time at which the dgs were calculated.
+    mbar_grads : Dict[str, Dict[str, np.ndarray]]
+        List of Dictionary of gradients obtained from MBAR. Each list corresponds to a given
+        fraction of simulation time. The first dict key is the name of the run. The inner dict
+        should contain the keys "lam_vals", "grads", and "grad_errs".
+    simtime_per_run : float
+        Simulation time per run in ns.
+    equil_time_per_run : float
+        Equilibration time per run in ns.
+    output_dir : str
+        Directory to save the plot to.
+    """
+    n_runs = len(mbar_grads[0])
+    fig, axs = _plt.subplots(1, n_runs, figsize=(5 * n_runs, 4), dpi=300)
+    # Rearrange the dictionary for plotting individual runs
+    mbar_grads_by_run = {run_name: [] for run_name in mbar_grads[0]}
+    for mbar_grad in mbar_grads:
+        for run_name in mbar_grad:
+            mbar_grads_by_run[run_name].append(mbar_grad[run_name])
+
+    for i, (run, grads) in enumerate(mbar_grads_by_run.items()):
+        mapper = _plot_mbar_gradient_convergence_single_run(
+            ax=axs[i],
+            fracts=fracts,
+            mbar_grads=grads,
+            simtime=simtime_per_run,
+            equil_time=equil_time_per_run,
+            run_name=run.replace("_", " "),
+        )
+        # Add a colourbar
+        fig.colorbar(mapper, ax=axs[i]).set_label("Simulation time / ns")
+
+    outfile = _os.path.join(output_dir, "mbar_gradient_convergence.png")
+    fig.tight_layout()
+    fig.savefig(
+        outfile, dpi=300, bbox_inches="tight", facecolor="white", transparent=False
+    )
+    _plt.close(fig)
 
 
 def plot_mbar_pmf(outfiles: _List[str], output_dir: str) -> None:
