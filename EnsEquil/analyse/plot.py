@@ -722,7 +722,10 @@ def plot_convergence(
     dgs = _np.hstack((nans, dgs))
 
     # Plot the free energy estimate as a function of the total simulation time
-    outfile = _os.path.join(output_dir, "convergence.png")
+    name = "convergence"
+    if equil_time == 0:
+        name += "_no_equil"
+    outfile = _os.path.join(output_dir, f"{name}.png")
     general_plot(
         times,
         dgs,
@@ -775,7 +778,10 @@ def plot_sq_sem_convergence(
     sq_sems = _np.square(_np.std(dgs, axis=0)) / dgs.shape[0]
 
     # Plot the free energy estimate as a function of the total simulation time
-    outfile = _os.path.join(output_dir, "convergence_sq_sem.png")
+    name = "convergence_sq_sem"
+    if equil_time == 0:
+        name += "_no_equil"
+    outfile = _os.path.join(output_dir, f"{name}.png")
     general_plot(
         times,
         sq_sems,
