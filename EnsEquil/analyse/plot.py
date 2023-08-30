@@ -900,7 +900,10 @@ def plot_mbar_gradient_convergence(
         # Add a colourbar
         fig.colorbar(mapper, ax=axs[i]).set_label("Simulation time / ns")
 
-    outfile = _os.path.join(output_dir, "mbar_gradient_convergence.png")
+    name = "mbar_gradient_convergence"
+    if equil_time_per_run == 0:
+        name += "_no_equil"
+    outfile = _os.path.join(output_dir, f"{name}.png")
     fig.tight_layout()
     fig.savefig(
         outfile, dpi=300, bbox_inches="tight", facecolor="white", transparent=False
