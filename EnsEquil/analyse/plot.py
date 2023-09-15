@@ -15,6 +15,7 @@ __all__ = [
     "plot_comparitive_convergence_sem",
 ]
 
+import glob as _glob
 import os as _os
 from math import ceil as _ceil
 from typing import Any as _Any
@@ -954,7 +955,10 @@ def plot_mbar_pmf(outfiles: _List[str], output_dir: str) -> None:
 
 
 def plot_rmsds(
-    lam_windows: _List["LamWindows"], output_dir: str, selection: str
+    lam_windows: _List["LamWindows"],
+    output_dir: str,
+    selection: str,
+    group_selection: _Optional[str] = None,
 ) -> None:  # type: ignore
     """
     Plot the RMSDs for each lambda window. The reference used is the
@@ -969,17 +973,29 @@ def plot_rmsds(
     selection: str
         The selection, written using the MDAnalysis selection language, to
         use for the calculation of RMSD.
+    group_selection: str, Optional, Default = None
+        The selection, written using the MDAnalysis selection language, to
+        use for the calculation of RMSD after alignment has been carried out
+        according to "selection". If None, the "selection" selection
+        passed to will be used to calculate RMSD as well as for alignment.
 
     Returns
     -------
     None
     """
     n_lams = len(lam_windows)
-    fig, axs = _plt.subplots(
-        nrows=_ceil(n_lams / 8), ncols=8, figsize=(40, 5 * (n_lams / 8))
+    ncols = 8 if n_lams > 8 else n_lams
+    nrows = _ceil(n_lams / 8)
+    figsize = (4 * ncols, 4 * nrows)
+    fig, axs = _plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize, dpi=300)
+    axs = [axs] if n_lams == 1 else axs.flatten()
+
+    # Take the overall reference as the first frame of the first simulation
+    reference_traj = _os.path.join(
+        lam_windows[0].sims[0].output_dir, "traj000000001.dcd"
     )
 
-    for i, ax in enumerate(axs.flatten()):  # type: ignore
+    for i, ax in enumerate(axs):  # type: ignore
         if i < n_lams:
             lam_window = lam_windows[i]
             # One set of RMSDS for each lambda window
@@ -988,6 +1004,8 @@ def plot_rmsds(
                 input_dirs=input_dirs,
                 selection=selection,
                 tot_simtime=lam_window.sims[0].tot_simtime,
+                reference_traj=reference_traj,
+                group_selection=group_selection,
             )  # Total simtime should be the same for all sims
             ax.legend()
             ax.set_title(f"$\lambda$ = {lam_window.lam}")
@@ -1007,7 +1025,10 @@ def plot_rmsds(
 
     fig.tight_layout()
 
-    name = f"{output_dir}/rmsd_{selection.replace(' ','')}"  # Use selection string to make sure save name is unique
+    group_selection_name = (
+        "none" if not group_selection else group_selection.replace(" ", "")
+    )
+    name = f"{output_dir}/rmsd_{selection.replace(' ','')}_{group_selection_name}"  # Use selection string to make sure save name is unique
     fig.savefig(
         name, dpi=300, bbox_inches="tight", facecolor="white", transparent=False
     )

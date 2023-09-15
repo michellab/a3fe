@@ -318,6 +318,7 @@ class SimulationRunner(ABC):
         run_nos: _Optional[_List[int]] = None,
         subsampling=False,
         fraction: float = 1,
+        plot_rmsds: bool = False,
     ) -> _Tuple[_np.ndarray, _np.ndarray]:
         f"""
         Analyse the {self.__class__.__name__} and any
@@ -336,6 +337,8 @@ class SimulationRunner(ABC):
             fraction=0.5, only the first half of the data will be used for
             analysis. If fraction=1, all data will be used. Note that unequilibrated
             data is discarded from the beginning of simulations in all cases.
+        plot_rmsds: bool, optional, default=False
+            Whether to plot RMSDS. This is slow and so defaults to False.
 
         Returns
         -------
@@ -374,7 +377,10 @@ class SimulationRunner(ABC):
         # Analyse the sub-simulation runners
         for sub_sim_runner in self._sub_sim_runners:
             dg, er = sub_sim_runner.analyse(
-                run_nos=run_nos, subsampling=subsampling, fraction=fraction
+                run_nos=run_nos,
+                subsampling=subsampling,
+                fraction=fraction,
+                plot_rmsds=plot_rmsds,
             )
             # Decide if the component should be added or subtracted
             # according to the dg_multiplier attribute

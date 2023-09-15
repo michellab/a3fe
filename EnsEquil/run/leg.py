@@ -23,6 +23,7 @@ import pandas as _pd
 
 from ..analyse.plot import plot_convergence as _plot_convergence
 from ..analyse.plot import plot_sq_sem_convergence as _plot_sq_sem_convergence
+from ..analyse.plot import plot_rmsds as _plot_rmsds
 from ..read._process_slurm_files import get_slurm_file_base as _get_slurm_file_base
 from ..read._process_somd_files import read_simfile_option as _read_simfile_option
 from ..read._process_somd_files import write_simfile_option as _write_simfile_option
@@ -1060,6 +1061,7 @@ class Leg(_SimulationRunner):
         run_nos: _Optional[_List[int]],
         subsampling=False,
         fraction: float = 1,
+        plot_rmsds: bool = False,
     ) -> _Tuple[_np.ndarray, _np.ndarray]:
         f"""
         Analyse the leg and any sub-simulations, and
@@ -1070,12 +1072,13 @@ class Leg(_SimulationRunner):
         subsampling: bool, optional, default=False
             If True, the free energy will be calculated by subsampling using
             the methods contained within pymbar.
-
         fraction: float, optional, default=1
             The fraction of the data to use for analysis. For example, if
             fraction=0.5, only the first half of the data will be used for
             analysis. If fraction=1, all data will be used. Note that unequilibrated
             data is discarded from the beginning of simulations in all cases.
+        plot_rmsds: bool, optional, default=False
+            Whether to plot RMSDS. This is slow and so defaults to False.
 
         Returns
         -------
@@ -1089,10 +1092,37 @@ class Leg(_SimulationRunner):
         run_nos = self._get_valid_run_nos(run_nos)
 
         dg_overall, er_overall = super().analyse(
-            run_nos=run_nos, subsampling=subsampling, fraction=fraction
+            run_nos=run_nos,
+            subsampling=subsampling,
+            fraction=fraction,
+            plot_rmsds=plot_rmsds,
         )
 
         if self.leg_type == _LegType.BOUND:
+            if plot_rmsds:
+                # We can plot the RMSD of the protein and the distance-to-bound configuration
+                self._logger.info(
+                    "Analysing RMSD of protein and computing distance-to-bound configuration..."
+                )
+                selections = [
+                    ("protein", None),
+                    # This is the distance to bound configuration -
+                    # the RMSD of the ligand in the frame of reference of the protein.
+                    (
+                        # "protein and (around 5 resname LIG)",
+                        "protein",
+                        "resname LIG and (not name H*)",
+                    ),
+                ]
+                for stage in self.stages:
+                    for selection, group_selection in selections:
+                        _plot_rmsds(
+                            lam_windows=stage.lam_windows,
+                            output_dir=stage.output_dir,
+                            selection=selection,
+                            group_selection=group_selection,
+                        )
+
             # We need to add on the restraint corrections. There are no errors associated with these.
             rest_corrs = _np.array(
                 [

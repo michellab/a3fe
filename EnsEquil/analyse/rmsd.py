@@ -8,20 +8,29 @@ import subprocess as _subprocess
 from tempfile import TemporaryDirectory as _TemporaryDirectory
 from typing import List as _List
 from typing import Tuple as _Tuple
+from typing import Optional as _Optional
 
 import BioSimSpace as _BSS
 import numpy as _np
 from MDAnalysis import Universe as _Universe
-from MDAnalysis.analysis import align as _align
+import MDAnalysis.transformations as _trans
 from MDAnalysis.analysis.rms import RMSD as _RMSD
 
 
 def get_rmsd(
-    input_dirs: _List[str], selection: str, tot_simtime: float
+    input_dirs: _List[str],
+    selection: str,
+    tot_simtime: float,
+    reference_traj: str,
+    group_selection: _Optional[str] = None,
 ) -> _Tuple[_np.ndarray, _np.ndarray]:
     """
     Return the RMSD for a given MDAnalysis selection. Reference frame taken as
     the first frame, regardless of whether the total equilibration time is 0 or not.
+
+    Note that if group_selection is None, the same selection as the one used for the
+    RMSD calculation will be used, otherwise the group_selection will be used for the
+    RMSD calculation.
 
     Parameters
     ----------
@@ -31,15 +40,24 @@ def get_rmsd(
         The selection, written using the MDAnalysis selection language, to use for the calculation of RMSD.
     tot_simtime : float
         The total simulation time per simulation.
+    reference_traj : str
+        The absolute path to the reference trajectory file. The reference will be taken as the first frame of
+        this trajectory.
+    group_selection : Optional[str], default=None
+        The selection, written using the MDAnalysis selection language, to use for the calculation of RMSD, after the
+        alignment of the trajectory according to the selection passed as "selection". If None, the same selection as
+        the one used for the RMSD calculation will be used.
 
     Returns
     -------
     rmsds: _np.ndarray
-        An array of the RMSDs with reference to the first frame
+        An array of the RMSDs, in nm, for each simulation with reference to the
+        first frame of the reference trajectory.
     times: _np.ndarray
         An array of the times, in ns, corresponding to the RMSDs
     """
     rmsds_list = []
+    group_selection = selection if group_selection is None else group_selection
 
     # Iterate through the runs and collect results
     for i, input_dir in enumerate(input_dirs):
@@ -48,13 +66,28 @@ def get_rmsd(
         with _TemporaryDirectory() as tmpdir:
             top_file = _os.path.join(tmpdir, "somd.parm7")
             _subprocess.run(["cp", f"{input_dir}/somd.prm7", top_file], check=True)
+            reference = _Universe(top_file, reference_traj)
+            # Ensure that the protein and ligand are whole and centered - note this is super slow
+            prot_and_or_lig = reference.select_atoms("protein or resname LIG")
+            not_prot_or_lig = reference.select_atoms("not (protein or resname LIG)")
+            # transforms = [
+            # _trans.unwrap(prot_and_or_lig),
+            # _trans.center_in_box(prot_and_or_lig),
+            # _trans.wrap(not_prot_or_lig),
+            # ]
+            # reference.trajectory.add_transformations(*transforms)
 
-            # Convert to .gro file
-            sys = _BSS.IO.readMolecules(
-                [top_file, _os.path.join(input_dir, "somd.rst7")]
-            )
-            _BSS.IO.saveMolecules(_os.path.join(tmpdir, "somd"), sys, "grotop")
-            top_file = _os.path.join(tmpdir, "somd.gro")
+            # To avoid the atom selection changing between the reference and mobile (e.g. use of "within" keyword
+            # followed by movement of the protein), extract the atoms matching the selections on the reference
+            # and convert this into a new selection string
+            # reference_selection = reference.select_atoms(selection)
+            # selection = " ".join(
+            # [f"index {i} or" for i in reference_selection.indices]
+            # )[:-3]
+            # reference_group_selection = reference.select_atoms(group_selection)
+            # group_selection = " ".join(
+            # [f"index {i} or" for i in reference_group_selection.indices]
+            # )[:-3]
 
             # There could be multiple trajectory files if the simulation has been restarted
             traj_files = _glob.glob(_os.path.join(input_dir, "*.dcd"))
@@ -63,8 +96,13 @@ def get_rmsd(
             rmsds_run = []
             for traj_file in traj_files:
                 mobile = _Universe(top_file, traj_file)
+                mobile.trajectory.add_transformations(*transforms)
                 R = _RMSD(
-                    mobile, select=selection, groupselections=[selection], ref_frame=0
+                    atomgroup=mobile,
+                    reference=reference,
+                    select=selection,
+                    groupselections=[group_selection],
+                    ref_frame=0,
                 )
                 R.run()
                 rmsd_results = R.results.rmsd.T

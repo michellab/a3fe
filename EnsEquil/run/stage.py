@@ -741,6 +741,7 @@ class Stage(_SimulationRunner):
         get_frnrg: bool = True,
         subsampling: bool = False,
         fraction: float = 1,
+        plot_rmsds: bool = False,
     ) -> _Union[_Tuple[float, float], _Tuple[None, None]]:
         r"""Analyse the results of the ensemble of simulations. Requires that
         all lambda windows have equilibrated.
@@ -760,6 +761,8 @@ class Stage(_SimulationRunner):
             fraction=0.5, only the first half of the data will be used for
             analysis. If fraction=1, all data will be used. Note that unequilibrated
             data is discarded from the beginning of simulations in all cases.
+        plot_rmsds: bool, optional, default=False
+            Whether to plot RMSDS. This is slow and so defaults to False.
 
         Returns
         -------
@@ -811,7 +814,7 @@ class Stage(_SimulationRunner):
                 win._write_equilibrated_simfiles()
 
             # Run MBAR and compute mean and 95 % C.I. of free energy
-            free_energies, errors, mbar_outfiles = _run_mbar(
+            free_energies, errors, mbar_outfiles, _ = _run_mbar(
                 run_nos=run_nos,
                 output_dir=self.output_dir,
                 percentage_end=fraction * 100,
@@ -861,10 +864,13 @@ class Stage(_SimulationRunner):
             )
 
         # Plot RMSDS
-        self._logger.info("Plotting RMSDs")
-        selections = ["resname LIG and (not name H*)"]  # , "protein"]
-        # for selection in selections:
-        # _plot_rmsds(lam_windows=self.lam_windows, output_dir=self.output_dir, selection=selection)
+        if plot_rmsds:
+            self._logger.info("Plotting RMSDs")
+            _plot_rmsds(
+                lam_windows=self.lam_windows,
+                output_dir=self.output_dir,
+                selection="resname LIG and (not name H*)",
+            )
 
         # Analyse the gradient data and make plots
         self._logger.info("Plotting gradients data")
