@@ -9,6 +9,8 @@ from warnings import warn as _warn
 
 import numpy as _np
 
+from .exceptions import ReadError as _ReadError
+
 
 def read_simfile_option(simfile: str, option: str) -> str:
     """Read an option from a SOMD simfile.
