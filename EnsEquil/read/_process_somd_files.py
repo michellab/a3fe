@@ -9,6 +9,8 @@ from warnings import warn as _warn
 
 import numpy as _np
 
+from .exceptions import ReadError as _ReadError
+
 
 def read_simfile_option(simfile: str, option: str) -> str:
     """Read an option from a SOMD simfile.
@@ -87,9 +89,12 @@ def read_mbar_result(outfile: str) -> _Tuple[float, float]:
     """
     with open(outfile, "r") as f:
         lines = f.readlines()
-    # The free energy is the 5th last line of the file
-    free_energy = float(lines[-4].split(",")[0])
-    free_energy_err = float(lines[-4].split(",")[1].split()[0])
+    try:
+        # The free energy is the 5th last line of the file
+        free_energy = float(lines[-4].split(",")[0])
+        free_energy_err = float(lines[-4].split(",")[1].split()[0])
+    except (IndexError, ValueError):
+        raise _ReadError(f"Could not read free energy from {outfile}.")
 
     return free_energy, free_energy_err
 
