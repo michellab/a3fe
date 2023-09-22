@@ -852,7 +852,11 @@ class Stage(_SimulationRunner):
                     ofile.write(f"Runs analysed: {run_nos}\n")
 
             # Plot overlap matrices and PMFs
-            _plot_overlap_mats(output_dir=self.output_dir, mbar_outfiles=mbar_outfiles)
+            _plot_overlap_mats(
+                output_dir=self.output_dir,
+                mbar_outfiles=mbar_outfiles,
+                nlam=len(self.lam_windows),
+            )
             _plot_mbar_pmf(mbar_outfiles, self.output_dir)
             equilibrated_gradient_data = _GradientData(
                 lam_winds=self.lam_windows, equilibrated=True
@@ -861,6 +865,7 @@ class Stage(_SimulationRunner):
                 output_dir=self.output_dir,
                 predicted=True,
                 gradient_data=equilibrated_gradient_data,
+                nlam=len(self.lam_windows),
             )
 
         # Plot RMSDS

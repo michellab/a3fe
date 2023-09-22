@@ -30,7 +30,6 @@ import matplotlib.cm as _cm
 import numpy as _np
 import pandas as _pd
 import scipy.stats as _stats
-import seaborn as _sns
 from scipy.stats import kruskal as _kruskal
 
 from ..read._process_somd_files import read_mbar_pmf as _read_mbar_pmf
@@ -584,6 +583,7 @@ def plot_overlap_mat(
     mbar_file: _Optional[str] = None,
     predicted: bool = False,
     gradient_data: _Optional[GradientData] = None,
+    color_bar_cutoffs=[0, 0.03, 0.1, 0.3, 1],
 ) -> None:
     """
     Plot the overlap matrix for a given MBAR file on the supplied axis.
@@ -615,12 +615,86 @@ def plot_overlap_mat(
         overlap_mat = gradient_data.get_predicted_overlap_mat()  # type: ignore
     else:
         overlap_mat = _read_overlap_mat(mbar_file)  # type: ignore
-    _sns.heatmap(overlap_mat, ax=ax, square=True).figure
+
+    # Tuple of colours and associated font colours.
+    # The last and first colours are for the top and bottom of the scale
+    # for the continuous colour bar, but are ignored for the discrete bar.
+    all_colors = (
+        ("#FBE8EB", "black"),  # Lighter pink
+        ("#FFD3E0", "black"),
+        ("#88CCEE", "black"),
+        ("#78C592", "black"),
+        ("#117733", "white"),
+        ("#004D00", "white"),
+    )  # Darker green
+
+    # Set the colour map.
+    # Create a color map using the extended palette and positions
+    box_colors = [all_colors[i][0] for i in range(len(color_bar_cutoffs) + 1)]
+    cmap = _colors.LinearSegmentedColormap.from_list(
+        "CustomMap", list(zip(color_bar_cutoffs, box_colors))
+    )
+
+    # Normalise the same way each time so that plots are always comparable.
+    norm = _colors.Normalize(vmin=0, vmax=1)
+
+    # Create the heatmap. Separate the cells with white lines.
+    im = ax.imshow(overlap_mat, cmap=cmap, norm=norm)
+    num_rows = len(overlap_mat[0])
+    for i in range(num_rows - 1):
+        for j in range(num_rows - 1):
+            # Make sure these are on the edges of the cells.
+            ax.axhline(i + 0.5, color="white", linewidth=0.5)
+            ax.axvline(j + 0.5, color="white", linewidth=0.5)
+
+    # Label each cell with the overlap value.
+    for i in range(num_rows):
+        for j in range(num_rows):
+            # Get the text colour based on the overlap value.
+            overlap_val = overlap_mat[i][j]
+            # Get the index of first color bound greater than the overlap value.
+            for idx, bound in enumerate(color_bar_cutoffs):
+                if bound > overlap_val:
+                    break
+            text_color = all_colors[1:-1][idx - 1][1]
+            ax.text(
+                j,
+                i,
+                "{:.2f}".format(overlap_mat[i][j]),
+                ha="center",
+                va="center",
+                fontsize=10,
+                color=text_color,
+            )
+
+    # Create a colorbar. Reduce the height of the colorbar to match the figure and remove the border.
+    cbar = ax.figure.colorbar(im, ax=ax, cmap=cmap, norm=norm, shrink=0.7)
+    cbar.outline.set_visible(False)
+
+    # Set the axis labels.
+    ax.set_xlabel(r"$\lambda$ Index")
+    ax.xaxis.set_label_position("top")
+    ax.set_ylabel(r"$\lambda$ Index")
+
+    ticks = [x for x in range(0, num_rows)]
+
+    # Set ticks every lambda window.
+    ax.set_xticks(ticks)
+    ax.xaxis.tick_top()
+    ax.set_yticks(ticks)
+
+    # Remove the borders.
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["bottom"].set_visible(False)
+    ax.spines["left"].set_visible(False)
+
     ax.set_title(name)
 
 
 def plot_overlap_mats(
     output_dir: str,
+    nlam: int,
     run_nos: _Optional[_List[int]] = None,
     mbar_outfiles: _Optional[_List[str]] = None,
     predicted: bool = False,
@@ -633,6 +707,8 @@ def plot_overlap_mats(
     ----------
     output_dir : str
         The directory to save the plot to.
+    nlam : int
+        Number of lambda windows.
     run_nos : Optional[List[int]], default=None
         List of run numbers to use for MBAR. If None, all runs will be used.
     mbar_outfiles : Optional[List[str]], default=None
@@ -660,7 +736,16 @@ def plot_overlap_mats(
         if not mbar_outfiles:
             raise ValueError("MBAR outfiles required if predicted is False.")
         n_runs = len(mbar_outfiles)
-    fig, axs = _plt.subplots(1, n_runs, figsize=(4 * n_runs, 4), dpi=300)
+
+    # Create the figure and axis. Use a default size for fewer than 16 windows,
+    # otherwise scale the figure size to the number of windows.
+    if nlam < 8:
+        fig, axs = _plt.subplots(1, n_runs, figsize=(4 * n_runs, 4), dpi=300)
+    else:
+        fig, axs = _plt.subplots(
+            1, n_runs, figsize=(n_runs * nlam / 2, nlam / 2), dpi=300
+        )
+
     # Avoid not subscriptable errors when there is only one run
     if n_runs == 1:
         axs = [axs]
