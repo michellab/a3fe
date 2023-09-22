@@ -683,7 +683,7 @@ def _compute_dg(
     defined in get_time_series_multiwindow_mbar. Defined at the module level so that it
     can be used with multiprocessing.
     """
-    free_energies, _, _ = _run_mbar(
+    free_energies, *_ = _run_mbar(
         output_dir=output_dir,
         run_nos=[run_no],
         equilibrated=equilibrated,

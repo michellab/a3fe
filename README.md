@@ -6,9 +6,7 @@ EnsEquil
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Documentation Status](https://readthedocs.org/projects/ensequil/badge/?version=latest)](https://ensequil.readthedocs.io/en/latest/?badge=latest)
       
-
-
-A package for running free energy calculations with SOMD with automated equilibration detection based on an ensemble of simulations. This requires the SLURM scheduling system.
+A package for running adaptive alchemical absolute binding free energy calculations with SOMD based on an ensemble of simulations. This requires the SLURM scheduling system.
 
 ### Installation
 
@@ -16,21 +14,10 @@ EnsEquil depends on SLURM for scheduling jobs, and on GROMACS for running initia
 
 We first need to install the [BioSimSpace](https://biosimspace.openbiosim.org/) dependencies using mamba (or conda). SOMD, which is used to run the simulations, is contained within Sire, which will be installed as a dependency of BioSimSpace.
 ```bash
-mamba create -n ensequil -c conda-forge -c openbiosim/label/dev biosimspace --only-deps
+mamba create -n ensequil -c conda-forge -c openbiosim/label/dev biosimspace
 mamba activate ensequil
-mamba install -c conda-forge ambertools pytest watchdog pypdb
 ```
-Now download BioSimSpace, install, and test:
-```bash
-git clone https://github.com/fjclark/BioSimSpace.git
-cd biosimspace/python
-git checkout feature_abfe_somd
-BSS_SKIP_DEPDENCIES=1 python setup.py develop
-cd ..
-pytest test
-cd ..
-```
-Finally, download EnsEquil, install, and test:
+Now download EnsEquil, install, and test:
  ```bash
  git clone https://github.com/fjclark/EnsEquil.git
  cd EnsEquil
@@ -44,12 +31,13 @@ Finally, download EnsEquil, install, and test:
 - Create a base directory for the calculation and create an directory called `input` within this
 - Move your input files into the the input directory. For example, if you have parameterised AMBER-format input files, name these bound_param.rst7, bound_param.prm7, free_param.rst7, and free_param.prm7. For more details see the documentation.
 - Copy run somd.sh and template_config.sh from EnsEquil/EnsEquil/data/example_run_dir to your `input` directory, making sure to the SLURM options in run_somd.sh so that the jobs will run on your cluster
-- In the calculation base directory, run the following python code, either through ipython or as a python script (you will likely want to run this with `nohup`/ through tmux to ensure that the calculation is not killed when you lose connection)
+- In the calculation base directory, run the following python code, either through ipython or as a python script (you will likely want to run the script with `nohup`or use ipython through tmux to ensure that the calculation is not killed when you lose connection)
 
 ```python
 import EnsEquil as ee 
 calc = ee.Calculation()
 calc.setup()
+calc.get_optimal_lam_vals()
 calc.run()
 calc.wait()
 calc.analyse()

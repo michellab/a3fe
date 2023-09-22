@@ -46,6 +46,9 @@ from ..analyse.plot import plot_mbar_pmf as _plot_mbar_pmf
 from ..analyse.plot import plot_overlap_mats as _plot_overlap_mats
 from ..analyse.plot import plot_rmsds as _plot_rmsds
 from ..analyse.plot import plot_sq_sem_convergence as _plot_sq_sem_convergence
+from ..analyse.plot import (
+    plot_mbar_gradient_convergence as _plot_mbar_gradient_convergence,
+)
 from ..analyse.process_grads import GradientData as _GradientData
 from ..read._process_somd_files import write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
@@ -738,6 +741,7 @@ class Stage(_SimulationRunner):
         get_frnrg: bool = True,
         subsampling: bool = False,
         fraction: float = 1,
+        plot_rmsds: bool = False,
     ) -> _Union[_Tuple[float, float], _Tuple[None, None]]:
         r"""Analyse the results of the ensemble of simulations. Requires that
         all lambda windows have equilibrated.
@@ -757,6 +761,8 @@ class Stage(_SimulationRunner):
             fraction=0.5, only the first half of the data will be used for
             analysis. If fraction=1, all data will be used. Note that unequilibrated
             data is discarded from the beginning of simulations in all cases.
+        plot_rmsds: bool, optional, default=False
+            Whether to plot RMSDS. This is slow and so defaults to False.
 
         Returns
         -------
@@ -808,7 +814,7 @@ class Stage(_SimulationRunner):
                 win._write_equilibrated_simfiles()
 
             # Run MBAR and compute mean and 95 % C.I. of free energy
-            free_energies, errors, mbar_outfiles = _run_mbar(
+            free_energies, errors, mbar_outfiles, _ = _run_mbar(
                 run_nos=run_nos,
                 output_dir=self.output_dir,
                 percentage_end=fraction * 100,
@@ -858,10 +864,13 @@ class Stage(_SimulationRunner):
             )
 
         # Plot RMSDS
-        self._logger.info("Plotting RMSDs")
-        selections = ["resname LIG and (not name H*)"]  # , "protein"]
-        # for selection in selections:
-        # _plot_rmsds(lam_windows=self.lam_windows, output_dir=self.output_dir, selection=selection)
+        if plot_rmsds:
+            self._logger.info("Plotting RMSDs")
+            _plot_rmsds(
+                lam_windows=self.lam_windows,
+                output_dir=self.output_dir,
+                selection="resname LIG and (not name H*)",
+            )
 
         # Analyse the gradient data and make plots
         self._logger.info("Plotting gradients data")
@@ -987,6 +996,20 @@ class Stage(_SimulationRunner):
 
         self._logger.info("Analysing convergence...")
 
+        # Check the assumption that all simulation times are the same
+        av_simtime = self.get_tot_simtime(run_nos=run_nos) / len(run_nos)
+        if not all(
+            [
+                _np.isclose(
+                    self.get_tot_simtime(run_nos=[run_no]), av_simtime, rtol=1e-2
+                )
+                for run_no in run_nos
+            ]
+        ):
+            raise RuntimeError(
+                "Not all simulation times are the same. Convergence analysis cannot be performed."
+            )
+
         # Get the dg_overall in terms of fraction of the total simulation time
         # Use steps of 5 % of the total simulation time
         fracts = _np.arange(0.05, 1.05, 0.05)
@@ -996,8 +1019,9 @@ class Stage(_SimulationRunner):
         dg_overall = _np.zeros(len(fracts))
 
         # Make sure to re-write the equilibrated simfiles
-        for win in self.lam_windows:
-            win._write_equilibrated_simfiles()
+        if equilibrated:
+            for win in self.lam_windows:
+                win._write_equilibrated_simfiles()
 
         # Now run mbar with multiprocessing to speed things up
         with _Pool() as pool:
@@ -1019,6 +1043,9 @@ class Stage(_SimulationRunner):
             dg_overall = _np.array(
                 [result[0] for result in results]
             ).transpose()  # result[0] is a 2D array for a given percent
+            mbar_grads = [
+                result[3] for result in results
+            ]  # result[3] is a Dict of gradient data for a given percent
 
         self._logger.info(f"Overall free energy changes: {dg_overall} kcal mol-1")
         self._logger.info(f"Fractions of (equilibrated) simulation time: {fracts}")
@@ -1035,6 +1062,17 @@ class Stage(_SimulationRunner):
                 self.output_dir,
                 len(run_nos),
             )
+
+        # Plot the convergence of the MBAR gradients
+        _plot_mbar_gradient_convergence(
+            fracts=fracts,
+            mbar_grads=mbar_grads,
+            simtime_per_run=self.get_tot_simtime(
+                run_nos=[1]
+            ),  # Assumes all simulation times the same
+            equil_time_per_run=self.equil_time if equilibrated else 0,
+            output_dir=self.output_dir,
+        )
 
         return fracts, dg_overall
 

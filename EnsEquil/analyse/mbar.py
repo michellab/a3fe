@@ -17,8 +17,10 @@ from typing import Tuple as _Tuple
 import numpy as _np
 
 from ..read._process_somd_files import read_mbar_result as _read_mbar_result
-from ..read._process_somd_files import \
-    write_truncated_sim_datafile as _write_truncated_sim_datafile
+from ..read._process_somd_files import (
+    write_truncated_sim_datafile as _write_truncated_sim_datafile,
+    read_mbar_gradients as _read_mbar_gradients,
+)
 
 
 def run_mbar(
@@ -29,7 +31,7 @@ def run_mbar(
     subsampling: bool = False,
     delete_outfiles: bool = False,
     equilibrated: bool = True,
-) -> _Tuple[_np.ndarray, _np.ndarray, _List[str]]:
+) -> _Tuple[_np.ndarray, _np.ndarray, _List[str], _Dict[str, _Dict[str, _np.ndarray]]]:
     """
     Run MBAR on SOMD output files.
 
@@ -65,6 +67,9 @@ def run_mbar(
         The mbar errors on the free energies from each run, in kcal mol-1.
     mbar_out_files : List[str]
         The paths to the MBAR output files.
+    mbar_grads: Dict[str, Dict[str, np.ndarray]]
+        The gradients of the free energies obtained from the MBAR results (not TI),
+        for each run.
     """
     # Check that the simfiles actually exist
     file_name = "simfile_equilibrated.dat" if equilibrated else "simfile.dat"
@@ -120,6 +125,15 @@ def run_mbar(
     free_energies = _np.array([_read_mbar_result(ofile)[0] for ofile in mbar_out_files])
     errors = _np.array([_read_mbar_result(ofile)[1] for ofile in mbar_out_files])
 
+    # Get the gradients from the MBAR results
+    mbar_grads = {}
+    for i, run_no in enumerate(run_nos):
+        mbar_grads[f"run_{run_no}"] = {}
+        lam_vals, grads, grad_errors = _read_mbar_gradients(mbar_out_files[i])
+        mbar_grads[f"run_{run_no}"]["lam_vals"] = lam_vals
+        mbar_grads[f"run_{run_no}"]["grads"] = grads
+        mbar_grads[f"run_{run_no}"]["grad_errors"] = grad_errors
+
     if delete_outfiles:
         for ofile in mbar_out_files:
             _subprocess.run(["rm", ofile])
@@ -129,4 +143,4 @@ def run_mbar(
     for tmp_simfile in tmp_simfiles:
         _subprocess.run(["rm", tmp_simfile])
 
-    return free_energies, errors, mbar_out_files
+    return free_energies, errors, mbar_out_files, mbar_grads

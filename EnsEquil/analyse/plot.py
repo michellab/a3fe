@@ -12,9 +12,10 @@ __all__ = [
     "plot_against_exp",
     "plot_gelman_rubin_rhat",
     "plot_comparitive_convergence",
-    "plot_comparitive_convergence_sq_sem",
+    "plot_comparitive_convergence_sem",
 ]
 
+import glob as _glob
 import os as _os
 from math import ceil as _ceil
 from typing import Any as _Any
@@ -24,6 +25,8 @@ from typing import Optional as _Optional
 from typing import Tuple as _Tuple
 
 import matplotlib.pyplot as _plt
+import matplotlib.colors as _colors
+import matplotlib.cm as _cm
 import numpy as _np
 import pandas as _pd
 import scipy.stats as _stats
@@ -720,7 +723,10 @@ def plot_convergence(
     dgs = _np.hstack((nans, dgs))
 
     # Plot the free energy estimate as a function of the total simulation time
-    outfile = _os.path.join(output_dir, "convergence.png")
+    name = "convergence"
+    if equil_time == 0:
+        name += "_no_equil"
+    outfile = _os.path.join(output_dir, f"{name}.png")
     general_plot(
         times,
         dgs,
@@ -773,7 +779,10 @@ def plot_sq_sem_convergence(
     sq_sems = _np.square(_np.std(dgs, axis=0)) / dgs.shape[0]
 
     # Plot the free energy estimate as a function of the total simulation time
-    outfile = _os.path.join(output_dir, "convergence_sq_sem.png")
+    name = "convergence_sq_sem"
+    if equil_time == 0:
+        name += "_no_equil"
+    outfile = _os.path.join(output_dir, f"{name}.png")
     general_plot(
         times,
         sq_sems,
@@ -781,6 +790,132 @@ def plot_sq_sem_convergence(
         r"$\mathrm{SEM}^2$ / kcal$^{2}$ mol$^{-2}$",
         outfile,
     )
+
+
+def _plot_mbar_gradient_convergence_single_run(
+    ax: _plt.Axes,
+    fracts: _np.ndarray,
+    mbar_grads: _List[_Dict[str, _np.ndarray]],
+    simtime: float,
+    equil_time: float,
+    run_name: str,
+) -> _cm.ScalarMappable:
+    """
+    Plot the convergence of the gradients obtained from MBAR as a function of simulation
+    time, on the axis supplied. Note that final gradients are subtracted so that changes
+    are more obvious. Because of this, the integral of any given "PMF" gives the difference
+    in the free energy estimate between the current and final times.
+
+    Parameters
+    ----------
+    ax : matplotlib axis
+        Axis on which to plot.
+    fracts : np.ndarray
+        Array of fractions of the total simulation time at which the gradients were calculated.
+    mbar_grads : List[Dict[str, np.ndarray]]
+        List of Dictionary of gradients obtained from MBAR. Each list corresponds to a given
+        fraction of simulation time. The dict should contain the keys "lam_vals", "grads", and
+        "grad_errs".
+    simtime : float
+        Total simulation time in ns.
+    equil_time : float
+        Equilibration time in ns.
+    run_name: str
+        The name of the run.
+
+    Returns
+    -------
+    mapper : matplotlib.cm.ScalarMappable
+        Colour mapper used to map simulation time to colour.
+    """
+    # Subtract the final gradient from each gradient
+    final_grads = mbar_grads[-1]
+    for mbar_grad in mbar_grads:
+        mbar_grad["grads"] -= final_grads["grads"]
+
+    # Get a list of times sampled
+    times = fracts * (simtime - equil_time) + equil_time
+
+    # Get a colour mapper to map simulation time to colour
+    norm = _colors.Normalize(vmin=times[0], vmax=times[-1], clip=True)
+    mapper = _cm.ScalarMappable(norm=norm, cmap=_cm.brg)
+
+    # Plot the free energy estimate as a function of the total simulation time
+    for i, mbar_grad in enumerate(mbar_grads):
+        ax.plot(
+            mbar_grad["lam_vals"],
+            mbar_grad["grads"],
+            color=mapper.to_rgba(times[i]),
+        )
+
+    # Labels
+    ax.set_xlabel(r"$\lambda$")
+    ax.set_ylabel(
+        r"$\langle \frac{\mathrm{d}h}{\mathrm{d}\lambda}\rangle _{\lambda} $ / kcal mol$^{-1}$"
+    ),
+    ax.set_title(run_name)
+
+    # Return the colour mapper so we can add it to the plot
+    return mapper
+
+
+def plot_mbar_gradient_convergence(
+    fracts: _np.ndarray,
+    mbar_grads: _List[_Dict[str, _Dict[str, _np.ndarray]]],
+    simtime_per_run: float,
+    equil_time_per_run: float,
+    output_dir: str,
+) -> None:
+    """
+    Plot the convergence of the gradients obtained from MBAR as a function of simulation
+    time. Note that final gradients are subtracted so that changes are more obvious. Because
+    of this, the integral of any given "PMF" gives the difference in the free energy estimate
+    between the current and final times.
+
+    Parameters
+    ----------
+    fracts : np.ndarray
+        Array of fractions of the total simulation time at which the dgs were calculated.
+    mbar_grads : Dict[str, Dict[str, np.ndarray]]
+        List of Dictionary of gradients obtained from MBAR. Each list corresponds to a given
+        fraction of simulation time. The first dict key is the name of the run. The inner dict
+        should contain the keys "lam_vals", "grads", and "grad_errs".
+    simtime_per_run : float
+        Simulation time per run in ns.
+    equil_time_per_run : float
+        Equilibration time per run in ns.
+    output_dir : str
+        Directory to save the plot to.
+    """
+    n_runs = len(mbar_grads[0])
+    fig, axs = _plt.subplots(1, n_runs, figsize=(5 * n_runs, 4), dpi=300)
+    # Rearrange the dictionary for plotting individual runs
+    mbar_grads_by_run = {run_name: [] for run_name in mbar_grads[0]}
+    for mbar_grad in mbar_grads:
+        for run_name in mbar_grad:
+            mbar_grads_by_run[run_name].append(mbar_grad[run_name])
+
+    for i, (run, grads) in enumerate(mbar_grads_by_run.items()):
+        mapper = _plot_mbar_gradient_convergence_single_run(
+            ax=axs[i],
+            fracts=fracts,
+            mbar_grads=grads,
+            simtime=simtime_per_run,
+            equil_time=equil_time_per_run,
+            run_name=run.replace("_", " "),
+        )
+        # Add a colourbar
+        fig.colorbar(mapper, ax=axs[i]).set_label("Simulation time / ns")
+
+    name = "mbar_gradient_convergence"
+    if equil_time_per_run == 0:
+        name += "_no_equil"
+    outfile = _os.path.join(output_dir, f"{name}.png")
+    fig.tight_layout()
+    fig.savefig(
+        outfile, dpi=300, bbox_inches="tight", facecolor="white", transparent=False
+    )
+    _plt.close(fig)
 
 
 def plot_mbar_pmf(outfiles: _List[str], output_dir: str) -> None:
@@ -820,7 +955,10 @@ def plot_mbar_pmf(outfiles: _List[str], output_dir: str) -> None:
 
 
 def plot_rmsds(
-    lam_windows: _List["LamWindows"], output_dir: str, selection: str
+    lam_windows: _List["LamWindows"],
+    output_dir: str,
+    selection: str,
+    group_selection: _Optional[str] = None,
 ) -> None:  # type: ignore
     """
     Plot the RMSDs for each lambda window. The reference used is the
@@ -835,17 +973,29 @@ def plot_rmsds(
     selection: str
         The selection, written using the MDAnalysis selection language, to
         use for the calculation of RMSD.
+    group_selection: str, Optional, Default = None
+        The selection, written using the MDAnalysis selection language, to
+        use for the calculation of RMSD after alignment has been carried out
+        according to "selection". If None, the "selection" selection
+        passed to will be used to calculate RMSD as well as for alignment.
 
     Returns
     -------
     None
     """
     n_lams = len(lam_windows)
-    fig, axs = _plt.subplots(
-        nrows=_ceil(n_lams / 8), ncols=8, figsize=(40, 5 * (n_lams / 8))
+    ncols = 8 if n_lams > 8 else n_lams
+    nrows = _ceil(n_lams / 8)
+    figsize = (4 * ncols, 4 * nrows)
+    fig, axs = _plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize, dpi=300)
+    axs = [axs] if n_lams == 1 else axs.flatten()
+
+    # Take the overall reference as the first frame of the first simulation
+    reference_traj = _os.path.join(
+        lam_windows[0].sims[0].output_dir, "traj000000001.dcd"
     )
 
-    for i, ax in enumerate(axs.flatten()):  # type: ignore
+    for i, ax in enumerate(axs):  # type: ignore
         if i < n_lams:
             lam_window = lam_windows[i]
             # One set of RMSDS for each lambda window
@@ -854,6 +1004,8 @@ def plot_rmsds(
                 input_dirs=input_dirs,
                 selection=selection,
                 tot_simtime=lam_window.sims[0].tot_simtime,
+                reference_traj=reference_traj,
+                group_selection=group_selection,
             )  # Total simtime should be the same for all sims
             ax.legend()
             ax.set_title(f"$\lambda$ = {lam_window.lam}")
@@ -873,7 +1025,10 @@ def plot_rmsds(
 
     fig.tight_layout()
 
-    name = f"{output_dir}/rmsd_{selection.replace(' ','')}"  # Use selection string to make sure save name is unique
+    group_selection_name = (
+        "none" if not group_selection else group_selection.replace(" ", "")
+    )
+    name = f"{output_dir}/rmsd_{selection.replace(' ','')}_{group_selection_name}"  # Use selection string to make sure save name is unique
     fig.savefig(
         name, dpi=300, bbox_inches="tight", facecolor="white", transparent=False
     )
@@ -1089,14 +1244,14 @@ def plot_comparitive_convergence(
     _plt.close(fig)
 
 
-def plot_comparitive_convergence_sq_sem(
+def plot_comparitive_convergence_sem(
     sim_runners: _SimulationRunnerIterator,
     output_dir: str = ".",
     name: _Optional[str] = None,
     color_indices: _Optional[_List[int]] = None,
 ) -> None:
     """
-    Plot the convergence of the squared SEM of the free energy changes
+    Plot the convergence of the SEM of the free energy changes
     for simulation runners against each other.
 
     Parameters

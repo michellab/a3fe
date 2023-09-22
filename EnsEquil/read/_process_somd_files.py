@@ -169,6 +169,52 @@ def read_mbar_pmf(outfile: str) -> _Tuple[_np.ndarray, _np.ndarray, _np.ndarray]
     return _np.array(lam), _np.array(pmf), _np.array(pmf_err)
 
 
+def read_mbar_gradients(
+    outfile: str,
+) -> _Tuple[_np.ndarray, _np.ndarray, _np.ndarray]:
+    """
+    Get the gradients of the free energy changes from the MBAR (not TI) results.
+    Note that there will be n-1 free energy changes for n lambda windows.
+
+    Parameters
+    ----------
+    outfile : str
+        The name of the output file.
+
+    Returns
+    -------
+    av_lams : np.ndarray
+        The average lambda value for the free energy change. For example,
+        if the change is between lam = 0 and lam = 0.1, then the average
+        lambda value will be 0.05.
+    grads : np.ndarray
+        The gradients of the free energy changes in kcal/mol.
+    grads_err : np.ndarray
+        The MBAR error in the gradients in kcal/mol.
+    """
+    with open(outfile, "r") as f:
+        lines = f.readlines()
+    av_lams = []
+    inter_dgs = []
+    inter_dgs_err = []
+    in_section = False
+    for line in lines:
+        if line.startswith("#DG from neighbouring lambda in kcal/mol"):
+            in_section = True
+            continue
+        if line.startswith("#"):
+            in_section = False
+            continue
+        if in_section:
+            delta_lam = float(line.split()[1]) - float(line.split()[0])
+            av_lam = (float(line.split()[0]) + float(line.split()[1])) / 2
+            av_lams.append(av_lam)
+            inter_dgs.append(float(line.split()[2]) / delta_lam)
+            inter_dgs_err.append(float(line.split()[3]) / delta_lam)
+
+    return _np.array(av_lams), _np.array(inter_dgs), _np.array(inter_dgs_err)
+
+
 def write_truncated_sim_datafile(
     simfile: str, outfile: str, fraction_final: float, fraction_initial: float = 0
 ) -> None:
