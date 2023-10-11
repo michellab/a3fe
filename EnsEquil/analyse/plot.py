@@ -13,6 +13,7 @@ __all__ = [
     "plot_gelman_rubin_rhat",
     "plot_comparitive_convergence",
     "plot_comparitive_convergence_sem",
+    "plot_normality",
 ]
 
 import glob as _glob
@@ -31,6 +32,7 @@ import numpy as _np
 import pandas as _pd
 import scipy.stats as _stats
 from scipy.stats import kruskal as _kruskal
+import seaborn as _sns
 
 from ..read._process_somd_files import read_mbar_pmf as _read_mbar_pmf
 from ..read._process_somd_files import read_overlap_mat as _read_overlap_mat
@@ -1385,6 +1387,63 @@ def plot_comparitive_convergence_sem(
     name = name if name else "comparitive_sem_convergence"
     fig.savefig(
         f"{output_dir}/{name}.png",
+        dpi=300,
+        bbox_inches="tight",
+        facecolor="white",
+        transparent=False,
+    )
+    _plt.close(fig)
+
+
+def plot_normality(data: _np.ndarray, output_dir: str) -> None:
+    """
+    Plot the histogram and QQ plot for a given set of data.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        The data to plot.
+    output_dir : str
+        The directory to save the plot to.
+
+    Returns
+    -------
+    None
+    """
+    # Plot the histogram and the QQ plot side-by-side
+    fig, axs = _plt.subplots(1, 3, figsize=(12, 4), dpi=300)
+
+    # Plot the histogram, kernel density estimate, and QQ plot
+    axs[0].hist(data, edgecolor="black")
+    _sns.kdeplot(data, ax=axs[1], color="black", linewidth=2)
+    _stats.probplot(data, plot=axs[2])
+
+    # Set the axis labels
+    axs[0].set_xlabel("Value")
+    axs[0].set_ylabel("Frequency")
+    axs[0].set_title("Histogram")
+    axs[1].set_xlabel("Value")
+    axs[1].set_ylabel("Frequency")
+    axs[1].set_title("Kernel Density Estimate")
+    axs[2].set_xlabel("Theoretical Normal Quantiles")
+    axs[2].set_ylabel("Ordered Values")
+    axs[2].set_title("QQ Plot")
+
+    # Compute the Shapiro-Wilk test and print the p value
+    _, p_value = _stats.shapiro(data)
+    axs[2].text(
+        0.5,
+        0.95,
+        f"Shapiro-Wilk p-value: {p_value:.2f}",
+        transform=axs[2].transAxes,
+        horizontalalignment="center",
+        verticalalignment="top",
+    )
+
+    # Stop the labels overlapping
+    fig.tight_layout()
+    fig.savefig(
+        f"{output_dir}/normality_plot.png",
         dpi=300,
         bbox_inches="tight",
         facecolor="white",
