@@ -337,7 +337,7 @@ class Simulation(_SimulationRunner):
                 )
             )
         # Need to modify the config file to set the correction n_cycles
-        n_cycles = int(runtime / self.time_per_cycle)
+        n_cycles = round(runtime / self.time_per_cycle)
         self._set_n_cycles(n_cycles)
 
         # Run SOMD - note that command excludes sbatch as this is added by the virtual queue
