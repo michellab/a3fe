@@ -235,11 +235,11 @@ class Calculation(_SimulationRunner):
         ----------
         simtime : float, Optional, default: 0.1
             The length of the short simulations to run, in ns.
-        er_type: str, optional, default="sem"
+        er_type: str, optional, default="root_var"
             Whether to integrate the standard error of the mean ("sem") or root
             variance of the gradients ("root_var") to calculate the optimal
             lambda values.
-        delta_er : float, default=0.1
+        delta_er : float, default=1
             If er_type == "root_var", the desired integrated root variance of the gradients
             between each lambda value, in kcal mol^(-1). If er_type == "sem", the
             desired integrated standard error of the mean of the gradients between each lambda
