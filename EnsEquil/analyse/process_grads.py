@@ -381,30 +381,26 @@ class GradientData:
         beta = (4.184 * 1000) / (_R * temperature)  # in kcal mol^-1
         predicted_overlap_mat = _np.zeros((self.n_lam, self.n_lam))
 
-        # Start with upper triangle
-        for base_index in range(self.n_lam):
-            unnormalised_overlap = 1
-            for i in range(self.n_lam - base_index):
-                if i != 0:
-                    delta_lam = (
-                        self.lam_vals[base_index + i]
-                        - self.lam_vals[base_index + i - 1]
-                    )
-                    av_var = (
-                        self.vars_intra[base_index + i]
-                        + self.vars_intra[base_index + i - 1]
-                    ) / 2
-                    unnormalised_overlap /= beta * delta_lam * _np.sqrt(av_var)
-                predicted_overlap_mat[base_index, base_index + i] = unnormalised_overlap
+        # Start with upper off-diagonal
+        for col_index in range(1, self.n_lam):
+            delta_lam = self.lam_vals[col_index] - self.lam_vals[col_index - 1]
+            average_var = (
+                self.vars_intra[col_index] + self.vars_intra[col_index - 1]
+            ) / 2
+            overlap = 1 / (2 + 0.5 * beta**2 * delta_lam**2 * average_var)
+            predicted_overlap_mat[col_index - 1, col_index] = overlap
 
-        # Copy the upper triangle to get the lower triangle, making sure not to duplicate the diagonal
-        predicted_overlap_mat += predicted_overlap_mat.T - _np.diag(
-            _np.diag(predicted_overlap_mat)
-        )
+        # Copy upper off-diagonal to lower off-diagonal
+        for row_index in range(1, self.n_lam):
+            predicted_overlap_mat[row_index, row_index - 1] = predicted_overlap_mat[
+                row_index - 1, row_index
+            ]
 
-        # Normalise by row
-        for i in range(self.n_lam):
-            predicted_overlap_mat[i, :] /= predicted_overlap_mat[i, :].sum()
+        # Compute the diagonal elements as 1 - current row sum
+        for row_index in range(self.n_lam):
+            predicted_overlap_mat[row_index, row_index] = (
+                1 - predicted_overlap_mat[row_index, :].sum()
+            )
 
         return predicted_overlap_mat
 
