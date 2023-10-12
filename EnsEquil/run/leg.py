@@ -433,13 +433,20 @@ class Leg(_SimulationRunner):
             and 0.1 kcal mol-1 ns^(1/2) for sem.
         run_nos : List[int], optional, default=[1]
             The run numbers to use for the calculation. Only 1 is run by default, so by default
-            we only analyse 1.
+            we only analyse 1. If using delta_er = "sem", more than one run must be specified.
 
         Returns
         -------
         mean_simulation_cost: float
             The mean cost of a simulation for the leg, in hr / ns.
         """
+        # Check that we have more than one run if using delta_er == "sem"
+        if er_type == "sem" and len(run_nos) == 1:
+            raise ValueError(
+                "If using er_type = 'sem', more than one run must be specified, as the "
+                "SEM is calculated using between-run errors by default."
+            )
+
         # Check that the leg has been set up
         if not hasattr(self, "stages"):
             raise ValueError(
