@@ -288,7 +288,7 @@ class Stage(_SimulationRunner):
         run_nos: _List[int],
         adaptive: bool = True,
         runtime: _Optional[float] = None,
-        max_runtime: float = 30,
+        max_runtime: float = 60,
     ) -> None:
         """Run the ensemble of simulations constituting the stage (optionally with adaptive
         equilibration detection), and, if using adaptive equilibration detection, perform
@@ -854,8 +854,8 @@ class Stage(_SimulationRunner):
             # Plot overlap matrices and PMFs
             _plot_overlap_mats(
                 output_dir=self.output_dir,
-                mbar_outfiles=mbar_outfiles,
                 nlam=len(self.lam_windows),
+                mbar_outfiles=mbar_outfiles,
             )
             _plot_mbar_pmf(mbar_outfiles, self.output_dir)
             equilibrated_gradient_data = _GradientData(
@@ -863,9 +863,9 @@ class Stage(_SimulationRunner):
             )
             _plot_overlap_mats(
                 output_dir=self.output_dir,
+                nlam=len(self.lam_windows),
                 predicted=True,
                 gradient_data=equilibrated_gradient_data,
-                nlam=len(self.lam_windows),
             )
 
         # Plot RMSDS
