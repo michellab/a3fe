@@ -17,12 +17,9 @@ from typing import Tuple as _Tuple
 import numpy as _np
 from sire.units import k_boltz as _k_boltz
 
-from ..read._process_slurm_files import \
-    get_slurm_file_base as _get_slurm_file_base
-from ..read._process_somd_files import \
-    read_simfile_option as _read_simfile_option
-from ..read._process_somd_files import \
-    write_simfile_option as _write_simfile_option
+from ..read._process_slurm_files import get_slurm_file_base as _get_slurm_file_base
+from ..read._process_somd_files import read_simfile_option as _read_simfile_option
+from ..read._process_somd_files import write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._virtual_queue import Job as _Job
 from ._virtual_queue import VirtualQueue as _VirtualQueue
@@ -340,7 +337,7 @@ class Simulation(_SimulationRunner):
                 )
             )
         # Need to modify the config file to set the correction n_cycles
-        n_cycles = int(runtime / self.time_per_cycle)
+        n_cycles = round(runtime / self.time_per_cycle)
         self._set_n_cycles(n_cycles)
 
         # Run SOMD - note that command excludes sbatch as this is added by the virtual queue
@@ -428,15 +425,19 @@ class Simulation(_SimulationRunner):
         if self.slurm_output_files:
             for file in self.slurm_output_files:
                 with open(file, "rt") as file:
+                    failed = True
                     for line in file.readlines():
                         if line.startswith("Simulation took"):
-                            return False
+                            # File shows success, so continue to next file
+                            failed = False
+                            break
+                    # We haven't found "Simulation took" in this file, indicating failure
+                    if failed:
+                        return True
 
-            # We aren't running and have output files, but no "Simulation took" line -> Failure
-            return True
-
-        else:  # No output files - assume we haven't run or failed
-            return False
+        # Either We aren't running and have output files, all with the "Simulation took" line,
+        # or we aren't running and have no output files - either way, we haven't failed
+        return False
 
     @property
     def slurm_output_files(self) -> _List[str]:

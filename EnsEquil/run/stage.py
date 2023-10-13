@@ -288,7 +288,7 @@ class Stage(_SimulationRunner):
         run_nos: _List[int],
         adaptive: bool = True,
         runtime: _Optional[float] = None,
-        max_runtime: float = 30,
+        max_runtime: float = 60,
     ) -> None:
         """Run the ensemble of simulations constituting the stage (optionally with adaptive
         equilibration detection), and, if using adaptive equilibration detection, perform
@@ -681,12 +681,19 @@ class Stage(_SimulationRunner):
             The number of lambda values to sample. If not provided, delta_er must be provided.
         run_nos : List[int], optional, default=[1]
             The run numbers to use for the calculation. Only 1 is run by default, so by default
-            we only analyse 1.
+            we only analyse 1. If using er_type = "SEM", more than one run must be specified.
         Returns
         -------
         optimal_lam_vals : np.ndarray
             List of optimal lambda values for the stage.
         """
+        # Check that we have more than one run if using delta_er == "sem"
+        if er_type == "sem" and len(run_nos) == 1:
+            raise ValueError(
+                "If using er_type = 'sem', more than one run must be specified, as the "
+                "SEM is calculated using between-run errors by default."
+            )
+
         self._logger.info(
             f"Calculating optimal lambda values with er_type = {er_type} and delta_er = {delta_er}..."
         )
@@ -854,8 +861,8 @@ class Stage(_SimulationRunner):
             # Plot overlap matrices and PMFs
             _plot_overlap_mats(
                 output_dir=self.output_dir,
-                mbar_outfiles=mbar_outfiles,
                 nlam=len(self.lam_windows),
+                mbar_outfiles=mbar_outfiles,
             )
             _plot_mbar_pmf(mbar_outfiles, self.output_dir)
             equilibrated_gradient_data = _GradientData(
@@ -863,9 +870,9 @@ class Stage(_SimulationRunner):
             )
             _plot_overlap_mats(
                 output_dir=self.output_dir,
+                nlam=len(self.lam_windows),
                 predicted=True,
                 gradient_data=equilibrated_gradient_data,
-                nlam=len(self.lam_windows),
             )
 
         # Plot RMSDS
