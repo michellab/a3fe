@@ -5,3 +5,4 @@ from .mbar import *
 from .plot import *
 from .process_grads import *
 from .rmsd import *
+from .waters import *

@@ -14,6 +14,7 @@ __all__ = [
     "plot_comparitive_convergence",
     "plot_comparitive_convergence_sem",
     "plot_normality",
+    "plot_av_waters",
 ]
 
 import glob as _glob
@@ -41,6 +42,7 @@ from .rmsd import get_rmsd as _get_rmsd
 from .compare import (
     get_comparitive_convergence_data as _get_comparitive_convergence_data,
 )
+from .waters import get_av_waters_stage as _get_av_waters_stage
 from ..run._utils import SimulationRunnerIterator as _SimulationRunnerIterator
 
 
@@ -1450,3 +1452,88 @@ def plot_normality(data: _np.ndarray, output_dir: str) -> None:
         transparent=False,
     )
     _plt.close(fig)
+
+
+def plot_av_waters(
+    lam_windows: _List["LamWindow"],
+    output_dir: str,
+    percent_traj: float,
+    index: int,
+    length: float,
+    index2: _Optional[int] = None,
+    length2: _Optional[float] = None,
+    run_nos: _Optional[_List[int]] = None,
+) -> None:
+    """
+    Calculate average number of waters within given distance
+    of an atom (or two atoms) with given index over the
+    specified percentage of the end of the trajectory,
+    for all simulations for all runs for all lambda windows
+    supplied.
+
+    Parameters
+    ----------
+    lam_windows : List[LamWindow]
+        List of LamWindow objects for which to calculate average number of waters
+
+    output_dir : str
+        Directory to save the plot to.
+
+    percent_traj : float
+        percentage of trajectory (beginning from end) over
+        which to average
+
+    index : int
+        Atom from which distance is calculated
+
+    length : float
+        Distance in Angstrom
+
+    index2 : int, optional, default=None
+        Optional. Index of second atom from which water must be within a specified distance
+
+    length2 : float, optional, default=None
+        Optional. Distance (Angstrom) from second atom which water must be within
+
+    run_nos : Optional[List[int]], default=None
+        Optional. List of run numbers to include in the analysis. If None, all runs will be included.
+
+    Returns
+    -------
+    avg_close_waters: _np.ndarray
+        Average number of waters within the specified distance(s) of the specified atom(s) for each
+        lambda window for each run. Shape is (n_runs, n_lam_windows).
+    """
+    # Get the data
+    lam_vals = _np.array([lam.lam for lam in lam_windows])
+    av_waters = _get_av_waters_stage(
+        lam_windows=lam_windows,
+        percent_traj=percent_traj,
+        index=index,
+        length=length,
+        index2=index2,
+        length2=length2,
+        run_nos=run_nos,
+    )
+
+    # Plot the data
+    y_label = (
+        f"Average number of waters within {length}"
+        + r"$\mathrm{AA}$ of atom"
+        + f"{index}"
+        if not index2
+        else f"Average number of waters within {length} "
+        + r"$\mathrm{AA}$ of atom"
+        + f"{index}"
+        + f" and {length2}"
+        + r"$\mathrm{AA}$ of atom"
+        + f"{index2}"
+    )
+    general_plot(
+        x_vals=lam_vals,
+        y_vals=av_waters,
+        x_label=r"$\lambda$",
+        y_label=y_label,
+        outfile=f"{output_dir}/av_waters_{index}_{length}_{index2}_{length2}.png",
+        run_nos=run_nos,
+    )

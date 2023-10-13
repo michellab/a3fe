@@ -96,7 +96,7 @@ def get_rmsd(
             rmsds_run = []
             for traj_file in traj_files:
                 mobile = _Universe(top_file, traj_file)
-                mobile.trajectory.add_transformations(*transforms)
+                # mobile.trajectory.add_transformations(*transforms)
                 R = _RMSD(
                     atomgroup=mobile,
                     reference=reference,
