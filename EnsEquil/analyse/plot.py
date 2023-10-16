@@ -1518,15 +1518,15 @@ def plot_av_waters(
 
     # Plot the data
     y_label = (
-        f"Average number of waters within {length}"
-        + r"$\mathrm{AA}$ of atom"
+        f"Average number of waters within \n {length} "
+        + r"$\mathrm{\AA}$ of atom "
         + f"{index}"
         if not index2
-        else f"Average number of waters within {length} "
-        + r"$\mathrm{AA}$ of atom"
-        + f"{index}"
-        + f" and {length2}"
-        + r"$\mathrm{AA}$ of atom"
+        else f"Average number of waters within\n {length} "
+        + r"$\mathrm{\AA}$ of index "
+        + f"{index} "
+        + f"and {length2} "
+        + r"$\mathrm{\AA}$ of index "
         + f"{index2}"
     )
     general_plot(
