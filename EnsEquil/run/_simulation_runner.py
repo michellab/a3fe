@@ -723,7 +723,7 @@ class SimulationRunner(ABC):
         for sub_sim_runner in self._sub_sim_runners:
             sub_sim_runner._refresh_logging()
 
-    def get_attr_values(self, attr: str) -> _Dict[SimulationRunner, _Any]:
+    def recursively_get_attr(self, attr: str) -> _Dict[SimulationRunner, _Any]:
         f"""
         Get the values of the attribute for the {self.__class__.__name__} and any sub-simulation runners.
         If the attribute is not present for a sub-simulation runner, None is returned.
@@ -745,11 +745,11 @@ class SimulationRunner(ABC):
             for sub_sim_runner in self._sub_sim_runners:
                 attrs_dict["sub_sim_runners"][
                     sub_sim_runner
-                ] = sub_sim_runner.get_attr_values(attr=attr)
+                ] = sub_sim_runner.recursively_get_attr(attr=attr)
 
         return attrs_dict
 
-    def set_attr_values(self, attr: str, value: _Any, force: bool = False) -> None:
+    def recursively_set_attr(self, attr: str, value: _Any, force: bool = False) -> None:
         f"""
         Set the attribute to the value for the {self.__class__.__name__} and any sub-simulation runners.
 
@@ -777,7 +777,7 @@ class SimulationRunner(ABC):
             self._logger.info(f"Setting the attribute {attr} to {value}.")
             setattr(self, attr, value)
         for sub_sim_runner in self._sub_sim_runners:
-            sub_sim_runner.set_attr_values(attr=attr, value=value, force=force)
+            sub_sim_runner.recursively_set_attr(attr=attr, value=value, force=force)
 
     def update_paths(self, old_sub_path: str, new_sub_path: str) -> None:
         """

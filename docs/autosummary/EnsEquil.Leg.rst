@@ -18,8 +18,8 @@
       ~Leg.analyse_convergence
       ~Leg.clean
       ~Leg.create_stage_input_dirs
-      ~Leg.get_attr_values
       ~Leg.get_optimal_lam_vals
+      ~Leg.get_results_df
       ~Leg.get_tot_gpu_time
       ~Leg.get_tot_simtime
       ~Leg.heat_and_preequil_input
@@ -28,9 +28,11 @@
       ~Leg.lighten
       ~Leg.minimise_input
       ~Leg.parameterise_input
+      ~Leg.recursively_get_attr
+      ~Leg.recursively_set_attr
+      ~Leg.reset
       ~Leg.run
       ~Leg.run_ensemble_equilibration
-      ~Leg.set_attr_values
       ~Leg.set_simfile_option
       ~Leg.setup
       ~Leg.solvate_input
@@ -63,6 +65,7 @@
       ~Leg.required_stages
       ~Leg.run_files
       ~Leg.running
+      ~Leg.runtime_attributes
       ~Leg.stages
       ~Leg.stream_log_level
       ~Leg.tot_gpu_time

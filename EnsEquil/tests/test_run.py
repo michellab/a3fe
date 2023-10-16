@@ -82,7 +82,7 @@ def test_update_paths(calc):
 
 def test_set_and_get_attributes(restrain_stage):
     """Check that the calculation attributes can be set and obtained correctly."""
-    attr_dict = restrain_stage.get_attr_values("ensemble_size")
+    attr_dict = restrain_stage.recursively_get_attr("ensemble_size")
     assert attr_dict["ensemble_size"] == 5
     assert (
         attr_dict["sub_sim_runners"][list(attr_dict["sub_sim_runners"].keys())[0]][
@@ -91,16 +91,16 @@ def test_set_and_get_attributes(restrain_stage):
         == 5
     )
     # Check it fails if the attribute doesn't exist
-    restrain_stage.set_attr_values("ensemble_sizee", 7)
-    attr_dict = restrain_stage.get_attr_values("ensemble_sizee")
+    restrain_stage.recursively_set_attr("ensemble_sizee", 7)
+    attr_dict = restrain_stage.recursively_get_attr("ensemble_sizee")
     assert attr_dict["ensemble_sizee"] == None
     # Check that we can force it to set the attribute
-    restrain_stage.set_attr_values("ensemble_sizee", 7, force=True)
-    attr_dict = restrain_stage.get_attr_values("ensemble_sizee")
+    restrain_stage.recursively_set_attr("ensemble_sizee", 7, force=True)
+    attr_dict = restrain_stage.recursively_get_attr("ensemble_sizee")
     assert attr_dict["ensemble_sizee"] == 7
     # Change the ensemble size attribute
-    restrain_stage.set_attr_values("ensemble_size", 7)
-    attr_dict = restrain_stage.get_attr_values("ensemble_size")
+    restrain_stage.recursively_set_attr("ensemble_size", 7)
+    attr_dict = restrain_stage.recursively_get_attr("ensemble_size")
     assert attr_dict["ensemble_size"] == 7
 
 

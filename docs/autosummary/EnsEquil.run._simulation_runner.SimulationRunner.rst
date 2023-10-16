@@ -17,14 +17,16 @@
       ~SimulationRunner.analyse
       ~SimulationRunner.analyse_convergence
       ~SimulationRunner.clean
-      ~SimulationRunner.get_attr_values
+      ~SimulationRunner.get_results_df
       ~SimulationRunner.get_tot_gpu_time
       ~SimulationRunner.get_tot_simtime
       ~SimulationRunner.is_equilibrated
       ~SimulationRunner.kill
       ~SimulationRunner.lighten
+      ~SimulationRunner.recursively_get_attr
+      ~SimulationRunner.recursively_set_attr
+      ~SimulationRunner.reset
       ~SimulationRunner.run
-      ~SimulationRunner.set_attr_values
       ~SimulationRunner.set_simfile_option
       ~SimulationRunner.setup
       ~SimulationRunner.update_paths
@@ -49,6 +51,7 @@
       ~SimulationRunner.output_dir
       ~SimulationRunner.run_files
       ~SimulationRunner.running
+      ~SimulationRunner.runtime_attributes
       ~SimulationRunner.stream_log_level
       ~SimulationRunner.tot_gpu_time
       ~SimulationRunner.tot_simtime

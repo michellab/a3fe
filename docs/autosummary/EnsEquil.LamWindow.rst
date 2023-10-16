@@ -17,14 +17,16 @@
       ~LamWindow.analyse
       ~LamWindow.analyse_convergence
       ~LamWindow.clean
-      ~LamWindow.get_attr_values
+      ~LamWindow.get_results_df
       ~LamWindow.get_tot_gpu_time
       ~LamWindow.get_tot_simtime
       ~LamWindow.is_equilibrated
       ~LamWindow.kill
       ~LamWindow.lighten
+      ~LamWindow.recursively_get_attr
+      ~LamWindow.recursively_set_attr
+      ~LamWindow.reset
       ~LamWindow.run
-      ~LamWindow.set_attr_values
       ~LamWindow.set_simfile_option
       ~LamWindow.setup
       ~LamWindow.update_paths
@@ -51,6 +53,7 @@
       ~LamWindow.output_dir
       ~LamWindow.run_files
       ~LamWindow.running
+      ~LamWindow.runtime_attributes
       ~LamWindow.sims
       ~LamWindow.stream_log_level
       ~LamWindow.tot_gpu_time

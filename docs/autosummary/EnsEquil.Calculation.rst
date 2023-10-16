@@ -17,15 +17,17 @@
       ~Calculation.analyse
       ~Calculation.analyse_convergence
       ~Calculation.clean
-      ~Calculation.get_attr_values
       ~Calculation.get_optimal_lam_vals
+      ~Calculation.get_results_df
       ~Calculation.get_tot_gpu_time
       ~Calculation.get_tot_simtime
       ~Calculation.is_equilibrated
       ~Calculation.kill
       ~Calculation.lighten
+      ~Calculation.recursively_get_attr
+      ~Calculation.recursively_set_attr
+      ~Calculation.reset
       ~Calculation.run
-      ~Calculation.set_attr_values
       ~Calculation.set_simfile_option
       ~Calculation.setup
       ~Calculation.update_paths
@@ -54,6 +56,7 @@
       ~Calculation.required_legs
       ~Calculation.run_files
       ~Calculation.running
+      ~Calculation.runtime_attributes
       ~Calculation.stream_log_level
       ~Calculation.tot_gpu_time
       ~Calculation.tot_simtime

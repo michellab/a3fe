@@ -20,7 +20,7 @@ def restrain_stage():
             stage_type=ee.enums.StageType.RESTRAIN,
         )
         # Set the relative simuation cost to 1
-        stage.set_attr_values("relative_simulation_cost", 1, force=True)
+        stage.recursively_set_attr("relative_simulation_cost", 1, force=True)
         # Must use yield so that the temporary directory is deleted after the tests
         # by the context manager and does not persist
         yield stage

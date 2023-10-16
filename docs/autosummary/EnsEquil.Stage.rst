@@ -17,15 +17,17 @@
       ~Stage.analyse
       ~Stage.analyse_convergence
       ~Stage.clean
-      ~Stage.get_attr_values
       ~Stage.get_optimal_lam_vals
+      ~Stage.get_results_df
       ~Stage.get_tot_gpu_time
       ~Stage.get_tot_simtime
       ~Stage.is_equilibrated
       ~Stage.kill
       ~Stage.lighten
+      ~Stage.recursively_get_attr
+      ~Stage.recursively_set_attr
+      ~Stage.reset
       ~Stage.run
-      ~Stage.set_attr_values
       ~Stage.set_simfile_option
       ~Stage.setup
       ~Stage.update
@@ -54,6 +56,7 @@
       ~Stage.output_dir
       ~Stage.run_files
       ~Stage.running
+      ~Stage.runtime_attributes
       ~Stage.stream_log_level
       ~Stage.tot_gpu_time
       ~Stage.tot_simtime
