@@ -93,9 +93,9 @@ def get_av_waters_lambda_window(
     lam_val: float,
     index: int,
     length: float,
+    run_nos: _List[int],
     index2: _Optional[int] = None,
     length2: _Optional[float] = None,
-    run_nos: _Optional[_List[int]] = None,
     print_fn: _Callable[[str], None] = print,
 ) -> _np.ndarray:
     """
@@ -123,14 +123,14 @@ def get_av_waters_lambda_window(
     length : float
         Distance in Angstrom
 
+    run_nos : List[int]
+        List of run numbers to include in the analysis.
+
     index2 : int, optional, default=None
         Optional. Index of second atom from which water must be within a specified distance
 
     length2 : float, optional, default=None
         Optional. Distance (Angstrom) from second atom which water must be within
-
-    run_nos : Optional[List[int]], default=None
-        Optional. List of run numbers to include in the analysis. If None, all runs will be included.
 
     print_fn : Optional[Callable[[str], None]], default=print
         Optional. Function to use for printing output.
@@ -211,7 +211,7 @@ def get_av_waters_stage(
         Average number of waters within the specified distance(s) of the specified atom(s) for each
         lambda window for each run. Shape is (n_runs, n_lam_windows).
     """
-    run_nos = lam_windows[0]._get_valid_run_nos(run_nos)
+    run_nos: _List["LamWindow"] = lam_windows[0]._get_valid_run_nos(run_nos)
     # Fill the array with Nans to start with
     avg_close_waters = _np.full((len(run_nos), len(lam_windows)), _np.nan)
     # Process the lambda windows in parallel
@@ -225,6 +225,7 @@ def get_av_waters_stage(
                     lam_window.lam,
                     index,
                     length,
+                    run_nos,
                     index2,
                     length2,
                     run_nos,
