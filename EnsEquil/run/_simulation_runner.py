@@ -969,7 +969,7 @@ class SimulationRunner(ABC):
             )
 
         # Store previous value of base dir before it is potentially overwritten below
-        suppliied_base_dir = self.base_dir
+        supplied_base_dir = self.base_dir
 
         # Load the SimulationRunner, possibly overwriting directories
         print(
@@ -980,7 +980,7 @@ class SimulationRunner(ABC):
 
         if update_paths:
             self.update_paths(
-                old_sub_path=self.base_dir, new_sub_path=suppliied_base_dir
+                old_sub_path=self.base_dir, new_sub_path=supplied_base_dir
             )
 
         # Refresh logging
