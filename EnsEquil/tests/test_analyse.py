@@ -273,7 +273,7 @@ def test_gelman_rubin(restrain_stage):
         assert rhat_dict == expected_rhat_dict
 
 
-def test_get_comparitive_convergence_data(restrain_stage_iterator):
+def test_get_comparitive_convergence_data_cumulative(restrain_stage_iterator):
     """Test the get_comparitive_convergence_data function."""
     results = get_comparitive_convergence_data(restrain_stage_iterator)
     times1 = results[0][0]
@@ -287,3 +287,19 @@ def test_get_comparitive_convergence_data(restrain_stage_iterator):
     assert dgs1.shape == (5, 20)
     assert np.array_equal(dgs1, dgs2)
     assert dgs1[-1][-1] == pytest.approx(1.716112, abs=1e-2)
+
+
+def test_get_comparitive_convergence_data_block(restrain_stage_iterator):
+    """Test the get_comparitive_convergence_data function."""
+    results = get_comparitive_convergence_data(restrain_stage_iterator, mode="block")
+    times1 = results[0][0]
+    times2 = results[1][0]
+    assert times1.shape == (20,)
+    # Check the arrays are the same with all
+    assert np.array_equal(times1, times2)
+    assert times1[-1] == pytest.approx(6.0, abs=1e-2)
+    dgs1 = results[0][1]
+    dgs2 = results[1][1]
+    assert dgs1.shape == (5, 20)
+    assert np.array_equal(dgs1, dgs2)
+    assert dgs1[-1][-1] == pytest.approx(1.674398, abs=1e-2)

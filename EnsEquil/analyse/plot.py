@@ -1271,6 +1271,7 @@ def plot_comparitive_convergence(
     sim_runners: _SimulationRunnerIterator,
     output_dir: str = ".",
     equilibrated: bool = False,
+    mode: str = "cumulative",
     name: _Optional[str] = None,
 ) -> None:
     """
@@ -1285,6 +1286,9 @@ def plot_comparitive_convergence(
     equilibrated : bool, optional, default=False
         Whether to use the equilibrated simulation time or the total simulation time. If False,
         all simulation data will be used, otherwise only the equilibrated data will be used.
+    mode : str, optional, default="cumulative"
+        "cumulative" or "block". The type of averaging to use. In both cases,
+        20 MBAR evaluations are performed per simulation runner.
     name : str, optional
         The name of the plot. Defaults to "comparitive_convergence".
 
@@ -1293,7 +1297,9 @@ def plot_comparitive_convergence(
     None
     """
     # Get the convergence data for each simulation runner
-    convergence_data = _get_comparitive_convergence_data(sim_runners, equilibrated)
+    convergence_data = _get_comparitive_convergence_data(
+        sim_runners, equilibrated, mode
+    )
 
     # Plot the convergence data
     fig, ax = _plt.subplots(figsize=(8, 6))
@@ -1346,6 +1352,7 @@ def plot_comparitive_convergence_sem(
     sim_runners: _SimulationRunnerIterator,
     output_dir: str = ".",
     equilibrated: bool = False,
+    mode: str = "cumulative",
     name: _Optional[str] = None,
     color_indices: _Optional[_List[int]] = None,
 ) -> None:
@@ -1362,6 +1369,9 @@ def plot_comparitive_convergence_sem(
     equilibrated : bool, optional, default=False
         Whether to use the equilibrated simulation time or the total simulation time. If False,
         all simulation data will be used, otherwise only the equilibrated data will be used.
+    mode : str, optional, default="cumulative"
+        "cumulative" or "block". The type of averaging to use. In both cases,
+        20 MBAR evaluations are performed per simulation runner.
     name : str, optional
         The name of the plot. Defaults to "comparitive_convergence".
     color_indices : List[int], optional
@@ -1378,7 +1388,9 @@ def plot_comparitive_convergence_sem(
         )
 
     # Get the convergence data for each simulation runner
-    convergence_data = _get_comparitive_convergence_data(sim_runners, equilibrated)
+    convergence_data = _get_comparitive_convergence_data(
+        sim_runners, equilibrated, mode
+    )
 
     # Plot the convergence data
     fig, ax = _plt.subplots(figsize=(8, 6))

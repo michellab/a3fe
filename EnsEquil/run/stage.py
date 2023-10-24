@@ -976,6 +976,7 @@ class Stage(_SimulationRunner):
     def analyse_convergence(
         self,
         run_nos: _Optional[_List[int]] = None,
+        mode: str = "cumulative",
         fraction: float = 1,
         equilibrated: bool = True,
     ) -> _Tuple[_np.ndarray, _np.ndarray]:
@@ -989,6 +990,9 @@ class Stage(_SimulationRunner):
         ----------
         run_nos : List[int], Optional, default: None
             The run numbers to analyse. If None, all runs will be analysed.
+        mode : str, optional, default="cumulative"
+            "cumulative" or "block". The type of averaging to use. In both cases,
+            20 MBAR evaluations are performed.
         fraction : float, optional, default=1
             The fraction of the total simulation time to use for the analysis.
             For example, if fraction=0.5, only the first 50 % of the simulation
@@ -1030,6 +1034,14 @@ class Stage(_SimulationRunner):
         end_percents = fracts * 100
         dg_overall = _np.zeros(len(fracts))
 
+        # If cumulative mode, start from start from the beginning of the simulation each time
+        if mode == "cumulative":
+            start_percents = _np.zeros(len(fracts))
+        elif mode == "block":
+            start_percents = _np.arange(0.00, 1.00, 0.05) * 100 * fraction
+        else:
+            raise ValueError("mode must be 'cumulative' or 'block'")
+
         # Make sure to re-write the equilibrated simfiles
         if equilibrated:
             for win in self.lam_windows:
@@ -1044,12 +1056,12 @@ class Stage(_SimulationRunner):
                         self.output_dir,
                         run_nos,
                         end_percent,
-                        0,  # Start percent
+                        start_percent,
                         False,  # Subsample
                         True,  # Delete output files
                         equilibrated,  # Equilibrated
                     )
-                    for end_percent in end_percents
+                    for start_percent, end_percent in zip(start_percents, end_percents)
                 ],
             )
             dg_overall = _np.array(

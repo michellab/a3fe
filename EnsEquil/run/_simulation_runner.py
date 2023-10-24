@@ -142,8 +142,15 @@ class SimulationRunner(ABC):
             # Save state
             self._dump()
 
-    def _set_up_logging(self) -> None:
-        """Set up the logging for the simulation runner."""
+    def _set_up_logging(self, null: bool = False) -> None:
+        """
+        Set up the logging for the simulation runner.
+
+        Parameters
+        ----------
+        null : bool, optional, default=False
+            Whether to silence all logging by writing to the null logger.
+        """
         # TODO: Debug - why is debug output no longer working
         # If logger exists, remove it and start again
         if hasattr(self, "_logger"):
@@ -520,6 +527,7 @@ class SimulationRunner(ABC):
     def analyse_convergence(
         self,
         run_nos: _Optional[_List[int]] = None,
+        mode: str = "cumulative",
         fraction: float = 1,
         equilibrated: bool = True,
     ) -> _Tuple[_np.ndarray, _np.ndarray]:
@@ -532,6 +540,9 @@ class SimulationRunner(ABC):
         ----------
         run_nos : List[int], Optional, default=None
             A list of the run numbers to analyse. If None, all runs are analysed.
+        mode : str, optional, default="cumulative"
+            "cumulative" or "block". The type of averaging to use. In both cases,
+            20 MBAR evaluations are performed.
         fraction: float, optional, default=1
             The fraction of the data to use for analysis. For example, if
             fraction=0.5, only the first half of the data will be used for
@@ -565,7 +576,7 @@ class SimulationRunner(ABC):
         # Now add up the data for each of the sub-simulation runners
         for sub_sim_runner in self._sub_sim_runners:
             _, dgs = sub_sim_runner.analyse_convergence(
-                run_nos=run_nos, fraction=fraction, equilibrated=equilibrated
+                run_nos=run_nos, mode=mode, fraction=fraction, equilibrated=equilibrated
             )
             # Decide if the component should be added or subtracted
             # according to the dg_multiplier attribute

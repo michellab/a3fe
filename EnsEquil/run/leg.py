@@ -1199,6 +1199,7 @@ class Leg(_SimulationRunner):
     def analyse_convergence(
         self,
         run_nos: _Optional[_List[int]] = None,
+        mode: str = "cumulative",
         fraction: float = 1,
         equilibrated: bool = True,
     ) -> _Tuple[_np.ndarray, _np.ndarray]:
@@ -1211,6 +1212,9 @@ class Leg(_SimulationRunner):
         ----------
         run_nos : Optional[List[int]], default=None
             If specified, only analyse the specified runs. Otherwise, analyse all runs.
+        mode : str, optional, default="cumulative"
+            "cumulative" or "block". The type of averaging to use. In both cases,
+            20 MBAR evaluations are performed.
         fraction: float, optional, default=1
             The fraction of the data to use for analysis. For example, if
             fraction=0.5, only the first half of the data will be used for
@@ -1242,7 +1246,7 @@ class Leg(_SimulationRunner):
         # Now add up the data for each of the sub-simulation runners
         for sub_sim_runner in self._sub_sim_runners:
             _, dgs = sub_sim_runner.analyse_convergence(
-                run_nos=run_nos, fraction=fraction, equilibrated=equilibrated
+                run_nos=run_nos, mode=mode, fraction=fraction, equilibrated=equilibrated
             )
             # Decide if the component should be added or subtracted
             # according to the dg_multiplier attribute

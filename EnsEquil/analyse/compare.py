@@ -51,6 +51,7 @@ def compare_variances_brown_forsythe(sim_runners: _SimulationRunnerIterator) -> 
 def get_comparitive_convergence_data(
     sim_runners: _SimulationRunnerIterator,
     equilibrated: bool = False,
+    mode: str = "cumulative",
 ) -> _List[_Tuple[_np.ndarray, _np.ndarray]]:
     """
     Get the convergence of multiple simulation runners against each other. The maximum time used for the
@@ -63,6 +64,9 @@ def get_comparitive_convergence_data(
     equilibrated : bool, default: False
         Whether to use the equilibrated simulation time or the total simulation time. If False,
         all simulation data will be used, otherwise only the equilibrated data will be used.
+    mode : str, optional, default="cumulative"
+        "cumulative" or "block". The type of averaging to use. In both cases,
+        20 MBAR evaluations are performed per simulation runner.
 
     Returns
     -------
@@ -83,7 +87,7 @@ def get_comparitive_convergence_data(
         # Adjust the fraction analysed so that the total time is the same for all simulation runners
         fraction = min_time / sim_runner.tot_simtime
         fracs, free_energies = sim_runner.analyse_convergence(
-            fraction=fraction, equilibrated=equilibrated
+            mode=mode, fraction=fraction, equilibrated=equilibrated
         )
         times = fracs * sim_runner.tot_simtime
         results.append((times, free_energies))
