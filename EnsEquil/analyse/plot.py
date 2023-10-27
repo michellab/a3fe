@@ -8,6 +8,7 @@ __all__ = [
     "plot_gradient_timeseries",
     "plot_equilibration_time",
     "plot_overlap_mat",
+    "plot_overlap_mats",
     "plot_mbar_pmf",
     "plot_against_exp",
     "plot_gelman_rubin_rhat",
