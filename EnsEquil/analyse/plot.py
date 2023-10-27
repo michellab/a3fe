@@ -11,7 +11,9 @@ __all__ = [
     "plot_mbar_pmf",
     "plot_against_exp",
     "plot_gelman_rubin_rhat",
+    "plot_comparitive_convergence_on_ax",
     "plot_comparitive_convergence",
+    "plot_comparitive_convergence_sem_on_ax",
     "plot_comparitive_convergence_sem",
     "plot_normality",
     "plot_av_waters",
@@ -1267,30 +1269,28 @@ def plot_gelman_rubin_rhat(
     _plt.close(fig)
 
 
-def plot_comparitive_convergence(
+def plot_comparitive_convergence_on_ax(
     sim_runners: _SimulationRunnerIterator,
-    output_dir: str = ".",
+    ax: _plt.Axes,
     equilibrated: bool = False,
     mode: str = "cumulative",
-    name: _Optional[str] = None,
 ) -> None:
     """
-    Plot the convergence of multiple simulation runners against each other.
+    Plot the convergence of multiple simulation runners against each other,
+    on the axis supplied.
 
     Parameters
     ----------
     sim_runners : List[sim_runner]
         The simulation runners to compare.
-    output_dir : str, optional
-        The directory to save the plot to. Defaults to the current directory.
+    ax : matplotlib axis
+        Axis on which to plot.
     equilibrated : bool, optional, default=False
         Whether to use the equilibrated simulation time or the total simulation time. If False,
         all simulation data will be used, otherwise only the equilibrated data will be used.
     mode : str, optional, default="cumulative"
         "cumulative" or "block". The type of averaging to use. In both cases,
         20 MBAR evaluations are performed per simulation runner.
-    name : str, optional
-        The name of the plot. Defaults to "comparitive_convergence".
 
     Returns
     -------
@@ -1302,7 +1302,6 @@ def plot_comparitive_convergence(
     )
 
     # Plot the convergence data
-    fig, ax = _plt.subplots(figsize=(8, 6))
     for i, (times, dgs) in enumerate(convergence_data):
         # Select a single colour for each simulation runner
         color = _plt.cm.tab10(i)
@@ -1332,6 +1331,45 @@ def plot_comparitive_convergence(
     ax.set_xlabel("Cumulative Total Sampling Time / ns")
     ax.set_ylabel(r"$\Delta G$ / kcal mol$^{-1}$")
     ax.legend(loc="best")
+
+
+def plot_comparitive_convergence(
+    sim_runners: _SimulationRunnerIterator,
+    output_dir: str = ".",
+    equilibrated: bool = False,
+    mode: str = "cumulative",
+    name: _Optional[str] = None,
+) -> None:
+    """
+    Plot the convergence of multiple simulation runners against each other.
+
+    Parameters
+    ----------
+    sim_runners : List[sim_runner]
+        The simulation runners to compare.
+    output_dir : str, optional
+        The directory to save the plot to. Defaults to the current directory.
+    equilibrated : bool, optional, default=False
+        Whether to use the equilibrated simulation time or the total simulation time. If False,
+        all simulation data will be used, otherwise only the equilibrated data will be used.
+    mode : str, optional, default="cumulative"
+        "cumulative" or "block". The type of averaging to use. In both cases,
+        20 MBAR evaluations are performed per simulation runner.
+    name : str, optional
+        The name of the plot. Defaults to "comparitive_convergence".
+
+    Returns
+    -------
+    None
+    """
+    # Create a figure and axis to plot the convergence data on
+    fig, ax = _plt.subplots(figsize=(8, 6))
+    plot_comparitive_convergence_on_ax(
+        sim_runners=sim_runners,
+        ax=ax,
+        equilibrated=equilibrated,
+        mode=mode,
+    )
     name = name if name else "comparitive_convergence"
     fig.savefig(
         f"{output_dir}/{name}.png",
@@ -1341,6 +1379,67 @@ def plot_comparitive_convergence(
         transparent=False,
     )
     _plt.close(fig)
+
+
+def plot_comparitive_convergence_sem_on_ax(
+    sim_runners: _SimulationRunnerIterator,
+    ax: _plt.Axes,
+    equilibrated: bool = False,
+    mode: str = "cumulative",
+    color_indices: _Optional[_List[int]] = None,
+) -> None:
+    """
+    Plot the convergence of the SEM of the free energy changes
+    for simulation runners against each other, on the supplied axis.
+
+    Parameters
+    ----------
+    sim_runners : List[sim_runner]
+        The simulation runners to compare.
+    ax: matplotlib axis
+        Axis on which to plot.
+    equilibrated : bool, optional, default=False
+        Whether to use the equilibrated simulation time or the total simulation time. If False,
+        all simulation data will be used, otherwise only the equilibrated data will be used.
+    mode : str, optional, default="cumulative"
+        "cumulative" or "block". The type of averaging to use. In both cases,
+        20 MBAR evaluations are performed per simulation runner.
+    color_indices : List[int], optional
+        The color group to use for the simulation runners. If None, a
+        different color will be used for each simulation runner.
+
+    Returns
+    -------
+    None
+    """
+    if color_indices and len(color_indices) != len(sim_runners):
+        raise ValueError(
+            "If color_indices is supplied, it must have the same length as sim_runners."
+        )
+
+    # Get the convergence data for each simulation runner
+    convergence_data = _get_comparitive_convergence_data(
+        sim_runners, equilibrated, mode
+    )
+
+    # Plot the convergence data
+    for i, (times, dgs) in enumerate(convergence_data):
+        # Select a single colour for each simulation runner
+        color = (
+            _plt.cm.tab10(i) if not color_indices else _plt.cm.tab10(color_indices[i])
+        )
+        # Calculate the squared SEM at each time point
+        sq_sems = (_np.std(dgs, axis=0)) / _np.sqrt(dgs.shape[0])
+        ax.plot(
+            times,
+            sq_sems,
+            label=f"{sim_runners.base_dirs[i]}",
+            color=color,
+        )
+
+    ax.set_xlabel("Cumulative Total Sampling Time / ns")
+    ax.set_ylabel(r"$\mathrm{SEM}$ / kcal mol$^{-1}$")
+    ax.legend(loc="best")
 
 
 def plot_comparitive_convergence_sem(
@@ -1377,35 +1476,15 @@ def plot_comparitive_convergence_sem(
     -------
     None
     """
-    if color_indices and len(color_indices) != len(sim_runners):
-        raise ValueError(
-            "If color_indices is supplied, it must have the same length as sim_runners."
-        )
-
-    # Get the convergence data for each simulation runner
-    convergence_data = _get_comparitive_convergence_data(
-        sim_runners, equilibrated, mode
-    )
-
     # Plot the convergence data
     fig, ax = _plt.subplots(figsize=(8, 6))
-    for i, (times, dgs) in enumerate(convergence_data):
-        # Select a single colour for each simulation runner
-        color = (
-            _plt.cm.tab10(i) if not color_indices else _plt.cm.tab10(color_indices[i])
-        )
-        # Calculate the squared SEM at each time point
-        sq_sems = (_np.std(dgs, axis=0)) / _np.sqrt(dgs.shape[0])
-        ax.plot(
-            times,
-            sq_sems,
-            label=f"{sim_runners.base_dirs[i]}",
-            color=color,
-        )
-
-    ax.set_xlabel("Cumulative Total Sampling Time / ns")
-    ax.set_ylabel(r"$\mathrm{SEM}$ / kcal mol$^{-1}$")
-    ax.legend(loc="best")
+    plot_comparitive_convergence_sem_on_ax(
+        sim_runners=sim_runners,
+        ax=ax,
+        equilibrated=equilibrated,
+        mode=mode,
+        color_indices=color_indices,
+    )
     name = name if name else "comparitive_sem_convergence"
     fig.savefig(
         f"{output_dir}/{name}.png",

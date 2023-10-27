@@ -94,25 +94,19 @@ def get_comparitive_convergence_data(
     # Get the convergence of each simulation runner
     results = []
     for sim_runner in sim_runners:
+        tot_equil_time = (
+            sim_runner.equil_time * sim_runner.ensemble_size if equilibrated else 0
+        )
         # Adjust the fraction analysed so that the total time is the same for all simulation runners
-        if equilibrated:
-            fraction = min_time / (
-                sim_runner.tot_simtime
-                - sim_runner.equil_time * sim_runner.ensemble_size
-            )
-        else:
-            fraction = min_time / sim_runner.tot_simtime
+        fraction = (min_time - tot_equil_time) / (
+            sim_runner.tot_simtime - tot_equil_time
+        )
 
         fracs, free_energies = sim_runner.analyse_convergence(
             mode=mode, fraction=fraction, equilibrated=equilibrated
         )
-        if equilibrated:
-            tot_equil_time = sim_runner.equil_time * sim_runner.ensemble_size
-            times = fracs * (sim_runner.tot_simtime - tot_equil_time) + tot_equil_time
-        else:
-            times = fracs * sim_runner.tot_simtime
+        times = fracs * (sim_runner.tot_simtime - tot_equil_time) + tot_equil_time
 
         results.append((times, free_energies))
-        breakpoint()
 
     return results
