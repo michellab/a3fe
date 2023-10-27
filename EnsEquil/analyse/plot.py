@@ -1329,12 +1329,7 @@ def plot_comparitive_convergence(
             color=color,
         )
 
-    xlabel = (
-        "Cumulative Total Sampling Time (Equilibration Ignored) / ns"
-        if not equilibrated
-        else "Cumulative Equilibrated Sampling Time / ns"
-    )
-    ax.set_xlabel(xlabel)
+    ax.set_xlabel("Cumulative Total Sampling Time / ns")
     ax.set_ylabel(r"$\Delta G$ / kcal mol$^{-1}$")
     ax.legend(loc="best")
     name = name if name else "comparitive_convergence"
@@ -1408,12 +1403,7 @@ def plot_comparitive_convergence_sem(
             color=color,
         )
 
-    xlabel = (
-        "Cumulative Total Sampling Time (Equilibration Ignored) / ns"
-        if not equilibrated
-        else "Cumulative Equilibrated Sampling Time / ns"
-    )
-    ax.set_xlabel(x_label)
+    ax.set_xlabel("Cumulative Total Sampling Time / ns")
     ax.set_ylabel(r"$\mathrm{SEM}$ / kcal mol$^{-1}$")
     ax.legend(loc="best")
     name = name if name else "comparitive_sem_convergence"

@@ -77,19 +77,42 @@ def get_comparitive_convergence_data(
     """
     # Get the minimum time used for the comparison
     min_time = float("inf")
+    equil_times = []
     for sim_runner in sim_runners:
+        equil_times.append(sim_runner.equil_time)
         # Make sure that the equilibration time is zero in all cases to allow for a fair comparison
         min_time = min(min_time, sim_runner.tot_simtime)
+
+    if equilibrated:
+        # Make sure that the equilibration times are equal
+        equil_times = [round(equil_time, 3) for equil_time in equil_times]
+        if not all([equil_time == min(equil_times) for equil_time in equil_times]):
+            raise ValueError(
+                "Equilibration times must be equal for all simulation runners."
+            )
 
     # Get the convergence of each simulation runner
     results = []
     for sim_runner in sim_runners:
         # Adjust the fraction analysed so that the total time is the same for all simulation runners
-        fraction = min_time / sim_runner.tot_simtime
+        if equilibrated:
+            fraction = min_time / (
+                sim_runner.tot_simtime
+                - sim_runner.equil_time * sim_runner.ensemble_size
+            )
+        else:
+            fraction = min_time / sim_runner.tot_simtime
+
         fracs, free_energies = sim_runner.analyse_convergence(
             mode=mode, fraction=fraction, equilibrated=equilibrated
         )
-        times = fracs * sim_runner.tot_simtime
+        if equilibrated:
+            tot_equil_time = sim_runner.equil_time * sim_runner.ensemble_size
+            times = fracs * (sim_runner.tot_simtime - tot_equil_time) + tot_equil_time
+        else:
+            times = fracs * sim_runner.tot_simtime
+
         results.append((times, free_energies))
+        breakpoint()
 
     return results
