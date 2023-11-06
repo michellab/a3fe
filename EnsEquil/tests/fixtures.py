@@ -38,6 +38,12 @@ def restrain_stage_iterator(restrain_stage):
 
 
 @pytest.fixture(scope="session")
+def restrain_stage_grad_data(restrain_stage):
+    """Create a gradient data object with analysis data"""
+    yield ee.analyse.GradientData(restrain_stage.lam_windows, equilibrated=True)
+
+
+@pytest.fixture(scope="session")
 def calc():
     """Create a calculation object to use in tests"""
     with TemporaryDirectory() as dirname:

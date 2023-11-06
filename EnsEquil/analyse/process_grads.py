@@ -174,6 +174,7 @@ class GradientData:
         self.sems_inter_delta_g = sems_inter_delta_g
         self.runtime_constant = lam_winds[0].runtime_constant  # Assume all the same
         self.run_nos = run_nos
+        self.lam_val_weights = lam_weights
 
     def get_time_normalised_sems(
         self, origin: str = "inter", smoothen: bool = True
@@ -292,6 +293,7 @@ class GradientData:
         n_lam_vals: _Optional[int] = None,
         sem_origin: str = "inter",
         smoothen_sems: bool = True,
+        round_lams: bool = True,
     ) -> _np.ndarray:
         """
         Calculate the optimal lambda values for a given number of lambda values
@@ -319,6 +321,9 @@ class GradientData:
             Whether to use the smoothened SEMs or not. If False, the raw SEMs
             are used. If True, the SEMs are smoothened by a block average over
             3 points. If er_type == "root_var", this is ignored.
+        round_lams : bool, optional, default=True
+            Whether to round the lambda values to 3 decimal places. This should always
+            be True, other than during testing.
 
         Returns
         -------
@@ -350,11 +355,30 @@ class GradientData:
 
         # For each desired SEM value, map it to a lambda value
         optimal_lam_vals = []
+        # optimal_intermediates = [
+        # _np.interp(sem, integrated_errors, self.lam_vals)
+        # for sem in requested_sem_vals
+        # ]
+        # optimal_lam_vals = []
+        # for i, intermed in enumerate(optimal_intermediates):
+        # if i == 0:
+        # optimal_lam_vals.append(intermed)
+        # elif i == len(optimal_intermediates) - 2:
+        # optimal_lam_vals.append(optimal_intermediates[-1])
+        # break
+        # else:
+        # optimal_lam_vals.append((intermed + optimal_intermediates[i + 1]) / 2)
+
+        # assert len(optimal_lam_vals) == len(optimal_intermediates) - 1
+
         for requested_sem in requested_sem_vals:
             optimal_lam_val = _np.interp(
                 requested_sem, integrated_errors, self.lam_vals
             )
-            optimal_lam_val = _np.round(optimal_lam_val, 3)
+            ## Note that rounding can result in slight decreases of the
+            ## performance compared to the theoretical maximum
+            if round_lams:
+                optimal_lam_val = _np.round(optimal_lam_val, 3)
             optimal_lam_vals.append(optimal_lam_val)
 
         optimal_lam_vals = _np.array(optimal_lam_vals)
@@ -403,6 +427,100 @@ class GradientData:
             )
 
         return predicted_overlap_mat
+
+    def get_predicted_improvement_factor(
+        self,
+        er_type: str = "sem",
+        sem_origin: str = "inter",
+        smoothen_sems: bool = False,
+        initial_lam_vals: _Optional[_List[float]] = None,
+    ) -> float:
+        """
+        Calculate the theoretical improvement factor in the standard deviation (error
+        type = "root_var") or standard error of the mean (error type = "sem") of the
+        free energy change between the first and last lambda windows, if the windows
+        were to be spaced optimally. The improvement factor is defined as the ratio
+        of the standard deviation or standard error of the mean of the free energy
+        change with the optimal spacing to that with the initial spacing (with equal
+        number of lambda windows).
+
+        See: Lundborg, Magnus, Jack Lidmar, and Berk Hess. "On the Path to Optimal Alchemistry."
+        The Protein Journal (2023): 1-13.
+
+        Parameters
+        ----------
+        er_type: str, optional, default="sem"
+            Whether to compute the metric based on the standard error of the mean ("sem")
+            or standard deviation ("root_var")(which does not account for autocorrelation).
+        sem_origin: str, optional, default="inter"
+            The origin of the SEM to integrate. Can be either 'inter' or 'intra'
+            for inter-run and intra-run SEMs respectively. If er_type == "root_var",
+            this is ignored.
+        smoothen_sems: bool, optional, default=True
+            Whether to use the smoothened SEMs or not. If False, the raw SEMs
+            are used. If True, the SEMs are smoothened by a block average over
+            3 points. If er_type == "root_var", this is ignored.
+        initial_lam_vals: List[float], optional, default=None
+            The reference lambda values to compare the theoretically-ideal lambda values
+            to (same number of lambda values but with optimal spacing). If None, the current
+            lambda values are used.
+
+        Returns
+        -------
+        predicted_improvement_factor : float
+            The theoretical improvement in the standard deviation or
+            standard error of the mean of the free energy change if optimal
+            spacing were used.
+        """
+        if initial_lam_vals is None:
+            initial_lam_vals = self.lam_vals
+
+        # Get the SEM or root variance of the free energy change
+        if er_type == "sem":
+            errors = self.get_time_normalised_sems(
+                origin=sem_origin, smoothen=smoothen_sems
+            )
+        elif er_type == "root_var":
+            errors = _np.sqrt(self.vars_intra)
+        else:
+            raise ValueError("er_type must be either 'sem' or 'root_var'")
+
+        # Calculate the optimal variance, e.g. thermodynamic length squared
+        v_opt = (_np.trapz(errors, self.lam_vals) ** 2) / len(initial_lam_vals)
+
+        # Assign boundaries for each lambda value
+        lam_boundaries = {}
+        for i, lam_val in enumerate(initial_lam_vals):
+            if i == 0:
+                lam_boundaries[lam_val] = [0, lam_val + 0.5 * initial_lam_vals[i + 1]]
+            elif i == len(initial_lam_vals) - 1:
+                lam_boundaries[lam_val] = [
+                    lam_val - 0.5 * (lam_val - initial_lam_vals[i - 1]),
+                    1,
+                ]
+            else:
+                lam_boundaries[lam_val] = [
+                    lam_val - 0.5 * (lam_val - initial_lam_vals[i - 1]),
+                    lam_val + 0.5 * (initial_lam_vals[i + 1] - lam_val),
+                ]
+
+        # Now, get the variances by assigning the integrated errors from the
+        # measured variances to the initial lambda values
+        integrated_errors = self.get_integrated_error(
+            er_type=er_type, origin=sem_origin, smoothen=smoothen_sems
+        )
+        weighted_initial_errors = []
+        for lam_val in initial_lam_vals:
+            boundaries = lam_boundaries[lam_val]
+            initial_error = _np.interp(boundaries[0], self.lam_vals, integrated_errors)
+            final_error = _np.interp(boundaries[1], self.lam_vals, integrated_errors)
+            weighted_initial_errors.append(final_error - initial_error)
+
+        weighted_initial_errors = _np.array(weighted_initial_errors)
+        v_initial = _np.sum(weighted_initial_errors**2)
+
+        # Return improvement factor, which tells us how much the error would be reduced
+        return _np.sqrt(v_opt / v_initial)
 
 
 def get_time_series_multiwindow(

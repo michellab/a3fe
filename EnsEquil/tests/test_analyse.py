@@ -14,7 +14,7 @@ from ..analyse.detect_equil import (
 from ..analyse.process_grads import get_time_series_multiwindow
 from ..analyse.compare import get_comparitive_convergence_data
 
-from .fixtures import restrain_stage, restrain_stage_iterator
+from .fixtures import restrain_stage, restrain_stage_iterator, restrain_stage_grad_data
 
 
 def test_analysis_all_runs(restrain_stage):
@@ -303,3 +303,42 @@ def test_get_comparitive_convergence_data_block(restrain_stage_iterator):
     assert dgs1.shape == (5, 20)
     assert np.array_equal(dgs1, dgs2)
     assert dgs1[-1][-1] == pytest.approx(1.674398, abs=1e-2)
+
+
+def test_predicted_improvement_factor(restrain_stage_grad_data):
+    """
+    Test the predicted improvement factor calculation,
+    and also check that the optimal lam vals calulcation
+    satisfies this.
+    """
+    grad_data = restrain_stage_grad_data
+    # Test with SEM
+    improvement_sem_20 = grad_data.get_predicted_improvement_factor(
+        initial_lam_vals=grad_data.calculate_optimal_lam_vals(
+            n_lam_vals=20, er_type="sem", smoothen_sems=False, round_lams=False
+        ),
+        er_type="sem",
+    )
+    assert improvement_sem_20 > 0.98
+    improvement_sem_100 = grad_data.get_predicted_improvement_factor(
+        initial_lam_vals=grad_data.calculate_optimal_lam_vals(
+            n_lam_vals=100, er_type="sem", smoothen_sems=False, round_lams=False
+        ),
+        er_type="sem",
+    )
+    assert improvement_sem_100 == pytest.approx(1.0, abs=1e-2)
+    # Test with SD
+    improvement_sd_20 = grad_data.get_predicted_improvement_factor(
+        initial_lam_vals=grad_data.calculate_optimal_lam_vals(
+            n_lam_vals=20, er_type="root_var", round_lams=False
+        ),
+        er_type="root_var",
+    )
+    assert improvement_sd_20 > 0.98
+    improvement_sd_100 = grad_data.get_predicted_improvement_factor(
+        initial_lam_vals=grad_data.calculate_optimal_lam_vals(
+            n_lam_vals=100, er_type="root_var", round_lams=False
+        ),
+        er_type="root_var",
+    )
+    assert improvement_sd_100 == pytest.approx(1.0, abs=1e-2)
