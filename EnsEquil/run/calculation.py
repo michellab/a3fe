@@ -223,6 +223,8 @@ class Calculation(_SimulationRunner):
         simtime: float = 0.1,
         er_type: str = "root_var",
         delta_er: float = 1,
+        set_relative_sim_cost: bool = True,
+        reference_sim_cost: float = 0.16,
         run_nos: _List[int] = [1],
     ) -> None:
         """
@@ -245,6 +247,14 @@ class Calculation(_SimulationRunner):
             desired integrated standard error of the mean of the gradients between each lambda
             value, in kcal mol^(-1) ns^(1/2). A sensible default for root_var is 1 kcal mol-1,
             and 0,1 kcal mol-1 ns^(1/2) for sem.
+        set_relative_sim_cost: bool, optional, default=True
+            Whether to recursively set the relative simulation cost for the leg and all
+            sub simulation runners according to the mean simulation cost of the leg.
+        reference_sim_cost: float, optional, default=0.16
+            The reference simulation cost to use if set_relative_sim_cost is True, in hr / ns.
+            The default of 0.16 is the average bound leg simulation cost from a test set of ligands
+            of a range of system sizes. This is used to set the relative simulation cost according to
+            average_sim_cost / reference_sim_cost.
         run_nos : List[int], optional, default=[1]
             The run numbers to use for the calculation. Only 1 is run by default, so by default
             we only analyse 1. If using delta_er == "sem", more than one run must be specified.
@@ -275,18 +285,14 @@ class Calculation(_SimulationRunner):
         for leg in self.legs:
             # Set simtime = None to avoid running any more simulations
             cost = leg.get_optimal_lam_vals(
-                simtime=None, er_type=er_type, delta_er=delta_er, run_nos=run_nos
+                simtime=None,
+                er_type=er_type,
+                delta_er=delta_er,
+                set_relative_sim_cost=set_relative_sim_cost,
+                reference_sim_cost=reference_sim_cost,
+                run_nos=run_nos,
             )
             costs[leg.leg_type] = cost
-
-        # Set the relative simulation cost for the free leg simulations
-        self._logger.info("Setting relative simulation costs...")
-        free_rel_simulation_cost = costs[_LegType.FREE] / costs[_LegType.BOUND]
-        for leg in self.legs:
-            if leg.leg_type == _LegType.FREE:
-                leg.recursively_set_attr(
-                    "relative_simulation_cost", free_rel_simulation_cost, force=True
-                )
 
         # Save state
         self._dump()
