@@ -6,7 +6,6 @@ __all__ = [
     "compute_statistic",
 ]
 
-from ensurepip import bootstrap
 from typing import Dict as _Dict
 from typing import List as _List
 from typing import Tuple as _Tuple
@@ -144,7 +143,7 @@ def compute_statistic(exp_dg: _pd.Series, calc_dg: _pd.Series, statistic: str) -
     if statistic == "mue":
         return _metrics.mean_absolute_error(exp_dg, calc_dg)
     if statistic == "rmse":
-        return _metrics.mean_squared_error(exp_dg, calc_dg)
+        return _np.sqrt(_metrics.mean_squared_error(exp_dg, calc_dg))
     if statistic == "rho":
         return _stats.spearmanr(exp_dg, calc_dg)[0]
     if statistic == "tau":
