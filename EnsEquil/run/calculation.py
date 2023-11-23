@@ -224,7 +224,7 @@ class Calculation(_SimulationRunner):
         er_type: str = "root_var",
         delta_er: float = 1,
         set_relative_sim_cost: bool = True,
-        reference_sim_cost: float = 0.16,
+        reference_sim_cost: float = 0.21,
         run_nos: _List[int] = [1],
     ) -> None:
         """
@@ -252,9 +252,9 @@ class Calculation(_SimulationRunner):
             sub simulation runners according to the mean simulation cost of the leg.
         reference_sim_cost: float, optional, default=0.16
             The reference simulation cost to use if set_relative_sim_cost is True, in hr / ns.
-            The default of 0.16 is the average bound leg simulation cost from a test set of ligands
-            of a range of system sizes. This is used to set the relative simulation cost according to
-            average_sim_cost / reference_sim_cost.
+            The default of 0.21 is the average bound leg simulation cost from a test set of ligands
+            of a range of system sizes on RTX 2080s. This is used to set the relative simulation
+            cost according to average_sim_cost / reference_sim_cost.
         run_nos : List[int], optional, default=[1]
             The run numbers to use for the calculation. Only 1 is run by default, so by default
             we only analyse 1. If using delta_er == "sem", more than one run must be specified.

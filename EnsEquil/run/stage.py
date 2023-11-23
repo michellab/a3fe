@@ -1207,6 +1207,7 @@ class Stage(_SimulationRunner):
                 block_size=self.block_size,
                 gradient_threshold=self.gradient_threshold,
                 runtime_constant=self.runtime_constant,
+                relative_simulation_cost=self.relative_simulation_cost,
                 ensemble_size=self.ensemble_size,
                 base_dir=lam_base_dir,
                 input_dir=self.input_dir,
