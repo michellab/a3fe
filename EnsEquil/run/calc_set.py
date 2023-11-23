@@ -299,6 +299,11 @@ class CalcSet(_SimulationRunner):
                 print(dg, conf_int)
             # Get the name of the ligand for the calculation and use this to add the results
             name = all_dgs.index[all_dgs["calc_base_dir"] == calc.base_dir]
+            # Make sure that there is only one row with this name
+            if not len(name) == 1:
+                raise ValueError(
+                    f"Found {len(name)} rows matching {calc.base_dir} in experimental dGs file"
+                )
             all_dgs.loc[name, "calc_dg"] = dg
             all_dgs.loc[name, "calc_er"] = conf_int
 
