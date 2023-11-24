@@ -20,6 +20,7 @@ dependencies:
   - ambertools
   - biosimspace
   - numpydoc
+  - gromacs
 
     # Testing
   - pytest
