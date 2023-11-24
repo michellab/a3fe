@@ -157,7 +157,7 @@ class Calculation(_SimulationRunner):
     @property
     def prep_stage(self) -> _PreparationStage:
         if self.legs:
-            min_prep_stage = _PreparationStage.STRUCTURES_ONLY
+            min_prep_stage = _PreparationStage.PREEQUILIBRATED
             for leg in self.legs:
                 min_prep_stage = min(
                     [min_prep_stage, leg.prep_stage], key=lambda x: x.value

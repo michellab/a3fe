@@ -6,15 +6,16 @@ import pathlib
 import subprocess
 from glob import glob
 from tempfile import TemporaryDirectory
+from typing import Optional
 
-import BioSimSpace as BSS
+import BioSimSpace.Sandpit.Exscientia as BSS
 import numpy as np
 import pytest
 
 import EnsEquil as ee
 
 from . import GROMACS_PRESENT, RUN_SLURM_TESTS, SLURM_PRESENT
-from .fixtures import calc, restrain_stage, complex_sys, mock_run_process, setup_calc
+from .fixtures import calc, restrain_stage, complex_sys
 
 LEGS_WITH_STAGES = {"bound": ["discharge", "vanish"], "free": ["discharge", "vanish"]}
 
@@ -137,13 +138,14 @@ def test_update(restrain_stage):
         assert lam.ensemble_size == 2
 
 
-class test_calc_setup:
+class TestCalcSetup:
     """
     Test the setup of a calculation and all sub-simulation runners.
     The function 'run_process' is patched so that the setup stages can be tested
     without actually running the simulations.
     """
 
+    @staticmethod
     @pytest.fixture(scope="class")
     def mock_run_process(complex_sys):
         """
@@ -184,6 +186,7 @@ class test_calc_setup:
         # Restore the original run_process function
         EnsEquil.run.system_prep.run_process = original_run_process
 
+    @staticmethod
     @pytest.fixture(scope="class")
     def setup_calc(mock_run_process):
         """Set up a calculation object completely from input files."""
@@ -193,30 +196,28 @@ class test_calc_setup:
             subprocess.run(
                 ["cp", "-r", "EnsEquil/data/example_run_dir/input", f"{dirname}/input"]
             )
-            calc = ee.Calculation(
+            setup_calc = ee.Calculation(
                 base_dir=dirname,
                 input_dir=f"{dirname}/input",
                 ensemble_size=1,
                 stream_log_level=logging.CRITICAL,  # Silence the logging
             )
-            assert calc.prep_stage == ee.run.enums.PreparationStage.PARAMETERISED
-            calc.setup(slurm=False)
-            yield calc
+            assert setup_calc.prep_stage == ee.run.enums.PreparationStage.PARAMETERISED
+            setup_calc.setup(slurm=False)
+            yield setup_calc
 
-    def test_setup_calc_overall(self, setup_calc):
+    def test_setup_calc_overall(self, setup_calc, mock_run_process):
         """Test that setting up the calculation was successful at a high level."""
-        calc = setup_calc
-        assert calc.setup_complete == True
-        assert calc.prep_stage == ee.run.enums.PreparationStage.PREEQUILIBRATED
-        assert len(calc.legs) == 2
-        legs = [leg.leg_type for leg in calc.legs]
+        assert setup_calc.setup_complete == True
+        assert setup_calc.prep_stage == ee.run.enums.PreparationStage.PREEQUILIBRATED
+        assert len(setup_calc.legs) == 2
+        legs = [leg.leg_type for leg in setup_calc.legs]
         assert ee.LegType.BOUND in legs
         assert ee.LegType.FREE in legs
 
-    def test_setup_calc_legs(self, setup_calc):
+    def test_setup_calc_legs(self, setup_calc, mock_run_process):
         """Test that setting up the calculation produced the correct legs."""
-        calc = setup_calc
-        for leg in calc.legs:
+        for leg in setup_calc.legs:
             expected_files = [
                 "Leg.log",
                 "vanish",
@@ -240,8 +241,7 @@ class test_calc_setup:
 
     def test_setup_calc_stages(self, setup_calc):
         """Test that setting up the calculation produced the correct stages."""
-        calc = setup_calc
-        for leg in calc.legs:
+        for leg in setup_calc.legs:
             expected_input_files = [
                 "run_somd.sh",
                 "somd_1.rst7",
@@ -271,7 +271,9 @@ class test_calc_setup:
                 assert len(base_files) == len(expected_base_files)
                 for file in expected_base_files:
                     assert file in os.listdir(stage.base_dir)
-                lam_vals = [float(lam.split("_")) for lam in os.listdir(stage.base_dir)]
+                lam_vals = [
+                    float(lam.split("_")[1]) for lam in os.listdir(stage.output_dir)
+                ]
                 expected_lam_vals = ee.Leg.default_lambda_values[leg.leg_type][
                     stage.stage_type
                 ]
@@ -280,9 +282,8 @@ class test_calc_setup:
 
     def test_setup_calc_lam(self, setup_calc):
         """Test that setting up the calculation produced the correct lambda windows."""
-        calc = setup_calc
-        expected_base_files = ["LamWindow.pkl", "output", "LamWindow.log", "run_01"]
-        for leg in calc.legs:
+        expected_base_files = ["LamWindow.pkl", "LamWindow.log", "run_01"]
+        for leg in setup_calc.legs:
             for stage in leg.stages:
                 for lam_win in stage.lam_windows:
                     assert lam_win.ensemble_size == 1
@@ -290,55 +291,27 @@ class test_calc_setup:
 
     def test_setup_calc_sims(self, setup_calc):
         """Test that setting up the calculation produced the correct simulations."""
-        calc = setup_calc
-        expected_base_files = [
-            "run_somd.sh",
-            "restraint.txt",
-            "somd.cfg",
-            "Simulation.pkl",
-            "Simulation.log",
-            "somd.prm7",
-            "somd.rst7",
-            "somd.pert",
-            "somd.err",
-            "somd.out",
-        ]
-        for leg in calc.legs:
+        for leg in setup_calc.legs:
+            expected_base_files = [
+                "run_somd.sh",
+                "somd.cfg",
+                "Simulation.pkl",
+                "Simulation.log",
+                "somd.prm7",
+                "somd.rst7",
+                "somd.pert",
+                "somd.err",
+                "somd.out",
+            ]
+            if leg.leg_type == ee.LegType.BOUND:
+                expected_base_files.append("restraint.txt")
             for stage in leg.stages:
                 for lam_win in stage.lam_windows:
                     for sim in lam_win.sims:
-                        assert os.listdir(sim.base_dir) == expected_base_files
-
-
-@pytest.mark.skipif(not GROMACS_PRESENT, reason="GROMACS not present")
-def test_setup_no_slurm():
-    """Test short setup stages without SLURM"""
-    with TemporaryDirectory() as dirname:
-        # Copy the example input directory to the temporary directory
-        # as we'll create some new files there
-        subprocess.run(
-            ["cp", "-r", "EnsEquil/data/example_run_dir/input", f"{dirname}/input"]
-        )
-        free_leg = ee.Leg(
-            base_dir=dirname,
-            input_dir=f"{dirname}/input",
-            ensemble_size=1,
-            stream_log_level=logging.CRITICAL,  # Silence the logging
-            leg_type=ee.run.enums.LegType.FREE,
-        )
-        # Test that the preparation stages work for the free leg to avoid wasting time
-        # running the complex
-        assert free_leg.leg_type == ee.run.enums.LegType.FREE
-        assert free_leg.prep_stage == ee.run.enums.PreparationStage.PARAMETERISED
-        free_leg.setup(slurm=False, short_ensemble_equil=True)
-        assert free_leg.prep_stage == ee.run.enums.PreparationStage.PREEQUILIBRATED
-        # Check that the required output files exist
-        for file in ["free_preequil.prm7", "free_preequil.rst7"]:
-            assert os.path.exists(os.path.join(free_leg.input_dir, file))
-        for file in ["somd_1.rst7", "somd.prm7", "somd.pert"]:
-            assert os.path.exists(
-                os.path.join(free_leg.base_dir, "discharge", "input", file)
-            )
+                        base_dir_files = os.listdir(sim.base_dir)
+                        assert len(base_dir_files) == len(expected_base_files)
+                        for file in expected_base_files:
+                            assert file in base_dir_files
 
 
 def test_simulation_runner_iterator(restrain_stage):
