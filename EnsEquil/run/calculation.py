@@ -142,7 +142,7 @@ class Calculation(_SimulationRunner):
             # We have the required files for this prep stage for both legs, and this is the most
             # advanced prep stage that files are present for
             if not files_absent:
-                self.prep_stage = prep_stage
+                self._prep_stage = prep_stage
                 self._logger.info(
                     f"Found all required input files for preparation stage {prep_stage.name.lower()}"
                 )
@@ -153,6 +153,18 @@ class Calculation(_SimulationRunner):
             f"any preparation stage. Required files are: {_Leg.required_input_files[_LegType.BOUND]}"
             f"and {_Leg.required_input_files[_LegType.FREE]}"
         )
+
+    @property
+    def prep_stage(self) -> _PreparationStage:
+        if self.legs:
+            min_prep_stage = _PreparationStage.STRUCTURES_ONLY
+            for leg in self.legs:
+                min_prep_stage = min(
+                    [min_prep_stage, leg.prep_stage], key=lambda x: x.value
+                )
+            self._prep_stage = min_prep_stage
+
+        return self._prep_stage
 
     def setup(
         self,

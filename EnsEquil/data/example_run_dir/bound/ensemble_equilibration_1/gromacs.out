@@ -1,0 +1,74 @@
+                      :-) GROMACS - gmx mdrun, 2021.3 (-:
+
+                            GROMACS is written by:
+     Andrey Alekseenko              Emile Apol              Rossen Apostolov     
+         Paul Bauer           Herman J.C. Berendsen           Par Bjelkmar       
+       Christian Blau           Viacheslav Bolnykh             Kevin Boyd        
+     Aldert van Buuren           Rudi van Drunen             Anton Feenstra      
+    Gilles Gouaillardet             Alan Gray               Gerrit Groenhof      
+       Anca Hamuraru            Vincent Hindriksen          M. Eric Irrgang      
+      Aleksei Iupinov           Christoph Junghans             Joe Jordan        
+    Dimitrios Karkoulis            Peter Kasson                Jiri Kraus        
+      Carsten Kutzner              Per Larsson              Justin A. Lemkul     
+       Viveca Lindahl            Magnus Lundborg             Erik Marklund       
+        Pascal Merz             Pieter Meulenhoff            Teemu Murtola       
+        Szilard Pall               Sander Pronk              Roland Schulz       
+       Michael Shirts            Alexey Shvetsov             Alfons Sijbers      
+       Peter Tieleman              Jon Vincent              Teemu Virolainen     
+     Christian Wennberg            Maarten Wolf              Artem Zhmurov       
+                           and the project leaders:
+        Mark Abraham, Berk Hess, Erik Lindahl, and David van der Spoel
+
+Copyright (c) 1991-2000, University of Groningen, The Netherlands.
+Copyright (c) 2001-2019, The GROMACS development team at
+Uppsala University, Stockholm University and
+the Royal Institute of Technology, Sweden.
+check out http://www.gromacs.org for more information.
+
+GROMACS is free software; you can redistribute it and/or modify it
+under the terms of the GNU Lesser General Public License
+as published by the Free Software Foundation; either version 2.1
+of the License, or (at your option) any later version.
+
+GROMACS:      gmx mdrun, version 2021.3
+Executable:   /usr/local/gromacs/bin/gmx
+Data prefix:  /usr/local/gromacs
+Working dir:  /home/finlayclark/software/devel/EnsEquil/EnsEquil/data/example_run_dir/bound/ensemble_equilibration_1
+Command line:
+  gmx mdrun -deffnm gromacs -c /home/finlayclark/software/devel/EnsEquil/EnsEquil/data/example_run_dir/bound/ensemble_equilibration_1/gromacs_out.gro
+
+Reading file gromacs.tpr, VERSION 2021.3 (single precision)
+Changing nstlist from 20 to 50, rlist from 0.835 to 0.924
+
+On host ishikawa 4 GPUs selected for this run.
+Mapping of GPU IDs to the 4 GPU tasks in the 4 ranks on this node:
+  PP:0,PP:1,PP:2,PP:3
+PP tasks will do (non-perturbed) short-ranged and most bonded interactions on the GPU
+PP task will update and constrain coordinates on the CPU
+Using 4 MPI threads
+Using 5 OpenMP threads per tMPI thread
+
+
+NOTE: DLB will not turn on during the first phase of PME tuning
+starting mdrun ''
+5000 steps,     10.0 ps.
+
+NOTE: DLB can now turn on, when beneficial
+
+Writing final coordinates.
+
+
+Dynamic load balancing report:
+ DLB was off during the run due to low measured imbalance.
+ Average load imbalance: 4.1%.
+ The balanceable part of the MD step is 53%, load imbalance is computed from this.
+ Part of the total run time spent waiting due to load imbalance: 2.2%.
+
+
+               Core t (s)   Wall t (s)        (%)
+       Time:    11617.243      580.862     2000.0
+                 (ns/day)    (hour/ns)
+Performance:        1.488       16.132
+
+GROMACS reminds you: "I have noticed a large, negative correlation between having a well-defined mission workload and concern for the Top500. It's almost like LINPACK is what you focus on when you don't know what to focus on." (Jeff Hammond)
+
