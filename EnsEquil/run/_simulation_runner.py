@@ -128,9 +128,11 @@ class SimulationRunner(ABC):
             for attribute, value in self.runtime_attributes.items():
                 setattr(self, attribute, value)
 
-            # Create attributes to store the free energy
+            # Create attributes to store the free energy and convergence data
             self._delta_g: _Union[None, _np.ndarray] = None
             self._delta_g_er: _Union[None, _np.ndarray] = None
+            self._delta_g_convergence: _Union[None, _np.ndarray] = None
+            self._delta_g_convergence_fracts: _Union[None, _np.ndarray] = None
 
             # Register the ensemble size
             self.ensemble_size = ensemble_size
@@ -328,7 +330,7 @@ class SimulationRunner(ABC):
         plot_rmsds: bool = False,
     ) -> _Tuple[_np.ndarray, _np.ndarray]:
         f"""
-        Analyse the {self.__class__.__name__} and any
+        Analyse the simulation runner and any
         sub-simulations, and return the overall free energy
         change.
 
@@ -584,6 +586,10 @@ class SimulationRunner(ABC):
 
         self._logger.info(f"Overall free energy changes: {dg_overall} kcal mol-1")
         self._logger.info(f"Fractions of (equilibrated) simulation time: {fracts}")
+
+        # Save the convergence information as an attribute
+        self._delta_g_convergence = dg_overall
+        self._delta_g_convergence_fracts = fracts
 
         # Plot the overall convergence and the squared SEM of the free energy change
         for plot in [_plot_convergence, _plot_sq_sem_convergence]:
