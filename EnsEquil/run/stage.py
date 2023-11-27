@@ -1074,6 +1074,10 @@ class Stage(_SimulationRunner):
         self._logger.info(f"Overall free energy changes: {dg_overall} kcal mol-1")
         self._logger.info(f"Fractions of (equilibrated) simulation time: {fracts}")
 
+        # Save the convergence information as an attribute
+        self._delta_g_convergence = dg_overall
+        self._delta_g_convergence_fracts = fracts
+
         # Plot the overall convergence and the squared SEM of the free energy change
         for plot in [_plot_convergence, _plot_sq_sem_convergence]:
             plot(
