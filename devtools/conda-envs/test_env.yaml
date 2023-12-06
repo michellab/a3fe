@@ -18,7 +18,7 @@ dependencies:
   - ipython
   - pymbar<4
   - ambertools
-  - biosimspace>=2023.4.0
+  - biosimspace>2023.4
   - numpydoc
   - gromacs
 
