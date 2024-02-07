@@ -152,6 +152,26 @@ def solvate_input(
     box_length = max(box_size) + 2 * padding
     box, angles = _BSS.Box.rhombicDodecahedronHexagon(box_length)
 
+    # Exclude waters if they are too far from the protein. These are unlikely
+    # to be important for the simulation and including them would require a larger
+    # box. Exclude if further than 10 A from the protein.
+    try:
+        waters_to_exclude = [
+            wat
+            for wat in parameterised_system.search(
+                "water and not (water within 10 of protein)"
+            ).molecules()
+        ]
+        # If we have failed to convert to molecules (old BSS bug), then do this for each molecule.
+        if hasattr(waters_to_exclude[0], "toMolecule"):
+            waters_to_exclude = [wat.toMolecule() for wat in waters_to_exclude]
+        print(
+            f"Excluding {len(waters_to_exclude)} waters that are over 10 A from the protein"
+        )
+    except ValueError:
+        waters_to_exclude = []
+    parameterised_system.removeMolecules(waters_to_exclude)
+
     print(f"Solvating system with {WATER_MODEL} water and {ION_CONC} M NaCl...")
     solvated_system = _BSS.Solvent.solvate(
         model=WATER_MODEL,
