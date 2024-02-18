@@ -6,6 +6,8 @@ a3fe
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Documentation Status](https://readthedocs.org/projects/a3fe/badge/?version=latest)](https://a3fe.readthedocs.io/en/latest/?badge=latest)
       
+<img src="./a3fe_logo.png" alt="Alt text" style="width: 50%; height: 50%;">
+
 A package for running adaptive alchemical absolute binding free energy calculations with SOMD based on an ensemble of simulations. This requires the SLURM scheduling system.
 
 ### Installation
