@@ -34,8 +34,8 @@ Now download a3fe, install, and test:
 - In the calculation base directory, run the following python code, either through ipython or as a python script (you will likely want to run the script with `nohup`or use ipython through tmux to ensure that the calculation is not killed when you lose connection)
 
 ```python
-import a3fe as ee 
-calc = ee.Calculation()
+import a3fe as a3 
+calc = a3.Calculation()
 calc.setup()
 calc.get_optimal_lam_vals()
 calc.run()

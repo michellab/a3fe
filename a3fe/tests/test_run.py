@@ -31,7 +31,7 @@ def test_calculation_loading(calc):
     )
     assert calc.output_dir == os.path.join(calc.base_dir, "output")
     assert calc.setup_complete == False
-    assert calc.prep_stage == a3.run.enums.PreparationStage.PARAMETERISED
+    assert calc.prep_stage.name == a3.run.enums.PreparationStage.PARAMETERISED.name
     assert calc.stream_log_level == logging.INFO
     # Check that pickle file exists
     assert os.path.exists(os.path.join(calc.base_dir, "Calculation.pkl"))
@@ -63,7 +63,7 @@ def test_calculation_reloading(calc):
     )
     assert calc2.output_dir == os.path.join(calc.base_dir, "output")
     assert calc2.setup_complete == False
-    assert calc2.prep_stage == a3.run.enums.PreparationStage.PARAMETERISED
+    assert calc2.prep_stage.name == a3.run.enums.PreparationStage.PARAMETERISED.name
     assert calc2.stream_log_level == logging.INFO
 
 
@@ -93,17 +93,17 @@ def test_set_and_get_attributes(restrain_stage):
         == 5
     )
     # Check it fails if the attribute doesn't exist
-    restrain_stage.recursively_set_attr("ensemble_size", 7)
-    attr_dict = restrain_stage.recursively_get_attr("ensemble_size")
-    assert attr_dict["ensemble_size"] == None
+    restrain_stage.recursively_set_attr("ensemble_sizee", 7)
+    attr_dict = restrain_stage.recursively_get_attr("ensemble_sizee")
+    assert attr_dict["ensemble_sizee"] == None
     # Check that we can force it to set the attribute
-    restrain_stage.recursively_set_attr("ensemble_size", 7, force=True)
-    attr_dict = restrain_stage.recursively_get_attr("ensemble_size")
-    assert attr_dict["ensemble_size"] == 7
+    restrain_stage.recursively_set_attr("ensemble_sizee", 7, force=True)
+    attr_dict = restrain_stage.recursively_get_attr("ensemble_sizee")
+    assert attr_dict["ensemble_sizee"] == 7
     # Change the ensemble size attribute
-    restrain_stage.recursively_set_attr("ensemble_size", 7)
-    attr_dict = restrain_stage.recursively_get_attr("ensemble_size")
-    assert attr_dict["ensemble_size"] == 7
+    restrain_stage.recursively_set_attr("ensemble_sizee", 7)
+    attr_dict = restrain_stage.recursively_get_attr("ensemble_sizee")
+    assert attr_dict["ensemble_sizee"] == 7
 
 
 def test_reset(restrain_stage):
@@ -202,14 +202,20 @@ class TestCalcSetup:
                 ensemble_size=1,
                 stream_log_level=logging.CRITICAL,  # Silence the logging
             )
-            assert setup_calc.prep_stage == a3.run.enums.PreparationStage.PARAMETERISED
+            assert (
+                setup_calc.prep_stage.name
+                == a3.run.enums.PreparationStage.PARAMETERISED.name
+            )
             setup_calc.setup(slurm=False)
             yield setup_calc
 
     def test_setup_calc_overall(self, setup_calc, mock_run_process):
         """Test that setting up the calculation was successful at a high level."""
         assert setup_calc.setup_complete == True
-        assert setup_calc.prep_stage == a3.run.enums.PreparationStage.PREEQUILIBRATED
+        assert (
+            setup_calc.prep_stage.name
+            == a3.run.enums.PreparationStage.PREEQUILIBRATED.name
+        )
         assert len(setup_calc.legs) == 2
         legs = [leg.leg_type for leg in setup_calc.legs]
         assert a3.LegType.BOUND in legs
@@ -365,7 +371,9 @@ def test_integration_calculation(calc_slurm):
     """Integration test to check that all major stages of the calculation work."""
 
     # Check that the preparation stages work
-    assert calc_slurm.prep_stage == a3.run.enums.PreparationStage.PARAMETERISED
+    assert (
+        calc_slurm.prep_stage.name == a3.run.enums.PreparationStage.PARAMETERISED.name
+    )
     calc_slurm.setup(short_ensemble_equil=True)
     assert calc_slurm.setup_complete == True
     # Check that all required slurm bash jobs have been created

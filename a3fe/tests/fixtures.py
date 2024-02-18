@@ -8,7 +8,7 @@ from typing import Optional
 import BioSimSpace.Sandpit.Exscientia as BSS
 import pytest
 
-import a3fe as ee
+import a3fe as a3
 
 
 @pytest.fixture(scope="session")
@@ -17,9 +17,9 @@ def restrain_stage():
     with TemporaryDirectory() as dirname:
         # Copy the input files to the temporary directory
         subprocess.run(["cp", "-r", "a3fe/data/example_restraint_stage/", dirname])
-        stage = ee.Stage(
+        stage = a3.Stage(
             base_dir=os.path.join(dirname, "example_restraint_stage"),
-            stage_type=ee.enums.StageType.RESTRAIN,
+            stage_type=a3.enums.StageType.RESTRAIN,
         )
         # Set the relative simuation cost to 1
         stage.recursively_set_attr("relative_simulation_cost", 1, force=True)
@@ -31,10 +31,10 @@ def restrain_stage():
 @pytest.fixture(scope="session")
 def restrain_stage_iterator(restrain_stage):
     """Create a simulation runner iterator object with analysis data to use in tests"""
-    restrain_stage_iterator = ee.run._utils.SimulationRunnerIterator(
+    restrain_stage_iterator = a3.run._utils.SimulationRunnerIterator(
         base_dirs=[restrain_stage.base_dir, restrain_stage.base_dir],
-        subclass=ee.Stage,
-        stage_type=ee.StageType.RESTRAIN,
+        subclass=a3.Stage,
+        stage_type=a3.StageType.RESTRAIN,
     )
     yield restrain_stage_iterator
 
@@ -42,14 +42,14 @@ def restrain_stage_iterator(restrain_stage):
 @pytest.fixture(scope="session")
 def restrain_stage_grad_data(restrain_stage):
     """Create a gradient data object with analysis data"""
-    yield ee.analyse.GradientData(restrain_stage.lam_windows, equilibrated=True)
+    yield a3.analyse.GradientData(restrain_stage.lam_windows, equilibrated=True)
 
 
 @pytest.fixture(scope="session")
 def calc():
     """Create a calculation object to use in tests"""
     with TemporaryDirectory() as dirname:
-        calc = ee.Calculation(
+        calc = a3.Calculation(
             base_dir=dirname,
             input_dir="a3fe/data/example_run_dir/input",
             ensemble_size=6,
