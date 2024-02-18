@@ -1,7 +1,7 @@
-﻿EnsEquil.run.\_simulation\_runner.SimulationRunner
+﻿a3fe.run.\_simulation\_runner.SimulationRunner
 ==================================================
 
-.. currentmodule:: EnsEquil.run._simulation_runner
+.. currentmodule:: a3fe.run._simulation_runner
 
 .. autoclass:: SimulationRunner
 

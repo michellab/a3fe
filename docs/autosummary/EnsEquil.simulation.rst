@@ -1,7 +1,7 @@
-﻿EnsEquil.simulation
+﻿a3fe.simulation
 ===================
 
-.. automodule:: EnsEquil.simulation
+.. automodule:: a3fe.simulation
 
    
    

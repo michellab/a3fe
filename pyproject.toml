@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 # Self-descriptive entries which should always be present
 # https://packaging.python.org/en/latest/specifications/declaring-project-metadata/
 [project]
-name = "EnsEquil"
+name = "a3fe"
 description = "A package for running free energy calculations with SOMD with automated equilibration detection based on an ensemble of simulations."
 dynamic = ["version"]
 readme = "README.md"
@@ -30,13 +30,13 @@ dependencies = [
      "matplotlib",
      "scipy",
      "ipython",
-     "pymbar<4",
+     "pymbar>=4",
 ]
 
 # Update the urls once the hosting is set up.
 #[project.urls]
-#"Source" = "https://github.com/<username>/EnsEquil/"
-#"Documentation" = "https://EnsEquil.readthedocs.io/"
+#"Source" = "https://github.com/<username>/a3fe/"
+#"Documentation" = "https://a3fe.readthedocs.io/"
 
 [project.optional-dependencies]
 test = [
@@ -76,7 +76,7 @@ where = ["."]
 
 # Ref https://setuptools.pypa.io/en/latest/userguide/datafiles.html#package-data
 [tool.setuptools.package-data]
-EnsEquil = [
+a3fe = [
     "py.typed"
 ]
 
@@ -96,4 +96,4 @@ match = ["*"]
 default-tag = "1.0.0"
 
 [tool.versioningit.write]
-file = "EnsEquil/_version.py"
+file = "a3fe/_version.py"

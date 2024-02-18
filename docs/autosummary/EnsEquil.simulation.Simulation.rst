@@ -1,7 +1,7 @@
-﻿EnsEquil.simulation.Simulation
+﻿a3fe.simulation.Simulation
 ==============================
 
-.. currentmodule:: EnsEquil
+.. currentmodule:: a3fe
 
 .. autoclass:: simulation.Simulation
 

@@ -12,7 +12,7 @@ import BioSimSpace.Sandpit.Exscientia as BSS
 import numpy as np
 import pytest
 
-import EnsEquil as ee
+import a3fe as ee
 
 from . import GROMACS_PRESENT, RUN_SLURM_TESTS, SLURM_PRESENT
 from .fixtures import calc, complex_sys, restrain_stage
@@ -27,7 +27,7 @@ def test_calculation_loading(calc):
     assert calc.loaded_from_pickle == False
     assert calc.ensemble_size == 6
     assert calc.input_dir == str(
-        pathlib.Path("EnsEquil/data/example_run_dir/input").resolve()
+        pathlib.Path("a3fe/data/example_run_dir/input").resolve()
     )
     assert calc.output_dir == os.path.join(calc.base_dir, "output")
     assert calc.setup_complete == False
@@ -54,12 +54,12 @@ def test_calculation_logging(calc):
 def test_calculation_reloading(calc):
     """Check that the calculations can be correctly loaded from a pickle."""
     calc2 = ee.Calculation(
-        base_dir=calc.base_dir, input_dir="EnsEquil/data/example_run_dir/input"
+        base_dir=calc.base_dir, input_dir="a3fe/data/example_run_dir/input"
     )
     assert calc2.loaded_from_pickle == True
     assert calc2.ensemble_size == 6
     assert calc2.input_dir == str(
-        pathlib.Path("EnsEquil/data/example_run_dir/input").resolve()
+        pathlib.Path("a3fe/data/example_run_dir/input").resolve()
     )
     assert calc2.output_dir == os.path.join(calc.base_dir, "output")
     assert calc2.setup_complete == False
@@ -73,7 +73,7 @@ def test_update_paths(calc):
         for file in glob(os.path.join(calc.base_dir, "*")):
             subprocess.run(["cp", "-r", file, new_dir])
         calc3 = ee.Calculation(
-            base_dir=new_dir, input_dir="EnsEquil/data/example_run_dir/input"
+            base_dir=new_dir, input_dir="a3fe/data/example_run_dir/input"
         )
         assert calc3.loaded_from_pickle == True
         current_dir = os.getcwd()
@@ -152,10 +152,10 @@ class TestCalcSetup:
         Mock the run_process function so that we can test the setup stages without
         actually running.
         """
-        import EnsEquil.run.system_prep
+        import a3fe.run.system_prep
 
         # Store the original run_process function
-        original_run_process = EnsEquil.run.system_prep.run_process
+        original_run_process = a3fe.run.system_prep.run_process
 
         def mock_run_process(
             system: BSS._SireWrappers._system.System,
@@ -168,7 +168,7 @@ class TestCalcSetup:
             # If so, make sure that there is a gromacs.xtc file in the work_dir
             if isinstance(protocol, BSS.Protocol.Production) and work_dir is not None:
                 traj_path = os.path.join(
-                    "EnsEquil",
+                    "a3fe",
                     "data",
                     "example_run_dir",
                     "bound",
@@ -180,11 +180,11 @@ class TestCalcSetup:
             return complex_sys
 
         # Patch the run_process function with the mock
-        EnsEquil.run.system_prep.run_process = mock_run_process
+        a3fe.run.system_prep.run_process = mock_run_process
         yield
 
         # Restore the original run_process function
-        EnsEquil.run.system_prep.run_process = original_run_process
+        a3fe.run.system_prep.run_process = original_run_process
 
     @staticmethod
     @pytest.fixture(scope="class")
@@ -194,7 +194,7 @@ class TestCalcSetup:
             # Copy the example input directory to the temporary directory
             # as we'll create some new files there
             subprocess.run(
-                ["cp", "-r", "EnsEquil/data/example_run_dir/input", f"{dirname}/input"]
+                ["cp", "-r", "a3fe/data/example_run_dir/input", f"{dirname}/input"]
             )
             setup_calc = ee.Calculation(
                 base_dir=dirname,
@@ -344,7 +344,7 @@ def calc_slurm():
         # as we'll create some new files there
         subprocess.run(["mkdir", "-p", dirname])
         subprocess.run(
-            ["cp", "-r", "EnsEquil/data/example_run_dir/input", f"{dirname}/input"]
+            ["cp", "-r", "a3fe/data/example_run_dir/input", f"{dirname}/input"]
         )
         calc = ee.Calculation(
             base_dir=dirname,

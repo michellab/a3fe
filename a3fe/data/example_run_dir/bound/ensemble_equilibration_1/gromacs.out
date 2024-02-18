@@ -33,9 +33,9 @@ of the License, or (at your option) any later version.
 GROMACS:      gmx mdrun, version 2021.3
 Executable:   /usr/local/gromacs/bin/gmx
 Data prefix:  /usr/local/gromacs
-Working dir:  /home/finlayclark/software/devel/EnsEquil/EnsEquil/data/example_run_dir/bound/ensemble_equilibration_1
+Working dir:  /home/finlayclark/software/devel/a3fe/a3fe/data/example_run_dir/bound/ensemble_equilibration_1
 Command line:
-  gmx mdrun -deffnm gromacs -c /home/finlayclark/software/devel/EnsEquil/EnsEquil/data/example_run_dir/bound/ensemble_equilibration_1/gromacs_out.gro
+  gmx mdrun -deffnm gromacs -c /home/finlayclark/software/devel/a3fe/a3fe/data/example_run_dir/bound/ensemble_equilibration_1/gromacs_out.gro
 
 Reading file gromacs.tpr, VERSION 2021.3 (single precision)
 Changing nstlist from 20 to 50, rlist from 0.835 to 0.924

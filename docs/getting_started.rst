@@ -1,23 +1,23 @@
 Getting Started
 ===============
-EnsEquil is a package for running alchemical absolute binding free energy calculations with SOMD (Sire / OpenMM Molecular Dynamics) through SLURM. 
+a3fe is a package for running alchemical absolute binding free energy calculations with SOMD (Sire / OpenMM Molecular Dynamics) through SLURM. 
 It is based on Sire(https://sire.openbiosim.org/) and also uses BioSimSpace(https://biosimspace.openbiosim.org/) during the set-up stages.
 
 Installation
 ************
-Please see the instructions on the github repo (https://github.com/fjclark/EnsEquil).
+Please see the instructions on the github repo (https://github.com/fjclark/a3fe).
 
 Quick Start
 ***********
-- Activate your EnsEquil conda environment 
+- Activate your a3fe conda environment 
 - Create a base directory for the calculation and create an directory called ``input`` within this
-- Move your input files into the the input directory. For example, if you have parameterised AMBER-format input files, name these bound_param.rst7, bound_param.prm7, free_param.rst7, and free_param.prm7. **Ensure that the ligand is named LIG and is the first molecule in the system.** For more details see Preparing Input for EnsEquil
-- Copy run somd.sh and template_config.sh from EnsEquil/EnsEquil/data/example_run_dir to your ``input`` directory, making sure to the SLURM options in run_somd.sh so that the jobs will run on your cluster
+- Move your input files into the the input directory. For example, if you have parameterised AMBER-format input files, name these bound_param.rst7, bound_param.prm7, free_param.rst7, and free_param.prm7. **Ensure that the ligand is named LIG and is the first molecule in the system.** For more details see Preparing Input for a3fe
+- Copy run somd.sh and template_config.sh from a3fe/a3fe/data/example_run_dir to your ``input`` directory, making sure to the SLURM options in run_somd.sh so that the jobs will run on your cluster
 - In the calculation base directory, run the following python code, either through ipython or as a python script (you will likely want to run this with ``nohup``/ through tmux to ensure that the calculation is not killed when you lose connection)
 
 .. code-block:: python
 
-    import EnsEquil as ee 
+    import a3fe as ee 
     calc = ee.Calculation()
     calc.setup()
     calc.run()
@@ -51,9 +51,9 @@ Some handy commands and code snippets, assuming that you have set up the calcula
     for leg in calc.legs:
         print(f"Total GPU hours for leg {leg.leg_type}: {leg.tot_gpu_time:.0f}")
 
-EnsEquil Design
+a3fe Design
 ***************
-EnsEquil stores and manipulates simulations based on a heirarchy of "simulation runners". Each simulation runner
+a3fe stores and manipulates simulations based on a heirarchy of "simulation runners". Each simulation runner
 is responsible for manipulating a set of "sub simulation runners". For example, ``Calculation`` objects hold and
 manipulate two ``Leg`` objects (bound and free), and ``Leg`` objects hold and manipulate ``Stage`` objects. The ``Stage``
 objects for first leg can be accessed through some Calculation instance ``calc`` with ``calc.legs[0].stages``. All simulation
@@ -75,10 +75,10 @@ allows them to be restarted at any point. The pickle files are automatically det
 runners when they are present in the base directory. For example, running ``calc = ee.Calculation()`` in the base directory of
 an pre-prepared calculation will load the previous calculation, overwriting any arguments supplied to Calculation().
 
-EnsEquil is designed to be easily adaptable to any SLURM cluster. The SLURM submission settings can be tailored by modifying
+a3fe is designed to be easily adaptable to any SLURM cluster. The SLURM submission settings can be tailored by modifying
 the header of ``template_config.cfg`` in the input directory.
 
-EnsEquil aims to run ABFE as efficiently as possible, while generating robust estimates of uncertainty. A user-specified number of 
+a3fe aims to run ABFE as efficiently as possible, while generating robust estimates of uncertainty. A user-specified number of 
 replicate simulations (this is specified when the simulation runner is created, e.g. ``calc = ee.Calculation(ensemble_size=5)``)
 are run (the default is 5). This allows:
 
@@ -88,14 +88,14 @@ are run (the default is 5). This allows:
 The adaptive equilibration algorithm decides if a set of repeat simulations at a given lambda window have equilibrated by averaging the
 individual dH/dlam over all repeats, then smoothing the result with block averaging (the block size can be specified when creating
 simulation runners, e.g. ``calc = ee.Calculation(block_size=1)``). If when the gradient of dH/dlam with respect to time falls below
-some threshold, the calculation is taken to be equilibrated, and the simulations are terminated. Otherwise, EnsEquil automatically
+some threshold, the calculation is taken to be equilibrated, and the simulations are terminated. Otherwise, a3fe automatically
 submits new SLURM jobs. This algorithm will be refined in future.
 
-If the input is not parameterised, EnsEquil will parameterise your input with ff14SB, OFF 2.0.0, and TIP3P. See 
-"Preparing Input for EnsEquil". EnsEquil will solvate your system in a rhombic dodecahedral box with 150 mM NaCl
+If the input is not parameterised, a3fe will parameterise your input with ff14SB, OFF 2.0.0, and TIP3P. See 
+"Preparing Input for a3fe". a3fe will solvate your system in a rhombic dodecahedral box with 150 mM NaCl
 and perform a standard minimisation, heating, and pre-equilibration routine.
 
-At present, EnsEquil uses GROMACS to run all set-up jobs, so please ensure that you have loaded the required CUDA and
+At present, a3fe uses GROMACS to run all set-up jobs, so please ensure that you have loaded the required CUDA and
 GROMACS modules, or sourced GMXRC. These GROMACS jobs are also submitted through SLURM, and a unique 5 ns "ensemble
 equilibration" simulation is run for each of the ``ensemble_size`` repeats. For the bound leg, these are used to extract
 different Boresch restraints for each replicate simulation using the in-built BioSimSpace algorithm (see
@@ -104,18 +104,18 @@ This fits force constants of the Boresch restraints according to the fluctuation
 to how severly they restrict the configurational space accessible to the ligand (more restriction is better as it indicates that the restraints are mimicking a 
 stronger native interaction).
 
-EnsEquil can use a default spacing of lambda windows which should work reasonably for most systems with the default SOMD
+a3fe can use a default spacing of lambda windows which should work reasonably for most systems with the default SOMD
 settings. However, to optimise the lambda schedule by running short (200 ps default) simulations and generating a new spacing
 according to the integrated variance of the gradients, run ``calc.get_optimal_lam_vals()``.
 
-One weakness of EnsEquil is that the molecular dynamics engine used for production simulations (SOMD) does not support enhanced sampling; HREX, REST2 etc are not available. However,
+One weakness of a3fe is that the molecular dynamics engine used for production simulations (SOMD) does not support enhanced sampling; HREX, REST2 etc are not available. However,
 this does mean that all individual SOMD simulations can be run in parallel. 
 
-Preparing Input for EnsEquil
+Preparing Input for a3fe
 ****************************
-EnsEquil accepts either PDB files of the protein and crystallographic waters, along with an sdf file for the ligand,
+a3fe accepts either PDB files of the protein and crystallographic waters, along with an sdf file for the ligand,
 or parameterised AMBER-format input files for the free and bound legs. The preparation stage will be detected
-by EnsEquil when you instantiate a Calculation, and only the required preparation steps will be carried out for each
+by a3fe when you instantiate a Calculation, and only the required preparation steps will be carried out for each
 leg. 
 
 To find out which input files are required for a given preparation stage for a given leg, run:
@@ -183,20 +183,20 @@ by simply editing the ligand name in the prm7 files.
 
 **The parameterisation step is liable to failure** and you may find it easier to parameterise the protein and waters using tleap.
 Once you have the files protein.rst7, protein.prm7, and ligand.sdf (and optionally waters.prm7 and waters.rst7), you can use the 
-notebook supplied in EnsEquil/Ensequil/data/example_run_dir/parameterise_and_assemble_input.ipynb to parameterise the ligand and create the parameterised
-input files required by EnsEquil.
+notebook supplied in a3fe/a3fe/data/example_run_dir/parameterise_and_assemble_input.ipynb to parameterise the ligand and create the parameterised
+input files required by a3fe.
 
 Running Simulations
 *******************
 Following the "Quick Start" guide will result in 5 repeat calculations being run for every lambda window. These will be adaptively
-checked for equilibration and resubmitted if equilibration has not been achieved, as described in "EnsEquil Design". The defaults
+checked for equilibration and resubmitted if equilibration has not been achieved, as described in "a3fe Design". The defaults
 can be modified when creating the Calculation, for example:
 
 .. code-block:: python
 
     calc = ee.Calculation(block_size=3, threshold=0.5, ensemble_size=4)
 
-EnsEquil is designed to be run adaptively, but can be run non-adaptively:
+a3fe is designed to be run adaptively, but can be run non-adaptively:
 
 .. code-block:: python
 

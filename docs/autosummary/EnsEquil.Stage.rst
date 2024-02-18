@@ -1,7 +1,7 @@
-﻿EnsEquil.Stage
+﻿a3fe.Stage
 ==============
 
-.. currentmodule:: EnsEquil
+.. currentmodule:: a3fe
 
 .. autoclass:: Stage
 

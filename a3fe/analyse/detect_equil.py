@@ -950,7 +950,7 @@ def dummy_check_equil_multiwindow(
 ) -> _Tuple[bool, _Optional[float]]:  # type: ignore
     """
     Becuse "check_equil_multiwindow" checks multiple windows at once and sets the _equilibrated
-    and _equil_time attributes of the lambda windows, but EnsEquil was written based on per-window
+    and _equil_time attributes of the lambda windows, but a3fe was written based on per-window
     checks, we need a dummy function which just reads the attributes of the lambda window and
     assumes that they have already been set by "check_equil_multiwindow".
 

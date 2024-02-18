@@ -1,7 +1,7 @@
-﻿EnsEquil.leg
+﻿a3fe.leg
 ============
 
-.. automodule:: EnsEquil.leg
+.. automodule:: a3fe.leg
 
    
    

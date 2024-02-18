@@ -1,5 +1,5 @@
 ;
-;	File '/home/finlayclark/software/devel/EnsEquil/EnsEquil/data/example_run_dir/bound/ensemble_equilibration_1/gromacs.out.mdp' was generated
+;	File '/home/finlayclark/software/devel/a3fe/a3fe/data/example_run_dir/bound/ensemble_equilibration_1/gromacs.out.mdp' was generated
 ;	By user: finlayclark (1001)
 ;	On host: ishikawa
 ;	At date: Thu Nov 23 17:06:52 2023
@@ -9,9 +9,9 @@
 ;	
 ;	Executable:   /usr/local/gromacs/bin/gmx
 ;	Data prefix:  /usr/local/gromacs
-;	Working dir:  /home/finlayclark/software/devel/EnsEquil/EnsEquil/data/example_run_dir/bound/ensemble_equilibration_1
+;	Working dir:  /home/finlayclark/software/devel/a3fe/a3fe/data/example_run_dir/bound/ensemble_equilibration_1
 ;	Command line:
-;	  gmx grompp -f /home/finlayclark/software/devel/EnsEquil/EnsEquil/data/example_run_dir/bound/ensemble_equilibration_1/gromacs.mdp -po /home/finlayclark/software/devel/EnsEquil/EnsEquil/data/example_run_dir/bound/ensemble_equilibration_1/gromacs.out.mdp -c /home/finlayclark/software/devel/EnsEquil/EnsEquil/data/example_run_dir/bound/ensemble_equilibration_1/gromacs.gro -p /home/finlayclark/software/devel/EnsEquil/EnsEquil/data/example_run_dir/bound/ensemble_equilibration_1/gromacs.top -r /home/finlayclark/software/devel/EnsEquil/EnsEquil/data/example_run_dir/bound/ensemble_equilibration_1/gromacs_ref.gro -o /home/finlayclark/software/devel/EnsEquil/EnsEquil/data/example_run_dir/bound/ensemble_equilibration_1/gromacs.tpr
+;	  gmx grompp -f /home/finlayclark/software/devel/a3fe/a3fe/data/example_run_dir/bound/ensemble_equilibration_1/gromacs.mdp -po /home/finlayclark/software/devel/a3fe/a3fe/data/example_run_dir/bound/ensemble_equilibration_1/gromacs.out.mdp -c /home/finlayclark/software/devel/a3fe/a3fe/data/example_run_dir/bound/ensemble_equilibration_1/gromacs.gro -p /home/finlayclark/software/devel/a3fe/a3fe/data/example_run_dir/bound/ensemble_equilibration_1/gromacs.top -r /home/finlayclark/software/devel/a3fe/a3fe/data/example_run_dir/bound/ensemble_equilibration_1/gromacs_ref.gro -o /home/finlayclark/software/devel/a3fe/a3fe/data/example_run_dir/bound/ensemble_equilibration_1/gromacs.tpr
 
 ; VARIOUS PREPROCESSING OPTIONS
 ; Preprocessor information: use cpp syntax.

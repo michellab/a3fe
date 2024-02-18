@@ -1,7 +1,7 @@
-﻿EnsEquil.PreparationStage
+﻿a3fe.PreparationStage
 =========================
 
-.. currentmodule:: EnsEquil
+.. currentmodule:: a3fe
 
 .. autoclass:: PreparationStage
 

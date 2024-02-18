@@ -1,7 +1,7 @@
-﻿EnsEquil.lambda\_window.LamWindow
+﻿a3fe.lambda\_window.LamWindow
 =================================
 
-.. currentmodule:: EnsEquil
+.. currentmodule:: a3fe
 
 .. autoclass:: lambda_window.LamWindow
 

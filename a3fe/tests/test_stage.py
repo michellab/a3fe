@@ -7,7 +7,7 @@ import os
 import subprocess
 from tempfile import TemporaryDirectory
 
-import EnsEquil as ee
+import a3fe as ee
 
 
 def test_dirs_created():
@@ -19,7 +19,7 @@ def test_dirs_created():
             [
                 "cp",
                 "-r",
-                "EnsEquil/data/example_run_dir/free/discharge/input",
+                "a3fe/data/example_run_dir/free/discharge/input",
                 f"{dirname}/input",
             ]
         )
