@@ -6,13 +6,9 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
-from ..read._process_somd_files import (
-    read_mbar_result,
-    read_overlap_mat,
-    write_truncated_sim_datafile,
-    read_mbar_pmf,
-    read_mbar_gradients,
-)
+from ..read._process_somd_files import (read_mbar_gradients, read_mbar_pmf,
+                                        read_mbar_result, read_overlap_mat,
+                                        write_truncated_sim_datafile)
 
 
 def test_read_mbar_result():

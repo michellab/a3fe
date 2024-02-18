@@ -18,8 +18,8 @@ from typing import Dict as _Dict
 from typing import List as _List
 from typing import Optional as _Optional
 from typing import Tuple as _Tuple
-from typing import Union as _Union
 from typing import Type as _Type
+from typing import Union as _Union
 
 import numpy as _np
 import pandas as _pd

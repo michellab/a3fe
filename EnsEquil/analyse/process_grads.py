@@ -12,9 +12,8 @@ from typing import Union as _Union
 import numpy as _np
 from scipy.constants import gas_constant as _R
 
-from .autocorrelation import (
-    get_statistical_inefficiency as _get_statistical_inefficiency,
-)
+from .autocorrelation import \
+    get_statistical_inefficiency as _get_statistical_inefficiency
 from .mbar import run_mbar as _run_mbar
 
 

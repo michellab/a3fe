@@ -20,7 +20,6 @@ sys.path.insert(0, os.path.abspath(".."))
 
 import EnsEquil
 
-
 # -- Project information -----------------------------------------------------
 
 project = "EnsEquil"

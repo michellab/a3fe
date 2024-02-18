@@ -1,12 +1,14 @@
 """Functionality for comparing two or more simulation runners."""
 
 
-import numpy as _np
-from ..run._utils import SimulationRunnerIterator as _SimulationRunnerIterator
+from typing import List as _List
+from typing import Tuple as _Tuple
+from typing import Union as _Union
 
+import numpy as _np
 from scipy.stats import levene as _levene
 
-from typing import List as _List, Tuple as _Tuple, Union as _Union
+from ..run._utils import SimulationRunnerIterator as _SimulationRunnerIterator
 
 __all__ = [
     "get_comparitive_convergence_data",

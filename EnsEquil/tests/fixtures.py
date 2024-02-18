@@ -7,7 +7,6 @@ from typing import Optional
 
 import BioSimSpace.Sandpit.Exscientia as BSS
 import pytest
-import subprocess
 
 import EnsEquil as ee
 

@@ -7,13 +7,13 @@ import os as _os
 import subprocess as _subprocess
 from tempfile import TemporaryDirectory as _TemporaryDirectory
 from typing import List as _List
-from typing import Tuple as _Tuple
 from typing import Optional as _Optional
+from typing import Tuple as _Tuple
 
 import BioSimSpace as _BSS
+import MDAnalysis.transformations as _trans
 import numpy as _np
 from MDAnalysis import Universe as _Universe
-import MDAnalysis.transformations as _trans
 from MDAnalysis.analysis.rms import RMSD as _RMSD
 
 

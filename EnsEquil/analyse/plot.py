@@ -29,24 +29,23 @@ from typing import List as _List
 from typing import Optional as _Optional
 from typing import Tuple as _Tuple
 
-import matplotlib.pyplot as _plt
-import matplotlib.colors as _colors
 import matplotlib.cm as _cm
+import matplotlib.colors as _colors
+import matplotlib.pyplot as _plt
 import numpy as _np
 import pandas as _pd
 import scipy.stats as _stats
-from scipy.stats import kruskal as _kruskal
 import seaborn as _sns
+from scipy.stats import kruskal as _kruskal
 
 from ..read._process_somd_files import read_mbar_pmf as _read_mbar_pmf
 from ..read._process_somd_files import read_overlap_mat as _read_overlap_mat
+from ..run._utils import SimulationRunnerIterator as _SimulationRunnerIterator
+from .compare import \
+    get_comparitive_convergence_data as _get_comparitive_convergence_data
 from .process_grads import GradientData
 from .rmsd import get_rmsd as _get_rmsd
-from .compare import (
-    get_comparitive_convergence_data as _get_comparitive_convergence_data,
-)
 from .waters import get_av_waters_stage as _get_av_waters_stage
-from ..run._utils import SimulationRunnerIterator as _SimulationRunnerIterator
 
 
 def general_plot(

@@ -16,11 +16,11 @@ from typing import Tuple as _Tuple
 
 import numpy as _np
 
+from ..read._process_somd_files import \
+    read_mbar_gradients as _read_mbar_gradients
 from ..read._process_somd_files import read_mbar_result as _read_mbar_result
-from ..read._process_somd_files import (
-    write_truncated_sim_datafile as _write_truncated_sim_datafile,
-    read_mbar_gradients as _read_mbar_gradients,
-)
+from ..read._process_somd_files import \
+    write_truncated_sim_datafile as _write_truncated_sim_datafile
 
 
 def run_mbar(

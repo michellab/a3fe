@@ -6,15 +6,13 @@ from tempfile import TemporaryDirectory
 import numpy as np
 import pytest
 
-from ..analyse.detect_equil import (
-    check_equil_multiwindow_gelman_rubin,
-    check_equil_multiwindow_modified_geweke,
-    check_equil_multiwindow_paired_t,
-)
-from ..analyse.process_grads import get_time_series_multiwindow
 from ..analyse.compare import get_comparitive_convergence_data
-
-from .fixtures import restrain_stage, restrain_stage_iterator, restrain_stage_grad_data
+from ..analyse.detect_equil import (check_equil_multiwindow_gelman_rubin,
+                                    check_equil_multiwindow_modified_geweke,
+                                    check_equil_multiwindow_paired_t)
+from ..analyse.process_grads import get_time_series_multiwindow
+from .fixtures import (restrain_stage, restrain_stage_grad_data,
+                       restrain_stage_iterator)
 
 
 def test_analysis_all_runs(restrain_stage):

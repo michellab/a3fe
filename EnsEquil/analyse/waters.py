@@ -1,18 +1,15 @@
 """Functions to analyse binding site waters."""
 
-from typing import (
-    List as _List,
-    Tuple as _Tuple,
-    Optional as _Optional,
-    Callable as _Callable,
-)
-
 import glob as _glob
+import os as _os
+from multiprocessing import Pool as _Pool
+from typing import Callable as _Callable
+from typing import List as _List
+from typing import Optional as _Optional
+from typing import Tuple as _Tuple
+
 import MDAnalysis as _mda
 import numpy as _np
-import os as _os
-
-from multiprocessing import Pool as _Pool
 
 
 def get_av_waters_simulation(

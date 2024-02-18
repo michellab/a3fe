@@ -15,7 +15,7 @@ import pytest
 import EnsEquil as ee
 
 from . import GROMACS_PRESENT, RUN_SLURM_TESTS, SLURM_PRESENT
-from .fixtures import calc, restrain_stage, complex_sys
+from .fixtures import calc, complex_sys, restrain_stage
 
 LEGS_WITH_STAGES = {"bound": ["discharge", "vanish"], "free": ["discharge", "vanish"]}
 

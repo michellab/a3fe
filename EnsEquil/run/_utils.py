@@ -4,12 +4,12 @@ import contextlib as _contextlib
 import os as _os
 from logging import Logger as _Logger
 from time import sleep as _sleep
+from typing import Any as _Any
 from typing import Callable as _Callable
 from typing import List as _List
 from typing import Optional as _Optional
 from typing import Tuple as _Tuple
 from typing import Type as _Type
-from typing import Any as _Any
 
 import BioSimSpace.Sandpit.Exscientia as _BSS
 

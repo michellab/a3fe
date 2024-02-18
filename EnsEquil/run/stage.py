@@ -23,34 +23,33 @@ import numpy as _np
 import pandas as _pd
 import scipy.stats as _stats
 
-from ..analyse.detect_equil import (
-    check_equil_multiwindow_gelman_rubin as _check_equil_multiwindow_gelman_rubin,
-)
-from ..analyse.detect_equil import (
-    check_equil_multiwindow_modified_geweke as _check_equil_multiwindow_modified_geweke,
-)
-from ..analyse.detect_equil import (
-    check_equil_multiwindow_paired_t as _check_equil_multiwindow_paired_t,
-)
-from ..analyse.detect_equil import (
-    dummy_check_equil_multiwindow as _dummy_check_equil_multiwindow,
-)
+from ..analyse.detect_equil import \
+    check_equil_multiwindow_gelman_rubin as \
+    _check_equil_multiwindow_gelman_rubin
+from ..analyse.detect_equil import \
+    check_equil_multiwindow_modified_geweke as \
+    _check_equil_multiwindow_modified_geweke
+from ..analyse.detect_equil import \
+    check_equil_multiwindow_paired_t as _check_equil_multiwindow_paired_t
+from ..analyse.detect_equil import \
+    dummy_check_equil_multiwindow as _dummy_check_equil_multiwindow
 from ..analyse.exceptions import AnalysisError as _AnalysisError
 from ..analyse.mbar import run_mbar as _run_mbar
 from ..analyse.plot import plot_convergence as _plot_convergence
 from ..analyse.plot import plot_equilibration_time as _plot_equilibration_time
 from ..analyse.plot import plot_gradient_hists as _plot_gradient_hists
 from ..analyse.plot import plot_gradient_stats as _plot_gradient_stats
-from ..analyse.plot import plot_gradient_timeseries as _plot_gradient_timeseries
+from ..analyse.plot import \
+    plot_gradient_timeseries as _plot_gradient_timeseries
+from ..analyse.plot import \
+    plot_mbar_gradient_convergence as _plot_mbar_gradient_convergence
 from ..analyse.plot import plot_mbar_pmf as _plot_mbar_pmf
 from ..analyse.plot import plot_overlap_mats as _plot_overlap_mats
 from ..analyse.plot import plot_rmsds as _plot_rmsds
 from ..analyse.plot import plot_sq_sem_convergence as _plot_sq_sem_convergence
-from ..analyse.plot import (
-    plot_mbar_gradient_convergence as _plot_mbar_gradient_convergence,
-)
 from ..analyse.process_grads import GradientData as _GradientData
-from ..read._process_somd_files import write_simfile_option as _write_simfile_option
+from ..read._process_somd_files import \
+    write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._utils import get_simtime as _get_simtime
 from ._virtual_queue import VirtualQueue as _VirtualQueue
