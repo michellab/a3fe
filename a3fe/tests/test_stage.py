@@ -7,7 +7,7 @@ import os
 import subprocess
 from tempfile import TemporaryDirectory
 
-import a3fe as ee
+import a3fe as a3
 
 
 def test_dirs_created():
@@ -24,8 +24,8 @@ def test_dirs_created():
             ]
         )
         # This should create output directories
-        ee.Stage(
-            stage_type=ee.StageType.DISCHARGE,
+        a3.Stage(
+            stage_type=a3.StageType.DISCHARGE,
             input_dir=f"{dirname}/input",
             base_dir=dirname,
             output_dir=f"{dirname}/output",

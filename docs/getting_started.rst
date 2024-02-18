@@ -17,8 +17,8 @@ Quick Start
 
 .. code-block:: python
 
-    import a3fe as ee 
-    calc = ee.Calculation()
+    import a3fe as a3 
+    calc = a3.Calculation()
     calc.setup()
     calc.run()
     calc.wait()
@@ -72,14 +72,14 @@ Calling calc.kill(), for example, recursively kills all sub simulation runners a
 Each simulation runner logs to a file in its base directory named according to the class name (e.g. Calculation.log). In addition,
 each simulation runner saves a pickled version of itself to a file named in the same way (e.g. Calculation.pkl), which
 allows them to be restarted at any point. The pickle files are automatically detected and used to load the Simulation
-runners when they are present in the base directory. For example, running ``calc = ee.Calculation()`` in the base directory of
+runners when they are present in the base directory. For example, running ``calc = a3.Calculation()`` in the base directory of
 an pre-prepared calculation will load the previous calculation, overwriting any arguments supplied to Calculation().
 
 a3fe is designed to be easily adaptable to any SLURM cluster. The SLURM submission settings can be tailored by modifying
 the header of ``template_config.cfg`` in the input directory.
 
 a3fe aims to run ABFE as efficiently as possible, while generating robust estimates of uncertainty. A user-specified number of 
-replicate simulations (this is specified when the simulation runner is created, e.g. ``calc = ee.Calculation(ensemble_size=5)``)
+replicate simulations (this is specified when the simulation runner is created, e.g. ``calc = a3.Calculation(ensemble_size=5)``)
 are run (the default is 5). This allows:
 
 - A reasonablly robust estimate of the uncertainty from the inter-run differences
@@ -87,7 +87,7 @@ are run (the default is 5). This allows:
 
 The adaptive equilibration algorithm decides if a set of repeat simulations at a given lambda window have equilibrated by averaging the
 individual dH/dlam over all repeats, then smoothing the result with block averaging (the block size can be specified when creating
-simulation runners, e.g. ``calc = ee.Calculation(block_size=1)``). If when the gradient of dH/dlam with respect to time falls below
+simulation runners, e.g. ``calc = a3.Calculation(block_size=1)``). If when the gradient of dH/dlam with respect to time falls below
 some threshold, the calculation is taken to be equilibrated, and the simulations are terminated. Otherwise, a3fe automatically
 submits new SLURM jobs. This algorithm will be refined in future.
 
@@ -123,7 +123,7 @@ To find out which input files are required for a given preparation stage for a g
 .. code-block:: python
 
     # Minimised parameterised structures for the free leg
-    ee.PreparationStage.MINIMISED.get_simulation_input_files(ee.LegType.FREE)
+    a3.PreparationStage.MINIMISED.get_simulation_input_files(a3.LegType.FREE)
 
 .. list-table:: Preparation stage types and required input files
    :widths: 25 25 25 50
@@ -194,7 +194,7 @@ can be modified when creating the Calculation, for example:
 
 .. code-block:: python
 
-    calc = ee.Calculation(block_size=3, threshold=0.5, ensemble_size=4)
+    calc = a3.Calculation(block_size=3, threshold=0.5, ensemble_size=4)
 
 a3fe is designed to be run adaptively, but can be run non-adaptively:
 

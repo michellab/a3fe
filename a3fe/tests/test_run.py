@@ -12,7 +12,7 @@ import BioSimSpace.Sandpit.Exscientia as BSS
 import numpy as np
 import pytest
 
-import a3fe as ee
+import a3fe as a3
 
 from . import GROMACS_PRESENT, RUN_SLURM_TESTS, SLURM_PRESENT
 from .fixtures import calc, complex_sys, restrain_stage
@@ -31,7 +31,7 @@ def test_calculation_loading(calc):
     )
     assert calc.output_dir == os.path.join(calc.base_dir, "output")
     assert calc.setup_complete == False
-    assert calc.prep_stage == ee.run.enums.PreparationStage.PARAMETERISED
+    assert calc.prep_stage == a3.run.enums.PreparationStage.PARAMETERISED
     assert calc.stream_log_level == logging.INFO
     # Check that pickle file exists
     assert os.path.exists(os.path.join(calc.base_dir, "Calculation.pkl"))
@@ -53,7 +53,7 @@ def test_calculation_logging(calc):
 
 def test_calculation_reloading(calc):
     """Check that the calculations can be correctly loaded from a pickle."""
-    calc2 = ee.Calculation(
+    calc2 = a3.Calculation(
         base_dir=calc.base_dir, input_dir="a3fe/data/example_run_dir/input"
     )
     assert calc2.loaded_from_pickle == True
@@ -63,7 +63,7 @@ def test_calculation_reloading(calc):
     )
     assert calc2.output_dir == os.path.join(calc.base_dir, "output")
     assert calc2.setup_complete == False
-    assert calc2.prep_stage == ee.run.enums.PreparationStage.PARAMETERISED
+    assert calc2.prep_stage == a3.run.enums.PreparationStage.PARAMETERISED
     assert calc2.stream_log_level == logging.INFO
 
 
@@ -72,7 +72,7 @@ def test_update_paths(calc):
     with TemporaryDirectory() as new_dir:
         for file in glob(os.path.join(calc.base_dir, "*")):
             subprocess.run(["cp", "-r", file, new_dir])
-        calc3 = ee.Calculation(
+        calc3 = a3.Calculation(
             base_dir=new_dir, input_dir="a3fe/data/example_run_dir/input"
         )
         assert calc3.loaded_from_pickle == True
@@ -93,13 +93,13 @@ def test_set_and_get_attributes(restrain_stage):
         == 5
     )
     # Check it fails if the attribute doesn't exist
-    restrain_stage.recursively_set_attr("ensemble_sizee", 7)
-    attr_dict = restrain_stage.recursively_get_attr("ensemble_sizee")
-    assert attr_dict["ensemble_sizee"] == None
+    restrain_stage.recursively_set_attr("ensemble_size", 7)
+    attr_dict = restrain_stage.recursively_get_attr("ensemble_size")
+    assert attr_dict["ensemble_size"] == None
     # Check that we can force it to set the attribute
-    restrain_stage.recursively_set_attr("ensemble_sizee", 7, force=True)
-    attr_dict = restrain_stage.recursively_get_attr("ensemble_sizee")
-    assert attr_dict["ensemble_sizee"] == 7
+    restrain_stage.recursively_set_attr("ensemble_size", 7, force=True)
+    attr_dict = restrain_stage.recursively_get_attr("ensemble_size")
+    assert attr_dict["ensemble_size"] == 7
     # Change the ensemble size attribute
     restrain_stage.recursively_set_attr("ensemble_size", 7)
     attr_dict = restrain_stage.recursively_get_attr("ensemble_size")
@@ -196,24 +196,24 @@ class TestCalcSetup:
             subprocess.run(
                 ["cp", "-r", "a3fe/data/example_run_dir/input", f"{dirname}/input"]
             )
-            setup_calc = ee.Calculation(
+            setup_calc = a3.Calculation(
                 base_dir=dirname,
                 input_dir=f"{dirname}/input",
                 ensemble_size=1,
                 stream_log_level=logging.CRITICAL,  # Silence the logging
             )
-            assert setup_calc.prep_stage == ee.run.enums.PreparationStage.PARAMETERISED
+            assert setup_calc.prep_stage == a3.run.enums.PreparationStage.PARAMETERISED
             setup_calc.setup(slurm=False)
             yield setup_calc
 
     def test_setup_calc_overall(self, setup_calc, mock_run_process):
         """Test that setting up the calculation was successful at a high level."""
         assert setup_calc.setup_complete == True
-        assert setup_calc.prep_stage == ee.run.enums.PreparationStage.PREEQUILIBRATED
+        assert setup_calc.prep_stage == a3.run.enums.PreparationStage.PREEQUILIBRATED
         assert len(setup_calc.legs) == 2
         legs = [leg.leg_type for leg in setup_calc.legs]
-        assert ee.LegType.BOUND in legs
-        assert ee.LegType.FREE in legs
+        assert a3.LegType.BOUND in legs
+        assert a3.LegType.FREE in legs
 
     def test_setup_calc_legs(self, setup_calc, mock_run_process):
         """Test that setting up the calculation produced the correct legs."""
@@ -226,10 +226,10 @@ class TestCalcSetup:
                 "ensemble_equilibration_1",
                 "virtual_queue.log",
             ]
-            expected_stage_types = [ee.StageType.DISCHARGE, ee.StageType.VANISH]
+            expected_stage_types = [a3.StageType.DISCHARGE, a3.StageType.VANISH]
 
-            if leg.leg_type == ee.LegType.BOUND:
-                expected_stage_types.append(ee.StageType.RESTRAIN)
+            if leg.leg_type == a3.LegType.BOUND:
+                expected_stage_types.append(a3.StageType.RESTRAIN)
                 expected_files.append("restrain")
 
             stage_types = [stage.stage_type for stage in leg.stages]
@@ -259,7 +259,7 @@ class TestCalcSetup:
                 "virtual_queue.log",
                 "Stage.log",
             ]
-            if leg.leg_type == ee.LegType.BOUND:
+            if leg.leg_type == a3.LegType.BOUND:
                 expected_input_files.append("restraint_1.txt")
 
             for stage in leg.stages:
@@ -274,7 +274,7 @@ class TestCalcSetup:
                 lam_vals = [
                     float(lam.split("_")[1]) for lam in os.listdir(stage.output_dir)
                 ]
-                expected_lam_vals = ee.Leg.default_lambda_values[leg.leg_type][
+                expected_lam_vals = a3.Leg.default_lambda_values[leg.leg_type][
                     stage.stage_type
                 ]
                 assert len(lam_vals) == len(expected_lam_vals)
@@ -303,7 +303,7 @@ class TestCalcSetup:
                 "somd.err",
                 "somd.out",
             ]
-            if leg.leg_type == ee.LegType.BOUND:
+            if leg.leg_type == a3.LegType.BOUND:
                 expected_base_files.append("restraint.txt")
             for stage in leg.stages:
                 for lam_win in stage.lam_windows:
@@ -318,9 +318,9 @@ def test_simulation_runner_iterator(restrain_stage):
     """Test that the simulation runner iterator works as expected."""
     # Take the first 3 lambda windows
     base_dirs = [window.base_dir for window in restrain_stage.lam_windows[:3]]
-    sim_runner_iterator = ee.run._utils.SimulationRunnerIterator(
+    sim_runner_iterator = a3.run._utils.SimulationRunnerIterator(
         base_dirs=base_dirs,
-        subclass=ee.LamWindow,
+        subclass=a3.LamWindow,
         lam=0,  # Overwritten once pickle loaded
         virtual_queue=restrain_stage.virtual_queue,
     )
@@ -346,7 +346,7 @@ def calc_slurm():
         subprocess.run(
             ["cp", "-r", "a3fe/data/example_run_dir/input", f"{dirname}/input"]
         )
-        calc = ee.Calculation(
+        calc = a3.Calculation(
             base_dir=dirname,
             input_dir=f"{dirname}/input",
             ensemble_size=2,
@@ -365,7 +365,7 @@ def test_integration_calculation(calc_slurm):
     """Integration test to check that all major stages of the calculation work."""
 
     # Check that the preparation stages work
-    assert calc_slurm.prep_stage == ee.run.enums.PreparationStage.PARAMETERISED
+    assert calc_slurm.prep_stage == a3.run.enums.PreparationStage.PARAMETERISED
     calc_slurm.setup(short_ensemble_equil=True)
     assert calc_slurm.setup_complete == True
     # Check that all required slurm bash jobs have been created
