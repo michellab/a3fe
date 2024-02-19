@@ -1,7 +1,7 @@
-﻿EnsEquil.lambda\_window
+﻿a3fe.lambda\_window
 =======================
 
-.. automodule:: EnsEquil.lambda_window
+.. automodule:: a3fe.lambda_window
 
    
    

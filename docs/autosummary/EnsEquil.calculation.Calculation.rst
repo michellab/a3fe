@@ -1,7 +1,7 @@
-﻿EnsEquil.calculation.Calculation
+﻿a3fe.calculation.Calculation
 ================================
 
-.. currentmodule:: EnsEquil
+.. currentmodule:: a3fe
 
 .. autoclass:: calculation.Calculation
 

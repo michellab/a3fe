@@ -1,7 +1,7 @@
-﻿EnsEquil.leg.Leg
+﻿a3fe.leg.Leg
 ================
 
-.. currentmodule:: EnsEquil
+.. currentmodule:: a3fe
 
 .. autoclass:: leg.Leg
 

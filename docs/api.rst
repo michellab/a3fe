@@ -4,11 +4,11 @@ API Documentation
 .. autosummary::
    :toctree: autosummary
 
-   EnsEquil
-   EnsEquil.Calculation
-   EnsEquil.Leg
-   EnsEquil.Stage
-   EnsEquil.LamWindow
-   EnsEquil.Simulation
-   EnsEquil.run._simulation_runner.SimulationRunner
-   EnsEquil.enums
+   a3fe
+   a3fe.Calculation
+   a3fe.Leg
+   a3fe.Stage
+   a3fe.LamWindow
+   a3fe.Simulation
+   a3fe.run._simulation_runner.SimulationRunner
+   a3fe.enums

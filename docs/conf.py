@@ -18,12 +18,11 @@ import sys
 
 sys.path.insert(0, os.path.abspath(".."))
 
-import EnsEquil
-
+import a3fe
 
 # -- Project information -----------------------------------------------------
 
-project = "EnsEquil"
+project = "a3fe"
 copyright = (
     "2023, Finlay Clark. Project structure based on the "
     "Computational Molecular Science Python Cookiecutter version 1.1"
@@ -130,7 +129,7 @@ html_static_path = ["_static"]
 # -- Options for HTMLHelp output ---------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = "EnsEquildoc"
+htmlhelp_basename = "a3fedoc"
 
 
 # -- Options for LaTeX output ------------------------------------------------
@@ -154,7 +153,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, "EnsEquil.tex", "EnsEquil Documentation", "EnsEquil", "manual"),
+    (master_doc, "a3fe.tex", "a3fe Documentation", "a3fe", "manual"),
 ]
 
 
@@ -162,7 +161,7 @@ latex_documents = [
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [(master_doc, "EnsEquil", "EnsEquil Documentation", [author], 1)]
+man_pages = [(master_doc, "a3fe", "a3fe Documentation", [author], 1)]
 
 
 # -- Options for Texinfo output ----------------------------------------------
@@ -173,10 +172,10 @@ man_pages = [(master_doc, "EnsEquil", "EnsEquil Documentation", [author], 1)]
 texinfo_documents = [
     (
         master_doc,
-        "EnsEquil",
-        "EnsEquil Documentation",
+        "a3fe",
+        "a3fe Documentation",
         author,
-        "EnsEquil",
+        "a3fe",
         "A package for running free energy calculations with SOMD with automated equilibration detection based on an ensemble of simulations.",
         "Miscellaneous",
     ),

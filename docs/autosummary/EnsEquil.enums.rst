@@ -1,7 +1,7 @@
-﻿EnsEquil.enums
+﻿a3fe.enums
 ==============
 
-.. automodule:: EnsEquil.enums
+.. automodule:: a3fe.enums
 
    
    

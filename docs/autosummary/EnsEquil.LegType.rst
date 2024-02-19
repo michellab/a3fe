@@ -1,7 +1,7 @@
-﻿EnsEquil.LegType
+﻿a3fe.LegType
 ================
 
-.. currentmodule:: EnsEquil
+.. currentmodule:: a3fe
 
 .. autoclass:: LegType
 
