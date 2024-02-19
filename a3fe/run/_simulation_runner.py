@@ -470,7 +470,7 @@ class SimulationRunner(ABC):
             # Add the results for each of the sub-simulation runners
             for sub_sim_runner in self._sub_sim_runners:
                 sub_results_df = sub_sim_runner.get_results_df(save_csv=save_csv)
-                results_df = results_df.append(sub_results_df)
+                results_df = _pd.concat([results_df, sub_results_df])
 
         try:  # To extract the overall free energy changes from a previous call of analyse()
             dgs = self._delta_g
@@ -597,9 +597,9 @@ class SimulationRunner(ABC):
                 fracts,
                 dg_overall,
                 self.get_tot_simtime(run_nos=run_nos),
-                self.equil_time
-                if equilibrated
-                else 0,  # Already per member of the ensemble
+                (
+                    self.equil_time if equilibrated else 0
+                ),  # Already per member of the ensemble
                 self.output_dir,
                 len(run_nos),
             )
@@ -760,9 +760,9 @@ class SimulationRunner(ABC):
         if self._sub_sim_runners:
             attrs_dict["sub_sim_runners"] = {}
             for sub_sim_runner in self._sub_sim_runners:
-                attrs_dict["sub_sim_runners"][
-                    sub_sim_runner
-                ] = sub_sim_runner.recursively_get_attr(attr=attr)
+                attrs_dict["sub_sim_runners"][sub_sim_runner] = (
+                    sub_sim_runner.recursively_get_attr(attr=attr)
+                )
 
         return attrs_dict
 
