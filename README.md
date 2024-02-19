@@ -3,7 +3,7 @@ a3fe
 [//]: # (Badges)
 [![GitHub Actions Build Status](https://github.com/fjclark/a3fe/workflows/CI/badge.svg)](https://github.com/fjclark/a3fe/actions?query=workflow%3ACI)
 [![codecov](https://codecov.io/gh/fjclark/a3fe/branch/main/graph/badge.svg?token=UMH0OUSUJY)](https://codecov.io/gh/fjclark/a3fe)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Documentation Status](https://readthedocs.org/projects/a3fe/badge/?version=latest)](https://a3fe.readthedocs.io/en/latest/?badge=latest)
       
 <img src="./a3fe_logo.png" alt="Alt text" style="width: 50%; height: 50%;">
