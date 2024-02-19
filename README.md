@@ -8,7 +8,7 @@ a3fe
       
 <img src="./a3fe_logo.png" alt="Alt text" style="width: 50%; height: 50%;">
 
-**A**utomated **A**daptive **A**absolute alchemical **F**ree **E**nergy calculator. A package for running adaptive alchemical absolute binding free energy calculations with SOMD based using adaptive protocols based on an ensemble of simulations. This requires the SLURM scheduling system.
+**A**utomated **A**daptive **A**bsolute alchemical **F**ree **E**nergy calculator. A package for running adaptive alchemical absolute binding free energy calculations with SOMD (distributed within [sire](https://sire.openbiosim.org/)) using adaptive protocols based on an ensemble of simulations. This requires the SLURM scheduling system.
 
 ### Installation
 
