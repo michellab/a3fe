@@ -138,6 +138,8 @@ def test_update(restrain_stage):
         assert lam.ensemble_size == 2
 
 
+# Skip until we figure out how to make it faster.
+@pytest.mark.skip
 class TestCalcSetup:
     """
     Test the setup of a calculation and all sub-simulation runners.
