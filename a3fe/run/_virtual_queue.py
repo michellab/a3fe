@@ -103,12 +103,20 @@ class VirtualQueue:
             del self._logger
         self._logger = _logging.getLogger(str(self))
         # For the file handler, we want to log everything
-        self._logger.setLevel(_logging.DEBUG)
         file_handler = _logging.FileHandler(f"{self.log_dir}/virtual_queue.log")
         file_handler.setFormatter(
-            _logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+            _logging.Formatter("%(levelname)s - %(asctime)s - %(name)s - %(message)s")
         )
+        file_handler.setLevel(_logging.DEBUG)
+        # For the stream handler, we want to log at the user-specified level
+        stream_handler = _logging.StreamHandler()
+        stream_handler.setFormatter(
+            _logging.Formatter("%(levelname)s - %(asctime)s - %(name)s - %(message)s")
+        )
+        stream_handler.setLevel(_logging.INFO)
+        # Add the handlers to the logger
         self._logger.addHandler(file_handler)
+        self._logger.addHandler(stream_handler)
 
     @property
     def queue(self) -> _List[Job]:

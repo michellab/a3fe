@@ -932,11 +932,14 @@ class SimulationRunner(ABC):
             sub_sim_runner._close_logging_handlers()
 
     def _update_log(self) -> None:
-        f"""Update the status log file with the current status of the {self.__class__.__name__}."""
-        self._logger.info("##############################################")
+        """
+        Update the status log file with the current status of the simulation runner.
+        This is detailed information and so is only visible at the debug log level.
+        """
+        self._logger.debug("##############################################")
         for var in vars(self):
-            self._logger.info(f"{var}: {getattr(self, var)}")
-        self._logger.info("##############################################")
+            self._logger.debug(f"{var}: {getattr(self, var)}")
+        self._logger.debug("##############################################")
 
     @property
     def _picklable_copy(self) -> SimulationRunner:
