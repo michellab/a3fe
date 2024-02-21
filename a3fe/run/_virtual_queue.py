@@ -123,6 +123,9 @@ class VirtualQueue:
         """The queue of jobs, both real and virtual."""
         return self._slurm_queue + self._pre_queue
 
+    def __str__(self) -> str:
+        return self.__class__.__name__
+
     def submit(self, command: str, slurm_file_base: str) -> Job:
         """
         Submit a job to the virtual queue.

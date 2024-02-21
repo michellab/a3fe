@@ -165,7 +165,6 @@ class SimulationRunner(ABC):
         self._logger = _logging.getLogger(
             f"{str(self)}_{next(self.__class__.class_count)}"
         )
-        self._logger.setLevel(_logging.DEBUG)
         self._logger.propagate = False
         # For the file handler, we want to log everything
         file_handler = _logging.FileHandler(
