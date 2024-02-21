@@ -55,8 +55,7 @@ jobs:
           pytest -v --cov=a3fe --cov-report=xml --color=yes a3fe/tests/
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4.0.1
         with:
-          file: ./coverage.xml
-          flags: unittests
-          name: codecov-${{ matrix.os }}-py${{ matrix.python-version }}
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: michellab/a3fe
