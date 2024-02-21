@@ -28,6 +28,7 @@ import scipy.stats as _stats
 from ..analyse.exceptions import AnalysisError as _AnalysisError
 from ..analyse.plot import plot_convergence as _plot_convergence
 from ..analyse.plot import plot_sq_sem_convergence as _plot_sq_sem_convergence
+from ._logging_formatters import _A3feFormatter
 
 
 class SimulationRunner(ABC):
@@ -153,7 +154,6 @@ class SimulationRunner(ABC):
         null : bool, optional, default=False
             Whether to silence all logging by writing to the null logger.
         """
-        # TODO: Debug - why is debug output no longer working
         # If logger exists, remove it and start again
         if hasattr(self, "_logger"):
             handlers = self._logger.handlers[:]
@@ -170,15 +170,11 @@ class SimulationRunner(ABC):
         file_handler = _logging.FileHandler(
             f"{self.base_dir}/{self.__class__.__name__}.log"
         )
-        file_handler.setFormatter(
-            _logging.Formatter("%(levelname)s - %(asctime)s - %(name)s - %(message)s")
-        )
+        file_handler.setFormatter(_A3feFormatter())
         file_handler.setLevel(_logging.DEBUG)
         # For the stream handler, we want to log at the user-specified level
         stream_handler = _logging.StreamHandler()
-        stream_handler.setFormatter(
-            _logging.Formatter("%(levelname)s - %(asctime)s - %(name)s - %(message)s")
-        )
+        stream_handler.setFormatter(_A3feFormatter())
         stream_handler.setLevel(self._stream_log_level)
         # Add the handlers to the logger
         self._logger.addHandler(file_handler)

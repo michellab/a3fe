@@ -14,6 +14,7 @@ from typing import Tuple as _Tuple
 
 from typing_extensions import Self
 
+from ._logging_formatters import _A3feFormatter
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._utils import retry as _retry
 from .enums import JobStatus as _JobStatus
@@ -102,17 +103,14 @@ class VirtualQueue:
                 handler.close()
             del self._logger
         self._logger = _logging.getLogger(str(self))
+        self._logger.propagate = False
         # For the file handler, we want to log everything
         file_handler = _logging.FileHandler(f"{self.log_dir}/virtual_queue.log")
-        file_handler.setFormatter(
-            _logging.Formatter("%(levelname)s - %(asctime)s - %(name)s - %(message)s")
-        )
+        file_handler.setFormatter(_A3feFormatter())
         file_handler.setLevel(_logging.DEBUG)
         # For the stream handler, we want to log at the user-specified level
         stream_handler = _logging.StreamHandler()
-        stream_handler.setFormatter(
-            _logging.Formatter("%(levelname)s - %(asctime)s - %(name)s - %(message)s")
-        )
+        stream_handler.setFormatter(_A3feFormatter())
         stream_handler.setLevel(_logging.INFO)
         # Add the handlers to the logger
         self._logger.addHandler(file_handler)
