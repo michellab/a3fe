@@ -14,6 +14,7 @@ import numpy as np
 import pytest
 
 import a3fe as a3
+from a3fe.analyse.detect_equil import dummy_check_equil_multiwindow
 
 from . import GROMACS_PRESENT, RUN_SLURM_TESTS, SLURM_PRESENT
 from .fixtures import calc, complex_sys, restrain_stage
@@ -237,6 +238,16 @@ class TestCalcSetup:
         legs = [leg.leg_type for leg in setup_calc.legs]
         assert a3.LegType.BOUND in legs
         assert a3.LegType.FREE in legs
+
+    def test_correct_equil_algorithm(self, setup_calc, mock_run_process):
+        """Test that the expected equilibration detection algorithms have been set."""
+        assert setup_calc.equil_detection == "multiwindow"
+        for leg in setup_calc.legs:
+            assert leg.equil_detection == "multiwindow"
+            for stage in leg.stages:
+                assert stage.equil_detection == "multiwindow"
+                for lam_win in stage.lam_windows:
+                    assert lam_win.check_equil == dummy_check_equil_multiwindow
 
     def test_setup_calc_legs(self, setup_calc, mock_run_process):
         """Test that setting up the calculation produced the correct legs."""

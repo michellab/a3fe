@@ -147,7 +147,7 @@ class Leg(_SimulationRunner):
         self,
         leg_type: _LegType,
         block_size: float = 1,
-        equil_detection: str = "block_gradient",
+        equil_detection: str = "multiwindow",
         gradient_threshold: _Optional[float] = None,
         runtime_constant: _Optional[float] = 0.001,
         relative_simulation_cost: float = 1,
@@ -168,6 +168,7 @@ class Leg(_SimulationRunner):
             Size of blocks to use for equilibration detection, in ns.
         equil_detection : str, Optional, default: "block_gradient"
             Method to use for equilibration detection. Options are:
+            - "multiwindow": Use the multiwindow paired t-test method to detect equilibration.
             - "block_gradient": Use the gradient of the block averages to detect equilibration.
             - "chodera": Use Chodera's method to detect equilibration.
         gradient_threshold : float, Optional, default: None
