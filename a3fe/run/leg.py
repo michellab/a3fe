@@ -27,6 +27,7 @@ from ..analyse.plot import plot_sq_sem_convergence as _plot_sq_sem_convergence
 from ..read._process_slurm_files import get_slurm_file_base as _get_slurm_file_base
 from ..read._process_somd_files import read_simfile_option as _read_simfile_option
 from ..read._process_somd_files import write_simfile_option as _write_simfile_option
+from . import system_prep as _system_prep
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._virtual_queue import Job as _Job
 from ._virtual_queue import VirtualQueue as _VirtualQueue
@@ -34,33 +35,6 @@ from .enums import LegType as _LegType
 from .enums import PreparationStage as _PreparationStage
 from .enums import StageType as _StageType
 from .stage import Stage as _Stage
-from .system_prep import heat_and_preequil_input as _sysprep_heat_and_preequil_input
-from .system_prep import minimise_input as _sysprep_minimise_input
-from .system_prep import parameterise_input as _sysprep_parameterise_input
-from .system_prep import (
-    run_ensemble_equilibration as _sysprep_run_ensemble_equilibration,
-)
-from .system_prep import (
-    slurm_ensemble_equilibration_bound as _slurm_ensemble_equilibration_bound,
-)
-from .system_prep import (
-    slurm_ensemble_equilibration_bound_short as _slurm_ensemble_equilibration_bound_short,
-)
-from .system_prep import (
-    slurm_ensemble_equilibration_free as _slurm_ensemble_equilibration_free,
-)
-from .system_prep import (
-    slurm_ensemble_equilibration_free_short as _slurm_ensemble_equilibration_free_short,
-)
-from .system_prep import slurm_heat_and_preequil_bound as _slurm_heat_and_preequil_bound
-from .system_prep import slurm_heat_and_preequil_free as _slurm_heat_and_preequil_free
-from .system_prep import slurm_minimise_bound as _slurm_minimise_bound
-from .system_prep import slurm_minimise_free as _slurm_minimise_free
-from .system_prep import slurm_parameterise_bound as _slurm_parameterise_bound
-from .system_prep import slurm_parameterise_free as _slurm_parameterise_free
-from .system_prep import slurm_solvate_bound as _slurm_solvate_bound
-from .system_prep import slurm_solvate_free as _slurm_solvate_free
-from .system_prep import solvate_input as _sysprep_solvate_input
 
 
 class Leg(_SimulationRunner):
@@ -545,10 +519,10 @@ class Leg(_SimulationRunner):
             )
             if self.leg_type == _LegType.BOUND:
                 job_name = "param_bound"
-                fn = _slurm_parameterise_bound
+                fn = _system_prep.slurm_parameterise_bound
             elif self.leg_type == _LegType.FREE:
                 job_name = "param_free"
-                fn = _slurm_parameterise_free
+                fn = _system_prep.slurm_parameterise_free
             else:
                 raise ValueError("Invalid leg type.")
             self._run_slurm(fn, wait=True, run_dir=self.input_dir, job_name=job_name)
@@ -564,7 +538,9 @@ class Leg(_SimulationRunner):
                     )
         else:
             self._logger.info("Parmeterising input structures...")
-            _sysprep_parameterise_input(self.leg_type, self.input_dir, self.input_dir)
+            _system_prep.parameterise_input(
+                self.leg_type, self.input_dir, self.input_dir
+            )
 
         # Update the preparation stage
         self.prep_stage = _PreparationStage.PARAMETERISED
@@ -586,10 +562,10 @@ class Leg(_SimulationRunner):
             self._logger.info("Solvating input structure. Submitting through SLURM...")
             if self.leg_type == _LegType.BOUND:
                 job_name = "solvate_bound"
-                fn = _slurm_solvate_bound
+                fn = _system_prep.slurm_solvate_bound
             elif self.leg_type == _LegType.FREE:
                 job_name = "solvate_free"
-                fn = _slurm_solvate_free
+                fn = _system_prep.slurm_solvate_free
             else:
                 raise ValueError("Invalid leg type.")
             self._run_slurm(fn, wait=True, run_dir=self.input_dir, job_name=job_name)
@@ -605,7 +581,7 @@ class Leg(_SimulationRunner):
                     )
         else:
             self._logger.info("Solvating input structure...")
-            _sysprep_solvate_input(self.leg_type, self.input_dir, self.input_dir)
+            _system_prep.solvate_input(self.leg_type, self.input_dir, self.input_dir)
 
         # Update the preparation stage
         self.prep_stage = _PreparationStage.SOLVATED
@@ -623,10 +599,10 @@ class Leg(_SimulationRunner):
             self._logger.info("Minimising input structure. Submitting through SLURM...")
             if self.leg_type == _LegType.BOUND:
                 job_name = "minimise_bound"
-                fn = _slurm_minimise_bound
+                fn = _system_prep.slurm_minimise_bound
             elif self.leg_type == _LegType.FREE:
                 job_name = "minimise_free"
-                fn = _slurm_minimise_free
+                fn = _system_prep.slurm_minimise_free
             else:
                 raise ValueError("Invalid leg type.")
             self._run_slurm(fn, wait=True, run_dir=self.input_dir, job_name=job_name)
@@ -642,7 +618,7 @@ class Leg(_SimulationRunner):
                     )
         else:
             self._logger.info("Minimising input structure...")
-            _sysprep_minimise_input(self.leg_type, self.input_dir, self.input_dir)
+            _system_prep.minimise_input(self.leg_type, self.input_dir, self.input_dir)
 
         # Update the preparation stage
         self.prep_stage = _PreparationStage.MINIMISED
@@ -660,10 +636,10 @@ class Leg(_SimulationRunner):
             self._logger.info("Heating and equilibrating. Submitting through SLURM...")
             if self.leg_type == _LegType.BOUND:
                 job_name = "heat_preequil_bound"
-                fn = _slurm_heat_and_preequil_bound
+                fn = _system_prep.slurm_heat_and_preequil_bound
             elif self.leg_type == _LegType.FREE:
                 job_name = "heat_preequil_free"
-                fn = _slurm_heat_and_preequil_free
+                fn = _system_prep.slurm_heat_and_preequil_free
             else:
                 raise ValueError("Invalid leg type.")
             self._run_slurm(fn, wait=True, run_dir=self.input_dir, job_name=job_name)
@@ -679,7 +655,7 @@ class Leg(_SimulationRunner):
                     )
         else:
             self._logger.info("Heating and equilibrating...")
-            _sysprep_heat_and_preequil_input(
+            _system_prep.heat_and_preequil_input(
                 self.leg_type, self.input_dir, self.input_dir
             )
 
@@ -740,16 +716,16 @@ class Leg(_SimulationRunner):
             if self.leg_type == _LegType.BOUND:
                 job_name = "ensemble_equil_bound"
                 fn = (
-                    _slurm_ensemble_equilibration_bound
+                    _system_prep.slurm_ensemble_equilibration_bound
                     if not short_ensemble_equil
-                    else _slurm_ensemble_equilibration_bound_short
+                    else _system_prep.slurm_ensemble_equilibration_bound_short
                 )
             elif self.leg_type == _LegType.FREE:
                 job_name = "ensemble_equil_free"
                 fn = (
-                    _slurm_ensemble_equilibration_free
+                    _system_prep.slurm_ensemble_equilibration_free
                     if not short_ensemble_equil
-                    else _slurm_ensemble_equilibration_free_short
+                    else _system_prep.slurm_ensemble_equilibration_free_short
                 )
             else:
                 raise ValueError("Invalid leg type.")
@@ -782,7 +758,7 @@ class Leg(_SimulationRunner):
                 self._logger.info(
                     f"Running ensemble equilibration {i + 1} of {len(outdirs_to_run)}..."
                 )
-                _sysprep_run_ensemble_equilibration(
+                _system_prep.run_ensemble_equilibration(
                     self.leg_type, outdir, outdir, short_ensemble_equil
                 )
 
@@ -982,7 +958,7 @@ class Leg(_SimulationRunner):
     ) -> None:
         """
         Run the supplied function through a slurm job. The function must be in
-        the _system_prep module.
+        the system_prep module.
 
         Parameters
         ----------
