@@ -365,7 +365,7 @@ def calc_slurm():
 # Test that the preparation stages work
 @pytest.mark.skipif(not SLURM_PRESENT, reason="SLURM not present")
 @pytest.mark.skipif(not RUN_SLURM_TESTS, reason="RUN_SLURM_TESTS is False")
-@pytest.skip(
+@pytest.mark.skip(
     "test_integration_calculation does not currently work due to the global mock of run_process"
 )
 def test_integration_calculation(calc_slurm):
