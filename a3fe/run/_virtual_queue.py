@@ -103,6 +103,7 @@ class VirtualQueue:
                 handler.close()
             del self._logger
         self._logger = _logging.getLogger(str(self))
+        self._logger.setLevel(_logging.DEBUG)
         self._logger.propagate = False
         # For the file handler, we want to log everything
         file_handler = _logging.FileHandler(f"{self.log_dir}/virtual_queue.log")

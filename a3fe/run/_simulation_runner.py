@@ -166,6 +166,7 @@ class SimulationRunner(ABC):
             f"{str(self)}_{next(self.__class__.class_count)}"
         )
         self._logger.propagate = False
+        self._logger.setLevel(_logging.DEBUG)
         # For the file handler, we want to log everything
         file_handler = _logging.FileHandler(
             f"{self.base_dir}/{self.__class__.__name__}.log"
