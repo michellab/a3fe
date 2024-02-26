@@ -461,14 +461,6 @@ def run_process(
     system : _BSS._SireWrappers._system.System
         System after the process has been run.
     """
-    # Print the name of this function where it is called
-    print(f"Running  in {__name__}...")
-    # Get name of the function where this is called for mocking
-    import inspect
-
-    print(f"Called from {inspect.stack()[1].function}")
-    breakpoint()
-
     process = _BSS.Process.Gromacs(system, protocol, work_dir=work_dir)
     process.start()
     process.wait()
