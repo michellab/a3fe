@@ -1140,10 +1140,7 @@ class Stage(_SimulationRunner):
     @property
     def tot_simtime(self) -> float:
         f"""The total simulation time in ns for the stage."""
-        # Use multiprocessing at the level of stages to speed this us - this is a good place as stages
-        # have lots of windows, so we benefit the most from parallelisation here.
-        with _get_context("spawn").Pool() as pool:
-            return sum(pool.map(_get_simtime, self._sub_sim_runners))
+        return self.get_tot_simtime()
 
     def _mv_output(self, save_name: str) -> None:
         """
