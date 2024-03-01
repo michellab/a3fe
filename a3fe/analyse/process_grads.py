@@ -2,7 +2,7 @@
 
 __all__ = ["GradientData"]
 
-from multiprocessing import Pool as _Pool
+from multiprocessing import get_context as _get_context
 from typing import Dict as _Dict
 from typing import List as _List
 from typing import Optional as _Optional
@@ -12,8 +12,9 @@ from typing import Union as _Union
 import numpy as _np
 from scipy.constants import gas_constant as _R
 
-from .autocorrelation import \
-    get_statistical_inefficiency as _get_statistical_inefficiency
+from .autocorrelation import (
+    get_statistical_inefficiency as _get_statistical_inefficiency,
+)
 from .mbar import run_mbar as _run_mbar
 
 
@@ -724,7 +725,7 @@ def get_time_series_multiwindow_mbar(
     ]
 
     # Run MBAR in parallel
-    with _Pool() as pool:
+    with _get_context("spawn").Pool() as pool:
         results = pool.starmap(
             _compute_dg,
             [

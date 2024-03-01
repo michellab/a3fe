@@ -2,7 +2,7 @@
 
 import glob as _glob
 import os as _os
-from multiprocessing import Pool as _Pool
+from multiprocessing import get_context as _get_context
 from typing import Callable as _Callable
 from typing import List as _List
 from typing import Optional as _Optional
@@ -212,7 +212,7 @@ def get_av_waters_stage(
     # Fill the array with Nans to start with
     avg_close_waters = _np.full((len(run_nos), len(lam_windows)), _np.nan)
     # Process the lambda windows in parallel
-    with _Pool() as pool:
+    with _get_context("spawn").Pool() as pool:
         per_lam_results = pool.starmap(
             get_av_waters_lambda_window,
             [

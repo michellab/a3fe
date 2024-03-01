@@ -9,7 +9,7 @@ import pathlib as _pathlib
 import threading as _threading
 from copy import deepcopy as _deepcopy
 from math import ceil as _ceil
-from multiprocessing import Pool as _Pool
+from multiprocessing import get_context as _get_context
 from time import sleep as _sleep
 from typing import Any as _Any
 from typing import Callable as _Callable
@@ -1048,7 +1048,7 @@ class Stage(_SimulationRunner):
                 win._write_equilibrated_simfiles()
 
         # Now run mbar with multiprocessing to speed things up
-        with _Pool() as pool:
+        with _get_context("spawn").Pool() as pool:
             results = pool.starmap(
                 _run_mbar,
                 [
@@ -1124,7 +1124,7 @@ class Stage(_SimulationRunner):
         # Use multiprocessing at the level of stages to speed this us - this is a good place as stages
         # have lots of windows, so we benefit the most from parallelisation here.
         run_nos = self._get_valid_run_nos(run_nos)
-        with _Pool() as pool:
+        with _get_context("spawn").Pool() as pool:
             tot_simtime = sum(
                 pool.starmap(
                     _get_simtime,
@@ -1141,7 +1141,7 @@ class Stage(_SimulationRunner):
         f"""The total simulation time in ns for the stage."""
         # Use multiprocessing at the level of stages to speed this us - this is a good place as stages
         # have lots of windows, so we benefit the most from parallelisation here.
-        with _Pool() as pool:
+        with _get_context("spawn").Pool() as pool:
             return sum(pool.map(_get_simtime, self._sub_sim_runners))
 
     def _mv_output(self, save_name: str) -> None:
