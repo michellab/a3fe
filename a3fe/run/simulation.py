@@ -17,12 +17,9 @@ from typing import Tuple as _Tuple
 import numpy as _np
 from sire.units import k_boltz as _k_boltz
 
-from ..read._process_slurm_files import \
-    get_slurm_file_base as _get_slurm_file_base
-from ..read._process_somd_files import \
-    read_simfile_option as _read_simfile_option
-from ..read._process_somd_files import \
-    write_simfile_option as _write_simfile_option
+from ..read._process_slurm_files import get_slurm_file_base as _get_slurm_file_base
+from ..read._process_somd_files import read_simfile_option as _read_simfile_option
+from ..read._process_somd_files import write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._virtual_queue import Job as _Job
 from ._virtual_queue import VirtualQueue as _VirtualQueue
