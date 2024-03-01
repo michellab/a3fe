@@ -176,7 +176,7 @@ texinfo_documents = [
         "a3fe Documentation",
         author,
         "a3fe",
-        "A package for running free energy calculations with SOMD with automated equilibration detection based on an ensemble of simulations.",
+        "Automated Adaptive Absolute alchemical Free Energy calculator. A package for running adaptive alchemical absolute binding free energy calculations with SOMD."
         "Miscellaneous",
     ),
 ]

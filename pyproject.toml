@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 # https://packaging.python.org/en/latest/specifications/declaring-project-metadata/
 [project]
 name = "a3fe"
-description = "A package for running free energy calculations with SOMD with automated equilibration detection based on an ensemble of simulations."
+description = "Automated Adaptive Absolute alchemical Free Energy calculator. A package for running adaptive alchemical absolute binding free energy calculations with SOMD."
 dynamic = ["version"]
 readme = "README.md"
 authors = [
