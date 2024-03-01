@@ -9,6 +9,7 @@ import pathlib as _pathlib
 import threading as _threading
 from copy import deepcopy as _deepcopy
 from math import ceil as _ceil
+from multiprocessing import Pool as _Pool
 from multiprocessing import get_context as _get_context
 from time import sleep as _sleep
 from typing import Any as _Any
@@ -1124,7 +1125,7 @@ class Stage(_SimulationRunner):
         # Use multiprocessing at the level of stages to speed this us - this is a good place as stages
         # have lots of windows, so we benefit the most from parallelisation here.
         run_nos = self._get_valid_run_nos(run_nos)
-        with _get_context("spawn").Pool() as pool:
+        with _Pool() as pool:
             tot_simtime = sum(
                 pool.starmap(
                     _get_simtime,
