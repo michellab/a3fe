@@ -463,7 +463,8 @@ class Simulation(_SimulationRunner):
             "*.dcd",
             "*.s3",
             "*.s3.previous",
-            "gradients.s3" "simfile_equilibrated.dat",
+            "gradients.s3",
+            "simfile_equilibrated.dat",
             "latest.pdb",
         ]
 
