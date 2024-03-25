@@ -276,7 +276,7 @@ class TestCalcSetup:
     def test_setup_calc_stages(self, setup_calc):
         """Test that setting up the calculation produced the correct stages."""
         for leg in setup_calc.legs:
-            expected_input_files = [
+            expected_input_files = {
                 "run_somd.sh",
                 "somd_1.rst7",
                 "somd.cfg",
@@ -285,48 +285,44 @@ class TestCalcSetup:
                 "somd.pert",
                 "somd.err",
                 "somd.out",
-            ]
-            expected_base_files = [
+            }
+            expected_base_files = {
                 "input",
                 "Stage.pkl",
                 "output",
                 "virtual_queue.log",
                 "Stage.log",
-            ]
+            }
             if leg.leg_type == a3.LegType.BOUND:
-                expected_input_files.append("restraint_1.txt")
+                expected_input_files.add("restraint_1.txt")
 
             for stage in leg.stages:
-                input_files = os.listdir(stage.input_dir)
-                assert len(input_files) == len(expected_input_files)
-                for file in expected_input_files:
-                    assert file in os.listdir(stage.input_dir)
-                base_files = os.listdir(stage.base_dir)
-                assert len(base_files) == len(expected_base_files)
-                for file in expected_base_files:
-                    assert file in os.listdir(stage.base_dir)
-                lam_vals = [
+                input_files = set(os.listdir(stage.input_dir))
+                assert expected_input_files == input_files
+                base_files = set(os.listdir(stage.base_dir))
+                assert base_files == expected_base_files
+
+                lam_vals = {
                     float(lam.split("_")[1]) for lam in os.listdir(stage.output_dir)
-                ]
-                expected_lam_vals = a3.Leg.default_lambda_values[leg.leg_type][
-                    stage.stage_type
-                ]
-                assert len(lam_vals) == len(expected_lam_vals)
-                assert all([lam in expected_lam_vals for lam in lam_vals])
+                }
+                expected_lam_vals = set(
+                    a3.Leg.default_lambda_values[leg.leg_type][stage.stage_type]
+                )
+                assert lam_vals == expected_lam_vals
 
     def test_setup_calc_lam(self, setup_calc):
         """Test that setting up the calculation produced the correct lambda windows."""
-        expected_base_files = ["LamWindow.pkl", "LamWindow.log", "run_01"]
+        expected_base_files = {"LamWindow.pkl", "LamWindow.log", "run_01"}
         for leg in setup_calc.legs:
             for stage in leg.stages:
                 for lam_win in stage.lam_windows:
                     assert lam_win.ensemble_size == 1
-                    assert os.listdir(lam_win.base_dir) == expected_base_files
+                    assert set(os.listdir(lam_win.base_dir)) == expected_base_files
 
     def test_setup_calc_sims(self, setup_calc):
         """Test that setting up the calculation produced the correct simulations."""
         for leg in setup_calc.legs:
-            expected_base_files = [
+            expected_base_files = {
                 "run_somd.sh",
                 "somd.cfg",
                 "Simulation.pkl",
@@ -336,16 +332,14 @@ class TestCalcSetup:
                 "somd.pert",
                 "somd.err",
                 "somd.out",
-            ]
+            }
             if leg.leg_type == a3.LegType.BOUND:
-                expected_base_files.append("restraint.txt")
+                expected_base_files.add("restraint.txt")
             for stage in leg.stages:
                 for lam_win in stage.lam_windows:
                     for sim in lam_win.sims:
-                        base_dir_files = os.listdir(sim.base_dir)
-                        assert len(base_dir_files) == len(expected_base_files)
-                        for file in expected_base_files:
-                            assert file in base_dir_files
+                        base_dir_files = set(os.listdir(sim.base_dir))
+                        assert base_dir_files == expected_base_files
 
 
 ######################## Tests Requiring SLURM ########################
