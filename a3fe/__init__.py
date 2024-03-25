@@ -1,4 +1,10 @@
-"""A package for running free energy calculations with SOMD with automated equilibration detection based on an ensemble of simulations."""
+"""
+Automated Adaptive Absolute alchemical Free Energy calculator. A package for running
+adaptive alchemical absolute binding free energy calculations with SOMD
+(distributed within sire(https://sire.openbiosim.org/)) using adaptive
+protocols based on an ensemble of simulations. This requires the SLURM scheduling
+system. Please see the documentation (https://a3fe.readthedocs.io/en/latest/?badge=latest).
+"""
 
 # This package was previously named "EnsEquil". To allow objects pickled with the
 # old name to be unpickled with the new name, we set EnsEquil to point to a3fe.
