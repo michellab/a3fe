@@ -6,16 +6,10 @@ import os as _os
 import subprocess as _subprocess
 from dataclasses import dataclass as _dataclass
 from time import sleep as _sleep
-from typing import Any as _Any
-from typing import Dict as _Dict
 from typing import List as _List
 from typing import Optional as _Optional
-from typing import Tuple as _Tuple
 
-from typing_extensions import Self
-
-from ._logging_formatters import _A3feFormatter
-from ._simulation_runner import SimulationRunner as _SimulationRunner
+from ._logging_formatters import _A3feFileFormatter, _A3feStreamFormatter
 from ._utils import retry as _retry
 from .enums import JobStatus as _JobStatus
 
@@ -107,11 +101,11 @@ class VirtualQueue:
         self._logger.propagate = False
         # For the file handler, we want to log everything
         file_handler = _logging.FileHandler(f"{self.log_dir}/virtual_queue.log")
-        file_handler.setFormatter(_A3feFormatter())
+        file_handler.setFormatter(_A3feFileFormatter())
         file_handler.setLevel(_logging.DEBUG)
         # For the stream handler, we want to log at the user-specified level
         stream_handler = _logging.StreamHandler()
-        stream_handler.setFormatter(_A3feFormatter())
+        stream_handler.setFormatter(_A3feStreamFormatter())
         stream_handler.setLevel(_logging.INFO)
         # Add the handlers to the logger
         self._logger.addHandler(file_handler)

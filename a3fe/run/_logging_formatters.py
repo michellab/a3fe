@@ -3,8 +3,8 @@
 import logging as _logging
 
 
-class _A3feFormatter(_logging.Formatter):
-    """Formatter for the simulation runner logger."""
+class _A3feStreamFormatter(_logging.Formatter):
+    """Stream formatter for the simulation runner logger."""
 
     # From https://stackoverflow.com/questions/384076/how-can-i-color-python-logging-output
     grey = "\x1b[38;20m"
@@ -26,6 +26,25 @@ class _A3feFormatter(_logging.Formatter):
         _logging.WARNING: yellow + format_str + reset,
         _logging.ERROR: red + format_str + reset,
         _logging.CRITICAL: bold_red + format_str + reset,
+    }
+
+    def format(self, record):
+        log_fmt = self.FORMATS.get(record.levelno)
+        formatter = _logging.Formatter(log_fmt)
+        return formatter.format(record)
+
+
+class _A3feFileFormatter(_logging.Formatter):
+    """Stream formatter for the simulation runner logger."""
+
+    format_str = "%(levelname)s - %(asctime)s - %(name)s - %(message)s"
+
+    FORMATS = {
+        _logging.DEBUG: format_str,
+        _logging.INFO: format_str,
+        _logging.WARNING: format_str,
+        _logging.ERROR: format_str,
+        _logging.CRITICAL: format_str,
     }
 
     def format(self, record):
