@@ -40,9 +40,7 @@ class Calculation(_SimulationRunner):
 
     def __init__(
         self,
-        block_size: float = 1,
         equil_detection: str = "multiwindow",
-        gradient_threshold: _Optional[float] = None,
         runtime_constant: _Optional[float] = 0.001,
         relative_simulation_cost: float = 1,
         ensemble_size: int = 5,
@@ -58,18 +56,11 @@ class Calculation(_SimulationRunner):
 
         Parameters
         ----------
-        block_size : float, Optional, default: 1
-            Size of blocks to use for equilibration detection, in ns.
         equil_detection : str, Optional, default: "multiwindow"
             Method to use for equilibration detection. Options are:
             - "multiwindow": Use the multiwindow paired t-test method to detect equilibration.
-            - "block_gradient": Use the gradient of the block averages to detect equilibration.
+                             This is applied on a per-stage basis.
             - "chodera": Use Chodera's method to detect equilibration.
-        gradient_threshold : float, Optional, default: None
-            The threshold for the absolute value of the gradient, in kcal mol-1 ns-1,
-            below which the simulation is considered equilibrated. If None, no theshold is
-            set and the simulation is equilibrated when the gradient passes through 0. A
-            sensible value appears to be 0.5 kcal mol-1 ns-1.
         runtime_constant : float, Optional, default: 0.001
             The runtime constant to use for the calculation, in kcal^2 mol^-2 ns^-1.
             This must be supplied if running adaptively. Each window is run until the
@@ -108,9 +99,7 @@ class Calculation(_SimulationRunner):
         )
 
         if not self.loaded_from_pickle:
-            self.block_size = block_size
             self.equil_detection = equil_detection
-            self.gradient_threshold = gradient_threshold
             self.runtime_constant = runtime_constant
             self.relative_simulation_cost = relative_simulation_cost
             self.setup_complete: bool = False
@@ -209,11 +198,9 @@ class Calculation(_SimulationRunner):
             self._logger.info(f"Setting up {leg_type.name.lower()} leg...")
             leg = _Leg(
                 leg_type=leg_type,
-                block_size=self.block_size,
                 equil_detection=self.equil_detection,
                 runtime_constant=self.runtime_constant,
                 relative_simulation_cost=self.relative_simulation_cost,
-                gradient_threshold=self.gradient_threshold,
                 ensemble_size=self.ensemble_size,
                 input_dir=self.input_dir,
                 base_dir=_os.path.join(self.base_dir, leg_type.name.lower()),

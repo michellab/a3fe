@@ -85,11 +85,12 @@ are run (the default is 5). This allows:
 - A reasonablly robust estimate of the uncertainty from the inter-run differences
 - More robust adaptive equilibration detection from the average gradient of dH/dlam with respect to simulation time
 
-The adaptive equilibration algorithm decides if a set of repeat simulations at a given lambda window have equilibrated by averaging the
-individual dH/dlam over all repeats, then smoothing the result with block averaging (the block size can be specified when creating
-simulation runners, e.g. ``calc = a3.Calculation(block_size=1)``). If when the gradient of dH/dlam with respect to time falls below
-some threshold, the calculation is taken to be equilibrated, and the simulations are terminated. Otherwise, a3fe automatically
-submits new SLURM jobs. This algorithm will be refined in future.
+The default equilibration detection algorithm is applied to a trace of the free energy change against time for an entire stage. This
+is obtained by block-averaging using MBAR with 100 blocks. The algorithm checks if there is a significant difference between the first
+10 % and last 50 % of free energy change data for each run, using a paired t-test. If the difference is significant, the data is taken to
+be unequilibrated, otherwise, it is presumed to be equilibrated. If lack of equilibration is detected, the algorithm repeatedly truncates
+date from the start of the simuliation and repeats the check. This continues until half of the data have been discarded. If the data are
+still not equilibrated, more simulation time is allocated.
 
 If the input is not parameterised, a3fe will parameterise your input with ff14SB, OFF 2.0.0, and TIP3P. See 
 "Preparing Input for a3fe". a3fe will solvate your system in a rhombic dodecahedral box with 150 mM NaCl
@@ -194,7 +195,7 @@ can be modified when creating the Calculation, for example:
 
 .. code-block:: python
 
-    calc = a3.Calculation(block_size=3, threshold=0.5, ensemble_size=4)
+    calc = a3.Calculation(ensemble_size=4)
 
 a3fe is designed to be run adaptively, but can be run non-adaptively:
 

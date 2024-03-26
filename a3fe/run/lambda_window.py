@@ -66,12 +66,11 @@ class LamWindow(_SimulationRunner):
         virtual_queue : VirtualQueue
             VirtualQueue object to use for submitting jobs.
         lam_val_weight : float, Optional, default: None
-            Weight to use for this lambda value in the free energy calculation.
-            This must be suplied if using the check_equil_shrinking_block_gradient
-            method for equilibration detection.
+            Weight to use for this lambda value in the free energy calculation
+            (e.g. from Trapezoidal rule).
         block_size : float, Optional, default: 1
             Size of the blocks to use for equilibration detection,
-            in ns.
+            in ns. Only used for the block gradient equilibration detection method.
         equil_detection : str, Optional, default: "multiwindow"
             Method to use for equilibration detection. Options are:
             - "multiwindow": Use the multiwindow paired t-test method to detect equilibration.
@@ -81,7 +80,8 @@ class LamWindow(_SimulationRunner):
             The threshold for the absolute value of the gradient, in kcal mol-1 ns-1,
             below which the simulation is considered equilibrated. If None, no theshold is
             set and the simulation is equilibrated when the gradient passes through 0. A
-            sensible value appears to be 0.5 kcal mol-1 ns-1.
+            sensible value appears to be 0.5 kcal mol-1 ns-1. Only required when the equilibration
+            detection method is "block_gradient".
         runtime_constant : float, Optional, default: 0.001
             The runtime constant to use for the calculation, in kcal^2 mol^-2 ns^-1.
             This must be supplied if running adaptively. Each window is run until the

@@ -77,9 +77,7 @@ class Stage(_SimulationRunner):
     def __init__(
         self,
         stage_type: _StageType,
-        block_size: float = 1,
         equil_detection: str = "multiwindow",
-        gradient_threshold: _Optional[float] = None,
         runtime_constant: _Optional[float] = 0.001,
         relative_simulation_cost: float = 1,
         ensemble_size: int = 5,
@@ -99,18 +97,10 @@ class Stage(_SimulationRunner):
         ----------
         stage_type : StageType
             The type of stage.
-        block_size : float, Optional, default: 1
-            Size of blocks to use for equilibration detection, in ns.
         equil_detection : str, Optional, default: "multiwindow"
             Method to use for equilibration detection. Options are:
             - "multiwindow": Use the multiwindow paired t-test method to detect equilibration.
-            - "block_gradient": Use the gradient of the block averages to detect equilibration.
             - "chodera": Use Chodera's method to detect equilibration.
-        gradient_threshold : float, Optional, default: None
-            The threshold for the absolute value of the gradient, in kcal mol-1 ns-1,
-            below which the simulation is considered equilibrated. If None, no theshold is
-            set and the simulation is equilibrated when the gradient passes through 0. A
-            sensible value appears to be 0.5 kcal mol-1 ns-1.
         runtime_constant : float, Optional, default: 0.001
             The runtime constant to use for the calculation, in kcal^2 mol^-2 ns^-1.
             This must be supplied if running adaptively. Each window is run until the
@@ -163,9 +153,7 @@ class Stage(_SimulationRunner):
                 self.lam_vals = lambda_values
             else:
                 self.lam_vals = self._get_lam_vals()
-            self.block_size = block_size
             self.equil_detection = equil_detection
-            self.gradient_threshold = gradient_threshold
             self.runtime_constant = runtime_constant
             self.relative_simulation_cost = relative_simulation_cost
             self._maximally_efficient = False  # Set to True if the stage has been run so as to reach max efficieny
@@ -184,9 +172,7 @@ class Stage(_SimulationRunner):
                         lam=lam_val,
                         lam_val_weight=lam_val_weights[i],
                         virtual_queue=self.virtual_queue,
-                        block_size=self.block_size,
                         equil_detection=self.equil_detection,
-                        gradient_threshold=self.gradient_threshold,
                         runtime_constant=self.runtime_constant,
                         relative_simulation_cost=self.relative_simulation_cost,
                         ensemble_size=self.ensemble_size,
@@ -394,64 +380,6 @@ class Stage(_SimulationRunner):
                 if not win.running:
                     self._logger.info(f"{win} has finished at {win.tot_simtime:.3f} ns")
                     self.running_wins.remove(win)
-
-                    # Write status after checking for running and equilibration, as the
-                    # _running and _equilibrated attributes have now been updated
-                    win._update_log()
-                    self._dump()
-
-    def _run_loop_adaptive_equilibration(
-        self,
-        run_nos: _List[int],
-        cycle_pause: int = 60,
-        max_runtime: float = 30,  # seconds  # ns
-    ) -> None:
-        """Run loop which adaptively checks for equilibration, and resubmits
-        the calculation if it has not equilibrated.
-
-        Parameters
-        ----------
-        run_nos : List[int]
-            The run numbers to run.
-        cycle_pause : int, Optional, default: 60
-            The number of seconds to wait between checking the status of the simulations.
-        max_runtime : float, Optional, default: 30
-            The maximum runtime for a single simulation during an adaptive simulation, in ns.
-        """
-        n_runs = len(run_nos)
-
-        while self.running_wins:
-            _sleep(cycle_pause)  # Check every 60 seconds
-            # Check if we've requested to kill the thread
-            if self.kill_thread:
-                self._logger.info(f"Kill thread requested: exiting run loop")
-                return
-
-            # Update the queue before checking the simulations
-            self.virtual_queue.update()
-
-            for win in self.running_wins:
-                # Check if the window has now finished - calling win.running updates the win._running attribute
-                if not win.running:
-                    # If we are in adaptive mode, check if the simulation has equilibrated and if not, resubmit
-                    if win.is_equilibrated(run_nos=run_nos):
-                        self._logger.info(
-                            f"{win} has equilibrated at {win.equil_time:.3f} ns"
-                        )
-                        self.running_wins.remove(win)
-                    else:
-                        # Check that we haven't exceeded the maximum runtime for any simulations
-                        if win.get_tot_simtime(run_nos=run_nos) / n_runs >= max_runtime:
-                            self._logger.info(
-                                f"{win} has not equilibrated but simulations have exceeded the maximum runtime of "
-                                f"{max_runtime} ns. Terminating simulations"
-                            )
-                            self.running_wins.remove(win)
-                        else:  # Not equilibrated and not over the maximum runtime, so resubmit
-                            self._logger.info(
-                                f"{win} has not equilibrated. Resubmitting for {self.block_size:.3f} ns"
-                            )
-                            win.run(run_nos=run_nos, runtime=self.block_size)
 
                     # Write status after checking for running and equilibration, as the
                     # _running and _equilibrated attributes have now been updated
@@ -1206,8 +1134,6 @@ class Stage(_SimulationRunner):
                 lam=lam_val,
                 lam_val_weight=lam_val_weights[i],
                 virtual_queue=self.virtual_queue,
-                block_size=self.block_size,
-                gradient_threshold=self.gradient_threshold,
                 runtime_constant=self.runtime_constant,
                 relative_simulation_cost=self.relative_simulation_cost,
                 ensemble_size=self.ensemble_size,
