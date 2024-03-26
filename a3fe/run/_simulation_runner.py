@@ -845,9 +845,9 @@ class SimulationRunner(ABC):
                 sub_sim_runner._set_up_logging()
 
     def clean(self, clean_logs=False) -> None:
-        f"""
-        Clean the {self.__class__.__name__} by deleting all files
-        with extensions matching {self.__class__.run_files} in the
+        """
+        Clean the simulation runner by deleting all files
+        with extensions matching self.__class__.run_files in the
         base and output dirs, and resetting the total runtime to 0.
 
         Parameters

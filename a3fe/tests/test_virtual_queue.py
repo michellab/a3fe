@@ -3,7 +3,7 @@
 import os
 from tempfile import TemporaryDirectory
 
-from ..run._virtual_queue import Job, VirtualQueue
+from ..run._virtual_queue import Job, VirtualQueue, _JobStatus
 
 
 def test_job():
@@ -39,3 +39,12 @@ def test_virtual_queue():
         assert v_queue.queue == [job1, job2]
         # Check that logging is working
         assert os.path.isfile(os.path.join(dirname, "virtual_queue.log"))
+
+        # Check that killing and flushing works correctly.
+        v_queue.kill(job1)
+        assert job1.slurm_job_id is None
+        assert job1.status == _JobStatus.KILLED
+
+        # Flusing pays no attention to the status of the jobs
+        v_queue._flush()
+        assert v_queue.queue == []

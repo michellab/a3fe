@@ -290,3 +290,11 @@ class VirtualQueue:
         while len(self.queue) > 0:
             self.update()
             _sleep(30)
+
+    def _flush(self) -> None:
+        """Remove all the jobs from the queu, regardless of status."""
+        self._slurm_queue = []
+        self._pre_queue = []
+        self._available_virt_job_id = 0
+        self._update_log()
+        self._logger.info("Queue flushed")

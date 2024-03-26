@@ -1219,6 +1219,21 @@ class Stage(_SimulationRunner):
             new_lam_win.check_equil = old_lam_vals_attrs["check_equil"]
             self.lam_windows.append(new_lam_win)
 
+    def clean(self, clean_logs=False) -> None:
+        """
+        Clean the simulation runner by deleting all files
+        with extensions matching self.__class__.run_files in the
+        base and output dirs, and resetting the total runtime to 0.
+        Also flush the virtual queue to remove any remaining simulations.
+
+        Parameters
+        ----------
+        clean_logs : bool, default=False
+            If True, also delete the log files.
+        """
+        self.virtual_queue._flush()
+        super().clean(clean_logs=clean_logs)
+
 
 class StageContextManager:
     """Stage context manager to ensure that all stages are killed when
