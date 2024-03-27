@@ -21,6 +21,7 @@ dependencies:
   - biosimspace>2023.4
   - numpydoc
   - gromacs
+  - pydantic
 
     # Testing
   - pytest

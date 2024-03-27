@@ -8,9 +8,7 @@ import os as _os
 import pathlib as _pathlib
 import shutil as _shutil
 import subprocess as _subprocess
-from functools import partial as _partial
 from time import sleep as _sleep
-from typing import Any as _Any
 from typing import Callable as _Callable
 from typing import Dict as _Dict
 from typing import List as _List
@@ -35,6 +33,7 @@ from .enums import LegType as _LegType
 from .enums import PreparationStage as _PreparationStage
 from .enums import StageType as _StageType
 from .stage import Stage as _Stage
+from .system_prep import SystemPreparationConfig as _SystemPreparationConfig
 
 
 class Leg(_SimulationRunner):
@@ -162,6 +161,8 @@ class Leg(_SimulationRunner):
 
         Parameters
         ----------
+        leg_type: a3.LegType
+            The type of leg to set up. Options are BOUND or FREE.
         equil_detection : str, Optional, default: "multiwindow"
             Method to use for equilibration detection. Options are:
             - "multiwindow": Use the multiwindow paired t-test method to detect equilibration.
@@ -269,10 +270,7 @@ class Leg(_SimulationRunner):
 
     def setup(
         self,
-        slurm: bool = True,
-        append_to_ligand_selection: str = "",
-        use_same_restraints: bool = True,
-        short_ensemble_equil: bool = False,
+        sysprep_config: _Optional[_SystemPreparationConfig] = None,
     ) -> None:
         """
         Set up the leg. This involves:
@@ -287,24 +285,19 @@ class Leg(_SimulationRunner):
 
         Parameters
         ----------
-        slurm : bool, default: True
-            If True, the setup jobs will be run through SLURM.
-        append_to_ligand_selection: str, optional, default = ""
-            If this is a bound leg, this appends the supplied string to the default atom
-            selection which chooses the atoms in the ligand to consider as potential anchor
-            points. The default atom selection is f'resname {ligand_resname} and not name H*'.
-            Uses the mdanalysis atom selection language. For example, 'not name O*' will result
-            in an atom selection of f'resname {ligand_resname} and not name H* and not name O*'.
-        use_same_restraints: bool, default=True
-            If True, the same restraints will be used for all of the bound leg repeats - by default
-            , the restraints generated for the first repeat are used. This allows meaningful
-            comparison between repeats for the bound leg. If False, the unique restraints are
-            generated for each repeat.
-        short_ensemble_equil: bool, default=False
-            If True, the ensemble equilibration will be run for 0.1 ns instead of 5 ns. This is
-            not recommended for production runs, but can be useful for testing.
+        sysprep_config: Optional[SystemPreparationConfig], default: None
+            Configuration object for the setup of the leg. If None, the default configuration
+            is used.
         """
         self._logger.info("Setting up leg...")
+
+        # First, we need to save the config to the input directory so that this can be reloaded
+        # by the slurm jobs.
+        cfg = (
+            sysprep_config if sysprep_config is not None else _SystemPreparationConfig()
+        )
+        cfg.save_pickle(self.input_dir, self.leg_type)
+
         # Create input directories, parameterise, solvate, minimise, heat and preequil, all
         # depending on the input files present.
 
@@ -313,30 +306,26 @@ class Leg(_SimulationRunner):
 
         # Then prepare as required according to the preparation stage
         if self.prep_stage == _PreparationStage.STRUCTURES_ONLY:
-            self.parameterise_input(slurm=slurm)
+            self.parameterise_input(slurm=cfg.slurm)
         if self.prep_stage == _PreparationStage.PARAMETERISED:
-            self.solvate_input(slurm=slurm)  # This also adds ions
+            self.solvate_input(slurm=cfg.slurm)  # This also adds ions
         if self.prep_stage == _PreparationStage.SOLVATED:
-            system = self.minimise_input(slurm=slurm)
+            system = self.minimise_input(slurm=cfg.slurm)
         if self.prep_stage == _PreparationStage.MINIMISED:
-            system = self.heat_and_preequil_input(slurm=slurm)
+            system = self.heat_and_preequil_input(slurm=cfg.slurm)
         if self.prep_stage == _PreparationStage.PREEQUILIBRATED:
             # Run separate equilibration simulations for each of the repeats and
             # extract the final structures to give a diverse ensemble of starting
             # conformations. For the bound leg, this also extracts the restraints.
-            system = self.run_ensemble_equilibration(
-                slurm=slurm,
-                append_to_ligand_selection=append_to_ligand_selection,
-                short_ensemble_equil=short_ensemble_equil,
-            )
+            system = self.run_ensemble_equilibration(sysprep_config=cfg)
 
         # Write input files
-        self.write_input_files(system, use_same_restraints=use_same_restraints)
+        self.write_input_files(system, use_same_restraints=cfg.use_same_restraints)
 
         # Make sure the stored restraints reflect the restraints used. TODO:
         # make this more robust my using the SOMD functionality to extract
         # results from the simfiles
-        if self.leg_type == _LegType.BOUND and use_same_restraints:
+        if self.leg_type == _LegType.BOUND and cfg.use_same_restraints:
             # Use the first restraints
             first_restr = self.restraints[0]
             self.restraints = [first_restr for _ in range(self.ensemble_size)]
@@ -651,9 +640,7 @@ class Leg(_SimulationRunner):
 
     def run_ensemble_equilibration(
         self,
-        slurm: bool = True,
-        append_to_ligand_selection: str = "",
-        short_ensemble_equil: bool = False,
+        sysprep_config: _SystemPreparationConfig,
     ) -> _BSS._SireWrappers._system.System:
         """
         Run 5 ns simulations with SOMD for each of the ensemble_size runs and extract the final structures
@@ -664,17 +651,8 @@ class Leg(_SimulationRunner):
 
         Parameters
         ----------
-        slurm : bool, optional, default=True
-            Whether to use SLURM to run the job, by default True.
-        append_to_ligand_selection: str, optional, default = ""
-            If this is a bound leg, this appends the supplied string to the default atom
-            selection which chooses the atoms in the ligand to consider as potential anchor
-            points. The default atom selection is f'resname {ligand_resname} and not name H*'.
-            Uses the mdanalysis atom selection language. For example, 'not name O*' will result
-            in an atom selection of f'resname {ligand_resname} and not name H* and not name O*'.
-        short_ensemble_equil: bool, optional, default=False
-            Whether to run a short ensemble equilibration of 0.1 ns instead of the default 5 ns.
-            This is not recommended for production runs, but can be useful for testing.
+        sysprep_config: SystemPreparationConfig
+            Configuration object for the setup of the leg.
         """
         # Generate output dirs and copy over the input
         outdirs = [
@@ -699,21 +677,16 @@ class Leg(_SimulationRunner):
             ]:
                 _subprocess.run(["cp", "-r", input_file, outdir], check=True)
 
-        if slurm:
+            # Also write a pickle of the config to the output directory
+            sysprep_config.save_pickle(outdir, self.leg_type)
+
+        if sysprep_config.slurm:
             if self.leg_type == _LegType.BOUND:
                 job_name = "ensemble_equil_bound"
-                fn = (
-                    _system_prep.slurm_ensemble_equilibration_bound
-                    if not short_ensemble_equil
-                    else _system_prep.slurm_ensemble_equilibration_bound_short
-                )
+                fn = _system_prep.slurm_ensemble_equilibration_bound
             elif self.leg_type == _LegType.FREE:
                 job_name = "ensemble_equil_free"
-                fn = (
-                    _system_prep.slurm_ensemble_equilibration_free
-                    if not short_ensemble_equil
-                    else _system_prep.slurm_ensemble_equilibration_free_short
-                )
+                fn = _system_prep.slurm_ensemble_equilibration_free
             else:
                 raise ValueError("Invalid leg type.")
 
@@ -746,7 +719,9 @@ class Leg(_SimulationRunner):
                     f"Running ensemble equilibration {i + 1} of {len(outdirs_to_run)}..."
                 )
                 _system_prep.run_ensemble_equilibration(
-                    self.leg_type, outdir, outdir, short_ensemble_equil
+                    self.leg_type,
+                    outdir,
+                    outdir,
                 )
 
         # Give the output files unique names
@@ -788,7 +763,7 @@ class Leg(_SimulationRunner):
                     traj=traj,
                     work_dir=outdir,
                     temperature=298.15 * _BSS.Units.Temperature.kelvin,
-                    append_to_ligand_selection=append_to_ligand_selection,
+                    append_to_ligand_selection=sysprep_config.append_to_ligand_selection,
                 )
 
                 # Check that we actually generated a restraint
@@ -842,7 +817,7 @@ class Leg(_SimulationRunner):
             )
             self._logger.info(f"Perturbation type: {stage_type.bss_perturbation_type}")
             # Ensure we remove the velocites to avoid RST7 file writing issues, as before
-            restrain_fe_calc = _BSS.FreeEnergy.AlchemicalFreeEnergy(
+            _BSS.FreeEnergy.AlchemicalFreeEnergy(
                 pre_equilibrated_system,
                 protocol,
                 engine="SOMD",
@@ -1047,7 +1022,7 @@ class Leg(_SimulationRunner):
         fraction: float = 1,
         plot_rmsds: bool = False,
     ) -> _Tuple[_np.ndarray, _np.ndarray]:
-        f"""
+        """
         Analyse the leg and any sub-simulations, and
         return the overall free energy change.
 
@@ -1267,7 +1242,7 @@ class Leg(_SimulationRunner):
         return fracts, dg_overall
 
     def lighten(self) -> None:
-        f"""Lighten the leg by deleting ensemble equilibration output
+        """Lighten the leg by deleting ensemble equilibration output
         and lightening all sub-simulation runners"""
         # Remove the ensemble equilibration directories
         for direct in _pathlib.Path(self.base_dir).glob("ensemble_equilibration*"):

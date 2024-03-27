@@ -31,6 +31,7 @@ dependencies = [
      "scipy",
      "ipython",
      "pymbar>=4",
+     "pydantic",
 ]
 
 # Update the urls once the hosting is set up.

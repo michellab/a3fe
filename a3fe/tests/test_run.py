@@ -15,6 +15,7 @@ import pytest
 
 import a3fe as a3
 from a3fe.analyse.detect_equil import dummy_check_equil_multiwindow
+from a3fe.run.system_prep import SystemPreparationConfig
 
 from . import GROMACS_PRESENT, RUN_SLURM_TESTS, SLURM_PRESENT
 from .fixtures import calc, complex_sys, restrain_stage
@@ -380,7 +381,10 @@ def test_integration_calculation(calc_slurm):
     assert (
         calc_slurm.prep_stage.name == a3.run.enums.PreparationStage.PARAMETERISED.name
     )
-    calc_slurm.setup(short_ensemble_equil=True)
+    # Set very short Ensemble equilibration time.
+    cfg = SystemPreparationConfig()
+    cfg.ensemble_equilibration_time = 100  # ps
+    calc_slurm.setup(bound_leg_sysprep_config=cfg, free_leg_sysprep_config=cfg)
     assert calc_slurm.setup_complete == True
     # Check that all required slurm bash jobs have been created
     required_slurm_jobnames = ["minimise", "solvate", "heat_preequil"]

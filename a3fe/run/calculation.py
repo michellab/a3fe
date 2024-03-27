@@ -21,6 +21,7 @@ from ._simulation_runner import SimulationRunner as _SimulationRunner
 from .enums import LegType as _LegType
 from .enums import PreparationStage as _PreparationStage
 from .leg import Leg as _Leg
+from .system_prep import SystemPreparationConfig as _SystemPreparationConfig
 
 
 class Calculation(_SimulationRunner):
@@ -158,10 +159,8 @@ class Calculation(_SimulationRunner):
 
     def setup(
         self,
-        slurm: bool = True,
-        append_to_ligand_selection: str = "",
-        use_same_restraints: bool = True,
-        short_ensemble_equil: bool = False,
+        bound_leg_sysprep_config: _Optional[_SystemPreparationConfig] = None,
+        free_leg_sysprep_config: _Optional[_SystemPreparationConfig] = None,
     ) -> None:
         """
         Set up the calculation. This involves parametrising, equilibrating, and
@@ -170,31 +169,27 @@ class Calculation(_SimulationRunner):
 
         Parameters
         ----------
-        slurm : bool, default=True
-            If True, the setup jobs will be run through SLURM.
-        append_to_ligand_selection: str, optional, default = ""
-            For the bound leg, this appends the supplied string to the default atom
-            selection which chooses the atoms in the ligand to consider as potential anchor
-            points. The default atom selection is f'resname {ligand_resname} and not name H*'.
-            Uses the mdanalysis atom selection language. For example, 'not name O*' will result
-            in an atom selection of f'resname {ligand_resname} and not name H* and not name O*'.
-        use_same_restraints: bool, default=True
-            If True, the same restraints will be used for all of the bound leg repeats - by default
-            , the restraints generated for the first repeat are used. This allows meaningful
-            comparison between repeats for the bound leg. If False, the unique restraints are
-            generated for each repeat.
-        short_ensemble_equil: bool, default=False
-            If True, the ensemble equilibration will be run for 0.1 ns instead of 5 ns. This is
-            not recommended for production calculations, but is useful for testing.
+        bound_leg_sysprep_config: SystemPreparationConfig, opttional, default = None
+            The system preparation configuration to use for the bound leg. If None, the default
+            configuration is used.
+        free_leg_sysprep_config: SystemPreparationConfig, opttional, default = None
+            The system preparation configuration to use for the free leg. If None, the default
+            configuration is used.
         """
 
         if self.setup_complete:
             self._logger.info("Setup already complete. Skipping...")
             return
 
+        configs = {
+            _LegType.BOUND: bound_leg_sysprep_config,
+            _LegType.FREE: free_leg_sysprep_config,
+        }
+
         # Set up the legs
         self.legs = []
         for leg_type in reversed(Calculation.required_legs):
+
             self._logger.info(f"Setting up {leg_type.name.lower()} leg...")
             leg = _Leg(
                 leg_type=leg_type,
@@ -207,12 +202,7 @@ class Calculation(_SimulationRunner):
                 stream_log_level=self.stream_log_level,
             )
             self.legs.append(leg)
-            leg.setup(
-                slurm=slurm,
-                append_to_ligand_selection=append_to_ligand_selection,
-                use_same_restraints=use_same_restraints,
-                short_ensemble_equil=short_ensemble_equil,
-            )
+            leg.setup(configs[leg_type])
 
         # Save the state
         self.setup_complete = True
