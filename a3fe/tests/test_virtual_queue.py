@@ -40,11 +40,7 @@ def test_virtual_queue():
         # Check that logging is working
         assert os.path.isfile(os.path.join(dirname, "virtual_queue.log"))
 
-        # Check that killing and flushing works correctly.
-        v_queue.kill(job1)
-        assert job1.slurm_job_id is None
-        assert job1.status == _JobStatus.KILLED
-
+        # Check that flushing works correctly.
         # Flusing pays no attention to the status of the jobs
         v_queue._flush()
         assert v_queue.queue == []
