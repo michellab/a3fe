@@ -225,7 +225,9 @@ class TestCalcSetup:
                 setup_calc.prep_stage.name
                 == a3.run.enums.PreparationStage.PARAMETERISED.name
             )
-            setup_calc.setup(slurm=False)
+            cfg = SystemPreparationConfig()
+            cfg.slurm = False
+            setup_calc.setup(bound_leg_sysprep_config=cfg, free_leg_sysprep_config=cfg)
             yield setup_calc
 
     def test_setup_calc_overall(self, setup_calc, mock_run_process):
