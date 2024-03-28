@@ -1,9 +1,9 @@
 """Fixtures for tests"""
 
 import os
+import pickle as pkl
 import subprocess
 from tempfile import TemporaryDirectory
-from typing import Optional
 
 import BioSimSpace.Sandpit.Exscientia as BSS
 import pytest
@@ -71,3 +71,11 @@ def complex_sys():
         ]
     )
     yield complex_sys
+
+
+@pytest.fixture(scope="session")
+def bss_restraint():
+    """Create a BioSimSpace restraint object to use in tests"""
+    with open("a3fe/data/example_run_dir/input/restraint.pkl", "rb") as f:
+        bss_restraint = pkl.load(f)
+    yield bss_restraint

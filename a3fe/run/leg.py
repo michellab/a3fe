@@ -26,6 +26,7 @@ from ..read._process_slurm_files import get_slurm_file_base as _get_slurm_file_b
 from ..read._process_somd_files import read_simfile_option as _read_simfile_option
 from ..read._process_somd_files import write_simfile_option as _write_simfile_option
 from . import system_prep as _system_prep
+from ._restraint import A3feRestraint as _A3feRestraint
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._virtual_queue import Job as _Job
 from ._virtual_queue import VirtualQueue as _VirtualQueue
@@ -915,6 +916,9 @@ class Leg(_SimulationRunner):
                 f"{stage_input_dir}/somd.cfg", "lambda array", lam_vals_str
             )
 
+        # We no longer need to store the large BSS restraint classes.
+        self._lighten_restraints()
+
     def _run_slurm(
         self, sys_prep_fn: _Callable, wait: bool, run_dir: str, job_name: str
     ) -> None:
@@ -1254,3 +1258,14 @@ class Leg(_SimulationRunner):
         if hasattr(self, "_sub_sim_runners"):
             for sub_sim_runner in self._sub_sim_runners:
                 sub_sim_runner.lighten()
+
+    def _lighten_restraints(self) -> None:
+        """
+        Replace the BioSimSpace restraints with a light-weight version
+        which does not store entire systems in memory.
+        """
+        if self.leg_type == _LegType.BOUND:
+            light_restraints = [
+                _A3feRestraint(restraint) for restraint in self.restraints
+            ]
+            self.restraints = light_restraints
