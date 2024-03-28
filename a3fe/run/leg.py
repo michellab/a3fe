@@ -800,8 +800,8 @@ class Leg(_SimulationRunner):
             generated for each repeat.
         """
         # Dummy values get overwritten later
-        DUMMY_RUNTIME = 0.001  # ns
-        DUMMY_LAM_VALS = [0.0]
+        dummy_runtime = 0.001  # ns
+        dummy_lam_vals = [0.0]
         if not hasattr(self, "stage_input_dirs"):
             raise AttributeError("No stage input directories have been set.")
 
@@ -811,8 +811,8 @@ class Leg(_SimulationRunner):
             )
             restraint = self.restraints[0] if self.leg_type == _LegType.BOUND else None
             protocol = _BSS.Protocol.FreeEnergy(
-                runtime=DUMMY_RUNTIME * _BSS.Units.Time.nanosecond,  # type: ignore
-                lam_vals=DUMMY_LAM_VALS,
+                runtime=dummy_runtime * _BSS.Units.Time.nanosecond,  # type: ignore
+                lam_vals=dummy_lam_vals,
                 perturbation_type=stage_type.bss_perturbation_type,
             )
             self._logger.info(f"Perturbation type: {stage_type.bss_perturbation_type}")
