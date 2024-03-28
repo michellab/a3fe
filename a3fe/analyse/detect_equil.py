@@ -9,7 +9,6 @@ __all__ = [
     "get_gelman_rubin_rhat",
 ]
 
-from typing import Any as _Any
 from typing import Dict as _Dict
 from typing import List as _List
 from typing import Optional as _Optional

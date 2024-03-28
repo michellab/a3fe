@@ -10,8 +10,6 @@ from typing import List as _List
 from typing import Optional as _Optional
 from typing import Tuple as _Tuple
 
-import BioSimSpace as _BSS
-import MDAnalysis.transformations as _trans
 import numpy as _np
 from MDAnalysis import Universe as _Universe
 from MDAnalysis.analysis.rms import RMSD as _RMSD

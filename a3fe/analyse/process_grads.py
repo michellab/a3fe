@@ -3,11 +3,9 @@
 __all__ = ["GradientData"]
 
 from multiprocessing import get_context as _get_context
-from typing import Dict as _Dict
 from typing import List as _List
 from typing import Optional as _Optional
 from typing import Tuple as _Tuple
-from typing import Union as _Union
 
 import numpy as _np
 from scipy.constants import gas_constant as _R

@@ -4,8 +4,6 @@ from pytest import approx
 
 from a3fe.run._restraint import A3feRestraint
 
-from .fixtures import bss_restraint
-
 
 def test_create_a3fe_restraint(bss_restraint):
     """Test that an A3feRestraint object can be created from a BioSimSpace restraint object."""

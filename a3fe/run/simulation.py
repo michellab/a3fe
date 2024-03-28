@@ -8,8 +8,6 @@ import os as _os
 import pathlib as _pathlib
 import subprocess as _subprocess
 from decimal import Decimal as _Decimal
-from typing import Any as _Any
-from typing import Dict as _Dict
 from typing import List as _List
 from typing import Optional as _Optional
 from typing import Tuple as _Tuple
@@ -151,10 +149,10 @@ class Simulation(_SimulationRunner):
         # Stage level
         if self.job in self.virtual_queue.queue:
             self._running = True
-            self._logger.info(f"Still running")
+            self._logger.info("Still running")
 
         else:  # Must have finished
-            self._logger.info(f"Not running")
+            self._logger.info("Not running")
             self._running = False
             # Check that job finished successfully
             if self.job.status == _JobStatus.FINISHED:
@@ -454,7 +452,7 @@ class Simulation(_SimulationRunner):
             self.virtual_queue.kill(self.job)
 
     def lighten(self) -> None:
-        f"""Lighten the simulation by deleting all restart
+        """Lighten the simulation by deleting all restart
         and trajectory files."""
         delete_files = [
             "*.dcd",

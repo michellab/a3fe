@@ -4,19 +4,12 @@ consisting of two legs (bound and unbound) and multiple stages."""
 __all__ = ["Calculation"]
 
 import logging as _logging
-import multiprocessing as _mp
 import os as _os
 import shutil as _shutil
-from typing import Any as _Any
-from typing import Callable as _Callable
-from typing import Dict as _Dict
 from typing import List as _List
 from typing import Optional as _Optional
-from typing import Tuple as _Tuple
 
-import pandas as _pd
 
-from ..analyse.exceptions import AnalysisError as _AnalysisError
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from .enums import LegType as _LegType
 from .enums import PreparationStage as _PreparationStage

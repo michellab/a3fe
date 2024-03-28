@@ -24,11 +24,7 @@ License along with this software. If not, see <http://www.gnu.org/licenses/>.
 
 __all__ = ["get_statistical_inefficiency"]
 
-from typing import Any as _Any
-from typing import Dict as _Dict
-from typing import List as _List
 from typing import Optional as _Optional
-from typing import Tuple as _Tuple
 
 import numpy as _np
 

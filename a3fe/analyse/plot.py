@@ -20,14 +20,11 @@ __all__ = [
     "plot_av_waters",
 ]
 
-import glob as _glob
 import os as _os
 from math import ceil as _ceil
-from typing import Any as _Any
 from typing import Dict as _Dict
 from typing import List as _List
 from typing import Optional as _Optional
-from typing import Tuple as _Tuple
 
 import matplotlib.cm as _cm
 import matplotlib.colors as _colors
@@ -189,7 +186,7 @@ def plot_gradient_stats(
         "integrated_var",
         "pred_best_simtime",
     ]
-    if not plot_type in plot_types:
+    if plot_type not in plot_types:
         raise ValueError(f"'plot_type' must be one of {plot_types}, not {plot_type}")
 
     # Make plots of variance of gradients

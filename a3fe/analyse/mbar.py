@@ -8,10 +8,8 @@ __all__ = ["run_mbar"]
 import glob as _glob
 import os as _os
 import subprocess as _subprocess
-from typing import Any as _Any
 from typing import Dict as _Dict
 from typing import List as _List
-from typing import Optional as _Optional
 from typing import Tuple as _Tuple
 
 import numpy as _np

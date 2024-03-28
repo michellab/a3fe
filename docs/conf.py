@@ -18,7 +18,6 @@ import sys
 
 sys.path.insert(0, os.path.abspath(".."))
 
-import a3fe
 
 # -- Project information -----------------------------------------------------
 

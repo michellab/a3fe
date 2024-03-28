@@ -3,7 +3,7 @@
 import os
 from tempfile import TemporaryDirectory
 
-from ..run._virtual_queue import Job, VirtualQueue, _JobStatus
+from ..run._virtual_queue import Job, VirtualQueue
 
 
 def test_job():

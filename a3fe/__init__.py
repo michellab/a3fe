@@ -29,7 +29,6 @@ if _nofile_soft < _nofile_hard:
 
 
 # Run imports
-from ._version import __version__
 
 # Pdb helper import
 from .read import *

@@ -3,7 +3,6 @@
 
 from typing import List as _List
 from typing import Tuple as _Tuple
-from typing import Union as _Union
 
 import numpy as _np
 from scipy.stats import levene as _levene

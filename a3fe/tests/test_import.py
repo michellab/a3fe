@@ -2,7 +2,6 @@
 
 import sys
 
-import a3fe
 
 
 def test_a3fe_imported():

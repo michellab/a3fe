@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import copy as _copy
-import glob as _glob
 import logging as _logging
 import os as _os
 import pathlib as _pathlib
@@ -11,14 +10,12 @@ import pickle as _pkl
 import subprocess as _subprocess
 from abc import ABC
 from itertools import count as _count
-from threading import Thread as _Thread
 from time import sleep as _sleep
 from typing import Any as _Any
 from typing import Dict as _Dict
 from typing import List as _List
 from typing import Optional as _Optional
 from typing import Tuple as _Tuple
-from typing import Type as _Type
 from typing import Union as _Union
 
 import numpy as _np
@@ -325,7 +322,7 @@ class SimulationRunner(ABC):
         fraction: float = 1,
         plot_rmsds: bool = False,
     ) -> _Tuple[_np.ndarray, _np.ndarray]:
-        f"""
+        """
         Analyse the simulation runner and any
         sub-simulations, and return the overall free energy
         change.

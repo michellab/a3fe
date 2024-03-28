@@ -28,15 +28,11 @@ from ..analyse.detect_equil import (
     check_equil_multiwindow_gelman_rubin as _check_equil_multiwindow_gelman_rubin,
 )
 from ..analyse.detect_equil import (
-    check_equil_multiwindow_modified_geweke as _check_equil_multiwindow_modified_geweke,
-)
-from ..analyse.detect_equil import (
     check_equil_multiwindow_paired_t as _check_equil_multiwindow_paired_t,
 )
 from ..analyse.detect_equil import (
     dummy_check_equil_multiwindow as _dummy_check_equil_multiwindow,
 )
-from ..analyse.exceptions import AnalysisError as _AnalysisError
 from ..analyse.mbar import run_mbar as _run_mbar
 from ..analyse.plot import plot_convergence as _plot_convergence
 from ..analyse.plot import plot_equilibration_time as _plot_equilibration_time
@@ -368,7 +364,7 @@ class Stage(_SimulationRunner):
             _sleep(cycle_pause)  # Check every 60 seconds
             # Check if we've requested to kill the thread
             if self.kill_thread:
-                self._logger.info(f"Kill thread requested: exiting run loop")
+                self._logger.info("Kill thread requested: exiting run loop")
                 return
 
             # Update the queue before checking the simulations
@@ -417,7 +413,7 @@ class Stage(_SimulationRunner):
                 _sleep(cycle_pause)  # Check every 60 seconds
                 # Check if we've requested to kill the thread
                 if self.kill_thread:
-                    self._logger.info(f"Kill thread requested: exiting run loop")
+                    self._logger.info("Kill thread requested: exiting run loop")
                     return
                 # Update the queue before checking the simulations
                 self.virtual_queue.update()
@@ -543,7 +539,7 @@ class Stage(_SimulationRunner):
         while not self.is_equilibrated(run_nos=run_nos):
             if self.kill_thread:
                 # Check if we've requested to kill the thread
-                self._logger.info(f"Kill thread requested: exiting run loop")
+                self._logger.info("Kill thread requested: exiting run loop")
                 return
 
             # Check if we have reached equilibration
@@ -714,7 +710,7 @@ class Stage(_SimulationRunner):
 
         # Check that this is not still running
         if self.running:
-            raise RuntimeError(f"Cannot perform analysis as the Stage is still running")
+            raise RuntimeError("Cannot perform analysis as the Stage is still running")
 
         # Check that none of the simulations have failed
         failed_sims_list = self.failed_simulations
@@ -1067,7 +1063,7 @@ class Stage(_SimulationRunner):
 
     @property
     def tot_simtime(self) -> float:
-        f"""The total simulation time in ns for the stage."""
+        """The total simulation time in ns for the stage."""
         return self.get_tot_simtime()
 
     def _mv_output(self, save_name: str) -> None:
