@@ -74,8 +74,8 @@ def complex_sys():
 
 
 @pytest.fixture(scope="session")
-def bss_restraint():
-    """Create a BioSimSpace restraint object to use in tests"""
+def a3fe_restraint():
+    """Create an A3FE restraint object to use in tests"""
     with open("a3fe/data/example_run_dir/input/restraint.pkl", "rb") as f:
-        bss_restraint = pkl.load(f)
-    yield bss_restraint
+        a3fe_restraint = pkl.load(f)
+    yield a3fe_restraint
