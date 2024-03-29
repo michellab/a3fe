@@ -13,7 +13,9 @@ from scipy.constants import gas_constant as _R
 from .autocorrelation import (
     get_statistical_inefficiency as _get_statistical_inefficiency,
 )
+from .mbar import collect_mbar_slurm as _collect_mbar_slurm
 from .mbar import run_mbar as _run_mbar
+from .mbar import submit_mbar_slurm as _submit_mbar_slurm
 
 
 class GradientData:
@@ -722,35 +724,62 @@ def get_time_series_multiwindow_mbar(
         (round(x[0], 5), round(x[1], 5)) for x in start_and_end_fracs
     ]
 
-    # Run MBAR in parallel
-    with _get_context("spawn").Pool() as pool:
-        results = pool.starmap(
-            _compute_dg,
-            [
-                (run_no, start_frac, end_frac, output_dir, equilibrated)
-                for run_no in run_nos
-                for start_frac, end_frac in start_and_end_fracs
-            ],
+    # Check whether we should use slurm or not.
+    use_slurms = [
+        getattr(lam_win, "slurm_equil_detection", False) for lam_win in lambda_windows
+    ]
+    # Raise an error if they're not all the same.
+    if not all(use_slurm == use_slurms[0] for use_slurm in use_slurms):
+        raise ValueError(
+            "use_slurm is not the same for all lambda windows. Please ensure that "
+            "use_slurm is the same for all lambda windows."
         )
+
+    if not use_slurms[0]:
+        # Run MBAR in parallel
+        with _get_context("spawn").Pool() as pool:
+            results = pool.starmap(
+                _compute_dg,
+                [
+                    (run_no, start_frac, end_frac, output_dir, equilibrated)
+                    for run_no in run_nos
+                    for start_frac, end_frac in start_and_end_fracs
+                ],
+            )
+    else:  # Use slurm
+        frac_jobs = []
+        results = []
+        for start_percent, end_percent in start_and_end_fracs:
+            frac_jobs.append(
+                _submit_mbar_slurm(
+                    output_dir=output_dir,
+                    virtual_queue=lambda_windows[0].virtual_queue,
+                    run_nos=run_nos,
+                    run_somd_dir=lambda_windows[0].input_dir,
+                    percentage_end=end_percent,
+                    percentage_start=start_percent,
+                    subsampling=False,
+                    equilibrated=equilibrated,
+                )
+            )
+
+        for frac_job in frac_jobs:
+            jobs, mbar_outfiles, tmp_simfiles = frac_job
+            results.append(
+                _collect_mbar_slurm(
+                    output_dir=output_dir,
+                    run_nos=run_nos,
+                    jobs=jobs,
+                    mbar_out_files=mbar_outfiles,
+                    virtual_queue=lambda_windows[0].virtual_queue,
+                    tmp_simfiles=tmp_simfiles,
+                )
+            )
 
     # Reshape the results
     for i, run_no in enumerate(run_nos):
         for j, (start_frac, end_frac) in enumerate(start_and_end_fracs):
             overall_dgs[i, j] = results[i * len(start_and_end_fracs) + j]
-
-    ## Run MBAR
-    # for i, run_no in enumerate(run_nos):
-    # for j, (start_frac, end_frac) in enumerate(start_and_end_fracs):
-    # free_energies, _, _ = _run_mbar(
-    # output_dir=output_dir,
-    # run_nos=[run_no],
-    # equilibrated=equilibrated,
-    # percentage_end=end_frac * 100,
-    # percentage_start=start_frac * 100,
-    # subsampling=False,
-    # delete_outfiles=True,
-    # )
-    # overall_dgs[i, j] = free_energies[0]
 
     # Get times per run
     for i, run_no in enumerate(run_nos):

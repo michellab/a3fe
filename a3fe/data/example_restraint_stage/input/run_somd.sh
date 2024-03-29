@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -o somd-array-gpu-%A.%a.out
-#SBATCH -p GTX980,RTX3080
+#SBATCH -p main
 #SBATCH -n 1
 #SBATCH --gres=gpu:1
 

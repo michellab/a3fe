@@ -85,12 +85,15 @@ def read_mbar_result(outfile: str) -> _Tuple[float, float]:
     """
     with open(outfile, "r") as f:
         lines = f.readlines()
-    try:
-        # The free energy is the 5th last line of the file
-        free_energy = float(lines[-4].split(",")[0])
-        free_energy_err = float(lines[-4].split(",")[1].split()[0])
-    except (IndexError, ValueError):
-        raise _ReadError(f"Could not read free energy from {outfile}.")
+
+    # line before the MBAR value starts with
+    for i, line in enumerate(lines):
+        if line.startswith("#MBAR free energy difference"):
+            try:
+                free_energy = float(lines[i + 1].split(",")[0])
+                free_energy_err = float(lines[i + 1].split(",")[1].split()[0])
+            except (IndexError, ValueError):
+                raise _ReadError(f"Could not read free energy from {outfile}.")
 
     return free_energy, free_energy_err
 

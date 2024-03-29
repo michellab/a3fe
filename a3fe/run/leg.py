@@ -1021,7 +1021,8 @@ class Leg(_SimulationRunner):
 
     def analyse(
         self,
-        run_nos: _Optional[_List[int]],
+        slurm: bool = False,
+        run_nos: _Optional[_List[int]] = None,
         subsampling=False,
         fraction: float = 1,
         plot_rmsds: bool = False,
@@ -1032,6 +1033,10 @@ class Leg(_SimulationRunner):
 
         Parameters
         ----------
+        slurm : bool, optional, default=False
+            Whether to use SLURM to run the analysis, by default False.
+        run_nos : List[int], Optional, default=None
+            A list of the run numbers to analyse. If None, all runs are analysed.
         subsampling: bool, optional, default=False
             If True, the free energy will be calculated by subsampling using
             the methods contained within pymbar.
@@ -1055,6 +1060,7 @@ class Leg(_SimulationRunner):
         run_nos = self._get_valid_run_nos(run_nos)
 
         dg_overall, er_overall = super().analyse(
+            slurm=slurm,
             run_nos=run_nos,
             subsampling=subsampling,
             fraction=fraction,
@@ -1154,6 +1160,7 @@ class Leg(_SimulationRunner):
 
     def analyse_convergence(
         self,
+        slurm: bool = False,
         run_nos: _Optional[_List[int]] = None,
         mode: str = "cumulative",
         fraction: float = 1,
@@ -1166,6 +1173,8 @@ class Leg(_SimulationRunner):
 
         Parameters
         ----------
+        slurm: bool, optional, default=False
+            Whether to use slurm for the analysis.
         run_nos : Optional[List[int]], default=None
             If specified, only analyse the specified runs. Otherwise, analyse all runs.
         mode : str, optional, default="cumulative"
@@ -1202,7 +1211,11 @@ class Leg(_SimulationRunner):
         # Now add up the data for each of the sub-simulation runners
         for sub_sim_runner in self._sub_sim_runners:
             _, dgs = sub_sim_runner.analyse_convergence(
-                run_nos=run_nos, mode=mode, fraction=fraction, equilibrated=equilibrated
+                slurm=slurm,
+                run_nos=run_nos,
+                mode=mode,
+                fraction=fraction,
+                equilibrated=equilibrated,
             )
             # Decide if the component should be added or subtracted
             # according to the dg_multiplier attribute

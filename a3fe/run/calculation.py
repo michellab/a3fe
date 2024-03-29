@@ -9,7 +9,6 @@ import shutil as _shutil
 from typing import List as _List
 from typing import Optional as _Optional
 
-
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from .enums import LegType as _LegType
 from .enums import PreparationStage as _PreparationStage
@@ -322,6 +321,7 @@ class Calculation(_SimulationRunner):
         master_run_somd = _os.path.join(self.input_dir, "run_somd.sh")
         for leg in self.legs:
             for stage in leg.stages:
+                _shutil.copy(master_run_somd, stage.input_dir)
                 for lambda_window in stage.lam_windows:
                     for simulation in lambda_window.sims:
                         _shutil.copy(master_run_somd, simulation.input_dir)

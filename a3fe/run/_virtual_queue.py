@@ -214,7 +214,7 @@ class VirtualQueue:
         # Define inner loop to allow use of retry decorator with self.logger
         @_retry(times=5, exceptions=(ValueError), wait_time=120, logger=self._logger)
         def _submit_job_inner(job_command: str) -> int:
-            cmd = f"sbatch {job_command}"
+            cmd = f"rbatch {job_command}"
             process = _subprocess.Popen(
                 cmd,
                 shell=True,

@@ -33,7 +33,9 @@ from ..analyse.detect_equil import (
 from ..analyse.detect_equil import (
     dummy_check_equil_multiwindow as _dummy_check_equil_multiwindow,
 )
+from ..analyse.mbar import collect_mbar_slurm as _collect_mbar_slurm
 from ..analyse.mbar import run_mbar as _run_mbar
+from ..analyse.mbar import submit_mbar_slurm as _submit_mbar_slurm
 from ..analyse.plot import plot_convergence as _plot_convergence
 from ..analyse.plot import plot_equilibration_time as _plot_equilibration_time
 from ..analyse.plot import plot_gradient_hists as _plot_gradient_hists
@@ -65,10 +67,14 @@ class Stage(_SimulationRunner):
     run_files = _SimulationRunner.run_files + [
         "check_equil_multiwindow*.txt",
         "freenrg-MBAR*.dat",
+        "*.out",
     ]
 
     runtime_attributes = _deepcopy(_SimulationRunner.runtime_attributes)
     runtime_attributes["_maximally_efficient"] = False
+
+    # A thread-safe counter for e.g. naming unique files.
+    _counter = _get_context("spawn").Value("i", 0)
 
     def __init__(
         self,
@@ -669,6 +675,7 @@ class Stage(_SimulationRunner):
 
     def analyse(
         self,
+        slurm: bool = False,
         run_nos: _Optional[_List[int]] = None,
         get_frnrg: bool = True,
         subsampling: bool = False,
@@ -680,6 +687,8 @@ class Stage(_SimulationRunner):
 
         Parameters
         ----------
+        slurm : bool, optional, default=False
+            Whether to use slurm for the analysis.
         run_nos : List[int], Optional, default: None
             The run numbers to analyse. If None, all runs will be analysed.
         get_frnrg : bool, optional, default=True
@@ -746,13 +755,36 @@ class Stage(_SimulationRunner):
                 win._write_equilibrated_simfiles()
 
             # Run MBAR and compute mean and 95 % C.I. of free energy
-            free_energies, errors, mbar_outfiles, _ = _run_mbar(
-                run_nos=run_nos,
-                output_dir=self.output_dir,
-                percentage_end=fraction * 100,
-                percentage_start=0,
-                subsampling=subsampling,
-            )
+            if not slurm:
+                free_energies, errors, mbar_outfiles, _ = _run_mbar(
+                    run_nos=run_nos,
+                    output_dir=self.output_dir,
+                    percentage_end=fraction * 100,
+                    percentage_start=0,
+                    subsampling=subsampling,
+                    equilibrated=True,
+                )
+            else:
+                jobs, mbar_outfiles, tmp_simfiles = _submit_mbar_slurm(
+                    output_dir=self.output_dir,
+                    virtual_queue=self.virtual_queue,
+                    run_nos=run_nos,
+                    run_somd_dir=self.input_dir,
+                    percentage_end=fraction * 100,
+                    percentage_start=0,
+                    subsampling=subsampling,
+                    equilibrated=True,
+                )
+
+                free_energies, errors, *_ = _collect_mbar_slurm(
+                    output_dir=self.output_dir,
+                    run_nos=run_nos,
+                    jobs=jobs,
+                    mbar_out_files=mbar_outfiles,
+                    virtual_queue=self.virtual_queue,
+                    tmp_simfiles=tmp_simfiles,
+                )
+
             mean_free_energy = _np.mean(free_energies)
             # Gaussian 95 % C.I.
             conf_int = (
@@ -900,6 +932,7 @@ class Stage(_SimulationRunner):
 
     def analyse_convergence(
         self,
+        slurm: bool = False,
         run_nos: _Optional[_List[int]] = None,
         mode: str = "cumulative",
         fraction: float = 1,
@@ -913,6 +946,8 @@ class Stage(_SimulationRunner):
 
         Parameters
         ----------
+        slurm: bool, optional, default=False
+            Whether to use slurm for the analysis.
         run_nos : List[int], Optional, default: None
             The run numbers to analyse. If None, all runs will be analysed.
         mode : str, optional, default="cumulative"
@@ -927,6 +962,8 @@ class Stage(_SimulationRunner):
 
         Returns
         -------
+        slurm: bool, optional, default=False
+            Whether to use slurm for the analysis.
         fracts : np.ndarray
             The fraction of the total (equilibrated) simulation time for each value of dg_overall.
         dg_overall : np.ndarray
@@ -972,29 +1009,62 @@ class Stage(_SimulationRunner):
             for win in self.lam_windows:
                 win._write_equilibrated_simfiles()
 
-        # Now run mbar with multiprocessing to speed things up
-        with _get_context("spawn").Pool() as pool:
-            results = pool.starmap(
-                _run_mbar,
-                [
-                    (
-                        self.output_dir,
-                        run_nos,
-                        end_percent,
-                        start_percent,
-                        False,  # Subsample
-                        True,  # Delete output files
-                        equilibrated,  # Equilibrated
+        if not slurm:
+            # Now run mbar with multiprocessing to speed things up
+            with _get_context("spawn").Pool() as pool:
+                results = pool.starmap(
+                    _run_mbar,
+                    [
+                        (
+                            self.output_dir,
+                            run_nos,
+                            end_percent,
+                            start_percent,
+                            False,  # Subsample
+                            True,  # Delete output files
+                            equilibrated,  # Equilibrated
+                        )
+                        for start_percent, end_percent in zip(
+                            start_percents, end_percents
+                        )
+                    ],
+                )
+        else:  # Use slurm
+            frac_jobs = []
+            results = []
+            for start_percent, end_percent in zip(start_percents, end_percents):
+                frac_jobs.append(
+                    _submit_mbar_slurm(
+                        output_dir=self.output_dir,
+                        virtual_queue=self.virtual_queue,
+                        run_nos=run_nos,
+                        run_somd_dir=self.input_dir,
+                        percentage_end=end_percent,
+                        percentage_start=start_percent,
+                        subsampling=False,
+                        equilibrated=equilibrated,
                     )
-                    for start_percent, end_percent in zip(start_percents, end_percents)
-                ],
-            )
-            dg_overall = _np.array(
-                [result[0] for result in results]
-            ).transpose()  # result[0] is a 2D array for a given percent
-            mbar_grads = [
-                result[3] for result in results
-            ]  # result[3] is a Dict of gradient data for a given percent
+                )
+
+            for frac_job in frac_jobs:
+                jobs, mbar_outfiles, tmp_simfiles = frac_job
+                results.append(
+                    _collect_mbar_slurm(
+                        output_dir=self.output_dir,
+                        run_nos=run_nos,
+                        jobs=jobs,
+                        mbar_out_files=mbar_outfiles,
+                        virtual_queue=self.virtual_queue,
+                        tmp_simfiles=tmp_simfiles,
+                    )
+                )
+
+        dg_overall = _np.array(
+            [result[0] for result in results]
+        ).transpose()  # result[0] is a 2D array for a given percent
+        mbar_grads = [
+            result[3] for result in results
+        ]  # result[3] is a Dict of gradient data for a given percent
 
         self._logger.info(f"Overall free energy changes: {dg_overall} kcal mol-1")
         self._logger.info(f"Fractions of (equilibrated) simulation time: {fracts}")

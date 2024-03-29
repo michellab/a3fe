@@ -23,10 +23,10 @@ from statsmodels.tsa.stattools import kpss as _kpss
 from .plot import general_plot as _general_plot
 from .plot import p_plot as _p_plot
 from .plot import plot_gelman_rubin_rhat as _plot_gelman_rubin_rhat
-from .process_grads import \
-    get_time_series_multiwindow as _get_time_series_multiwindow
-from .process_grads import \
-    get_time_series_multiwindow_mbar as _get_time_series_multiwindow_mbar
+from .process_grads import get_time_series_multiwindow as _get_time_series_multiwindow
+from .process_grads import (
+    get_time_series_multiwindow_mbar as _get_time_series_multiwindow_mbar,
+)
 
 
 def check_equil_block_gradient(lam_win: "LamWindow", run_nos: _Optional[_List[int]]) -> _Tuple[bool, _Optional[float]]:  # type: ignore
@@ -127,9 +127,9 @@ def check_equil_block_gradient(lam_win: "LamWindow", run_nos: _Optional[_List[in
         outfile=f"{lam_win.output_dir}/dhdl_block_gradient" + append_to_name,
         # Shift the equilibration time by 2 * block size to account for the
         # delay in the block average calculation.
-        vline_val=equil_time + 1 * lam_win.block_size
-        if equil_time is not None
-        else None,
+        vline_val=(
+            equil_time + 1 * lam_win.block_size if equil_time is not None else None
+        ),
         run_nos=run_nos,
     )
 
@@ -139,9 +139,9 @@ def check_equil_block_gradient(lam_win: "LamWindow", run_nos: _Optional[_List[in
         x_label="Simulation Time per Window per Run / ns",
         y_label=r"$\frac{\partial}{\partial t}\frac{\partial H}{\partial \lambda}$ / kcal mol$^{-1}$ ns$^{-1}$",
         outfile=f"{lam_win.output_dir}/ddhdl_block_gradient" + append_to_name,
-        vline_val=equil_time + 2 * lam_win.block_size
-        if equil_time is not None
-        else None,
+        vline_val=(
+            equil_time + 2 * lam_win.block_size if equil_time is not None else None
+        ),
         hline_val=0,
         run_nos=run_nos,
     )
@@ -302,9 +302,9 @@ def check_equil_shrinking_block_gradient(
         outfile=f"{lam_win.output_dir}/dhdl_block_gradient",
         # Shift the equilibration time by 2 * block size to account for the
         # delay in the block average calculation.
-        vline_val=equil_time + 1 * equil_block_size
-        if equil_block_size is not None
-        else None,
+        vline_val=(
+            equil_time + 1 * equil_block_size if equil_block_size is not None else None
+        ),
         run_nos=run_nos,
     )  # type: ignore
 

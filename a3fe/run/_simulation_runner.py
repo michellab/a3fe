@@ -317,6 +317,7 @@ class SimulationRunner(ABC):
 
     def analyse(
         self,
+        slurm: bool = False,
         run_nos: _Optional[_List[int]] = None,
         subsampling=False,
         fraction: float = 1,
@@ -329,6 +330,8 @@ class SimulationRunner(ABC):
 
         Parameters
         ----------
+        slurm : bool, optional, default=False
+            Whether to use slurm for the analysis.
         run_nos : List[int], Optional, default=None
             A list of the run numbers to analyse. If None, all runs are analysed.
         subsampling: bool, optional, default=False
@@ -379,6 +382,7 @@ class SimulationRunner(ABC):
         # Analyse the sub-simulation runners
         for sub_sim_runner in self._sub_sim_runners:
             dg, er = sub_sim_runner.analyse(
+                slurm=slurm,
                 run_nos=run_nos,
                 subsampling=subsampling,
                 fraction=fraction,
@@ -521,18 +525,21 @@ class SimulationRunner(ABC):
 
     def analyse_convergence(
         self,
+        slurm: bool = False,
         run_nos: _Optional[_List[int]] = None,
         mode: str = "cumulative",
         fraction: float = 1,
         equilibrated: bool = True,
     ) -> _Tuple[_np.ndarray, _np.ndarray]:
-        f"""
+        """
         Get a timeseries of the total free energy change of the
-        {self.__class__.__name__} against total simulation time. Also plot this.
+        sub-simulation runner against total simulation time. Also plot this.
         Keep this separate from analyse as it is expensive to run.
 
         Parameters
         ----------
+        slurm: bool, optional, default=False
+            Whether to use slurm for the analysis.
         run_nos : List[int], Optional, default=None
             A list of the run numbers to analyse. If None, all runs are analysed.
         mode : str, optional, default="cumulative"
@@ -571,7 +578,11 @@ class SimulationRunner(ABC):
         # Now add up the data for each of the sub-simulation runners
         for sub_sim_runner in self._sub_sim_runners:
             _, dgs = sub_sim_runner.analyse_convergence(
-                run_nos=run_nos, mode=mode, fraction=fraction, equilibrated=equilibrated
+                slurm=slurm,
+                run_nos=run_nos,
+                mode=mode,
+                fraction=fraction,
+                equilibrated=equilibrated,
             )
             # Decide if the component should be added or subtracted
             # according to the dg_multiplier attribute
