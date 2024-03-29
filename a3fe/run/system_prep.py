@@ -87,6 +87,34 @@ class SystemPreparationConfig(_BaseModel):
         extra = "forbid"
         validate_assignment = True
 
+    def get_tot_simtime(self, n_runs: int, leg_type: _LegType) -> int:
+        """
+        Get the total simulation time for the ensemble equilibration.
+
+        Parameters
+        ----------
+        n_runs : int
+            Number of ensemble equilibration runs.
+        leg_type : LegType
+            The type of the leg.
+
+        Returns
+        -------
+        int
+            Total simulation time in ps.
+        """
+
+        # See functions below for where these times are used.
+        tot_simtime = 0
+        tot_simtime += self.runtime_short_nvt
+        tot_simtime += (
+            self.runtime_nvt * 2 if leg_type == _LegType.BOUND else self.runtime_nvt
+        )
+        tot_simtime += self.runtime_npt * 2
+        tot_simtime += self.runtime_npt_unrestrained
+        tot_simtime += self.ensemble_equilibration_time * n_runs
+        return tot_simtime
+
     def save_pickle(self, save_dir: str, leg_type: _LegType) -> None:
         """
         Save the configuration to a pickle file.
