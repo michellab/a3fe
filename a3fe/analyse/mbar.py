@@ -226,9 +226,13 @@ def submit_mbar_slurm(
             file.writelines(slurm_lines)
 
         # Submit to the virtual queue
-        cmd = f"--chdir={output_dir} {slurm_file}"  # The virtual queue adds sbatch
+        cmd_list = [
+            "--chdir",
+            f"{output_dir}",
+            f"{slurm_file}",
+        ]  # The virtual queue adds sbatch
         slurm_file_base = _get_slurm_file_base(slurm_file)
-        job = virtual_queue.submit(cmd, slurm_file_base=slurm_file_base)
+        job = virtual_queue.submit(cmd_list, slurm_file_base=slurm_file_base)
         # Update the virtual queue to submit the job
         virtual_queue.update()
         jobs.append(job)

@@ -960,9 +960,13 @@ class Leg(_SimulationRunner):
             file.writelines(header_lines)
 
         # Submit to the virtual queue
-        cmd = f"--chdir={run_dir} {run_dir}/{job_name}.sh"  # The virtual queue adds sbatch
+        cmd_list = [
+            "--chdir",
+            f"{run_dir}",
+            f"{run_dir}/{job_name}.sh",
+        ]  # The virtual queue adds sbatch
         slurm_file_base = _get_slurm_file_base(slurm_file)
-        job = self.virtual_queue.submit(cmd, slurm_file_base=slurm_file_base)
+        job = self.virtual_queue.submit(cmd_list, slurm_file_base=slurm_file_base)
         self._logger.info(f"Submitted job {job}")
         self.jobs.append(job)
         # Update the virtual queue to submit the job

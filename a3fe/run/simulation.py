@@ -174,9 +174,9 @@ class Simulation(_SimulationRunner):
                     ["mv", old_job.slurm_outfile, f"{self.output_dir}/failure"]
                 )
                 # Now resubmit
-                cmd = old_job.command
+                cmd_list = old_job.command_list
                 self.job = self.virtual_queue.submit(
-                    command=cmd, slurm_file_base=self.slurm_file_base
+                    command_list=cmd_list, slurm_file_base=self.slurm_file_base
                 )
                 self._logger.info(f"{old_job} failed and was resubmitted as {self.job}")
                 self._running = True
@@ -339,9 +339,14 @@ class Simulation(_SimulationRunner):
         self._set_n_cycles(n_cycles)
 
         # Run SOMD - note that command excludes sbatch as this is added by the virtual queue
-        cmd = f"--chdir {self.output_dir} {self.input_dir}/run_somd.sh {self.lam}"
+        cmd_list = [
+            "--chdir",
+            f"{self.output_dir}",
+            f"{self.input_dir}/run_somd.sh",
+            f"{self.lam}",
+        ]
         self.job = self.virtual_queue.submit(
-            command=cmd, slurm_file_base=self.slurm_file_base
+            command_list=cmd_list, slurm_file_base=self.slurm_file_base
         )
         self._logger.info(f"Submitted with job {self.job}")
 

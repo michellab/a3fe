@@ -8,9 +8,9 @@ from ..run._virtual_queue import Job, VirtualQueue
 
 def test_job():
     """Test that the Job class works correctly"""
-    job = Job(1, "echo hello")
+    job = Job(1, ["echo", "hello"])
     assert job.virtual_job_id == 1
-    assert job.command == "echo hello"
+    assert job.command_list == ["echo", "hello"]
     assert job.slurm_job_id is None
     job.slurm_job_id = 1234
     assert job.slurm_job_id == 1234
@@ -27,11 +27,11 @@ def test_virtual_queue():
         virtual_job_id = v_queue._available_virt_job_id
         # Increment this so that it is never used again for this queue
         v_queue._available_virt_job_id += 1
-        job1 = Job(virtual_job_id, "echo hello")
+        job1 = Job(virtual_job_id, ["echo", "hello"])
         v_queue._pre_queue.append(job1)
         v_queue._logger.info(f"{job1} submitted")
         # Add a job straight to the slurm queue
-        job2 = Job(virtual_job_id, "echo hello")
+        job2 = Job(virtual_job_id, ["echo", "hello"])
         v_queue._slurm_queue.append(job2)
         v_queue._update_log()
 
