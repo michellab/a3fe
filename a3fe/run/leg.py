@@ -235,7 +235,7 @@ class Leg(_SimulationRunner):
             system = self.run_ensemble_equilibration(sysprep_config=cfg)
 
         # Write input files
-        self.write_input_files(system, use_same_restraints=cfg.use_same_restraints)
+        self.write_input_files(system, config=cfg)
 
         # Make sure the stored restraints reflect the restraints used. TODO:
         # make this more robust my using the SOMD functionality to extract
@@ -621,11 +621,13 @@ class Leg(_SimulationRunner):
                     file
                 ) in _PreparationStage.PREEQUILIBRATED.get_simulation_input_files(
                     self.leg_type
-                ):
+                ) + [
+                    "somd.rst7"
+                ]:
                     if not _os.path.isfile(f"{outdir}/{file}"):
                         raise RuntimeError(
                             f"SLURM job failed to produce {file}. Please check the output of the "
-                            f"last slurm log in {outdir} directory for error."
+                            f"last slurm log in {outdir} directory for errors."
                         )
 
         else:  # Not slurm
@@ -698,7 +700,7 @@ class Leg(_SimulationRunner):
     def write_input_files(
         self,
         pre_equilibrated_system: _BSS._SireWrappers._system.System,  # type: ignore
-        use_same_restraints: bool = True,
+        config: _SystemPreparationConfig,
     ) -> None:
         """
         Write the required input files to all of the stage input directories.
@@ -708,11 +710,8 @@ class Leg(_SimulationRunner):
         pre_equilibrated_system: _BSS._SireWrappers._system.System
             The equilibrated system to run further equilinration on. The final coordinates
             are then used as input for each of the individual runs.
-        use_same_restraints: bool, default=True
-            If True, the same restraints will be used for all of the bound leg repeats - by default
-            , the restraints generated for the first repeat are used. This allows meaningful
-            comparison between repeats for the bound leg. If False, the unique restraints are
-            generated for each repeat.
+        config: SystemPreparationConfig
+            Configuration object for the setup of the leg.
         """
         # Dummy values get overwritten later
         dummy_runtime = 0.001  # ns
@@ -759,7 +758,7 @@ class Leg(_SimulationRunner):
                 _shutil.copy(coordinates_file, f"{stage_input_dir}/somd_{i+1}.rst7")
                 if self.leg_type == _LegType.BOUND:
                     if (
-                        use_same_restraints
+                        config.use_same_restraints
                     ):  # Want to use same restraints for all repeats
                         restraint_file = (
                             f"{self.base_dir}/ensemble_equilibration_1/restraint_1.txt"
@@ -824,7 +823,7 @@ class Leg(_SimulationRunner):
             )
 
             # Set the default lambda windows based on the leg and stage types
-            lam_vals = Leg.default_lambda_values[self.leg_type][stage_type]
+            lam_vals = config.lambda_values[self.leg_type][stage_type]
             lam_vals_str = ", ".join([str(lam_val) for lam_val in lam_vals])
             _write_simfile_option(
                 f"{stage_input_dir}/somd.cfg", "lambda array", lam_vals_str
