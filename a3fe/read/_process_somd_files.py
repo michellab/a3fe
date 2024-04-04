@@ -92,10 +92,12 @@ def read_mbar_result(outfile: str) -> _Tuple[float, float]:
             try:
                 free_energy = float(lines[i + 1].split(",")[0])
                 free_energy_err = float(lines[i + 1].split(",")[1].split()[0])
+                return free_energy, free_energy_err
+
             except (IndexError, ValueError):
                 raise _ReadError(f"Could not read free energy from {outfile}.")
 
-    return free_energy, free_energy_err
+    raise _ReadError(f"Could not find free energy in {outfile}.")
 
 
 def read_overlap_mat(outfile: str) -> _np.ndarray:
