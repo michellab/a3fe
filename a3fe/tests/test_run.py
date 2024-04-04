@@ -307,8 +307,9 @@ class TestCalcSetup:
                 lam_vals = {
                     float(lam.split("_")[1]) for lam in os.listdir(stage.output_dir)
                 }
+                cfg = SystemPreparationConfig()
                 expected_lam_vals = set(
-                    a3.Leg.default_lambda_values[leg.leg_type][stage.stage_type]
+                    cfg.lambda_values[leg.leg_type][stage.stage_type]
                 )
                 assert lam_vals == expected_lam_vals
 
