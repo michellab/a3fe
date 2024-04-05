@@ -60,7 +60,12 @@ class VirtualQueue:
     when there are few enough jobs queued. This gets round slurm
     queue limits."""
 
-    def __init__(self, queue_len_lim: int = 2000, log_dir: str = "./output") -> None:
+    def __init__(
+        self,
+        queue_len_lim: int = 2000,
+        log_dir: str = "./output",
+        stream_log_level: int = 10,
+    ) -> None:
         """
         Initialise the virtual queue.
 
@@ -70,6 +75,8 @@ class VirtualQueue:
             The maximum number of jobs to queue in the real queue.
         log_dir : str, Optional, default: "./output"
             The directory to write the log to.
+        stream_log_level : int, Optional, default: 10
+            The log level for the stream handler.
 
         Returns
         -------
@@ -80,6 +87,7 @@ class VirtualQueue:
         self._available_virt_job_id = 0
         self.queue_len_lim = queue_len_lim
         self.log_dir = log_dir
+        self._stream_log_level = stream_log_level
 
         # Set up logging
         self._set_up_logging()
@@ -89,6 +97,10 @@ class VirtualQueue:
 
     def _set_up_logging(self) -> None:
         """Set up logging for the virtual queue"""
+        # Virtual queues didn't use to have the ._stream_log_level attribute. This
+        # code ensures backwards compatibility.
+        if not hasattr(self, "_stream_log_level"):
+            self._stream_log_level = _logging.INFO
         # If logging has already been set up, remove it
         if hasattr(self, "_logger"):
             handlers = self._logger.handlers[:]
@@ -106,10 +118,21 @@ class VirtualQueue:
         # For the stream handler, we want to log at the user-specified level
         stream_handler = _logging.StreamHandler()
         stream_handler.setFormatter(_A3feStreamFormatter())
-        stream_handler.setLevel(_logging.INFO)
+        stream_handler.setLevel(self._stream_log_level)
         # Add the handlers to the logger
         self._logger.addHandler(file_handler)
         self._logger.addHandler(stream_handler)
+
+    @property
+    def stream_log_level(self) -> int:
+        """The log level for the stream handler."""
+        return self._stream_log_level
+
+    @stream_log_level.setter
+    def stream_log_level(self, value: int) -> None:
+        """Set the log level for the stream handler."""
+        self._stream_log_level = value
+        self._set_up_logging()
 
     @property
     def queue(self) -> _List[Job]:

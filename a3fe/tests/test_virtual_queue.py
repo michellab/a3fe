@@ -1,5 +1,6 @@
 """Unit and regression tests for the _virtual_queue module."""
 
+import logging
 import os
 from tempfile import TemporaryDirectory
 
@@ -44,3 +45,7 @@ def test_virtual_queue():
         # Flusing pays no attention to the status of the jobs
         v_queue._flush()
         assert v_queue.queue == []
+
+        # Check that we can change the stream log level of the stream handler
+        v_queue.stream_log_level = logging.DEBUG
+        assert v_queue._logger.handlers[0].level == logging.DEBUG

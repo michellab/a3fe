@@ -851,6 +851,8 @@ class SimulationRunner(ABC):
             for sub_sim_runner in self._sub_sim_runners:
                 sub_sim_runner.stream_log_level = value
                 sub_sim_runner._set_up_logging()
+        if hasattr(self, "virtual_queue"):
+            self.virtual_queue.stream_log_level = value  # type: ignore
 
     def clean(self, clean_logs=False) -> None:
         """

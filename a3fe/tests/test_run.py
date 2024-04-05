@@ -69,12 +69,22 @@ def test_calculation_reloading(calc):
     assert calc2.stream_log_level == logging.INFO
 
 
+def test_logging_level(calc):
+    """Check that changing the logging level works as expected."""
+    calc3 = a3.Calculation(
+        base_dir=calc.base_dir, input_dir="a3fe/data/example_run_dir/input"
+    )
+    calc3.stream_log_level = logging.WARNING
+    assert calc3._logger.handlers[1].level == logging.WARNING
+    assert calc3._logger.handlers[0].level == logging.DEBUG
+
+
 def test_update_paths(calc):
     """Check that the calculation paths can be updated correctly."""
     with TemporaryDirectory() as new_dir:
         for file in glob(os.path.join(calc.base_dir, "*")):
             subprocess.run(["cp", "-r", file, new_dir])
-        calc3 = a3.Calculation(
+        calc4 = a3.Calculation(
             base_dir=new_dir, input_dir="a3fe/data/example_run_dir/input"
         )
         assert calc3.loaded_from_pickle == True

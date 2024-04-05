@@ -164,7 +164,9 @@ class Stage(_SimulationRunner):
             # Set boolean to allow us to kill the thread
             self.kill_thread: bool = False
             self.running_wins: _List[_LamWindow] = []
-            self.virtual_queue = _VirtualQueue(log_dir=self.base_dir)
+            self.virtual_queue = _VirtualQueue(
+                log_dir=self.base_dir, stream_log_level=self.stream_log_level
+            )
             # Creating lambda window objects sets up required input directories
             lam_val_weights = self.lam_val_weights
             for i, lam_val in enumerate(self.lam_vals):

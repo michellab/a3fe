@@ -138,7 +138,9 @@ class Leg(_SimulationRunner):
             self._validate_input()
 
             # Create a virtual queue for the prep jobs
-            self.virtual_queue = _VirtualQueue(log_dir=self.base_dir)
+            self.virtual_queue = _VirtualQueue(
+                log_dir=self.base_dir, stream_log_level=self.stream_log_level
+            )
 
             # If this is a bound leg, we want to store restraints
             if self.leg_type == _LegType.BOUND:
