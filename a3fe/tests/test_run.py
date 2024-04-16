@@ -87,11 +87,11 @@ def test_update_paths(calc):
         calc4 = a3.Calculation(
             base_dir=new_dir, input_dir="a3fe/data/example_run_dir/input"
         )
-        assert calc3.loaded_from_pickle == True
+        assert calc4.loaded_from_pickle == True
         current_dir = os.getcwd()
-        calc3.update_paths(old_sub_path=calc3.base_dir, new_sub_path=current_dir)
-        assert calc3.base_dir == current_dir
-        assert calc3._logger.handlers[0].baseFilename == os.path.join(current_dir, "Calculation.log")  # type: ignore
+        calc4.update_paths(old_sub_path=calc4.base_dir, new_sub_path=current_dir)
+        assert calc4.base_dir == current_dir
+        assert calc4._logger.handlers[0].baseFilename == os.path.join(current_dir, "Calculation.log")  # type: ignore
 
 
 def test_set_and_get_attributes(restrain_stage):
