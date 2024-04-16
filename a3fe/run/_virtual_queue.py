@@ -251,7 +251,7 @@ class VirtualQueue:
             logger=self._logger,
         )
         def _submit_job_inner(job_command_list: _List[str]) -> int:
-            cmds = ["rbatch"] + job_command_list
+            cmds = ["sbatch"] + job_command_list
             process = _subprocess.Popen(
                 cmds,
                 stdin=_subprocess.PIPE,
