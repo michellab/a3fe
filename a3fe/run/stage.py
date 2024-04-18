@@ -1121,7 +1121,7 @@ class Stage(_SimulationRunner):
         # Use multiprocessing at the level of stages to speed this us - this is a good place as stages
         # have lots of windows, so we benefit the most from parallelisation here.
         run_nos = self._get_valid_run_nos(run_nos)
-        with _Pool() as pool:
+        with _get_context("spawn").Pool() as pool:
             tot_simtime = sum(
                 pool.starmap(
                     _get_simtime,
