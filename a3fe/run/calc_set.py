@@ -19,6 +19,7 @@ from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._utils import TmpWorkingDir as _TmpWorkingDir
 from .calculation import Calculation as _Calculation
 from .enums import SetProtocol as _SetProtocol
+from .system_prep import SystemPreparationConfig as _SystemPreparationConfig
 
 
 class CalcSet(_SimulationRunner):
@@ -127,8 +128,23 @@ class CalcSet(_SimulationRunner):
         )
         self.calc_paths.append(value.base_dir)
 
-    def setup(self) -> None:
-        """Set up all calculations sequentially."""
+    def setup(
+        self,
+        bound_leg_sysprep_config: _Optional[_SystemPreparationConfig] = None,
+        free_leg_sysprep_config: _Optional[_SystemPreparationConfig] = None,
+    ) -> None:
+        """
+        Set up all calculations sequentially.
+
+        Parameters
+        ----------
+        bound_leg_sysprep_config: SystemPreparationConfig, opttional, default = None
+            The system preparation configuration to use for the bound leg. If None, the default
+            configuration is used.
+        free_leg_sysprep_config: SystemPreparationConfig, opttional, default = None
+            The system preparation configuration to use for the free leg. If None, the default
+            configuration is used.
+        """
         for calc in self.calcs:
             if calc.setup_complete:
                 self._logger.info(
@@ -137,7 +153,10 @@ class CalcSet(_SimulationRunner):
                 continue
             try:
                 self._logger.info(f"Setting up calculation in {calc.base_dir}")
-                calc.setup()
+                calc.setup(
+                    bound_leg_sysprep_config=bound_leg_sysprep_config,
+                    free_leg_sysprep_config=free_leg_sysprep_config,
+                )
                 self._logger.info(f"Calculation in {calc.base_dir} successfully set up")
             except Exception as e:
                 # TODO: Add more specific exception handling
