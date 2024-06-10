@@ -660,10 +660,10 @@ class Stage(_SimulationRunner):
         )
         for plot_type in [
             "mean",
-            "sem",
             "stat_ineff",
             "integrated_sem",
             "integrated_var",
+            "pred_best_simtime",
         ]:
             _plot_gradient_stats(
                 gradients_data=unequilibrated_gradient_data,
