@@ -1202,7 +1202,6 @@ class Leg(_SimulationRunner):
         and lightening all sub-simulation runners"""
         # Remove the ensemble equilibration directories
         for direct in _pathlib.Path(self.base_dir).glob("ensemble_equilibration*"):
-            print("DIRECTORY TO REMOVE", direct)
             self._logger.info(f"Deleting {direct}")
             _subprocess.run(["rm", "-rf", direct])
 
