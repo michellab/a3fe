@@ -38,8 +38,9 @@ from scipy.stats import kruskal as _kruskal
 from ..read._process_somd_files import read_mbar_pmf as _read_mbar_pmf
 from ..read._process_somd_files import read_overlap_mat as _read_overlap_mat
 from ..run._utils import SimulationRunnerIterator as _SimulationRunnerIterator
-from .compare import \
-    get_comparitive_convergence_data as _get_comparitive_convergence_data
+from .compare import (
+    get_comparitive_convergence_data as _get_comparitive_convergence_data,
+)
 from .process_grads import GradientData
 from .rmsd import get_rmsd as _get_rmsd
 from .waters import get_av_waters_stage as _get_av_waters_stage
@@ -168,7 +169,7 @@ def plot_gradient_stats(
         Directory to save the plot to.
     plot_type : str
         Type of plot to make. Can be "mean", "variance", "sem", "stat_ineff", "integrated_sem",
-        "sq_sem_sim_time" or "integrated_var".
+        or "integrated_var".
 
     Returns
     -------
@@ -178,11 +179,8 @@ def plot_gradient_stats(
     plot_type = plot_type.lower()
     plot_types = [
         "mean",
-        "intra_run_variance",
-        "sem",
         "stat_ineff",
         "integrated_sem",
-        "sq_sem_sim_time",
         "integrated_var",
         "pred_best_simtime",
     ]
@@ -203,38 +201,6 @@ def plot_gradient_stats(
         ax.set_ylabel(
             r"$\langle \frac{\mathrm{d}h}{\mathrm{d}\lambda}\rangle _{\lambda} $ / kcal mol$^{-1}$"
         ),
-
-    elif plot_type == "intra_run_variance":
-        ax.bar(
-            gradients_data.lam_vals,
-            gradients_data.vars_intra,
-            width=0.02,
-            edgecolor="black",
-        )
-        ax.set_ylabel(
-            r"Mean Intra-Run Var($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $) / kcal$^{2}$ mol$^{-2}$"
-        ),
-
-    elif plot_type == "sem":
-        ax.bar(
-            gradients_data.lam_vals,
-            gradients_data.sems_intra,
-            width=0.02,
-            edgecolor="black",
-            label="Intra-Run",
-        )
-        ax.bar(
-            gradients_data.lam_vals,
-            gradients_data.sems_inter,
-            bottom=gradients_data.sems_intra,
-            width=0.02,
-            edgecolor="black",
-            label="Inter-Run",
-        )
-        ax.set_ylabel(
-            r"SEM($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $) / kcal mol$^{-1}$"
-        ),
-        ax.legend()
 
     elif plot_type == "stat_ineff":
         ax.bar(
@@ -269,16 +235,15 @@ def plot_gradient_stats(
             linewidth=2,
         )
         # Add vertical lines to show optimal lambda windows
-        delta_sem = 0.1
+        n_lam_vals = 10
         integrated_sems = gradients_data.get_integrated_error(
             er_type="sem", origin="inter", smoothen=True
         )
         total_sem = integrated_sems[-1]
-        sem_vals = _np.linspace(0, total_sem, int(total_sem / delta_sem) + 1)
+        sem_vals = _np.linspace(0, total_sem, n_lam_vals)
         optimal_lam_vals = gradients_data.calculate_optimal_lam_vals(
             er_type="sem",
-            # delta_er=delta_sem ,
-            n_lam_vals=30,
+            n_lam_vals=n_lam_vals,
             sem_origin="inter",
             smoothen_sems=True,
         )
@@ -291,19 +256,6 @@ def plot_gradient_stats(
         ax2.set_ylabel(
             r"Integrated Standardised SEM($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $) / kcal mol$^{-1}$ ns$^{1/2}$"
         ),
-
-    elif plot_type == "sq_sem_sim_time":
-        ax.bar(
-            gradients_data.lam_vals,
-            gradients_data.sems_inter_delta_g**2
-            / (gradients_data.total_times * len(gradients_data.run_nos)),
-            width=0.02,
-            edgecolor="black",
-        )
-        ax.set_ylabel(
-            r"(SEM($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $))$^2$ / Total Sim Time / kcal$^2$ mol$^{-2}$ ns$^{-1}$"
-        ),
-        ax.legend()
 
     elif plot_type == "pred_best_simtime":
         # Calculate the predicted optimum simulation time
@@ -350,16 +302,13 @@ def plot_gradient_stats(
             linewidth=2,
         )
         # Add vertical lines to show optimal lambda windows
-        delta_root_var = 1  # kcal mol^-1
+        n_lam_vals = 10
         integrated_root_var = gradients_data.get_integrated_error(er_type="root_var")
         total_root_var = integrated_root_var[-1]
-        root_var_vals = _np.linspace(
-            0, total_root_var, int(total_root_var / delta_root_var) + 1
-        )
+        root_var_vals = _np.linspace(0, total_root_var, n_lam_vals)
         optimal_lam_vals = gradients_data.calculate_optimal_lam_vals(
             er_type="root_var",
-            # delta_er=delta_root_var)
-            n_lam_vals=30,
+            n_lam_vals=n_lam_vals,
         )
         # Add horizontal lines at sem vals
         for root_var_val in root_var_vals:
@@ -1250,11 +1199,12 @@ def plot_gelman_rubin_rhat(
         width=0.02,
         edgecolor="black",
     )
-    # This shouldn't be below 1, so don't show values below 1
-    ax.set_ylim(bottom=0.98)
-
     # Set a horizontal line at the cutoff value
     ax.axhline(y=cutoff, color="red", linestyle="dashed")
+
+    # Make sure the y axis includes the cutoff
+    # This shouldn't be below 1, so don't show values below 1
+    ax.set_ylim(0.98, cutoff + 0.01)
 
     ax.set_ylabel(r"$\hat{R}$")
     ax.set_xlabel(r"$\lambda$")
