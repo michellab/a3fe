@@ -660,7 +660,6 @@ class Stage(_SimulationRunner):
         )
         for plot_type in [
             "mean",
-            "intra_run_variance",
             "sem",
             "stat_ineff",
             "integrated_sem",
