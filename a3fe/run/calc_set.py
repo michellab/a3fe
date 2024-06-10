@@ -172,11 +172,25 @@ class CalcSet(_SimulationRunner):
         run_nos: _Optional[_List[int]] = None,
         adaptive: bool = True,
         runtime: _Optional[float] = None,
+        runtime_constant: _Optional[float] = None,
         run_stages_parallel: bool = False,
         protocol: _SetProtocol = _SetProtocol.STANDARD,
     ) -> None:
         """
-        Run all calculations. Analysis is not performed by default.
+        Run all calculations. Analysis is not performed by default. If running adaptively,
+        cycles of short runs then optimal runtime estimation are performed, where the optimal
+        runtime is estimated according to
+
+        .. math::
+
+            t_{\\mathrm{Optimal, k}} = \\sqrt{\\frac{t_{\\mathrm{Current}, k}}{C}}\\sigma_{\\mathrm{Current}}(\\Delta \\widehat{F}_k)
+
+        where:
+        - :math:`t_{\\mathrm{Optimal, k}}` is the calculated optimal runtime for lambda window :math:`k`
+        - :math:`t_{\\mathrm{Current}, k}` is the current runtime for lambda window :math:`k`
+        - :math:`C` is the runtime constant
+        - :math:`\sigma_{\\mathrm{Current}}(\\Delta \\widehat{F}_k)` is the current uncertainty in the free energy change contribution for lambda window :math:`k`. This is estimated from inter-run deviations.
+        - :math:`\Delta \\widehat{F}_k` is the free energy change contribution for lambda window :math:`k`
 
         Parameters
         ----------
@@ -187,6 +201,10 @@ class CalcSet(_SimulationRunner):
             If False, the stages will run for the specified runtime and analysis will not be performed.
         runtime : float, Optional, default: None
             If adaptive is False, runtime must be supplied and stage will run for this number of nanoseconds.
+        runtime_constant: float, Optional, default: None
+            The runtime_constant (kcal**2 mol**-2 ns*-1) only affects behaviour if running adaptively. This is used
+            to calculate how long to run each simulation for based on the current uncertainty of the per-stage
+            free energy estimate.
         run_stages_parallel: bool, Optional, default: False
             If True, the stages for each individual calculation will be run in parallel. Can casuse issues with
             QOS limits on HPC clusters as each stage might try to submit jobs at the same time, resulting in
@@ -199,6 +217,8 @@ class CalcSet(_SimulationRunner):
         None
         """
         run_nos = self._get_valid_run_nos(run_nos)
+        if runtime_constant:
+            self.recursively_set_attr("runtime_constant", runtime_constant, silent=True)
 
         self._logger.info(f"Running calculations with protocol {protocol}")
 

@@ -770,7 +770,9 @@ class SimulationRunner(ABC):
 
         return attrs_dict
 
-    def recursively_set_attr(self, attr: str, value: _Any, force: bool = False) -> None:
+    def recursively_set_attr(
+        self, attr: str, value: _Any, force: bool = False, silent: bool = False
+    ) -> None:
         f"""
         Set the attribute to the value for the {self.__class__.__name__} and any sub-simulation runners.
 
@@ -782,20 +784,23 @@ class SimulationRunner(ABC):
             The value to set the attribute to.
         force : bool, default=False
             If True, set the attribute even if it doesn't exist.
+        silent: bool, default=False
+            If True, don't log the setting of the attribute or raise any warnings.
         """
         # Don't set the attribute if it doesn't exist
         if not hasattr(self, attr):
-            if not force:
+            if not force and not silent:
                 self._logger.warning(
                     f"The {self.__class__.__name__} does not have the attribute {attr} and this will not be created."
                 )
-            if force:
+            if force and not silent:
                 self._logger.info(
                     f"Setting the attribute {attr} to {value} even though it does not exist."
                 )
                 setattr(self, attr, value)
         else:
-            self._logger.info(f"Setting the attribute {attr} to {value}.")
+            if not silent:
+                self._logger.info(f"Setting the attribute {attr} to {value}.")
             setattr(self, attr, value)
         for sub_sim_runner in self._sub_sim_runners:
             sub_sim_runner.recursively_set_attr(attr=attr, value=value, force=force)
