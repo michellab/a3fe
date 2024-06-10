@@ -11,9 +11,6 @@ from typing import Union as _Union
 
 import numpy as _np
 
-from ..analyse.detect_equil import (
-    check_equil_block_gradient as _check_equil_block_gradient,
-)
 from ..analyse.detect_equil import check_equil_chodera as _check_equil_chodera
 from ..analyse.detect_equil import (
     dummy_check_equil_multiwindow as _dummy_check_equil_multiwindow,
@@ -28,7 +25,6 @@ class LamWindow(_SimulationRunner):
 
     equil_detection_methods = {
         "multiwindow": _dummy_check_equil_multiwindow,
-        "block_gradient": _check_equil_block_gradient,
         "chodera": _check_equil_chodera,
     }
 

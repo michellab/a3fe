@@ -8,7 +8,11 @@ import pytest
 
 from ..analyse.compare import get_comparitive_convergence_data
 from ..analyse.detect_equil import (
+    check_equil_block_gradient,
+    check_equil_chodera,
+    check_equil_multiwindow,
     check_equil_multiwindow_gelman_rubin,
+    check_equil_multiwindow_kpss,
     check_equil_multiwindow_modified_geweke,
     check_equil_multiwindow_paired_t,
 )
@@ -221,21 +225,47 @@ def test_get_time_series_multiwindow_mbar(restrain_stage):
     assert overall_times.sum(axis=0)[-1] == pytest.approx(2.4, abs=1e-2)
 
 
-def test_geweke(restrain_stage):
-    """Test the modified Geweke equilibration analysis."""
+# Parameterise with a dictionary of equilibration functions and expected results
+@pytest.mark.parametrize(
+    "equil_func, expected",
+    [
+        (check_equil_block_gradient, 0.0024),
+        (check_equil_chodera, 0.0567999),
+    ],
+)
+def test_per_window_equilibration_detection(restrain_stage, equil_func, expected):
+    """Regression tests for equilibration detection methods working on a single window."""
     with TemporaryDirectory() as tmpdir:
+        lam_win = restrain_stage.lam_windows[3]
+        lam_win.output_dir = tmpdir
+        lam_win.block_size = 0.05
+        equilibrated, fractional_equil_time = equil_func(lam_win=lam_win, run_nos=[1])
+        assert equilibrated
+        assert fractional_equil_time == pytest.approx(expected, abs=1e-2)
+
+
+@pytest.mark.parametrize(
+    "equil_func, expected, args",
+    [
+        (check_equil_multiwindow_kpss, 0.3, {}),
         (
-            equilibrated,
-            fractional_equil_time,
-        ) = check_equil_multiwindow_modified_geweke(
+            check_equil_multiwindow_modified_geweke,
+            0.0048,
+            {"intervals": 10, "p_cutoff": 0.4},
+        ),
+    ],
+)
+def test_equil_multiwindow(restrain_stage, equil_func, expected, args):
+    """Test the multiwindow equilibration analysis."""
+    with TemporaryDirectory() as tmpdir:
+        equilibrated, fractional_equil_time = equil_func(
             lambda_windows=restrain_stage.lam_windows,
             output_dir=tmpdir,
-            intervals=10,
-            p_cutoff=0.4,
+            **args,
         )
 
         assert equilibrated
-        assert fractional_equil_time == pytest.approx(0.0048, abs=1e-2)
+        assert fractional_equil_time == pytest.approx(expected, abs=1e-2)
 
 
 def test_paired_t(restrain_stage):
