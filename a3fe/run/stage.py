@@ -1104,40 +1104,6 @@ class Stage(_SimulationRunner):
     def setup(self) -> None:
         raise NotImplementedError("Stages are set up when they are created")
 
-    def get_tot_simtime(self, run_nos: _Optional[_List[int]] = None) -> float:
-        """
-        Get the total simulation time for the stage, in ns.
-
-        Parameters
-        ----------
-        run_nos : List[int], Optional, default: None
-            The run numbers to analyse. If None, all runs will be analysed.
-
-        Returns
-        -------
-        tot_simtime : float
-            The total simulation time for the stage, in ns.
-        """
-        # Use multiprocessing at the level of stages to speed this us - this is a good place as stages
-        # have lots of windows, so we benefit the most from parallelisation here.
-        run_nos = self._get_valid_run_nos(run_nos)
-        with _get_context("spawn").Pool() as pool:
-            tot_simtime = sum(
-                pool.starmap(
-                    _get_simtime,
-                    [
-                        (sub_sim_runner, run_nos)
-                        for sub_sim_runner in self._sub_sim_runners
-                    ],
-                )
-            )
-        return tot_simtime
-
-    @property
-    def tot_simtime(self) -> float:
-        """The total simulation time in ns for the stage."""
-        return self.get_tot_simtime()
-
     def _mv_output(self, save_name: str) -> None:
         """
         Move the output directory to a new location, without
