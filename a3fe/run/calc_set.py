@@ -203,7 +203,7 @@ class CalcSet(_SimulationRunner):
             If adaptive is False, runtime must be supplied and stage will run for this number of nanoseconds.
         runtime_constant: float, Optional, default: None
             The runtime_constant (kcal**2 mol**-2 ns*-1) only affects behaviour if running adaptively. This is used
-            to calculate how long to run each simulation for based on the current uncertainty of the per-stage
+            to calculate how long to run each simulation for based on the current uncertainty of the per-window
             free energy estimate.
         run_stages_parallel: bool, Optional, default: False
             If True, the stages for each individual calculation will be run in parallel. Can casuse issues with
