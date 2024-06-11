@@ -220,7 +220,7 @@ def plot_gradient_stats(
             edgecolor="black",
         )
         ax.set_ylabel(
-            r"SEM($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $) / kcal mol$^{-1}$ ns$^{1/2}$"
+            r"$\sqrt{t}$SEM($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $) / kcal mol$^{-1}$ ns$^{1/2}$"
         ),
         ax.legend()
         # Get second y axis so we can plot on different scales
@@ -254,7 +254,7 @@ def plot_gradient_stats(
         for lam_val in optimal_lam_vals:
             ax2.axvline(x=lam_val, color="black", linestyle="dashed", linewidth=0.5)
         ax2.set_ylabel(
-            r"Integrated Standardised SEM($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $) / kcal mol$^{-1}$ ns$^{1/2}$"
+            r"Integrated $\sqrt{t}$SEM($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $) / kcal mol$^{-1}$ ns$^{1/2}$"
         ),
 
     elif plot_type == "pred_best_simtime":
@@ -360,9 +360,11 @@ def plot_gradient_hists(
     ensemble_size = len(
         gradients_data.gradients[0]
     )  # Check the length of the gradients data for the first window
-    fig, axs = _plt.subplots(
-        nrows=_ceil(n_lams / 8), ncols=8, figsize=(40, 5 * (n_lams / 8))
-    )
+    limit_ncols = 8
+    actual_n_cols = min(n_lams, limit_ncols)
+    n_rows = _ceil(n_lams / limit_ncols)
+    figsize = (actual_n_cols * 4, n_rows * 4)
+    fig, axs = _plt.subplots(nrows=n_rows, ncols=actual_n_cols, figsize=figsize)
     for i, ax in enumerate(axs.flatten()):  # type: ignore
         if i < n_lams:
             # One histogram for each simulation
@@ -440,9 +442,11 @@ def plot_gradient_timeseries(
     """
     # Plot mixed gradients for each window
     n_lams = len(gradients_data.lam_vals)
-    fig, axs = _plt.subplots(
-        nrows=_ceil(n_lams / 8), ncols=8, figsize=(40, 5 * (n_lams / 8))
-    )
+    limit_ncols = 8
+    actual_n_cols = min(n_lams, limit_ncols)
+    n_rows = _ceil(n_lams / limit_ncols)
+    figsize = (actual_n_cols * 4, n_rows * 4)
+    fig, axs = _plt.subplots(nrows=n_rows, ncols=actual_n_cols, figsize=figsize)
     for i, ax in enumerate(axs.flatten()):  # type: ignore
         if i < n_lams:
             # One histogram for each simulation
