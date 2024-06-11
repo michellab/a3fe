@@ -335,7 +335,7 @@ class GradientData:
         elif delta_er is not None and n_lam_vals is not None:
             raise ValueError("Only one of delta_er or n_lam_vals can be provided.")
 
-        # Calculate the integrated standard error of the mean of the gradients
+        # Calculate the integrated gradient error (of the requested type)
         # as a function of lambda, using the trapezoidal rule.
         integrated_errors = self.get_integrated_error(
             er_type=er_type, origin=sem_origin, smoothen=smoothen_sems
@@ -355,21 +355,6 @@ class GradientData:
 
         # For each desired SEM value, map it to a lambda value
         optimal_lam_vals = []
-        # optimal_intermediates = [
-        # _np.interp(sem, integrated_errors, self.lam_vals)
-        # for sem in requested_sem_vals
-        # ]
-        # optimal_lam_vals = []
-        # for i, intermed in enumerate(optimal_intermediates):
-        # if i == 0:
-        # optimal_lam_vals.append(intermed)
-        # elif i == len(optimal_intermediates) - 2:
-        # optimal_lam_vals.append(optimal_intermediates[-1])
-        # break
-        # else:
-        # optimal_lam_vals.append((intermed + optimal_intermediates[i + 1]) / 2)
-
-        # assert len(optimal_lam_vals) == len(optimal_intermediates) - 1
 
         for requested_sem in requested_sem_vals:
             optimal_lam_val = _np.interp(
@@ -388,8 +373,7 @@ class GradientData:
     def get_predicted_overlap_mat(self, temperature: float = 298) -> _np.ndarray:
         """
         Calculate the predicted overlap matrix for the lambda windows
-        based on the intra-run variances alone. The relationship is
-        var_ij = beta^-2
+        based on the intra-run variances alone.
 
         Parameters
         ----------
@@ -726,7 +710,7 @@ def get_time_series_multiwindow_mbar(
 
     # Check whether we should use slurm or not.
     use_slurms = [
-        getattr(lam_win, "slurm_equil_detection", False) for lam_win in lambda_windows
+        getattr(lam_win, "slurm_equil_detection", True) for lam_win in lambda_windows
     ]
     # Raise an error if they're not all the same.
     if not all(use_slurm == use_slurms[0] for use_slurm in use_slurms):
