@@ -803,7 +803,9 @@ class SimulationRunner(ABC):
                 self._logger.info(f"Setting the attribute {attr} to {value}.")
             setattr(self, attr, value)
         for sub_sim_runner in self._sub_sim_runners:
-            sub_sim_runner.recursively_set_attr(attr=attr, value=value, force=force)
+            sub_sim_runner.recursively_set_attr(
+                attr=attr, value=value, force=force, silent=silent
+            )
 
     def update_paths(self, old_sub_path: str, new_sub_path: str) -> None:
         """
