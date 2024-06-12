@@ -849,7 +849,7 @@ def get_gelman_rubin_rhat(
 
 
 def check_equil_multiwindow_gelman_rubin(
-    lambda_windows: gg_List["LamWindow"],  # noqa: F821
+    lambda_windows: _List["LamWindow"],  # noqa: F821
     output_dir: str,
     cutoff: float = 1.1,
     run_nos: _Optional[_List[int]] = None,
