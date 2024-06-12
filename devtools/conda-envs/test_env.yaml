@@ -10,7 +10,7 @@ dependencies:
     # Base depends
   - arviz
   - pandas
-  - python
+  - python>=3.9
   - pip
   - numpy
   - matplotlib
