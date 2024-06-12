@@ -253,7 +253,7 @@ def collect_mbar_slurm(
     jobs: _List[_Job],
     mbar_out_files: _List[str],
     virtual_queue: _VirtualQueue,
-    delete_outfiles: bool = False,
+    delete_outfiles: bool = True,
     tmp_simfiles: _List[str] = [],
 ) -> _Tuple[_np.ndarray, _np.ndarray, _List[str], _Dict[str, _Dict[str, _np.ndarray]]]:
     """
@@ -271,7 +271,7 @@ def collect_mbar_slurm(
         The paths to the MBAR
     virtual_queue : VirtualQueue
         The virtual queue to submit the MBAR jobs to.
-    delete_outfiles : bool, Optional, default: False
+    delete_outfiles : bool, Optional, default: True
         Whether to delete the MBAR analysis output files after the free
         energy change and errors have been extracted.
     tmp_simfiles : List[str], Optional, default: []

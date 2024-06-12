@@ -39,7 +39,7 @@ class LamWindow(_SimulationRunner):
         lam_val_weight: _Optional[float] = None,
         block_size: float = 1,
         equil_detection: str = "multiwindow",
-        slurm_equil_detection: bool = False,
+        slurm_equil_detection: bool = True,
         gradient_threshold: _Optional[float] = None,
         runtime_constant: _Optional[float] = 0.005,
         relative_simulation_cost: float = 1,
@@ -70,7 +70,7 @@ class LamWindow(_SimulationRunner):
             - "multiwindow": Use the multiwindow paired t-test method to detect equilibration.
             - "block_gradient": Use the gradient of the block averages to detect equilibration.
             - "chodera": Use Chodera's method to detect equilibration.
-        slurm_equil_detection : bool, Optional, default: False
+        slurm_equil_detection : bool, Optional, default: True
             Whether to use SLURM to run the equilibration detection MBAR calculations.
         gradient_threshold : float, Optional, default: None
             The threshold for the absolute value of the gradient, in kcal mol-1 ns-1,

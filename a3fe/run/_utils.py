@@ -1,17 +1,21 @@
 """"Utilities for SimulationRunners."""
 
+from __future__ import annotations
+
 import contextlib as _contextlib
 import os as _os
 from logging import Logger as _Logger
 from time import sleep as _sleep
 from typing import Any as _Any
 from typing import Callable as _Callable
+from typing import Generic as _Generic
 from typing import List as _List
 from typing import Optional as _Optional
 from typing import Tuple as _Tuple
 from typing import Type as _Type
+from typing import TypeVar as _TypeVar
 
-import BioSimSpace.Sandpit.Exscientia as _BSS
+_T = _TypeVar("_T", bound="SimulationRunner")
 
 
 def check_has_wat_and_box(system: _BSS._SireWrappers._system.System) -> None:  # type: ignore
@@ -101,7 +105,7 @@ def TmpWorkingDir(path):
         _os.chdir(old_cwd)
 
 
-class SimulationRunnerIterator:
+class SimulationRunnerIterator(_Generic[_T]):
     """
     Iterator for SimulationRunners. This is required to avoid too many
     open files, because each simulation runner opens its own loggers.
@@ -112,7 +116,7 @@ class SimulationRunnerIterator:
     def __init__(
         self,
         base_dirs: _List[str],
-        subclass: _Type["SimulationRunner"],
+        subclass: _Type[_T],
         **kwargs: _Any,
     ) -> None:
         """
@@ -120,7 +124,7 @@ class SimulationRunnerIterator:
         ----------
         base_dirs : List[str]
             A list of the base directories for the simulation runners.
-        subclass : Type[SimulationRunner]
+        subclass : Type[_T]
             The subclass of SimulationRunner to use.
         **kwargs : Any
             Any keyword arguments to pass to the subclass when initialising.
@@ -135,7 +139,7 @@ class SimulationRunnerIterator:
         self.i = 0  # Reset the iterator so we can reuse it
         return self
 
-    def __next__(self) -> "SimulationRunner":
+    def __next__(self) -> _T:
         if self.i >= len(self.base_dirs):
             # Tear down the current simulation runner
             if self.current_sim_runner is not None:

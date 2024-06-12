@@ -1,4 +1,4 @@
-""" Unit and regression test for the run module. """
+"""Unit and regression tests for the run module. """
 
 import logging
 import os

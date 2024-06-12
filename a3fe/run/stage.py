@@ -376,12 +376,12 @@ class Stage(_SimulationRunner):
             else:
                 self._run_loop_non_adaptive()
 
+            # All simulations are now finished, so perform final analysis
+            self._logger.info(f"All simulations in {self} have finished.")
+
         except Exception as e:
             self._logger.exception("")
             raise e
-
-        # All simulations are now finished, so perform final analysis
-        self._logger.info(f"All simulations in {self} have finished.")
 
     def _run_loop_non_adaptive(self, cycle_pause: int = 60) -> None:
         """The run loop for non-adaptive runs. Simply wait
