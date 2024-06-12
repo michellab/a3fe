@@ -576,7 +576,8 @@ class Stage(_SimulationRunner):
                 return
 
             # Check if we have reached equilibration
-            self.wait()
+            super().wait()  # Use super to avoid checking if thread is alive
+
             self._logger.info(
                 "Checking for equilibration with the check_equil_multiwindow algorithm..."
             )
