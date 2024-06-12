@@ -765,6 +765,7 @@ def get_time_series_multiwindow_mbar(
                     mbar_out_files=mbar_outfiles,
                     virtual_queue=lambda_windows[0].virtual_queue,
                     tmp_simfiles=tmp_simfiles,
+                    delete_outfiles=True,
                 )
             )
 
