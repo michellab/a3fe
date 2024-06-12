@@ -574,7 +574,7 @@ class Stage(_SimulationRunner):
                 return
 
             # Check if we have reached equilibration
-            super().wait()  # Use super to avoid checking if thread is alive
+            self._wait_ignoring_thread()
 
             self._logger.info(
                 "Checking for equilibration with the check_equil_multiwindow algorithm..."
@@ -1153,6 +1153,15 @@ class Stage(_SimulationRunner):
         self.virtual_queue.update()
         while self.running:
             _sleep(30)  # Check every 30 seconds
+            self.virtual_queue.update()
+
+    def _wait_ignoring_thread(self) -> None:
+        """Wait for the stage to finish running, ignoring the thread."""
+        _sleep(30)
+        self.virtual_queue.update()
+        # Superclass implementation of running ignores the thread
+        while super().running:
+            _sleep(30)
             self.virtual_queue.update()
 
     @property
