@@ -1,6 +1,5 @@
 """Functionality for comparing two or more simulation runners."""
 
-
 from typing import List as _List
 from typing import Tuple as _Tuple
 
