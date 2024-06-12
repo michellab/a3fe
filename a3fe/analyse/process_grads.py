@@ -730,18 +730,24 @@ def get_time_series_multiwindow_mbar(
                     for start_frac, end_frac in start_and_end_fracs
                 ],
             )
+
+        # Reshape the results
+        for i, run_no in enumerate(run_nos):
+            for j, (start_frac, end_frac) in enumerate(start_and_end_fracs):
+                overall_dgs[i, j] = results[i * len(start_and_end_fracs) + j]
+
     else:  # Use slurm
         frac_jobs = []
         results = []
-        for start_percent, end_percent in start_and_end_fracs:
+        for start_frac, end_frac in start_and_end_fracs:
             frac_jobs.append(
                 _submit_mbar_slurm(
                     output_dir=output_dir,
                     virtual_queue=lambda_windows[0].virtual_queue,
                     run_nos=run_nos,
                     run_somd_dir=lambda_windows[0].input_dir,
-                    percentage_end=end_percent,
-                    percentage_start=start_percent,
+                    percentage_end=end_frac * 100,
+                    percentage_start=start_frac * 100,
                     subsampling=False,
                     equilibrated=equilibrated,
                 )
@@ -760,10 +766,10 @@ def get_time_series_multiwindow_mbar(
                 )
             )
 
-    # Reshape the results
-    for i, run_no in enumerate(run_nos):
-        for j, (start_frac, end_frac) in enumerate(start_and_end_fracs):
-            overall_dgs[i, j] = results[i * len(start_and_end_fracs) + j]
+        # Reshape the results to be consistent with the non-slurm case
+        for i, run_no in enumerate(run_nos):
+            for j, (start_frac, end_frac) in enumerate(start_and_end_fracs):
+                overall_dgs[i, j] = results[j][0][i]
 
     # Get times per run
     for i, run_no in enumerate(run_nos):
