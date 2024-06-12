@@ -11,7 +11,7 @@ system. Please see the documentation (https://a3fe.readthedocs.io/en/latest/?bad
 import sys as _sys
 import warnings as _warnings
 
-from ._version import __version__
+from ._version import __version__  # noqa: F401
 
 _sys.modules["EnsEquil"] = _sys.modules["a3fe"]
 
