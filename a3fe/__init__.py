@@ -25,6 +25,7 @@ from .run import (
     Stage,
     StageType,
     SystemPreparationConfig,
+    enums,
 )
 
 _sys.modules["EnsEquil"] = _sys.modules["a3fe"]
