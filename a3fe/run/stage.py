@@ -1156,6 +1156,15 @@ class Stage(_SimulationRunner):
             _sleep(30)  # Check every 30 seconds
             self.virtual_queue.update()
 
+    @property
+    def running(self) -> bool:
+        """Check if the stage is running."""
+        # Override the base class method so that we can also check for active threads
+        live_thread = (
+            self.run_thread.is_alive() if self.run_thread is not None else False
+        )
+        return super().running or live_thread
+
     def update(self, save_name: str = "output_saved") -> None:
         """
         Delete the current set of lamda windows and simulations, and
