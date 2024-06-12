@@ -10,7 +10,6 @@ from ..analyse.compare import get_comparitive_convergence_data
 from ..analyse.detect_equil import (
     check_equil_block_gradient,
     check_equil_chodera,
-    check_equil_multiwindow,
     check_equil_multiwindow_gelman_rubin,
     check_equil_multiwindow_kpss,
     check_equil_multiwindow_modified_geweke,

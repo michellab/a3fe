@@ -9,7 +9,6 @@ import pathlib as _pathlib
 import threading as _threading
 from copy import deepcopy as _deepcopy
 from math import ceil as _ceil
-from multiprocessing import Pool as _Pool
 from multiprocessing import get_context as _get_context
 from time import sleep as _sleep
 from typing import Any as _Any
@@ -51,7 +50,6 @@ from ..analyse.plot import plot_sq_sem_convergence as _plot_sq_sem_convergence
 from ..analyse.process_grads import GradientData as _GradientData
 from ..read._process_somd_files import write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
-from ._utils import get_simtime as _get_simtime
 from ._virtual_queue import VirtualQueue as _VirtualQueue
 from .enums import StageType as _StageType
 from .lambda_window import LamWindow as _LamWindow

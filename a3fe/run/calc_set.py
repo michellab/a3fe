@@ -2,7 +2,6 @@
 
 __all__ = ["CalcSet"]
 
-import copy as _copy
 import logging as _logging
 import os as _os
 from typing import Dict as _Dict
