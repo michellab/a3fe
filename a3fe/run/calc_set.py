@@ -11,14 +11,14 @@ from typing import List as _List
 from typing import Optional as _Optional
 
 import numpy as _np
+from scipy import stats as _stats
 
 from ..analyse.analyse_set import compute_stats as _compute_stats
 from ..analyse.plot import plot_against_exp as _plt_against_exp
 from ..read._read_exp_dgs import read_exp_dgs as _read_exp_dgs
 from ._simulation_runner import SimulationRunner as _SimulationRunner
-from ._utils import TmpWorkingDir as _TmpWorkingDir
+from ._utils import SimulationRunnerIterator as _SimulationRunnerIterator
 from .calculation import Calculation as _Calculation
-from .enums import SetProtocol as _SetProtocol
 from .system_prep import SystemPreparationConfig as _SystemPreparationConfig
 
 
@@ -32,7 +32,7 @@ class CalcSet(_SimulationRunner):
     def __init__(
         self,
         calc_paths: _Optional[_List] = None,
-        calc_args: _Optional[_Dict[str, _Dict]] = None,
+        calc_args: _Dict[str, _Dict] = {},
         base_dir: _Optional[str] = None,
         input_dir: _Optional[str] = None,
         output_dir: _Optional[str] = None,
@@ -49,7 +49,7 @@ class CalcSet(_SimulationRunner):
         calc_paths: List, Optional, default: None
             List of paths to the Calculation base directories. If None, then all directories
             in the current directory will be assumed to be calculation base directories
-        calc_args: Dict[str: _Dict], Optional, default: None
+        calc_args: Dict[str: _Dict], Optional, default: {}
             Dictionary of arguments to pass to the Calculation objects in the form
             {"path_to_calc_base_dir": {keyword: arg, ...} ...}
         base_dir : str, Optional, default: None
@@ -90,35 +90,36 @@ class CalcSet(_SimulationRunner):
                     for directory in _os.listdir()
                     if _os.path.isdir(directory)
                 ]
-            self.calc_paths = calc_paths
-            for calc_path in calc_paths:
-                # Temporarily move to the calculation base directory
-                with _TmpWorkingDir(calc_path) as _:
-                    if calc_args:
-                        calc = _Calculation(
-                            **calc_args, stream_log_level=stream_log_level
-                        )
-                    else:
-                        calc = _Calculation(stream_log_level=stream_log_level)
-                    # Save the calculation to a pickle before unloading from memory
-                    calc._dump()
-                    calc._close_logging_handlers()
-                    del calc
+            self.calc_paths = [_os.path.abspath(directory) for directory in calc_paths]
+            self._calc_args = calc_args
+
+            # Check that we can load all of the calculations
+            for calc in self.calcs:
+                # Having set them up according to _calc_args, save them
+                calc._dump()
 
             # Save the state and update log
             self._update_log()
             self._dump()
 
-        # Point self._sub_sim_runners at the calculation generator
-        # Do this outside of the if statement to ensure that the generator is always created,
-        # because it is lost upon dumping to a pickle (can't pickle generator objects)
-        self._sub_sim_runners = self.calcs
+    @property
+    def _sub_sim_runners(self) -> _SimulationRunnerIterator[_Calculation]:
+        return _SimulationRunnerIterator(
+            getattr(self, "calc_paths", []),
+            _Calculation,
+            **getattr(self, "_calc_args", {}),
+        )
+
+    @_sub_sim_runners.setter
+    def _sub_sim_runners(self, value: _Iterable) -> None:
+        """
+        Do nothing. This is required for compatibility with the parent class
+         , which sets _sub_sim_runners to an empty list in __init__
+        """
 
     @property
-    def calcs(self) -> _Iterable[_Calculation]:
-        """Generator to avoid loading all calculations into memory at once"""
-        for calc_path in self.calc_paths:
-            yield _Calculation(base_dir=calc_path)
+    def calcs(self) -> _SimulationRunnerIterator[_Calculation]:  # type: ignore
+        return self._sub_sim_runners
 
     @calcs.setter
     def calcs(self, value: _Calculation) -> None:
@@ -158,14 +159,12 @@ class CalcSet(_SimulationRunner):
                     free_leg_sysprep_config=free_leg_sysprep_config,
                 )
                 self._logger.info(f"Calculation in {calc.base_dir} successfully set up")
+
             except Exception as e:
-                # TODO: Add more specific exception handling
                 self._logger.error(
                     f"Error setting up calculation in {calc.base_dir}: {e}"
                 )
-            finally:
-                calc._close_logging_handlers()
-                del calc
+                raise e
 
     def run(
         self,
@@ -174,7 +173,6 @@ class CalcSet(_SimulationRunner):
         runtime: _Optional[float] = None,
         runtime_constant: _Optional[float] = None,
         run_stages_parallel: bool = False,
-        protocol: _SetProtocol = _SetProtocol.STANDARD,
     ) -> None:
         """
         Run all calculations. Analysis is not performed by default. If running adaptively,
@@ -209,97 +207,36 @@ class CalcSet(_SimulationRunner):
             If True, the stages for each individual calculation will be run in parallel. Can casuse issues with
             QOS limits on HPC clusters as each stage might try to submit jobs at the same time, resulting in
             oversubmission of jobs. Each calculation will still be run sequentially.
-        protocol: SetProtocol: Optional, default: SetProtocol.STANDARD
-            The protocol to use for the calculations. This must be a SetProtocol enum.
 
         Returns
         -------
         None
         """
-        run_nos = self._get_valid_run_nos(run_nos)
-        if runtime_constant:
-            self.recursively_set_attr("runtime_constant", runtime_constant, silent=True)
-
-        self._logger.info(f"Running calculations with protocol {protocol}")
-
-        if protocol == _SetProtocol.NONADAPTIVE_OPT:
-            self._logger.warning(
-                "Running calculations in with non-adaptive optimised protocol. As a result, "
-                "the runtime, adaptive and parallel arguments will be ignored."
-            )
-
-        # Run each calculation sqeuentially.
+        # Run each calculation sequentially
         for calc in self.calcs:
             if calc.is_complete:
                 self._logger.info(
                     f"Calculation in {calc.base_dir} is already complete. Skipping..."
                 )
                 continue
+
             try:
                 self._logger.info(f"Running calculation in {calc.base_dir}")
-                if protocol == _SetProtocol.STANDARD:
-                    calc.run(
-                        run_nos=run_nos,
-                        adaptive=adaptive,
-                        runtime=runtime,
-                        parallel=run_stages_parallel,
-                    )
-                    calc.wait()
-                if protocol == _SetProtocol.NONADAPTIVE_OPT:
-                    self._run_calc_non_adaptive_opt(calc)
+                calc.run(
+                    run_nos=run_nos,
+                    adaptive=adaptive,
+                    runtime=runtime,
+                    runtime_constant=runtime_constant,
+                    parallel=run_stages_parallel,
+                )
+                calc.wait()
                 self._logger.info(
                     f"Calculation in {calc.base_dir} completed successfully"
                 )
+
             except Exception as e:
-                # TODO: Add more specific exception handling
                 self._logger.error(f"Error running calculation in {calc.base_dir}: {e}")
-            finally:
-                calc._close_logging_handlers()
-                del calc
-
-    def _run_calc_non_adaptive_opt(self, calc: _Calculation) -> None:
-        """
-        Run a calculation using the non-adaptive optimised protocol.
-        This involves running all stages for 6 ns and discarding the
-        first ns, other than for bound vanish, which is run for 8 ns
-        and the first 3 ns are discarded. Stages are run sequentially
-        and not directly through the Calculation object.
-
-        Parameters
-        ----------
-        calc : _Calculation
-            The calculation to run.
-
-        Returns
-        -------
-        None
-        """
-        for leg in calc.legs:
-            for stage in leg.stages:
-                if (
-                    leg.leg_type.value == 1 and stage.stage_type.value == 3
-                ):  # Bound (1) vanish (3)
-                    stage.run(adaptive=False, runtime=8)
-                    stage.wait()
-                else:
-                    stage.run(adaptive=False, runtime=6)
-                    stage.wait()
-        calc.wait()
-        # Set the equilibration time to 1 ns unless bound vanish, in which case 3 ns
-        for leg in calc.legs:
-            for stage in leg.stages:
-                if (
-                    leg.leg_type.value == 1 and stage.stage_type.value == 3
-                ):  # Bound (1) vanish (3)
-                    for lam in stage.lam_windows:
-                        lam._equilibrated = True
-                        lam._equil_time = 3
-                else:
-                    for lam in stage.lam_windows:
-                        lam._equilibrated = True
-                        lam._equil_time = 1
-        calc._dump()
-        calc.analyse()
+                raise e
 
     def analyse(self, exp_dgs_path: str, offset: bool) -> None:
         """
@@ -319,39 +256,47 @@ class CalcSet(_SimulationRunner):
         """
         # Read the experimental dGs into a pandas dataframe and add the extra
         # columns needed for the calculated values
-        all_dgs = _read_exp_dgs(exp_dgs_path)
+        all_dgs = _read_exp_dgs(exp_dgs_path, self.base_dir)
         all_dgs["calc_dg"] = _np.nan
         all_dgs["calc_er"] = _np.nan
 
         # Get the calculated dGs
         for calc in self.calcs:
-            # For now, just pull the results from the output files
-            with open(
-                _os.path.join(calc.output_dir, "overall_stats.dat"), "rt"
-            ) as ifile:
-                lines = ifile.readlines()
-                dg = float(lines[1].split(" ")[3])
-                conf_int = float(lines[1].split(" ")[-2])
-                print(dg, conf_int)
+
             # Get the name of the ligand for the calculation and use this to add the results
+            # get the tail of the base dir name
             name = all_dgs.index[all_dgs["calc_base_dir"] == calc.base_dir]
+
             # Make sure that there is only one row with this name
             if not len(name) == 1:
                 raise ValueError(
                     f"Found {len(name)} rows matching {calc.base_dir} in experimental dGs file"
                 )
-            all_dgs.loc[name, "calc_dg"] = dg
-            all_dgs.loc[name, "calc_er"] = conf_int
 
-            # Remove the calcultion from memory
-            calc._close_logging_handlers()
-            del calc
+            # Carry out MBAR analysis if it has not been done already
+            if calc._delta_g is None:
+                calc.analyse()
+
+            # Get the confidence interval
+            mean_free_energy = _np.mean(calc._delta_g)
+            conf_int = (
+                _stats.t.interval(
+                    0.95,
+                    len(calc._delta_g) - 1,  # type: ignore
+                    mean_free_energy,
+                    scale=_stats.sem(calc._delta_g),
+                )[1]
+                - mean_free_energy
+            )  # 95 % C.I.
+
+            all_dgs.loc[name, "calc_dg"] = mean_free_energy
+            all_dgs.loc[name, "calc_er"] = conf_int
 
         # Offset the calculated values with their corrections
         all_dgs["calc_dg"] += all_dgs["calc_cor"]
 
         # Save results including NaNs
-        all_dgs.to_csv(_os.path.join(self.output_dir, "results_summary"), sep=",")
+        all_dgs.to_csv(_os.path.join(self.output_dir, "results_summary.txt"), sep=",")
 
         # Exclude rows with NaN
         all_dgs.dropna(inplace=True)
@@ -374,12 +319,3 @@ class CalcSet(_SimulationRunner):
         _plt_against_exp(
             all_results=all_dgs, output_dir=self.output_dir, offset=offset, stats=stats
         )
-
-    @property
-    def _picklable_copy(self) -> _SimulationRunner:
-        """Return a copy of the Set which can be pickled. To do this,
-        we must avoid trying to pickle the Calculations stored as sub
-        simulation runners."""
-        picklable_copy = _copy.copy(self)
-        picklable_copy._sub_sim_runners = []
-        return picklable_copy

@@ -1,0 +1,94 @@
+/tmp/slurmd/job201829/slurm_script: line 7: module: command not found
+CUDA_VISIBLE_DEVICES=2
+lambda is:  1.0
+OPENMM_PLUGIN_DIR = /export/users/finlayclark/miniconda3/envs/ensequil/lib/plugins
+
+Loading configuration information from file somd.cfg
+
+Running a somd-freenrg calculation using files /export/users/finlayclark/benchmarking/non_adaptive/t4l_200ps/bound/restrain/output/lambda_1.000/run_03/somd.prm7, /export/users/finlayclark/benchmarking/non_adaptive/t4l_200ps/bound/restrain/output/lambda_1.000/run_03/somd.rst7 and /export/users/finlayclark/benchmarking/non_adaptive/t4l_200ps/bound/restrain/output/lambda_1.000/run_03/somd.pert.
+Using parameters:
+===============
+barostat == True
+boresch restraints dictionary == {'anchor_points': {'r1': 1550, 'r2': 1530, 'r3': 1552, 'l1': 4, 'l2': 3, 'l3': 5}, 'equilibrium_values': {'r0': 7.69, 'thetaA0': 1.3, 'thetaB0': 1.48, 'phiA0': 2.56, 'phiB0': 2.94, 'phiC0': 1.41}, 'force_constants': {'kr': 3.1, 'kthetaA': 14.38, 'kthetaB': 12.41, 'kphiA': 29.93, 'kphiB': 0.4, 'kphiC': 27.59}}
+buffered coordinates frequency == 5000
+center solute == True
+charge difference == 0
+constraint == hbonds
+crdfile == /export/users/finlayclark/benchmarking/non_adaptive/t4l_200ps/bound/restrain/output/lambda_1.000/run_03/somd.rst7
+cutoff distance == 12 Å
+cutoff type == cutoffperiodic
+energy frequency == 200
+hydrogen mass repartitioning factor == 3.0
+integrator == langevinmiddle
+inverse friction == 1 ps
+lambda array == (0.0, 0.125, 0.25, 0.375, 0.5, 1.0)
+lambda_val == 1.0
+minimise == True
+morphfile == /export/users/finlayclark/benchmarking/non_adaptive/t4l_200ps/bound/restrain/output/lambda_1.000/run_03/somd.pert
+ncycles == 2
+nmoves == 25000
+perturbed residue number == 1
+platform == CUDA
+pressure == 1 atm
+reaction field dielectric == 78.3
+temperature == 25°C
+thermostat == False
+timestep == 0.004 ps
+topfile == /export/users/finlayclark/benchmarking/non_adaptive/t4l_200ps/bound/restrain/output/lambda_1.000/run_03/somd.prm7
+turn on receptor-ligand restraints mode == True
+use boresch restraints == True
+===============
+### Running Single Topology Molecular Dynamics Free Energy (v0.2) on node06 ###
+###================Setting up calculation=====================###
+New run. Loading input and creating restart
+lambda is 1.0
+Create the System...
+Selecting dummy groups
+In "turn on receptor-ligand restraints mode". Lambda will be used to scale
+                  the strength of protein-ligand restraints. Ensure that a dummy pert file mapping
+                  the original parameters for all ligand atoms to themselves has been supplied.
+Setting up Boresch restraints...
+Boresch restraints dictionary = {'anchor_points': {'r1': 1550, 'r2': 1530, 'r3': 1552, 'l1': 4, 'l2': 3, 'l3': 5}, 'equilibrium_values': {'r0': 7.69, 'thetaA0': 1.3, 'thetaB0': 1.48, 'phiA0': 2.56, 'phiB0': 2.94, 'phiC0': 1.41}, 'force_constants': {'kr': 3.1, 'kthetaA': 14.38, 'kthetaB': 12.41, 'kphiA': 29.93, 'kphiB': 0.4, 'kphiC': 27.59}}
+Boresch anchor points:
+r1=Atom( C:1551  [  23.73,   39.99,   33.27] )
+r2=Atom( CA:1531 [  22.39,   39.67,   32.52] )
+r3=Atom( N:1553  [  24.74,   39.11,   33.13] )
+l1=Atom( C1CB:5  [  19.10,   45.58,   32.53] )
+l2=Atom( CG8F:4  [  19.46,   45.79,   33.84] )
+l3=Atom( CFNO:6  [  19.89,   45.99,   31.47] )
+Applying Hydrogen Mass repartition to input using a factor of 3.0 
+Creating force fields... 
+Setting up moves...
+Created one MD move that uses OpenMM for all molecules on GPU device 0
+Saving restart
+Setting up sim file. 
+There are 36358 atoms in the group 
+###===========================================================###
+
+Initial energy: -113265 kcal mol-1
+###=======================Minimisation========================###
+Running minimization.
+Tolerance for minimization: 1
+Maximum number of minimization iterations: 1000
+Energy after the minimization: -142877 kcal mol-1
+Energy minimization done.
+###===========================================================###
+
+###====================somd-freenrg run=======================###
+Starting somd-freenrg run...
+25000 moves 2 cycles, 200 ps simulation time
+
+Cycle =  1 
+
+Backing up previous restart
+Saving new restart
+
+Cycle =  2 
+
+Backing up previous restart
+Saving new restart
+Simulation took 72 s 
+###===========================================================###
+
+Clearing buffers...
+Starting /export/users/finlayclark/miniconda3/envs/ensequil/bin/somd-freenrg: number of threads equals 32

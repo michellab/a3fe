@@ -1,0 +1,98 @@
+version 1
+molecule LIG
+        name           C
+        initial_type   C1
+        final_type     C1
+        initial_LJ     3.48065 0.08688
+        final_LJ       3.48065 0.08688
+        initial_charge -0.13000
+        final_charge   -0.13000
+    endatom
+        name           C1CB
+        initial_type   C1
+        final_type     C1
+        initial_LJ     3.48065 0.08688
+        final_LJ       3.48065 0.08688
+        initial_charge -0.13000
+        final_charge   -0.13000
+    endatom
+        name           CFNO
+        initial_type   C1
+        final_type     C1
+        initial_LJ     3.48065 0.08688
+        final_LJ       3.48065 0.08688
+        initial_charge -0.13000
+        final_charge   -0.13000
+    endatom
+        name           CG8F
+        initial_type   C1
+        final_type     C1
+        initial_LJ     3.48065 0.08688
+        final_LJ       3.48065 0.08688
+        initial_charge -0.13000
+        final_charge   -0.13000
+    endatom
+        name           CHBR
+        initial_type   C1
+        final_type     C1
+        initial_LJ     3.48065 0.08688
+        final_LJ       3.48065 0.08688
+        initial_charge -0.13000
+        final_charge   -0.13000
+    endatom
+        name           CPOI
+        initial_type   C1
+        final_type     C1
+        initial_LJ     3.48065 0.08688
+        final_LJ       3.48065 0.08688
+        initial_charge -0.13000
+        final_charge   -0.13000
+    endatom
+        name           H
+        initial_type   H1
+        final_type     H1
+        initial_LJ     2.57258 0.01561
+        final_LJ       2.57258 0.01561
+        initial_charge 0.13000
+        final_charge   0.13000
+    endatom
+        name           H6B9
+        initial_type   H1
+        final_type     H1
+        initial_LJ     2.57258 0.01561
+        final_LJ       2.57258 0.01561
+        initial_charge 0.13000
+        final_charge   0.13000
+    endatom
+        name           HAK1
+        initial_type   H1
+        final_type     H1
+        initial_LJ     2.57258 0.01561
+        final_LJ       2.57258 0.01561
+        initial_charge 0.13000
+        final_charge   0.13000
+    endatom
+        name           HM80
+        initial_type   H1
+        final_type     H1
+        initial_LJ     2.57258 0.01561
+        final_LJ       2.57258 0.01561
+        initial_charge 0.13000
+        final_charge   0.13000
+    endatom
+        name           HO2R
+        initial_type   H1
+        final_type     H1
+        initial_LJ     2.57258 0.01561
+        final_LJ       2.57258 0.01561
+        initial_charge 0.13000
+        final_charge   0.13000
+    endatom
+        name           HVRJ
+        initial_type   H1
+        final_type     H1
+        initial_LJ     2.57258 0.01561
+        final_LJ       2.57258 0.01561
+        initial_charge 0.13000
+        final_charge   0.13000
+    endatom

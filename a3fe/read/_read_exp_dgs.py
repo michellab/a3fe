@@ -6,13 +6,17 @@ import os as _os
 import pandas as _pd
 
 
-def read_exp_dgs(dgs_file: str) -> _pd.DataFrame:
+def read_exp_dgs(dgs_file: str, base_dir: str) -> _pd.DataFrame:
     """Read the experimental free energy changes into a pandas dataframe
 
     Parameters
     ----------
     dgs_file : str
         Path to the experimental free energy changes file.
+
+    base_dir: str
+        The base directory to interpret the relative paths in the dgs file
+        with respect to.
 
     Returns
     -------
@@ -28,7 +32,9 @@ def read_exp_dgs(dgs_file: str) -> _pd.DataFrame:
             f"The experimental values file must have the columns {required_columns} but has the columns {exp_df.columns}"
         )
 
-    # Convert the paths to absolute paths
-    exp_df["calc_base_dir"] = exp_df["calc_base_dir"].apply(_os.path.abspath)
+    # Convert the paths to absolute paths relative to the dgs file
+    exp_df["calc_base_dir"] = exp_df["calc_base_dir"].apply(
+        lambda x: _os.path.abspath(_os.path.join(base_dir, x))
+    )
 
     return exp_df

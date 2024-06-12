@@ -8,7 +8,6 @@ __all__ = [
     "StageType",
     "LegType",
     "PreparationStage",
-    "SetProtocol",
 ]
 
 
@@ -89,10 +88,3 @@ class PreparationStage(_Enum):
                 f"{leg_type.name.lower()}{self.file_suffix}.{file_type}"
                 for file_type in ["prm7", "rst7"]
             ]
-
-
-class SetProtocol(_Enum):
-    """The protocol to use for running the set of calculations."""
-
-    STANDARD = 1
-    NONADAPTIVE_OPT = 2

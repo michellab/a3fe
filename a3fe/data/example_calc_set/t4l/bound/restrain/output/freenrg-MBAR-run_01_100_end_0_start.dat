@@ -1,0 +1,40 @@
+# Analysing data contained in file(s) ['/home/finlayclark/Documents/research/benchmarking/non_adaptive_final/t4l_200ps/bound/restrain/output/lambda_0.000/run_01/simfile_truncated_100_end_0_start.dat', '/home/finlayclark/Documents/research/benchmarking/non_adaptive_final/t4l_200ps/bound/restrain/output/lambda_0.125/run_01/simfile_truncated_100_end_0_start.dat', '/home/finlayclark/Documents/research/benchmarking/non_adaptive_final/t4l_200ps/bound/restrain/output/lambda_0.250/run_01/simfile_truncated_100_end_0_start.dat', '/home/finlayclark/Documents/research/benchmarking/non_adaptive_final/t4l_200ps/bound/restrain/output/lambda_0.375/run_01/simfile_truncated_100_end_0_start.dat', '/home/finlayclark/Documents/research/benchmarking/non_adaptive_final/t4l_200ps/bound/restrain/output/lambda_0.500/run_01/simfile_truncated_100_end_0_start.dat', '/home/finlayclark/Documents/research/benchmarking/non_adaptive_final/t4l_200ps/bound/restrain/output/lambda_1.000/run_01/simfile_truncated_100_end_0_start.dat']
+#Overlap matrix
+0.2915 0.2170 0.1693 0.1372 0.1148 0.0702
+0.2170 0.1971 0.1768 0.1589 0.1439 0.1063
+0.1693 0.1768 0.1758 0.1711 0.1651 0.1420
+0.1372 0.1589 0.1711 0.1774 0.1799 0.1755
+0.1148 0.1439 0.1651 0.1799 0.1901 0.2061
+0.0702 0.1063 0.1420 0.1755 0.2061 0.2999
+#DG from neighbouring lambda in kcal/mol
+0.0000 0.1250 0.4412 0.0096
+0.1250 0.2500 0.3512 0.0060
+0.2500 0.3750 0.2911 0.0045
+0.3750 0.5000 0.2486 0.0038
+0.5000 1.0000 0.7423 0.0116
+#PMF from MBAR in kcal/mol
+0.0000 0.0000 0.0000
+0.1250 0.4412 0.0096
+0.2500 0.7924 0.0151
+0.3750 1.0835 0.0189
+0.5000 1.3321 0.0218
+1.0000 2.0744 0.0296
+#TI average gradients and standard deviation in kcal/mol
+0.0000 4.8510 2.3057
+0.1250 3.4644 1.6856
+0.2500 2.3053 1.2744
+0.3750 2.5850 1.5814
+0.5000 2.0112 1.1178
+1.0000 1.1428 0.6915
+#PMF from TI in kcal/mol
+0.0000 0.0000
+0.1250 0.5197
+0.2500 0.8803
+0.3750 1.1860
+0.5000 1.4732
+1.0000 2.2617
+#MBAR free energy difference in kcal/mol: 
+2.074448, 0.029567  #WARNING SUBSAMPLING DISABLED, CONSIDER RERUN WITH SUBSAMPLING OPTION
+#TI free energy difference in kcal/mol: 
+2.261725  #WARNING SUBSAMPLING DISABLED, CONSIDER RERUN WITH SUBSAMPLING OPTION 
+Starting analyse_freenrg: number of threads equals 20

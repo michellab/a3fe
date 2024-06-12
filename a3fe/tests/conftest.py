@@ -16,16 +16,37 @@ def restrain_stage():
     """Create a stage object with analysis data to use in tests"""
     with TemporaryDirectory() as dirname:
         # Copy the input files to the temporary directory
-        subprocess.run(["cp", "-r", "a3fe/data/example_restraint_stage/", dirname])
+        subprocess.run(
+            ["cp", "-r", "a3fe/data/example_restraint_stage/", dirname], check=True
+        )
         stage = a3.Stage(
             base_dir=os.path.join(dirname, "example_restraint_stage"),
             stage_type=a3.enums.StageType.RESTRAIN,
         )
         # Set the relative simuation cost to 1
         stage.recursively_set_attr("relative_simulation_cost", 1, force=True)
+        # Ensure the tests don't try to use slurm
+        stage.recursively_set_attr("slurm_equil_detection", False, force=True)
         # Must use yield so that the temporary directory is deleted after the tests
         # by the context manager and does not persist
         yield stage
+
+
+@pytest.fixture(scope="session")
+def calc_set():
+    """Create a calculation set object to use in tests"""
+    with TemporaryDirectory() as dirname:
+        # Copy input files to the temporary directory
+        subprocess.run(["cp", "-r", "a3fe/data/example_calc_set/", dirname], check=True)
+        base_dir = os.path.join(dirname, "example_calc_set")
+        calc_paths = [
+            os.path.join(base_dir, name) for name in ["mdm2_pip2_short", "t4l"]
+        ]
+        calc_set = a3.CalcSet(
+            base_dir=base_dir,
+            calc_paths=calc_paths,
+        )
+        yield calc_set
 
 
 @pytest.fixture(scope="session")
