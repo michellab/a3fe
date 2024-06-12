@@ -13,8 +13,6 @@ import a3fe as a3
 def test_dirs_created():
     """Check that all expected directories are created"""
     with TemporaryDirectory() as dirname:
-        # Store current working directory to change back to later
-        cwd = os.getcwd()
         subprocess.run(
             [
                 "cp",

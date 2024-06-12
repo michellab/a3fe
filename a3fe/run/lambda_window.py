@@ -1,5 +1,7 @@
 """Functionality for running simulations at a single lambda value."""
 
+__all__ = ["LamWindow"]
+
 import glob as _glob
 import logging as _logging
 import os as _os

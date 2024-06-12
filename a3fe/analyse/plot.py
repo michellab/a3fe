@@ -486,7 +486,7 @@ def plot_gradient_timeseries(
     _plt.close(fig)
 
 
-def plot_equilibration_time(lam_windows: _List["LamWindows"], output_dir: str) -> None:  # type: ignore
+def plot_equilibration_time(lam_windows: _List["LamWindows"], output_dir: str) -> None:  # type: ignore # noqa: F821
     """
     Plot the equilibration time for each lambda window.
 
@@ -996,7 +996,7 @@ def plot_mbar_pmf(outfiles: _List[str], output_dir: str) -> None:
 
 
 def plot_rmsds(
-    lam_windows: _List["LamWindows"],
+    lam_windows: _List["LamWindows"],  # noqa: F821
     output_dir: str,
     selection: str,
     group_selection: _Optional[str] = None,
@@ -1505,7 +1505,7 @@ def plot_normality(data: _np.ndarray, output_dir: str) -> None:
 
 
 def plot_av_waters(
-    lam_windows: _List["LamWindow"],
+    lam_windows: _List["LamWindow"],  # noqa: F821
     output_dir: str,
     percent_traj: float,
     index: int,

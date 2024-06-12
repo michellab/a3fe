@@ -26,13 +26,13 @@ LEGS_WITH_STAGES = {"bound": ["discharge", "vanish"], "free": ["discharge", "van
 def test_calculation_loading(calc):
     """Check that the calculation loads correctly"""
     # Check that the calculation has the correct attributes
-    assert calc.loaded_from_pickle == False
+    assert not calc.loaded_from_pickle
     assert calc.ensemble_size == 6
     assert calc.input_dir == str(
         pathlib.Path("a3fe/data/example_run_dir/input").resolve()
     )
     assert calc.output_dir == os.path.join(calc.base_dir, "output")
-    assert calc.setup_complete == False
+    assert not calc.setup_complete
     assert calc.prep_stage.name == a3.run.enums.PreparationStage.PARAMETERISED.name
     assert calc.stream_log_level == logging.INFO
     # Check that pickle file exists
@@ -58,13 +58,13 @@ def test_calculation_reloading(calc):
     calc2 = a3.Calculation(
         base_dir=calc.base_dir, input_dir="a3fe/data/example_run_dir/input"
     )
-    assert calc2.loaded_from_pickle == True
+    assert calc2.loaded_from_pickle
     assert calc2.ensemble_size == 6
     assert calc2.input_dir == str(
         pathlib.Path("a3fe/data/example_run_dir/input").resolve()
     )
     assert calc2.output_dir == os.path.join(calc.base_dir, "output")
-    assert calc2.setup_complete == False
+    assert not calc2.setup_complete
     assert calc2.prep_stage.name == a3.run.enums.PreparationStage.PARAMETERISED.name
     assert calc2.stream_log_level == logging.INFO
 
@@ -87,7 +87,7 @@ def test_update_paths(calc):
         calc4 = a3.Calculation(
             base_dir=new_dir, input_dir="a3fe/data/example_run_dir/input"
         )
-        assert calc4.loaded_from_pickle == True
+        assert calc4.loaded_from_pickle
         current_dir = os.getcwd()
         calc4.update_paths(old_sub_path=calc4.base_dir, new_sub_path=current_dir)
         assert calc4.base_dir == current_dir
@@ -107,7 +107,7 @@ def test_set_and_get_attributes(restrain_stage):
     # Check it fails if the attribute doesn't exist
     restrain_stage.recursively_set_attr("ensemble_sizee", 7)
     attr_dict = restrain_stage.recursively_get_attr("ensemble_sizee")
-    assert attr_dict["ensemble_sizee"] == None
+    assert attr_dict["ensemble_sizee"] is None
     # Check that we can force it to set the attribute
     restrain_stage.recursively_set_attr("ensemble_sizee", 7, force=True)
     attr_dict = restrain_stage.recursively_get_attr("ensemble_sizee")
@@ -123,7 +123,7 @@ def test_reset(restrain_stage):
     # First, check that they're consistent with having run the stage
     equilibrated = all([lam._equilibrated for lam in restrain_stage.lam_windows])
     equil_times = [lam._equil_time for lam in restrain_stage.lam_windows]
-    assert equilibrated == True
+    assert equilibrated
     assert None not in equil_times
     # Now reset the stage and recheck
     restrain_stage.reset()
@@ -184,7 +184,7 @@ class TestCalcSetup:
         actually running.
         """
         # Store the original run_process function
-        original_run_process = a3.run.system_prep.run_process
+        # original_run_process = a3.run.system_prep.run_process
 
         def _mock_run_process_inner(
             system: BSS._SireWrappers._system.System,
@@ -241,7 +241,7 @@ class TestCalcSetup:
 
     def test_setup_calc_overall(self, setup_calc, mock_run_process):
         """Test that setting up the calculation was successful at a high level."""
-        assert setup_calc.setup_complete == True
+        assert setup_calc.setup_complete
         assert (
             setup_calc.prep_stage.name
             == a3.run.enums.PreparationStage.PREEQUILIBRATED.name
@@ -397,7 +397,7 @@ def test_integration_calculation(calc_slurm):
     cfg = SystemPreparationConfig()
     cfg.ensemble_equilibration_time = 100  # ps
     calc_slurm.setup(bound_leg_sysprep_config=cfg, free_leg_sysprep_config=cfg)
-    assert calc_slurm.setup_complete == True
+    assert calc_slurm.setup_complete
     # Check that all required slurm bash jobs have been created
     required_slurm_jobnames = ["minimise", "solvate", "heat_preequil"]
     for leg in LEGS_WITH_STAGES.keys():
@@ -449,7 +449,7 @@ def test_integration_calculation(calc_slurm):
     # Check that a short, non-adaptive run works
     calc_slurm.run(adaptive=False, runtime=0.1)
     calc_slurm.wait()
-    assert calc_slurm.running == False
+    assert not calc_slurm.running
     # Set the entire simulation time to equilibrated
     for leg in calc_slurm.legs:
         for stage in leg.stages:

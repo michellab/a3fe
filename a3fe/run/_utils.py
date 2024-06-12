@@ -15,7 +15,9 @@ from typing import Tuple as _Tuple
 from typing import Type as _Type
 from typing import TypeVar as _TypeVar
 
-_T = _TypeVar("_T", bound="SimulationRunner")
+import BioSimSpace as _BSS
+
+_T = _TypeVar("_T", bound="SimulationRunner")  # noqa: F821
 
 
 def check_has_wat_and_box(system: _BSS._SireWrappers._system.System) -> None:  # type: ignore
@@ -27,7 +29,7 @@ def check_has_wat_and_box(system: _BSS._SireWrappers._system.System) -> None:  #
 
 
 def get_simtime(
-    sim_runner: "SimulationRunner", run_nos: _Optional[_List[int]] = None
+    sim_runner: "SimulationRunner", run_nos: _Optional[_List[int]] = None  # noqa: F821
 ) -> float:
     """
     Get the simulation time of a sub simulation runner, in ns. This function

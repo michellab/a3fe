@@ -1,5 +1,11 @@
 import os
 import shutil
+import subprocess
+from typing import Optional
+
+import BioSimSpace.Sandpit.Exscientia as BSS
+
+import a3fe
 
 # Check if slurm is present
 SLURM_PRESENT = False if shutil.which("sbatch") is None else True
@@ -21,14 +27,6 @@ if not os.path.exists("a3fe"):
 # Globally mock the run_process function so that we can test the setup stages without
 # actually running. This is a temporary fix until we figure out how to do the mocking
 # properly with fixtures.
-
-import subprocess
-from typing import Optional
-
-import BioSimSpace.Sandpit.Exscientia as BSS
-
-import a3fe
-
 original_run_process = a3fe.run.system_prep.run_process
 
 # Create a complex system object to return from the mock run_process function

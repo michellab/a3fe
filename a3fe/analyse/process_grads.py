@@ -1,5 +1,7 @@
 """Functionality to process the gradient data."""
 
+from __future__ import annotations
+
 __all__ = ["GradientData"]
 
 from multiprocessing import get_context as _get_context
@@ -23,7 +25,7 @@ class GradientData:
 
     def __init__(
         self,
-        lam_winds: _List["LamWindow"],
+        lam_winds: _List["LamWindow"],  # noqa: F821
         equilibrated: bool,
         run_nos: _Optional[_List[int]] = None,
     ) -> None:  # type: ignore
@@ -508,7 +510,7 @@ class GradientData:
 
 
 def get_time_series_multiwindow(
-    lambda_windows: _List["LamWindow"],
+    lambda_windows: _List["LamWindow"],  # noqa: F821
     equilibrated: bool = False,
     run_nos: _Optional[_List[int]] = None,
     start_frac: float = 0.0,
@@ -628,7 +630,7 @@ def get_time_series_multiwindow(
 
 
 def get_time_series_multiwindow_mbar(
-    lambda_windows: _List["LamWindow"],
+    lambda_windows: _List["LamWindow"],  # noqa: F821
     output_dir: str,
     equilibrated: bool = False,
     run_nos: _Optional[_List[int]] = None,

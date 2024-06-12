@@ -1,5 +1,11 @@
 """Functions to analyse binding site waters."""
 
+__all__ = [
+    "get_av_waters_simulation",
+    "get_av_waters_lambda_window",
+    "get_av_waters_stage",
+]
+
 import glob as _glob
 import os as _os
 from multiprocessing import Pool as _Pool
@@ -84,7 +90,7 @@ def get_av_waters_simulation(
 
 
 def get_av_waters_lambda_window(
-    simulations: _List["Simulation"],
+    simulations: _List["Simulation"],  # noqa: F821
     percent_traj: float,
     lam_val: float,
     index: int,
@@ -158,7 +164,7 @@ def get_av_waters_lambda_window(
 
 
 def get_av_waters_stage(
-    lam_windows: _List["LamWindow"],
+    lam_windows: _List["LamWindow"],  # noqa: F821
     percent_traj: float,
     index: int,
     length: float,
@@ -207,7 +213,9 @@ def get_av_waters_stage(
         Average number of waters within the specified distance(s) of the specified atom(s) for each
         lambda window for each run. Shape is (n_runs, n_lam_windows).
     """
-    run_nos: _List["LamWindow"] = lam_windows[0]._get_valid_run_nos(run_nos)
+    run_nos: _List["LamWindow"] = lam_windows[0]._get_valid_run_nos(  # noqa: F821
+        run_nos
+    )  # noqa: F821
     # Fill the array with Nans to start with
     avg_close_waters = _np.full((len(run_nos), len(lam_windows)), _np.nan)
     # Process the lambda windows in parallel

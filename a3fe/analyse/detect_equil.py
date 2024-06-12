@@ -29,7 +29,7 @@ from .process_grads import (
 )
 
 
-def check_equil_block_gradient(lam_win: "LamWindow", run_nos: _Optional[_List[int]]) -> _Tuple[bool, _Optional[float]]:  # type: ignore
+def check_equil_block_gradient(lam_win: "LamWindow", run_nos: _Optional[_List[int]]) -> _Tuple[bool, _Optional[float]]:  # type: ignore # noqa: F821
     """
     Check if the ensemble of simulations at the lambda window is
     equilibrated based on the ensemble gradient between averaged blocks.
@@ -149,7 +149,7 @@ def check_equil_block_gradient(lam_win: "LamWindow", run_nos: _Optional[_List[in
     return equilibrated, equil_time
 
 
-def check_equil_chodera(lam_win: "LamWindow", run_nos: _Optional[_List[int]] = None) -> _Tuple[bool, _Optional[float]]:  # type: ignore
+def check_equil_chodera(lam_win: "LamWindow", run_nos: _Optional[_List[int]] = None) -> _Tuple[bool, _Optional[float]]:  # type: ignore # noqa: F821
     """
     Check if the ensemble of simulations at the lambda window is
     equilibrated based Chodera's method of maximising the number
@@ -178,7 +178,6 @@ def check_equil_chodera(lam_win: "LamWindow", run_nos: _Optional[_List[int]] = N
 
     # Conversion between time and gradient indices.
     time_to_ind = 1 / (lam_win.sims[0].timestep * lam_win.sims[0].nrg_freq)
-    idx_block_size = int(lam_win.block_size * time_to_ind)
 
     # Read dh/dl data from all simulations
     dh_dls = []
@@ -245,7 +244,7 @@ def check_equil_chodera(lam_win: "LamWindow", run_nos: _Optional[_List[int]] = N
 
 
 def check_equil_multiwindow(
-    lambda_windows: _List["LamWindow"],
+    lambda_windows: _List["LamWindow"],  # noqa: F821
     output_dir: str,
     run_nos: _Optional[_List[int]] = None,
 ) -> _Tuple[bool, _Optional[float]]:  # type: ignore
@@ -357,7 +356,7 @@ def check_equil_multiwindow(
 
 
 def check_equil_multiwindow_kpss(
-    lambda_windows: _List["LamWindow"],
+    lambda_windows: _List["LamWindow"],  # noqa: F821
     output_dir: str,
     run_nos: _Optional[_List[int]] = None,
 ) -> _Tuple[bool, _Optional[float]]:  # type: ignore
@@ -451,7 +450,7 @@ def check_equil_multiwindow_kpss(
 
 
 def check_equil_multiwindow_modified_geweke(
-    lambda_windows: _List["LamWindow"],
+    lambda_windows: _List["LamWindow"],  # noqa: F821
     output_dir: str,
     run_nos: _Optional[_List[int]] = None,
     first_frac: float = 0.1,
@@ -562,9 +561,7 @@ def check_equil_multiwindow_modified_geweke(
         # Check if the p-value is greater than the cutoff
         if p_value > p_cutoff:
             # No evidence to reject the null hypothesis that the data is stationary at current p cutoff
-            if (
-                equilibrated == False
-            ):  #  Make sure we haven't already detected equilibration
+            if not equilibrated:  #  Make sure we haven't already detected equilibration
                 equilibrated = True
                 fractional_equil_time = start_frac
                 equil_time = overall_times[0][0]
@@ -615,7 +612,7 @@ def check_equil_multiwindow_modified_geweke(
 
 
 def check_equil_multiwindow_paired_t(
-    lambda_windows: _List["LamWindow"],
+    lambda_windows: _List["LamWindow"],  # noqa: F821
     output_dir: str,
     run_nos: _Optional[_List[int]] = None,
     first_frac: float = 0.1,
@@ -719,9 +716,7 @@ def check_equil_multiwindow_paired_t(
         # Check if the p-value is greater than the cutoff
         if p_value > p_cutoff:
             # No evidence to reject the null hypothesis that the data is stationary at current p cutoff
-            if (
-                equilibrated == False
-            ):  #  Make sure we haven't already detected equilibration
+            if not equilibrated:  #  Make sure we haven't already detected equilibration
                 equilibrated = True
                 fractional_equil_time = start_frac
                 equil_time = overall_times[0][0]
@@ -770,8 +765,8 @@ def check_equil_multiwindow_paired_t(
 
 
 def dummy_check_equil_multiwindow(
-    lam_win: "LamWindow", run_nos: _Optional[_List[int]] = None
-) -> _Tuple[bool, _Optional[float]]:  # type: ignore
+    lam_win: "LamWindow", run_nos: _Optional[_List[int]] = None  # type: ignore # noqa: F821
+) -> _Tuple[bool, _Optional[float]]:
     """
     Becuse "check_equil_multiwindow" checks multiple windows at once and sets the _equilibrated
     and _equil_time attributes of the lambda windows, but a3fe was written based on per-window
@@ -809,7 +804,7 @@ def dummy_check_equil_multiwindow(
 
 
 def get_gelman_rubin_rhat(
-    lambda_window: "LamWindow",
+    lambda_window: "LamWindow",  # noqa: F821
     discard_frac: float = 0.1,
     run_nos: _Optional[_List[int]] = None,
 ) -> float:
@@ -854,7 +849,7 @@ def get_gelman_rubin_rhat(
 
 
 def check_equil_multiwindow_gelman_rubin(
-    lambda_windows: _List["LamWindow"],
+    lambda_windows: gg_List["LamWindow"],  # noqa: F821
     output_dir: str,
     cutoff: float = 1.1,
     run_nos: _Optional[_List[int]] = None,

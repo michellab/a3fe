@@ -66,8 +66,8 @@ def get_rmsd(
             _subprocess.run(["cp", f"{input_dir}/somd.prm7", top_file], check=True)
             reference = _Universe(top_file, reference_traj)
             # Ensure that the protein and ligand are whole and centered - note this is super slow
-            prot_and_or_lig = reference.select_atoms("protein or resname LIG")
-            not_prot_or_lig = reference.select_atoms("not (protein or resname LIG)")
+            # prot_and_or_lig = reference.select_atoms("protein or resname LIG")
+            # not_prot_or_lig = reference.select_atoms("not (protein or resname LIG)")
             # transforms = [
             # _trans.unwrap(prot_and_or_lig),
             # _trans.center_in_box(prot_and_or_lig),
