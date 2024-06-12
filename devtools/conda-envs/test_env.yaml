@@ -22,6 +22,8 @@ dependencies:
   - numpydoc
   - gromacs
   - pydantic
+  - ruff
+  - black
 
     # Testing
   - pytest
