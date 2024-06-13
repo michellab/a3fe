@@ -974,6 +974,10 @@ class SimulationRunner(ABC):
                         ]
         return picklable_copy
 
+    def save(self) -> None:
+        """Save the current state of the simulation object to a pickle file."""
+        self._dump()
+
     def _dump(self) -> None:
         """Dump the current state of the simulation object to a pickle file, and do
         the same for any sub-simulations."""
