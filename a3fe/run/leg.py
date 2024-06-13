@@ -573,7 +573,7 @@ class Leg(_SimulationRunner):
         """
         # Generate output dirs and copy over the input
         outdirs = [
-            f"{self.base_dir}/ensemble_equilibration_{i+1}"
+            f"{self.base_dir}/ensemble_equilibration_{i + 1}"
             for i in range(self.ensemble_size)
         ]
 
@@ -619,13 +619,12 @@ class Leg(_SimulationRunner):
 
             # Check that the required input files have been produced, since slurm can fail silently
             for i, outdir in enumerate(outdirs_to_run):
-                for (
-                    file
-                ) in _PreparationStage.PREEQUILIBRATED.get_simulation_input_files(
-                    self.leg_type
-                ) + [
-                    "somd.rst7"
-                ]:
+                for file in (
+                    _PreparationStage.PREEQUILIBRATED.get_simulation_input_files(
+                        self.leg_type
+                    )
+                    + ["somd.rst7"]
+                ):
                     if not _os.path.isfile(f"{outdir}/{file}"):
                         raise RuntimeError(
                             f"SLURM job failed to produce {file}. Please check the output of the "
@@ -646,7 +645,7 @@ class Leg(_SimulationRunner):
         # Give the output files unique names
         for i, outdir in enumerate(outdirs_to_run):
             _subprocess.run(
-                ["mv", f"{outdir}/somd.rst7", f"{outdir}/somd_{i+1}.rst7"], check=True
+                ["mv", f"{outdir}/somd.rst7", f"{outdir}/somd_{i + 1}.rst7"], check=True
             )
 
         # Load the system and mark the ligand to be decoupled
@@ -668,14 +667,14 @@ class Leg(_SimulationRunner):
         if self.leg_type == _LegType.BOUND:
             # For each run, load the trajectory and extract the restraints
             for i, outdir in enumerate(outdirs):
-                self._logger.info(f"Loading trajectory for run {i+1}...")
+                self._logger.info(f"Loading trajectory for run {i + 1}...")
                 top_file = f"{self.input_dir}/{_PreparationStage.PREEQUILIBRATED.get_simulation_input_files(self.leg_type)[0]}"
                 traj = _BSS.Trajectory.Trajectory(
                     topology=top_file,
                     trajectory=f"{outdir}/gromacs.xtc",
                     system=pre_equilibrated_system,
                 )
-                self._logger.info(f"Selecting restraints for run {i+1}...")
+                self._logger.info(f"Selecting restraints for run {i + 1}...")
                 restraint = _BSS.FreeEnergy.RestraintSearch.analyse(
                     method="BSS",
                     system=pre_equilibrated_system,
@@ -687,10 +686,10 @@ class Leg(_SimulationRunner):
 
                 # Check that we actually generated a restraint
                 if restraint is None:
-                    raise ValueError(f"No restraints found for run {i+1}.")
+                    raise ValueError(f"No restraints found for run {i + 1}.")
 
                 # Save the restraints to a text file and store within the Leg object
-                with open(f"{outdir}/restraint_{i+1}.txt", "w") as f:
+                with open(f"{outdir}/restraint_{i + 1}.txt", "w") as f:
                     f.write(restraint.toString(engine="SOMD"))  # type: ignore
                 self.restraints.append(restraint)
 
@@ -755,9 +754,9 @@ class Leg(_SimulationRunner):
             # Copy the final coordinates from the ensemble equilibration stage to the stage input directory
             # and, if this is the bound stage, also copy over the restraints
             for i in range(self.ensemble_size):
-                ens_equil_output_dir = f"{self.base_dir}/ensemble_equilibration_{i+1}"
-                coordinates_file = f"{ens_equil_output_dir}/somd_{i+1}.rst7"
-                _shutil.copy(coordinates_file, f"{stage_input_dir}/somd_{i+1}.rst7")
+                ens_equil_output_dir = f"{self.base_dir}/ensemble_equilibration_{i + 1}"
+                coordinates_file = f"{ens_equil_output_dir}/somd_{i + 1}.rst7"
+                _shutil.copy(coordinates_file, f"{stage_input_dir}/somd_{i + 1}.rst7")
                 if self.leg_type == _LegType.BOUND:
                     if (
                         config.use_same_restraints
@@ -766,9 +765,9 @@ class Leg(_SimulationRunner):
                             f"{self.base_dir}/ensemble_equilibration_1/restraint_1.txt"
                         )
                     else:
-                        restraint_file = f"{ens_equil_output_dir}/restraint_{i+1}.txt"
+                        restraint_file = f"{ens_equil_output_dir}/restraint_{i + 1}.txt"
                     _shutil.copy(
-                        restraint_file, f"{stage_input_dir}/restraint_{i+1}.txt"
+                        restraint_file, f"{stage_input_dir}/restraint_{i + 1}.txt"
                     )
 
             # Update the template-config.cfg file with the perturbed residue number generated

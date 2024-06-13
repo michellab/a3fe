@@ -1,4 +1,4 @@
-""""Unit tests for the _restraint dataclass."""
+""" "Unit tests for the _restraint dataclass."""
 
 from pytest import approx
 

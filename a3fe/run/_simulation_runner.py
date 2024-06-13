@@ -420,7 +420,7 @@ class SimulationRunner(ABC):
             )
             for i in range(self.ensemble_size):
                 ofile.write(
-                    f"Free energy from run {i+1}: {dg_overall[i]: .3f} +/- {er_overall[i]:.3f} kcal/mol\n"
+                    f"Free energy from run {i + 1}: {dg_overall[i]: .3f} +/- {er_overall[i]:.3f} kcal/mol\n"
                 )
             ofile.write(
                 "Errors are 95 % C.I.s based on the assumption of a Gaussian distribution of free energies\n"
@@ -831,7 +831,9 @@ class SimulationRunner(ABC):
         if hasattr(self, "virtual_queue"):
             # Virtual queue may have already been updated
             if new_sub_path not in self.virtual_queue.log_dir:  # type: ignore
-                self.virtual_queue.log_dir = self.virtual_queue.log_dir.replace(old_sub_path, new_sub_path)  # type: ignore
+                self.virtual_queue.log_dir = self.virtual_queue.log_dir.replace(
+                    old_sub_path, new_sub_path
+                )  # type: ignore
                 self.virtual_queue._set_up_logging()  # type: ignore
 
         # Update the paths of any sub-simulation runners

@@ -1,5 +1,5 @@
 """Functionality to read experimental free energies from a supplied csv file.
-   This must have the columns: calc_base_dir, name, exp_dg, exp_er"""
+This must have the columns: calc_base_dir, name, exp_dg, exp_er"""
 
 import os as _os
 

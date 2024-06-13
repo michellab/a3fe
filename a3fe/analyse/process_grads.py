@@ -577,7 +577,10 @@ def get_time_series_multiwindow(
     # simulation time for the whole calculation
     n_runs = len(run_nos)
     overall_dgs = _np.zeros(
-        [n_runs, 100]
+        [
+            n_runs,
+            100,
+        ]
     )  # One point for each % of the total simulation time
     overall_times = _np.zeros([n_runs, 100])
     for lam_win in lambda_windows:
@@ -696,15 +699,16 @@ def get_time_series_multiwindow_mbar(
     n_runs = len(run_nos)
     n_points = 100
     overall_dgs = _np.zeros(
-        [n_runs, n_points]
+        [
+            n_runs,
+            n_points,
+        ]
     )  # One point for each % of the total simulation time
     overall_times = _np.zeros([n_runs, n_points])
     start_and_end_fracs = [
         (i, i + (end_frac - start_frac) / n_points)
         for i in _np.linspace(start_frac, end_frac, n_points + 1)
-    ][
-        :-1
-    ]  # Throw away the last point as > 1
+    ][:-1]  # Throw away the last point as > 1
     # Round the values to avoid floating point errors
     start_and_end_fracs = [
         (round(x[0], 5), round(x[1], 5)) for x in start_and_end_fracs

@@ -81,9 +81,7 @@ class CalcSet(_SimulationRunner):
 
         if not self.loaded_from_pickle:
             # Load/ create the Calculations - temporarily shift to the Calculation base dir
-            if (
-                not calc_paths
-            ):  # If not supplied, assume that every sub-directory is a calculation base dir
+            if not calc_paths:  # If not supplied, assume that every sub-directory is a calculation base dir
                 calc_paths = [
                     directory
                     for directory in _os.listdir()
@@ -261,7 +259,6 @@ class CalcSet(_SimulationRunner):
 
         # Get the calculated dGs
         for calc in self.calcs:
-
             # Get the name of the ligand for the calculation and use this to add the results
             # get the tail of the base dir name
             name = all_dgs.index[all_dgs["calc_base_dir"] == calc.base_dir]

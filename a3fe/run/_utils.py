@@ -1,4 +1,4 @@
-""""Utilities for SimulationRunners."""
+""" "Utilities for SimulationRunners."""
 
 from __future__ import annotations
 
@@ -29,7 +29,8 @@ def check_has_wat_and_box(system: _BSS._SireWrappers._system.System) -> None:  #
 
 
 def get_simtime(
-    sim_runner: "SimulationRunner", run_nos: _Optional[_List[int]] = None  # noqa: F821
+    sim_runner: "SimulationRunner",  # noqa: F821
+    run_nos: _Optional[_List[int]] = None,
 ) -> float:
     """
     Get the simulation time of a sub simulation runner, in ns. This function

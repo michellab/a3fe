@@ -1,5 +1,5 @@
 """Functions for running free energy calculations with SOMD with automated
- equilibration detection based on an ensemble of simulations."""
+equilibration detection based on an ensemble of simulations."""
 
 __all__ = ["Stage"]
 
@@ -833,7 +833,7 @@ class Stage(_SimulationRunner):
                     )
                     for i in range(len(free_energies)):
                         ofile.write(
-                            f"Free energy from run {i+1}: {free_energies[i]: .3f} +/- {errors[i]:.3f} kcal/mol\n"
+                            f"Free energy from run {i + 1}: {free_energies[i]: .3f} +/- {errors[i]:.3f} kcal/mol\n"
                         )
                     ofile.write(
                         "Errors are 95 % C.I.s based on the assumption of a Gaussian distribution of free energies\n"
@@ -924,7 +924,9 @@ class Stage(_SimulationRunner):
                 )
 
         if get_frnrg:
-            self._logger.info(f"Overall free energy changes: {free_energies} kcal mol-1")  # type: ignore
+            self._logger.info(
+                f"Overall free energy changes: {free_energies} kcal mol-1"
+            )  # type: ignore
             self._logger.info(f"Overall errors: {errors} kcal mol-1")  # type: ignore
             self._logger.info(f"Analysed runs: {run_nos}")
             # Update the interally-stored results

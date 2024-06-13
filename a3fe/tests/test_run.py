@@ -1,4 +1,4 @@
-"""Unit and regression tests for the run module. """
+"""Unit and regression tests for the run module."""
 
 import logging
 import os
@@ -42,7 +42,9 @@ def test_calculation_loading(calc):
 def test_calculation_logging(calc):
     """Check that the calculation logging is set up correctly"""
     assert type(calc._logger.handlers[0]) == logging.FileHandler  # type: ignore
-    assert calc._logger.handlers[0].baseFilename == os.path.join(calc.base_dir, "Calculation.log")  # type: ignore
+    assert calc._logger.handlers[0].baseFilename == os.path.join(
+        calc.base_dir, "Calculation.log"
+    )  # type: ignore
     assert calc._logger.handlers[0].level == logging.DEBUG  # type: ignore
     assert type(calc._logger.handlers[1]) == logging.StreamHandler  # type: ignore
     assert calc._logger.handlers[1].level == logging.INFO  # type: ignore
@@ -91,7 +93,9 @@ def test_update_paths(calc):
         current_dir = os.getcwd()
         calc4.update_paths(old_sub_path=calc4.base_dir, new_sub_path=current_dir)
         assert calc4.base_dir == current_dir
-        assert calc4._logger.handlers[0].baseFilename == os.path.join(current_dir, "Calculation.log")  # type: ignore
+        assert calc4._logger.handlers[0].baseFilename == os.path.join(
+            current_dir, "Calculation.log"
+        )  # type: ignore
 
 
 def test_set_and_get_attributes(restrain_stage):
@@ -221,7 +225,12 @@ class TestCalcSetup:
             # Copy the example input directory to the temporary directory
             # as we'll create some new files there
             subprocess.run(
-                ["cp", "-r", "a3fe/data/example_run_dir/input", f"{dirname}/input"]
+                [
+                    "cp",
+                    "-r",
+                    "a3fe/data/example_run_dir/input",
+                    f"{dirname}/input",
+                ]
             )
 
             setup_calc = a3.Calculation(
@@ -366,7 +375,12 @@ def calc_slurm():
         # as we'll create some new files there
         subprocess.run(["mkdir", "-p", dirname])
         subprocess.run(
-            ["cp", "-r", "a3fe/data/example_run_dir/input", f"{dirname}/input"]
+            [
+                "cp",
+                "-r",
+                "a3fe/data/example_run_dir/input",
+                f"{dirname}/input",
+            ]
         )
         calc = a3.Calculation(
             base_dir=dirname,

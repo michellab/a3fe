@@ -96,7 +96,9 @@ def general_plot(
     fig, ax = _plt.subplots(figsize=(8, 6))
     ax.plot(x_vals, y_avg, label="Mean", linewidth=2)
     for i, entry in enumerate(y_vals):
-        ax.plot(x_vals, entry, alpha=0.5, label=f"run {run_nos[i] if run_nos else i+1}")
+        ax.plot(
+            x_vals, entry, alpha=0.5, label=f"run {run_nos[i] if run_nos else i + 1}"
+        )
     if vline_val is not None:
         ax.axvline(x=vline_val, color="red", linestyle="dashed")
     if hline_val is not None:
@@ -198,9 +200,11 @@ def plot_gradient_stats(
             edgecolor="black",
             yerr=gradients_data.sems_overall,
         )
-        ax.set_ylabel(
-            r"$\langle \frac{\mathrm{d}h}{\mathrm{d}\lambda}\rangle _{\lambda} $ / kcal mol$^{-1}$"
-        ),
+        (
+            ax.set_ylabel(
+                r"$\langle \frac{\mathrm{d}h}{\mathrm{d}\lambda}\rangle _{\lambda} $ / kcal mol$^{-1}$"
+            ),
+        )
 
     elif plot_type == "stat_ineff":
         ax.bar(
@@ -219,9 +223,11 @@ def plot_gradient_stats(
             width=0.02,
             edgecolor="black",
         )
-        ax.set_ylabel(
-            r"$\sqrt{t}$SEM($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $) / kcal mol$^{-1}$ ns$^{1/2}$"
-        ),
+        (
+            ax.set_ylabel(
+                r"$\sqrt{t}$SEM($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $) / kcal mol$^{-1}$ ns$^{1/2}$"
+            ),
+        )
         ax.legend()
         # Get second y axis so we can plot on different scales
         ax2 = ax.twinx()
@@ -253,9 +259,11 @@ def plot_gradient_stats(
         # Add vertical lines at optimal lambda vals
         for lam_val in optimal_lam_vals:
             ax2.axvline(x=lam_val, color="black", linestyle="dashed", linewidth=0.5)
-        ax2.set_ylabel(
-            r"Integrated $\sqrt{t}$SEM($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $) / kcal mol$^{-1}$ ns$^{1/2}$"
-        ),
+        (
+            ax2.set_ylabel(
+                r"Integrated $\sqrt{t}$SEM($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $) / kcal mol$^{-1}$ ns$^{1/2}$"
+            ),
+        )
 
     elif plot_type == "pred_best_simtime":
         # Calculate the predicted optimum simulation time
@@ -277,7 +285,7 @@ def plot_gradient_stats(
             width=0.02,
             edgecolor="black",
         )
-        ax.set_ylabel(r"Predicted most efficient runtimes per run /  ns"),
+        (ax.set_ylabel(r"Predicted most efficient runtimes per run /  ns"),)
         ax.legend()
 
     elif plot_type == "integrated_var":
@@ -288,9 +296,11 @@ def plot_gradient_stats(
             width=0.02,
             edgecolor="black",
         )
-        ax.set_ylabel(
-            r"(Var($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $))$^{1/2}$ / kcal mol$^{-1}$"
-        ),
+        (
+            ax.set_ylabel(
+                r"(Var($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $))$^{1/2}$ / kcal mol$^{-1}$"
+            ),
+        )
         ax.legend()
         # Get second y axis so we can plot on different scales
         ax2 = ax.twinx()
@@ -318,9 +328,11 @@ def plot_gradient_stats(
         # Add vertical lines at optimal lambda vals
         for lam_val in optimal_lam_vals:
             ax2.axvline(x=lam_val, color="black", linestyle="dashed", linewidth=0.5)
-        ax2.set_ylabel(
-            r"Integrated (Var($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $))$^{1/2}$ / kcal mol$^{-1}$"
-        ),
+        (
+            ax2.set_ylabel(
+                r"Integrated (Var($\frac{\mathrm{d}h}{\mathrm{d}\lambda} $))$^{1/2}$ / kcal mol$^{-1}$"
+            ),
+        )
         ax2.legend()
         ax2.legend()
 
@@ -374,7 +386,7 @@ def plot_gradient_hists(
                     bins=50,
                     density=True,
                     alpha=0.5,
-                    label=f"Run {run_nos[j] if run_nos else j+1}",
+                    label=f"Run {run_nos[j] if run_nos else j + 1}",
                 )
             ax.legend()
             ax.set_title(f"$\lambda$ = {gradients_data.lam_vals[i]}")
@@ -455,7 +467,7 @@ def plot_gradient_timeseries(
                     gradients_data.times[i],
                     gradients,
                     alpha=0.5,
-                    label=f"Run {run_nos[j] if run_nos else j+1}",
+                    label=f"Run {run_nos[j] if run_nos else j + 1}",
                 )
             ax.legend()
             ax.set_title(f"$\lambda$ = {gradients_data.lam_vals[i]}")
@@ -709,7 +721,7 @@ def plot_overlap_mats(
     for i in range(n_runs):
         plot_overlap_mat(
             ax=axs[i],
-            name=f"Run {i+1}" if not predicted else "Predicted",
+            name=f"Run {i + 1}" if not predicted else "Predicted",
             mbar_file=mbar_outfiles[i] if mbar_outfiles else None,
             predicted=predicted,
             gradient_data=gradient_data,
@@ -891,9 +903,11 @@ def _plot_mbar_gradient_convergence_single_run(
 
     # Labels
     ax.set_xlabel(r"$\lambda$")
-    ax.set_ylabel(
-        r"$\langle \frac{\mathrm{d}h}{\mathrm{d}\lambda}\rangle _{\lambda} $ / kcal mol$^{-1}$"
-    ),
+    (
+        ax.set_ylabel(
+            r"$\langle \frac{\mathrm{d}h}{\mathrm{d}\lambda}\rangle _{\lambda} $ / kcal mol$^{-1}$"
+        ),
+    )
     ax.set_title(run_name)
 
     # Return the colour mapper so we can add it to the plot
@@ -1053,7 +1067,7 @@ def plot_rmsds(
             ax.set_xlabel("Time (ns)")
             ax.set_ylabel(r"RMSD ($\AA$)")
             for j, rmsd in enumerate(rmsds):
-                ax.plot(times, rmsd, label=f"Run {j+1}")
+                ax.plot(times, rmsd, label=f"Run {j + 1}")
             ax.legend()
 
             # If we have equilibration data, plot this
@@ -1069,7 +1083,7 @@ def plot_rmsds(
     group_selection_name = (
         "none" if not group_selection else group_selection.replace(" ", "")
     )
-    name = f"{output_dir}/rmsd_{selection.replace(' ','')}_{group_selection_name}"  # Use selection string to make sure save name is unique
+    name = f"{output_dir}/rmsd_{selection.replace(' ', '')}_{group_selection_name}"  # Use selection string to make sure save name is unique
     fig.savefig(
         name, dpi=300, bbox_inches="tight", facecolor="white", transparent=False
     )

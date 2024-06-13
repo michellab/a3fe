@@ -148,7 +148,7 @@ def get_av_waters_lambda_window(
     avg_close_waters = _np.full(n_runs, _np.nan)
     for i, run_no in enumerate(run_nos):
         print_fn(
-            f"Calculating average number of waters for run {i+1} of {n_runs} for lambda window {lam_val}"
+            f"Calculating average number of waters for run {i + 1} of {n_runs} for lambda window {lam_val}"
         )
         sim = simulations[run_no - 1]
         avg_close_waters[i] = get_av_waters_simulation(

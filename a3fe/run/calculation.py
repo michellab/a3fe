@@ -185,7 +185,6 @@ class Calculation(_SimulationRunner):
         # Set up the legs
         self.legs = []
         for leg_type in reversed(Calculation.required_legs):
-
             self._logger.info(f"Setting up {leg_type.name.lower()} leg...")
             leg = _Leg(
                 leg_type=leg_type,

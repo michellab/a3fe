@@ -271,9 +271,7 @@ def write_truncated_sim_datafile(
         raise ValueError(f"No data found in simfile: {simfile}.")
     start_reading_idx = (
         # + 1 and -1 because no data is written at t = 0
-        round((final_idx - start_data_idx + 1) * fraction_initial)
-        + start_data_idx
-        - 1
+        round((final_idx - start_data_idx + 1) * fraction_initial) + start_data_idx - 1
     )
     end_reading_idx = (
         round((final_idx - start_data_idx + 1) * fraction_final) + start_data_idx - 1

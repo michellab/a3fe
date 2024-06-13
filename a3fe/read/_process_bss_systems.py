@@ -5,7 +5,9 @@ from BioSimSpace.Sandpit.Exscientia._SireWrappers import Molecule as _Molecule
 from sire.legacy import Mol as _SireMol
 
 
-def rename_lig(bss_system: _BSS._SireWrappers._system.System, new_name: str = "LIG") -> None:  # type: ignore
+def rename_lig(
+    bss_system: _BSS._SireWrappers._system.System, new_name: str = "LIG"
+) -> None:  # type: ignore
     """Rename the ligand in a BSS system.
 
     Parameters

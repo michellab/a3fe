@@ -171,7 +171,11 @@ class Simulation(_SimulationRunner):
                         ]
                     )
                 _subprocess.run(
-                    ["mv", old_job.slurm_outfile, f"{self.output_dir}/failure"]
+                    [
+                        "mv",
+                        old_job.slurm_outfile,
+                        f"{self.output_dir}/failure",
+                    ]
                 )
                 # Now resubmit
                 cmd_list = old_job.command_list
@@ -370,7 +374,11 @@ class Simulation(_SimulationRunner):
             # Read last line of simfile with subprocess to make as fast as possible
             step = int(
                 _subprocess.check_output(
-                    ["tail", "-1", f"{self.output_dir}/simfile.dat"]
+                    [
+                        "tail",
+                        "-1",
+                        f"{self.output_dir}/simfile.dat",
+                    ]
                 )
                 .decode("utf-8")
                 .strip()

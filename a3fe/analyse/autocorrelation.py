@@ -1,7 +1,7 @@
 """Functionality to calculate autocorrelation
 
-Aknowledgement: "get_statistical_inefficiency" is copied almost exactly from 
-"statisticalInefficiency_multiscale" here: 
+Aknowledgement: "get_statistical_inefficiency" is copied almost exactly from
+"statisticalInefficiency_multiscale" here:
 https://github.com/choderalab/automatic-equilibration-detection/blob/master/examples/liquid-argon/equilibration.py
 The license and original authorship are preserved below:
 

@@ -29,7 +29,10 @@ from .process_grads import (
 )
 
 
-def check_equil_block_gradient(lam_win: "LamWindow", run_nos: _Optional[_List[int]]) -> _Tuple[bool, _Optional[float]]:  # type: ignore # noqa: F821
+def check_equil_block_gradient(
+    lam_win: "LamWindow",  # type: ignore # noqa: F821
+    run_nos: _Optional[_List[int]],
+) -> _Tuple[bool, _Optional[float]]:
     """
     Check if the ensemble of simulations at the lambda window is
     equilibrated based on the ensemble gradient between averaged blocks.
@@ -149,7 +152,10 @@ def check_equil_block_gradient(lam_win: "LamWindow", run_nos: _Optional[_List[in
     return equilibrated, equil_time
 
 
-def check_equil_chodera(lam_win: "LamWindow", run_nos: _Optional[_List[int]] = None) -> _Tuple[bool, _Optional[float]]:  # type: ignore # noqa: F821
+def check_equil_chodera(
+    lam_win: "LamWindow",  # type: ignore # noqa: F821
+    run_nos: _Optional[_List[int]] = None,
+) -> _Tuple[bool, _Optional[float]]:
     """
     Check if the ensemble of simulations at the lambda window is
     equilibrated based Chodera's method of maximising the number
@@ -337,7 +343,9 @@ def check_equil_multiwindow(
     # Write out data
     with open(f"{output_dir}/check_equil_multiwindow.txt", "w") as ofile:
         ofile.write(f"Equilibrated: {equilibrated}\n")
-        ofile.write(f"Overall gradient {overall_grad_dg} +/- {conf_int[1] - overall_grad_dg} kcal mol^-1 ns^-1\n")  # type: ignore
+        ofile.write(
+            f"Overall gradient {overall_grad_dg} +/- {conf_int[1] - overall_grad_dg} kcal mol^-1 ns^-1\n"
+        )  # type: ignore
         ofile.write(f"Fractional equilibration time: {fractional_equil_time} \n")
         ofile.write(f"Equilibration time: {equil_time} ns\n")
         ofile.write(f"Run numbers: {run_nos}\n")
@@ -549,13 +557,14 @@ def check_equil_multiwindow_modified_geweke(
             last_slice_means,
             equal_var=False,  # Welches t-test
             alternative="two-sided",
-        )[
-            1
-        ]  # First value is the t statistic - we want p
+        )[1]  # First value is the t statistic - we want p
 
         # Store results - note that time is the per-run time
         p_vals_and_times.append(
-            (p_value, overall_times[0][0])
+            (
+                p_value,
+                overall_times[0][0],
+            )
         )  # second value is the equilibration time
 
         # Check if the p-value is greater than the cutoff
@@ -704,13 +713,14 @@ def check_equil_multiwindow_paired_t(
             first_slice_means,
             last_slice_means,
             alternative="two-sided",
-        )[
-            1
-        ]  # First value is the t statistic - we want p
+        )[1]  # First value is the t statistic - we want p
 
         # Store results - note that time is the per-run time
         p_vals_and_times.append(
-            (p_value, overall_times[0][0])
+            (
+                p_value,
+                overall_times[0][0],
+            )
         )  # second value is the equilibration time
 
         # Check if the p-value is greater than the cutoff
@@ -765,7 +775,8 @@ def check_equil_multiwindow_paired_t(
 
 
 def dummy_check_equil_multiwindow(
-    lam_win: "LamWindow", run_nos: _Optional[_List[int]] = None  # type: ignore # noqa: F821
+    lam_win: "LamWindow",  # type: ignore # noqa: F821
+    run_nos: _Optional[_List[int]] = None,
 ) -> _Tuple[bool, _Optional[float]]:
     """
     Becuse "check_equil_multiwindow" checks multiple windows at once and sets the _equilibrated
