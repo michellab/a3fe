@@ -745,8 +745,8 @@ class SimulationRunner(ABC):
             sub_sim_runner._refresh_logging()
 
     def recursively_get_attr(self, attr: str) -> _Dict[SimulationRunner, _Any]:
-        f"""
-        Get the values of the attribute for the {self.__class__.__name__} and any sub-simulation runners.
+        """
+        Get the values of the attribute for the simulation runner and any sub-simulation runners.
         If the attribute is not present for a sub-simulation runner, None is returned.
 
         Parameters
@@ -757,7 +757,7 @@ class SimulationRunner(ABC):
         Returns
         -------
         attr_values : Dict[SimulationRunner, Any]
-            A dictionary of the attribute values for the {self.__class__.__name__} and any sub-simulation runners.
+            A dictionary of the attribute values for the simulation runner and any sub-simulation runners.
         """
         attrs_dict = {}
         attrs_dict[attr] = getattr(self, attr, None)
@@ -773,8 +773,8 @@ class SimulationRunner(ABC):
     def recursively_set_attr(
         self, attr: str, value: _Any, force: bool = False, silent: bool = False
     ) -> None:
-        f"""
-        Set the attribute to the value for the {self.__class__.__name__} and any sub-simulation runners.
+        """
+        Set the attribute to the value for the simulation runner and any sub-simulation runners.
 
         Parameters
         ----------

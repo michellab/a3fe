@@ -11,6 +11,8 @@ Welcome to a3fe's documentation!
    :caption: Contents:
 
    getting_started
+   a3fe_design
+   guides
    api
 
 
