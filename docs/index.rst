@@ -13,6 +13,7 @@ Welcome to a3fe's documentation!
    getting_started
    a3fe_design
    guides
+   CHANGELOG
    api
 
 
