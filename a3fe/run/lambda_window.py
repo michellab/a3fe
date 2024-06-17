@@ -260,26 +260,6 @@ class LamWindow(_SimulationRunner):
         run_nos = self._get_valid_run_nos(run_nos)
         return sum([self.sims[run_no - 1].get_tot_gpu_time() for run_no in run_nos])
 
-    def is_equilibrated(self, run_nos: _Optional[_List[int]] = None) -> bool:
-        """
-        Check if the ensemble of simulations at the lambda window is
-        equilibrated, based on the run numbers specified and the
-        equilibration detection method. Store the equilibration status
-        and time in private variables if so.
-
-        Parameters
-        ----------
-        run_nos : List[int], Optional, default: None
-            The run numbers to equilibration detection. If None, all runs will be used.
-
-        Returns
-        -------
-        equilibrated : bool
-            True if the simulation is equilibrated, False otherwise.
-        """
-        self._equilibrated, self._equil_time = self.check_equil(self, run_nos=run_nos)
-        return self._equilibrated
-
     @property
     def equilibrated(self) -> bool:
         """Whether equilibration has been achieved."""
