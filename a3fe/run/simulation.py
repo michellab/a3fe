@@ -620,7 +620,7 @@ class Simulation(_SimulationRunner):
 
     def set_simfile_option(self, option: str, value: str) -> None:
         """Set the value of an option in the simulation configuration file."""
-        _write_simfile_option(self.simfile_path, option, value)
+        _write_simfile_option(self.simfile_path, option, value, logger=self._logger)
 
     def analyse(self) -> None:
         raise NotImplementedError(

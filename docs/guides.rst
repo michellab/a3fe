@@ -122,8 +122,8 @@ Once you have the required files in `input` as described above, you can run a st
 We suggest running this through ipython (so that you can interact with the calculation while it is running) in a tmux session (so that the process
 is not killed when you log out).
 
-Customising Calculation Setup
-******************************
+Customising Calculations
+*************************
 
 Calculation setup options, including the force fields, lambda schedules, and length of the equilibration steps, can be customised using :class:`a3fe.run.system_prep.SystemPreparationConfig`.
 For example, to use GAFF2 instead of OFF2 for the small molecule, set this in the config object and pass this to ``calc.setup()``:
@@ -134,9 +134,11 @@ For example, to use GAFF2 instead of OFF2 for the small molecule, set this in th
     cfg.forcefields["ligand"] = "gaff2"
     calc_set.setup(bound_leg_sysprep_config = cfg, free_leg_sysprep_config = cfg)
 
-To customise specifics of how each lambda window is run (e.g. timestep), you can modify the ``template_config.cfg`` file in the input directory.
-To see a list of available options, run ``somd-freenrg --help-config``. If you have already set up your calculation, you will need to run ``calc.update_run_somd()``
-to update all simulation inputs with the new config file.
+To customise the specifics of how each lambda window is run (e.g. timestep), you can use the ``set_simfile_option`` method. For example, to set the timestep to 2 fs, run
+``calc.set_simfile_option("timestep", "2 * femtosecond")``. This will change parameters from the defaults given in ``template_config.cfg`` in the ``input`` directory, and warn
+you if you are trying to set a parameter that is not present in the template config file. To see a list of available options, run ``somd-freenrg --help-config``. Note that if you
+want to change any slurm options in ``run_somd.sh``, you should modify ``run_somd.sh`` in the the calculation ``input`` directory then run ``calc.update_run_somd()`` to update all
+``run_somd.sh`` files in the calculation.
 
 Running Fast Non-Adaptive Calculations
 ***************************************

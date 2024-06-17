@@ -1143,7 +1143,7 @@ class Stage(_SimulationRunner):
     def set_simfile_option(self, option: str, value: str) -> None:
         """Set the value of an option in the simulation configuration file."""
         simfile = _os.path.join(self.input_dir, "somd.cfg")
-        _write_simfile_option(simfile, option, value)
+        _write_simfile_option(simfile, option, value, logger=self._logger)
         super().set_simfile_option(option, value)
 
     def wait(self) -> None:

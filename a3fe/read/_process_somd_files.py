@@ -1,5 +1,7 @@
 """Functionality to manipulate SOMD files."""
 
+from logging import Logger as _Logger
+from typing import Optional as _Optional
 from typing import Tuple as _Tuple
 from warnings import warn as _warn
 
@@ -31,7 +33,9 @@ def read_simfile_option(simfile: str, option: str) -> str:
     raise ValueError(f"Option {option} not found in simfile {simfile}")
 
 
-def write_simfile_option(simfile: str, option: str, value: str) -> None:
+def write_simfile_option(
+    simfile: str, option: str, value: str, logger: _Optional[_Logger] = None
+) -> None:
     """Write an option to a SOMD simfile.
 
     Parameters
@@ -42,6 +46,9 @@ def write_simfile_option(simfile: str, option: str, value: str) -> None:
         The option to write.
     value : str
         The value to write.
+    logger : Optional[Logger]
+        The logger to use for logging.
+
     Returns
     -------
     None
@@ -57,6 +64,10 @@ def write_simfile_option(simfile: str, option: str, value: str) -> None:
 
     # If the option is not present, append it to the end of the file
     if option_line_idx is None:
+        if logger is not None:
+            logger.warning(
+                f"Option {option} not found in simfile {simfile}. Appending new option to the end of the file."
+            )
         lines.append(f"{option} = {value}\n")
     # Otherwise, replace the line with the new value
     else:
