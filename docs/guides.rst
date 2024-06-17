@@ -113,8 +113,7 @@ Once you have the required files in `input` as described above, you can run a st
     calc.setup()
     calc.run(adaptive=False, runtime=5) # Run for 5 ns per window per replicate
     calc.wait() # Wait for the simulations to finish
-    calc.recursively_set_attr("_equilibrated", True) # Manually set equilibration to True
-    calc.recursively_set_attr("_equil_time", 1) # Manually set equilibration time to 1 ns
+    calc.set_equilibration_time(1) # Discard the first ns of simulation time
     calc.analyse() # Fast analyses
     calc.analyse_convergence() # Slower convergence analysis
     calc.save()
@@ -152,15 +151,14 @@ three replicates. Note that this is expected to produce an erroneously favourabl
   # Shorten several of the initial equilibration stages.
   # This should still be stable.
   cfg = a3.SystemPreparationConfig()
-  cfg.runtime_npt_unrestrained = 50
-  cfg.runtime_npt = 50
-  cfg.ensemble_equilibration_time = 100
+  cfg.runtime_npt_unrestrained = 50 # ps
+  cfg.runtime_npt = 50 # ps
+  cfg.ensemble_equilibration_time = 100 # ps
   calc = a3.Calculation(ensemble_size = 3)
   calc_set.setup(bound_leg_sysprep_config = cfg, free_leg_sysprep_config = cfg)
-  calc_set.run(adaptive = False, runtime=0.1)
+  calc_set.run(adaptive = False, runtime=0.1) # ns
   calc.wait() # Wait for the simulations to finish
-  calc.recursively_set_attr("_equilibrated", True) # Manually set equilibration to True
-  calc.recursively_set_attr("_equil_time", 1) # Manually set equilibration time to 1 ns
+  calc.set_equilibration_time(1) # Discard the first ns of simulation time
   calc.analyse() # Fast analyses
   calc.save()
 
@@ -219,11 +217,8 @@ Analysis can be performed with:
 
 .. note::
 
-    Your simulations must be equilibrated before analysis can be performed. Practically, this means that the
-    ``_equilibrated`` attribute must be set to True and the ``_equil_time`` attribute must be set to the equilibration time
-    in ns for all lambda windows. This can be done manually with e.g. ``calc.recursively_set_attr("_equilibrated", True)`` and
-    ``calc.recursively_set_attr("_equil_time", 1)``, but will be done automatically by all equilibration detection methods (run
-    automatically during adaptive calculations).
+    Your simulations must be equilibrated before analysis can be performed. Practically, this means that all lambda windows must be set as equilibrated.
+    This will be done automatically by the adaptive equilibration detection algorithms, but can also be done manually with e.g. ``calc.set_equilibration_time(1)``.
 
 ``calc.analyse()`` generates a variety of outputs in the ``output`` directories of the calculation, leg, and stage directories. The most detailed
 information is given in the stage output directories. You can get a detailed breakdown of the results as a pandas dataframe by running ``calc.get_results_df()``.
@@ -262,8 +257,7 @@ You can run sets of calculations using the :class:`a3fe.run.CalcSet` class. To d
     calc_set.setup()
     calc_set.run(adaptive=False, runtime=5)
     calc_set.wait()
-    calc_set.recursively_set_attr("_equilibrated", True)
-    calc_set.recursively_set_attr("_equil_time", 1)
+    calc_set.set_equilibration_time(1)
     calc_set.analyse(exp_dgs_path = "input/exp_dgs.csv", offset = False)
     calc_set.save()
 

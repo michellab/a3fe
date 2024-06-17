@@ -641,6 +641,12 @@ class Simulation(_SimulationRunner):
             "for an ensemble of simulations within a lambda window."
         )
 
+    def set_equilibration_time(self, equil_time: float) -> None:
+        raise NotImplementedError(
+            "Equilibration time is not set for a single simulation, only "
+            "for an ensemble of simulations within a lambda window."
+        )
+
     def analyse_convergence(self) -> None:
         raise (
             NotImplementedError(

@@ -783,7 +783,17 @@ class SimulationRunner(ABC):
                 attr=attr, value=value, force=force, silent=silent
             )
 
-    def set_
+    def set_equilibration_time(self, equil_time: float) -> None:
+        """
+        Set the equilibration time for the simulation runner and any sub-simulation runners.
+
+        Parameters
+        ----------
+        equil_time : float
+            The equilibration time to set, in ns per run per lambda window.
+        """
+        for sub_sim_runner in self._sub_sim_runners:
+            sub_sim_runner.set_equilibration_time(equil_time)
 
     def update_paths(self, old_sub_path: str, new_sub_path: str) -> None:
         """

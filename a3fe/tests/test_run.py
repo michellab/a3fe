@@ -139,6 +139,18 @@ def test_reset(restrain_stage):
     assert equil_times_none
 
 
+def test_set_equilibration_time(restrain_stage):
+    """Test that the set_equilibration_time method works"""
+    # First, set to unequilibrated
+    restrain_stage.reset()
+    restrain_stage.set_equilibration_time(0.1)
+    assert all([lam._equil_time == 0.1 for lam in restrain_stage.lam_windows])
+    assert all([lam._equilibrated for lam in restrain_stage.lam_windows])
+    assert restrain_stage.equil_time == pytest.approx(
+        0.1 * len(restrain_stage.lam_windows), abs=1e-6
+    )
+
+
 def test_update(restrain_stage):
     """Check that the stage update method works"""
     # Change the positions of the lambda windows and ensemble size

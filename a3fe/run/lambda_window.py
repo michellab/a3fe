@@ -275,6 +275,19 @@ class LamWindow(_SimulationRunner):
         """The failed simulations"""
         return [sim for sim in self.sims if sim.failed]
 
+    def set_equilibration_time(self, equil_time: float) -> None:
+        """
+        Set the equilibration time for the simulation runner and any sub-simulation runners.
+
+        Parameters
+        ----------
+        equil_time : float
+            The equilibration time to set, in ns per run per lambda window.
+        """
+        self._logger.info(f"Setting equilibration time to {equil_time:.3f} ns per run")
+        self._equilibrated = True
+        self._equil_time = equil_time
+
     def _write_equilibrated_simfiles(self) -> None:
         """
         Remove unequilibrated data from simulation files for all simulations

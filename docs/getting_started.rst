@@ -19,11 +19,12 @@ Quick Start
 .. code-block:: python
 
     import a3fe as a3 
-    calc = a3.Calculation()
+    calc = a3.Calculation(ensemble_size=5)
     calc.setup()
     calc.get_optimal_lam_vals()
-    calc.run(adaptive=True)
+    calc.run(adaptive=False, runtime = 5) # Run non-adaptively for 5 ns per replicate
     calc.wait()
+    calc.set_equilibration_time(1) # Discard the first ns of simulation time
     calc.analyse()
     calc.save()
 
