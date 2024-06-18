@@ -2,7 +2,7 @@ Getting Started
 ===============
 a3fe is a package for running alchemical absolute binding free energy calculations with SOMD (Sire / OpenMM Molecular Dynamics) through SLURM. 
 It is based on Sire(https://sire.openbiosim.org/) and also uses BioSimSpace(https://biosimspace.openbiosim.org/) during the set-up stages. For a
-discussion of the algorithms used, please see ADD_PREPRINT_LINK.
+discussion of the algorithms used, please see [the preprint](https://doi.org/10.26434/chemrxiv-2024-3ft7f).
 
 Installation
 ************

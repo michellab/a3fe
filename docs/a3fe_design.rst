@@ -46,7 +46,7 @@ a3fe implements agorithms for:
 - Adaptive allocation of simulation time to minimise the inter-run uncertainty (e.g. ``calc.run(adaptive=True)``)
 - Adaptive equilibration detection (see :func:`a3fe.analyse.detect_equil.check_equil_multiwindow_paired_t`, used when ``calc.run(adaptive=True)`` is specified)
 
-For more details of the algorithms, please see ADD_PREPRINT_LINK.
+For more details of the algorithms, please see [the preprint](https://doi.org/10.26434/chemrxiv-2024-3ft7f).
 
 Some Notes on the Implementation
 *********************************

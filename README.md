@@ -11,6 +11,10 @@ a3fe
 
 **A**utomated **A**daptive **A**bsolute alchemical **F**ree **E**nergy calculator. A package for running adaptive alchemical absolute binding free energy calculations with SOMD (distributed within [sire](https://sire.openbiosim.org/)) using adaptive protocols based on an ensemble of simulations. This requires the SLURM scheduling system. Please see the [**documentation**](https://a3fe.readthedocs.io/en/latest/?badge=latest).
 
+For details of the algorithms and testing, please see the assocated prerint: 
+
+**Clark, F.; Robb, G.; Cole, D.; Michel, J. Automated Adaptive Absolute Binding Free Energy Calculations. ChemRxiv June 18, 2024. https://doi.org/10.26434/chemrxiv-2024-3ft7f.**
+
 ### Installation
 
 a3fe depends on SLURM for scheduling jobs, and on GROMACS for running initial equilibration simulations. Please ensure that your have sourced your GMXRC or loaded your GROMACS module before proceeding with the installation. While we recommend installing with [mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html), you can substitute `mamba` with `conda` in the following commands.
