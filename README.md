@@ -23,7 +23,7 @@ Now, download and install a3fe:
 ```bash
 git clone https://github.com/michellab/a3fe.git
 cd a3fe
-mamba env create -f environment.yml
+mamba env create -f environment.yaml
 python -m pip install --no-deps .
 ```
 
