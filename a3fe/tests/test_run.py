@@ -41,13 +41,13 @@ def test_calculation_loading(calc):
 
 def test_calculation_logging(calc):
     """Check that the calculation logging is set up correctly"""
-    assert type(calc._logger.handlers[0]) == logging.FileHandler  # type: ignore
+    assert type(calc._logger.handlers[0]) is logging.FileHandler
     assert calc._logger.handlers[0].baseFilename == os.path.join(
         calc.base_dir, "Calculation.log"
-    )  # type: ignore
-    assert calc._logger.handlers[0].level == logging.DEBUG  # type: ignore
-    assert type(calc._logger.handlers[1]) == logging.StreamHandler  # type: ignore
-    assert calc._logger.handlers[1].level == logging.INFO  # type: ignore
+    ) 
+    assert calc._logger.handlers[0].level == logging.DEBUG
+    assert type(calc._logger.handlers[1]) is logging.StreamHandler
+    assert calc._logger.handlers[1].level == logging.INFO
 
     # Try writing to the log and check that it's written to the file
     calc._logger.info("Test message")
