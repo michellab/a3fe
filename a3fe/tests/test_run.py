@@ -44,7 +44,7 @@ def test_calculation_logging(calc):
     assert type(calc._logger.handlers[0]) is logging.FileHandler
     assert calc._logger.handlers[0].baseFilename == os.path.join(
         calc.base_dir, "Calculation.log"
-    ) 
+    )
     assert calc._logger.handlers[0].level == logging.DEBUG
     assert type(calc._logger.handlers[1]) is logging.StreamHandler
     assert calc._logger.handlers[1].level == logging.INFO
