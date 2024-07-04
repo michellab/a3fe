@@ -103,6 +103,7 @@ class Simulation(_SimulationRunner):
             output_dir=output_dir,
             stream_log_level=stream_log_level,
             update_paths=update_paths,
+            dump=False,
         )
 
         if not self.loaded_from_pickle:
