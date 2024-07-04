@@ -146,6 +146,7 @@ class Stage(_SimulationRunner):
             stream_log_level=stream_log_level,
             ensemble_size=ensemble_size,
             update_paths=update_paths,
+            dump=False,
         )
 
         if not self.loaded_from_pickle:

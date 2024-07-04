@@ -55,6 +55,7 @@ class SimulationRunner(ABC):
         dg_multiplier: int = 1,
         ensemble_size: int = 5,
         update_paths: bool = True,
+        dump: bool = True,
     ) -> None:
         """
         base_dir : str, Optional, default: None
@@ -80,6 +81,8 @@ class SimulationRunner(ABC):
         update_paths: bool, Optional, default: True
             If True, if the simulation runner is loaded by unpickling, then
             update_paths() is called.
+        dump: bool, Optional, default: True
+            If True, the state of the simulation runner is saved to a pickle file.
         """
         # Set up the directories (which may be overwritten if the
         # simulation runner is subsequently loaded from a pickle file)
@@ -140,7 +143,8 @@ class SimulationRunner(ABC):
             self._set_up_logging()
 
             # Save state
-            self._dump()
+            if dump:
+                self._dump()
 
     def _set_up_logging(self, null: bool = False) -> None:
         """
