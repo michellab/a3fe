@@ -40,7 +40,7 @@ dependencies = [
 "Documentation" = "https://a3fe.readthedocs.io/"
 
 [metadata]
-version = "0.1.0"
+version = "0.1.1"
 
 [project.optional-dependencies]
 test = [
@@ -97,7 +97,7 @@ distance-dirty = "{base_version}+{distance}.{vcs}{rev}.dirty"
 method = "git"  # <- The method name
 # Parameters to pass to the method:
 match = ["*"]
-default-tag = "0.1.0"
+default-tag = "0.1.1"
 
 [tool.versioningit.write]
 file = "a3fe/_version.py"
