@@ -171,7 +171,7 @@ class CalcSet(_SimulationRunner):
         runtime_constant: _Optional[float] = None,
         run_stages_parallel: bool = False,
     ) -> None:
-        """
+        r"""
         Run all calculations. Analysis is not performed by default. If running adaptively,
         cycles of short runs then optimal runtime estimation are performed, where the optimal
         runtime is estimated according to

@@ -389,7 +389,7 @@ def plot_gradient_hists(
                     label=f"Run {run_nos[j] if run_nos else j + 1}",
                 )
             ax.legend()
-            ax.set_title(f"$\lambda$ = {gradients_data.lam_vals[i]}")
+            ax.set_title(rf"$\lambda$ = {gradients_data.lam_vals[i]}")
             ax.set_xlabel(r"$\frac{\mathrm{d}h}{\mathrm{d}\lambda}$ / kcal mol$^{-1}$")
             ax.set_ylabel("Probability density")
             ax.text(
@@ -470,7 +470,7 @@ def plot_gradient_timeseries(
                     label=f"Run {run_nos[j] if run_nos else j + 1}",
                 )
             ax.legend()
-            ax.set_title(f"$\lambda$ = {gradients_data.lam_vals[i]}")
+            ax.set_title(rf"$\lambda$ = {gradients_data.lam_vals[i]}")
             ax.set_xlabel("Time / ns")
             ax.set_ylabel(r"$\frac{\mathrm{d}h}{\mathrm{d}\lambda}$ / kcal mol$^{-1}$")
             ax.text(
@@ -1063,7 +1063,7 @@ def plot_rmsds(
                 group_selection=group_selection,
             )  # Total simtime should be the same for all sims
             ax.legend()
-            ax.set_title(f"$\lambda$ = {lam_window.lam}")
+            ax.set_title(rf"$\lambda$ = {lam_window.lam}")
             ax.set_xlabel("Time (ns)")
             ax.set_ylabel(r"RMSD ($\AA$)")
             for j, rmsd in enumerate(rmsds):
