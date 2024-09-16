@@ -1,6 +1,7 @@
 """Functionality for processing slurm files."""
 
 import os as _os
+import re as _re
 
 
 def get_slurm_file_base(slurm_file: str) -> str:
@@ -22,7 +23,7 @@ def get_slurm_file_base(slurm_file: str) -> str:
     # Find the slurm output file
     with open(slurm_file, "r") as f:
         for line in f:
-            split_line = line.split()
+            split_line = _re.split(" |=", line)
             if len(split_line) > 0 and split_line[0] == "#SBATCH":
                 if split_line[1] == "--output" or split_line[1] == "-o":
                     slurm_pattern = split_line[2]
