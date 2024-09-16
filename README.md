@@ -24,6 +24,7 @@ Now, download and install a3fe:
 git clone https://github.com/michellab/a3fe.git
 cd a3fe
 mamba env create -f environment.yaml
+mamba activate a3fe
 python -m pip install --no-deps .
 ```
 
