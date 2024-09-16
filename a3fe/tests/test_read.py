@@ -115,6 +115,7 @@ def test_write_truncated_sim_datafile_end_and_start():
         assert lines[13].split()[0] == "5000"
         assert lines[-2].split()[0] == "9000"
 
+
 def test_process_slurm_file_base():
     """
     Test that the SLURM file base name is correctly extracted from a SLURM file.
@@ -123,5 +124,7 @@ def test_process_slurm_file_base():
     assert slurm_file_base == "a3fe/data/example_run_dir/input/somd-array-gpu-"
 
     # Test alternative formatting
-    slurm_file_base = get_slurm_file_base("a3fe/data/alternative_input/alternative_run_somd.sh")
+    slurm_file_base = get_slurm_file_base(
+        "a3fe/data/alternative_input/alternative_run_somd.sh"
+    )
     assert slurm_file_base == "a3fe/data/alternative_input/somd-array-gpu-"
