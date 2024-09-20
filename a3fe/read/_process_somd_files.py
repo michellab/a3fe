@@ -68,7 +68,14 @@ def write_simfile_option(
             logger.warning(
                 f"Option {option} not found in simfile {simfile}. Appending new option to the end of the file."
             )
+
+        # First, ensure that the previous line terminates with a newline
+        # (Otherwise we'll end up adding the new option to the end of the previous line)
+        if lines[-1][-1] != "\n":
+            lines[-1] += "\n"
+
         lines.append(f"{option} = {value}\n")
+
     # Otherwise, replace the line with the new value
     else:
         lines[option_line_idx] = f"{option} = {value}\n"
