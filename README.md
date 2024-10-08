@@ -11,9 +11,9 @@ a3fe
 
 **A**utomated **A**daptive **A**bsolute alchemical **F**ree **E**nergy calculator. A package for running adaptive alchemical absolute binding free energy calculations with SOMD (distributed within [sire](https://sire.openbiosim.org/)) using adaptive protocols based on an ensemble of simulations. This requires the SLURM scheduling system. Please see the [**documentation**](https://a3fe.readthedocs.io/en/latest/?badge=latest).
 
-For details of the algorithms and testing, please see the assocated prerint: 
+For details of the algorithms and testing, please see the assocated paper:
 
-**Clark, F.; Robb, G.; Cole, D.; Michel, J. Automated Adaptive Absolute Binding Free Energy Calculations. ChemRxiv June 18, 2024. https://doi.org/10.26434/chemrxiv-2024-3ft7f.**
+**Clark, F.; Robb, G. R.; Cole, D. J.; Michel, J. Automated Adaptive Absolute Binding Free Energy Calculations. J. Chem. Theory Comput. 2024, 20 (18), 7806–7828. https://doi.org/10.1021/acs.jctc.4c00806.**
 
 ### Installation
 
