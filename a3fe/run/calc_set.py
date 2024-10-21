@@ -270,7 +270,7 @@ class CalcSet(_SimulationRunner):
                 )
 
             # Carry out MBAR analysis if it has not been done already
-            if calc._delta_g is None:
+            if any(calc._delta_g is None):
                 calc.analyse()
 
             # Get the confidence interval
