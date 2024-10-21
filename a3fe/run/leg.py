@@ -28,6 +28,7 @@ from ..read._process_somd_files import write_simfile_option as _write_simfile_op
 from . import system_prep as _system_prep
 from ._restraint import A3feRestraint as _A3feRestraint
 from ._simulation_runner import SimulationRunner as _SimulationRunner
+from ._utils import get_single_mol as _get_single_mol
 from ._virtual_queue import Job as _Job
 from ._virtual_queue import VirtualQueue as _VirtualQueue
 from .enums import LegType as _LegType
@@ -715,6 +716,27 @@ class Leg(_SimulationRunner):
         config: SystemPreparationConfig
             Configuration object for the setup of the leg.
         """
+        # Get the charge of the ligand
+        lig = _get_single_mol(pre_equilibrated_system, "LIG")
+        lig_charge = round(lig.charge().value())
+
+        # If we have a charged ligand, make sure that SOMD is using PME
+        if lig_charge != 0:
+            try:
+                cuttoff_type = _read_simfile_option(f"{self.input_dir}/template_config.cfg", "cutoff type")
+            except ValueError: # Will get this if the option is not present (but the default is not PME)
+                cuttoff_type = None
+            if cuttoff_type != "PME":
+                raise ValueError(
+                    f"The ligand has a non-zero charge ({lig_charge}), so SOMD must use PME for the electrostatics. "
+                    "Please set the 'cutoff type' option in the somd.cfg file to 'PME'."
+                )
+
+            self._logger.info(f"Ligand has charge {lig_charge}. Using co-alchemical ion approach to maintain neutrality.")
+
+        # Figure out where the ligand is in the system
+        perturbed_resnum = pre_equilibrated_system.getIndex(lig) + 1
+
         # Dummy values get overwritten later
         dummy_runtime = 0.001  # ns
         dummy_lam_vals = [0.0]
@@ -775,14 +797,6 @@ class Leg(_SimulationRunner):
             # by BSS, as well as the restraints options
             _shutil.copy(f"{self.input_dir}/template_config.cfg", stage_input_dir)
 
-            # Read simfile options
-            perturbed_resnum = _read_simfile_option(
-                f"{stage_input_dir}/somd.cfg", "perturbed residue number"
-            )
-            # Temporary fix for BSS bug - perturbed residue number is wrong, but since we always add the
-            # ligand first to the system, this should always be 1 anyway
-            # TODO: Fix this - raise BSS issue
-            perturbed_resnum = "1"
             try:
                 use_boresch_restraints = _read_simfile_option(
                     f"{stage_input_dir}/somd.cfg", "use boresch restraints"
@@ -798,21 +812,17 @@ class Leg(_SimulationRunner):
                 turn_on_receptor_ligand_restraints_mode = False
 
             # Now write simfile options
-            _write_simfile_option(
-                f"{stage_input_dir}/template_config.cfg",
-                "perturbed residue number",
-                perturbed_resnum,
-            )
-            _write_simfile_option(
-                f"{stage_input_dir}/template_config.cfg",
-                "use boresch restraints",
-                str(use_boresch_restraints),
-            )
-            _write_simfile_option(
-                f"{stage_input_dir}/template_config.cfg",
-                "turn on receptor-ligand restraints mode",
-                str(turn_on_receptor_ligand_restraints_mode),
-            )
+            options_to_write = {"perturbed_residue number": str(perturbed_resnum),
+                                "use boresch restraints": use_boresch_restraints,
+                                "turn on receptor-ligand restraints mode": turn_on_receptor_ligand_restraints_mode,
+                                # This automatically uses the co-alchemical ion approach when there is a charge difference
+                                "charge difference": str(-lig_charge),
+                                }
+
+            for option, value in options_to_write.items():
+                _write_simfile_option(
+                    f"{stage_input_dir}/template_config.cfg", option, value
+                )
 
             # Now overwrite the SOMD generated config file with the updated template
             _subprocess.run(

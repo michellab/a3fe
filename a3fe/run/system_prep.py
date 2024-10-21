@@ -36,10 +36,6 @@ class SystemPreparationConfig(_BaseModel):
         Whether to use SLURM for the preparation.
     forcefields : dict
         Forcefields to use for the ligand, protein, and water.
-    lig_net_charge : int
-        Net charge of the ligand. It is not recommended to use A3FE for charged ligands
-        as it uses reaction field electrostatics and does not keep the box netural or apply
-        corrections. Run at your own risk!
     water_model : str
         Water model to use.
     ion_conc : float
@@ -77,7 +73,6 @@ class SystemPreparationConfig(_BaseModel):
         "protein": "ff14SB",
         "water": "tip3p",
     }
-    lig_net_charge: int = _Field(0, ge=-5, le=5)
     water_model: str = "tip3p"
     ion_conc: float = _Field(0.15, ge=0, lt=1)  # M
     steps: int = _Field(1000, gt=0, lt=100_000)  # This is the default for _BSS
@@ -181,18 +176,6 @@ class SystemPreparationConfig(_BaseModel):
             ],
         },
     }
-
-    @_field_validator("lig_net_charge")
-    def validate_lig_net_charge(lig_net_charge: int) -> int:
-        """Validator for the ligand net charge."""
-        if lig_net_charge != 0:
-            # Raise a user warning if the ligand is charged
-            _warnings.warn(
-                "Warning: A3FE uses reaction field electrostatics and does not keep the box neutral or apply corrections. "
-                "This can lead to artefacts in the results. Run charged ligands at your own risk!"
-            )
-
-        return lig_net_charge
 
     class Config:
         """
@@ -316,10 +299,18 @@ def parameterise_input(
     lig_sys = _BSS.IO.readMolecules(f"{input_dir}/ligand.sdf")
     # Ensure that the ligand is named "LIG"
     _rename_lig(lig_sys, "LIG")
+    # Check charge of the ligand
+    lig = lig_sys[0]
+    lig_charge = round(lig.charge().value())
+    if lig_charge != 0:
+        _warnings.warn(
+            f"Ligand has a charge of {lig_charge}. Co-alchemical ion approach will be used."
+             " Ensure that your box is large enough to avoid artefacts."
+        )
     param_lig = _BSS.Parameters.parameterise(
-        molecule=lig_sys[0],
+        molecule=lig,
         forcefield=cfg.forcefields["ligand"],
-        net_charge=cfg.lig_net_charge,
+        net_charge=lig_charge,
     ).getMolecule()
 
     # If bound, then parameterise the protein and waters and add to the system

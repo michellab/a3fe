@@ -2,6 +2,10 @@
 Change Log
 ===============
 
+0.2.0
+====================
+- Added ability to run charged compounds using the co-alchemical ion approach. Ligand net charge is detected from the input files and the config is checked to ensure that PME is used for electrostatics.
+
 0.1.3
 ====================
 
