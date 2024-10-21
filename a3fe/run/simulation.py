@@ -230,7 +230,7 @@ class Simulation(_SimulationRunner):
         elif len(rst7_files) > 1:
             # Rename the rst7 file for this run to somd.rst7 and delete any other
             # rst7 files
-            self._logger.info("Multiple rst7 files found - renaming")
+            self._logger.debug("Multiple rst7 files found - renaming")
             _subprocess.run(
                 [
                     "mv",
@@ -263,7 +263,7 @@ class Simulation(_SimulationRunner):
             for file in unwanted_rest_files:
                 _subprocess.run(["rm", file])
         else:
-            self._logger.info("No restraint file found")
+            self._logger.debug("No restraint file found")
 
     def _update_simfile(self) -> None:
         """Set the lambda value in the simulation file, as well as some
@@ -314,7 +314,7 @@ class Simulation(_SimulationRunner):
 
         slurm_file = _os.path.join(self.input_dir, "run_somd.sh")
         self.slurm_file_base = _get_slurm_file_base(slurm_file)
-        self._logger.info(f"Found slurm output file basename: {self.slurm_file_base}")
+        self._logger.debug(f"Found slurm output file basename: {self.slurm_file_base}")
 
     def run(self, runtime: float = 2.5) -> None:
         """
