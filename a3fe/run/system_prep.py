@@ -305,7 +305,7 @@ def parameterise_input(
     if lig_charge != 0:
         _warnings.warn(
             f"Ligand has a charge of {lig_charge}. Co-alchemical ion approach will be used."
-             " Ensure that your box is large enough to avoid artefacts."
+            " Ensure that your box is large enough to avoid artefacts."
         )
     param_lig = _BSS.Parameters.parameterise(
         molecule=lig,

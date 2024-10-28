@@ -723,8 +723,10 @@ class Leg(_SimulationRunner):
         # If we have a charged ligand, make sure that SOMD is using PME
         if lig_charge != 0:
             try:
-                cuttoff_type = _read_simfile_option(f"{self.input_dir}/template_config.cfg", "cutoff type")
-            except ValueError: # Will get this if the option is not present (but the default is not PME)
+                cuttoff_type = _read_simfile_option(
+                    f"{self.input_dir}/template_config.cfg", "cutoff type"
+                )
+            except ValueError:  # Will get this if the option is not present (but the default is not PME)
                 cuttoff_type = None
             if cuttoff_type != "PME":
                 raise ValueError(
@@ -732,7 +734,9 @@ class Leg(_SimulationRunner):
                     "Please set the 'cutoff type' option in the somd.cfg file to 'PME'."
                 )
 
-            self._logger.info(f"Ligand has charge {lig_charge}. Using co-alchemical ion approach to maintain neutrality.")
+            self._logger.info(
+                f"Ligand has charge {lig_charge}. Using co-alchemical ion approach to maintain neutrality."
+            )
 
         # Figure out where the ligand is in the system
         perturbed_resnum = pre_equilibrated_system.getIndex(lig) + 1
@@ -812,12 +816,13 @@ class Leg(_SimulationRunner):
                 turn_on_receptor_ligand_restraints_mode = False
 
             # Now write simfile options
-            options_to_write = {"perturbed_residue number": str(perturbed_resnum),
-                                "use boresch restraints": use_boresch_restraints,
-                                "turn on receptor-ligand restraints mode": turn_on_receptor_ligand_restraints_mode,
-                                # This automatically uses the co-alchemical ion approach when there is a charge difference
-                                "charge difference": str(-lig_charge),
-                                }
+            options_to_write = {
+                "perturbed_residue number": str(perturbed_resnum),
+                "use boresch restraints": use_boresch_restraints,
+                "turn on receptor-ligand restraints mode": turn_on_receptor_ligand_restraints_mode,
+                # This automatically uses the co-alchemical ion approach when there is a charge difference
+                "charge difference": str(-lig_charge),
+            }
 
             for option, value in options_to_write.items():
                 _write_simfile_option(

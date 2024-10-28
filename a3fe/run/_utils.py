@@ -27,12 +27,16 @@ def check_has_wat_and_box(system: _BSS._SireWrappers._system.System) -> None:  #
     if system.nWaterMolecules() == 0:
         raise ValueError("System does not have water.")
 
-def get_single_mol(system: _BSS._SireWrappers._system.System, mol_name: str) -> BSS._SireWrappers._molecule.Molecule:  # type: ignore
+
+def get_single_mol(
+    system: _BSS._SireWrappers._system.System, mol_name: str
+) -> BSS._SireWrappers._molecule.Molecule:  # type: ignore
     """Get a single molecule from a BSS system."""
     mols = system.search(f"resname {mol_name}").molecules()
     if len(mols) != 1:
         raise ValueError(f"Expected 1 molecule with name {mol_name}, got {len(mols)}")
     return mols[0]
+
 
 def get_simtime(
     sim_runner: "SimulationRunner",  # noqa: F821
