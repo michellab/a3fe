@@ -6,6 +6,7 @@ Change Log
 ====================
 
 - Added ability to run charged compounds using the co-alchemical ion approach. Ligand net charge is detected from the input files and the config is checked to ensure that PME is used for electrostatics.
+- Added parameterisation tests.
 - Fixed bug arising from incorrect removal of "is_equilibrated" method (37de921)
 
 0.1.3
