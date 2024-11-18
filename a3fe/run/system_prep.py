@@ -17,7 +17,6 @@ from typing import Optional as _Optional
 import BioSimSpace.Sandpit.Exscientia as _BSS
 from pydantic import BaseModel as _BaseModel
 from pydantic import Field as _Field
-from pydantic import field_validator as _field_validator
 
 from ..read._process_bss_systems import rename_lig as _rename_lig
 from ._utils import check_has_wat_and_box as _check_has_wat_and_box
