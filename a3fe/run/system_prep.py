@@ -307,11 +307,13 @@ def parameterise_input(
             f"Ligand has a charge of {lig_charge}. Co-alchemical ion approach will be used."
              " Ensure that your box is large enough to avoid artefacts."
         )
-    param_lig = _BSS.Parameters.parameterise(
-        molecule=lig,
-        forcefield=cfg.forcefields["ligand"],
-        net_charge=lig_charge,
-    ).getMolecule()
+
+    # Only include ligand charge if we're using gaff (OpenFF doesn't need it)
+    param_args = {"molecule": lig, "forcefield": cfg.forcefields["ligand"]}
+    if "gaff" in cfg.forcefields["ligand"]:
+        param_args["net_charge"] = lig_charge
+    
+    param_lig = _BSS.Parameters.parameterise(**param_args).getMolecule()
 
     # If bound, then parameterise the protein and waters and add to the system
     if leg_type == _LegType.BOUND:
