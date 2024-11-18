@@ -261,3 +261,14 @@ You can run sets of calculations using the :class:`a3fe.run.CalcSet` class. To d
     calc_set.analyse(exp_dgs_path = "input/exp_dgs.csv", offset = False)
     calc_set.save()
 
+ABFE with Charged Ligands
+*************************
+
+Since A3FE 0.2.0, ABFE calculations with charged ligands are supported using a co-alchemical ion approach. The charge of the ligand will be automatically detected, assuming that this is correctly specified in the input sdf. The only change in the input required is that the use of PME, rather than reaction field electrostatics, should be specified in ``template_config.cfg`` as e.g.:
+
+.. code-block:: bash
+
+    ### Non-Bonded Interactions ###
+    cutoff type = PME
+    cutoff distance = 10 * angstrom
+
