@@ -1,5 +1,6 @@
 """Utilities for the Ensemble, Window, and Simulation Classes"""
 
+import getpass as _getpass
 import glob as _glob
 import logging as _logging
 import os as _os
@@ -201,7 +202,7 @@ class VirtualQueue:
             to the decorator"""
             # Get job ids of currently running jobs. This assumes no array jobs.
             commands = [
-                ["squeue", "-h", "-u", _os.getenv("USER")],
+                ["squeue", "-h", "-u", _getpass.getuser()],
                 ["awk", "{print $1}"],
                 ["grep", "-v", "-E", "'\\[|_'"],
                 ["paste", "-s", "-d,", "-"],
