@@ -82,6 +82,36 @@ def calc():
 
 
 @pytest.fixture(scope="session")
+def t4l_calc():
+    """
+    Create a calculation using the quickly-parametrised T4L system.
+    The preparation stage is STRUCTURES_ONLY, and this is used for
+    testing parameterisation.
+    """
+    with TemporaryDirectory() as dirname:
+        # Copy T4L structure files
+        subprocess.run(
+            ["cp", "-r", "a3fe/data/t4l_input", os.path.join(dirname, "input")],
+            check=True,
+        )
+
+        # Copy over remaining input files
+        for file in ["run_somd.sh", "template_config.cfg"]:
+            subprocess.run(
+                ["cp", os.path.join("a3fe/data/example_run_dir/input/", file), os.path.join(dirname, "input")],
+                check=True,
+            )
+
+        calc = a3.Calculation(
+            base_dir=dirname,
+        )
+        calc._dump()
+
+        yield calc
+
+
+
+@pytest.fixture(scope="session")
 def complex_sys():
     """Create a complex system object to use in tests"""
     base_path = os.path.join("a3fe", "data", "example_run_dir", "bound", "input")
