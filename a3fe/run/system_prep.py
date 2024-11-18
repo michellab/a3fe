@@ -312,7 +312,7 @@ def parameterise_input(
     param_args = {"molecule": lig, "forcefield": cfg.forcefields["ligand"]}
     if "gaff" in cfg.forcefields["ligand"]:
         param_args["net_charge"] = lig_charge
-    
+
     param_lig = _BSS.Parameters.parameterise(**param_args).getMolecule()
 
     # If bound, then parameterise the protein and waters and add to the system

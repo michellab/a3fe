@@ -190,10 +190,12 @@ def test_parameterisation_free(t4l_calc):
 
     leg_type = a3.LegType.FREE
     free_leg = a3.Leg(leg_type=leg_type, base_dir=t4l_calc.base_dir)
-        
+
     try:
         # We need to save the config to the input directory
-        a3.SystemPreparationConfig(forcefields={'ligand': 'gaff2', 'protein': 'ff14SB', 'water': 'tip3p'}).save_pickle(t4l_calc.input_dir, leg_type)
+        a3.SystemPreparationConfig(
+            forcefields={"ligand": "gaff2", "protein": "ff14SB", "water": "tip3p"}
+        ).save_pickle(t4l_calc.input_dir, leg_type)
         # Parameterise benzene
         free_leg.parameterise_input(slurm=False)
 
@@ -207,15 +209,21 @@ def test_parameterisation_free(t4l_calc):
 
         # Check that they have properties that only charged molecules should have
         expected_properties = ["charge", "LJ"]
-        assert all([prop in bss_lig._sire_object.property_keys() for prop in expected_properties])
+        assert all(
+            [
+                prop in bss_lig._sire_object.property_keys()
+                for prop in expected_properties
+            ]
+        )
 
         # Check that the charge on the first atom is as expected
-        assert pytest.approx(bss_lig.getAtoms()[0].charge().value(), abs=1e-6) == -0.1300
+        assert (
+            pytest.approx(bss_lig.getAtoms()[0].charge().value(), abs=1e-6) == -0.1300
+        )
 
     # Always delete Leg.pkl
     finally:
         os.remove(f"{free_leg.base_dir}/Leg.pkl")
-
 
 
 def test_parameterisation_bound(t4l_calc):
@@ -225,7 +233,9 @@ def test_parameterisation_bound(t4l_calc):
 
     try:
         # We need to save the config to the input directory
-        a3.SystemPreparationConfig(forcefields={'ligand': 'gaff2', 'protein': 'ff14SB', 'water': 'tip3p'}).save_pickle(t4l_calc.input_dir, leg_type)
+        a3.SystemPreparationConfig(
+            forcefields={"ligand": "gaff2", "protein": "ff14SB", "water": "tip3p"}
+        ).save_pickle(t4l_calc.input_dir, leg_type)
         # Parameterise benzene
         assert leg_type == a3.LegType.BOUND
         assert bound_leg.leg_type == leg_type
@@ -242,10 +252,17 @@ def test_parameterisation_bound(t4l_calc):
 
         # Check that they have properties that only charged molecules should have
         expected_properties = ["charge", "LJ"]
-        assert all([prop in bss_lig._sire_object.property_keys() for prop in expected_properties])
+        assert all(
+            [
+                prop in bss_lig._sire_object.property_keys()
+                for prop in expected_properties
+            ]
+        )
 
         # Check that the charge on the first atom is as expected
-        assert pytest.approx(bss_lig.getAtoms()[0].charge().value(), abs=1e-6) == -0.1300
+        assert (
+            pytest.approx(bss_lig.getAtoms()[0].charge().value(), abs=1e-6) == -0.1300
+        )
 
         # Check that the protein has +9 charge
         bss_prot = bss_sys[1]
@@ -254,8 +271,6 @@ def test_parameterisation_bound(t4l_calc):
     # Always delete Leg.pkl
     finally:
         os.remove(f"{bound_leg.base_dir}/Leg.pkl")
-
-
 
 
 class TestCalcSetup:

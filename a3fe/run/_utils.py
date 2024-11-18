@@ -30,7 +30,7 @@ def check_has_wat_and_box(system: _BSS._SireWrappers._system.System) -> None:  #
 
 def get_single_mol(
     system: _BSS._SireWrappers._system.System, mol_name: str
-) -> BSS._SireWrappers._molecule.Molecule:  # type: ignore
+) -> _BSS._SireWrappers._molecule.Molecule:  # type: ignore
     """Get a single molecule from a BSS system."""
     mols = system.search(f"resname {mol_name}").molecules()
     if len(mols) != 1:

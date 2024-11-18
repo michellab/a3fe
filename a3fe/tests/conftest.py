@@ -98,7 +98,11 @@ def t4l_calc():
         # Copy over remaining input files
         for file in ["run_somd.sh", "template_config.cfg"]:
             subprocess.run(
-                ["cp", os.path.join("a3fe/data/example_run_dir/input/", file), os.path.join(dirname, "input")],
+                [
+                    "cp",
+                    os.path.join("a3fe/data/example_run_dir/input/", file),
+                    os.path.join(dirname, "input"),
+                ],
                 check=True,
             )
 
@@ -108,7 +112,6 @@ def t4l_calc():
         calc._dump()
 
         yield calc
-
 
 
 @pytest.fixture(scope="session")
