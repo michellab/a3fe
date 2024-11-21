@@ -701,6 +701,30 @@ class SimulationRunner(ABC):
             for failure in sub_sim_runner.failed_simulations
         ]
 
+    def is_equilibrated(self, run_nos: _Optional[_List[int]] = None) -> bool:
+        f"""
+        Whether the {self.__class__.__name__} is equilibrated. This updates
+        the _equilibrated and _equil_time attributes of the lambda windows,
+        which are accessed by the equilibrated and equil_time properties.
+
+        Parameters
+        ----------
+        run_nos : List[int], Optional, default=None
+            A list of the run numbers to check for equilibration. If None, all runs are analysed.
+
+        Returns
+        -------
+        equilibrated : bool
+            Whether the {self.__class__.__name__} is equilibrated.
+        """
+        run_nos = self._get_valid_run_nos(run_nos)
+        return all(
+            [
+                sub_sim_runner.is_equilibrated(run_nos=run_nos)
+                for sub_sim_runner in self._sub_sim_runners
+            ]
+        )
+
     @property
     def equilibrated(self) -> float:
         f"""Whether the {self.__class__.__name__} is equilibrated."""

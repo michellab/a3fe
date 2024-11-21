@@ -185,6 +185,94 @@ def test_simulation_runner_iterator(restrain_stage):
         assert sim_runner.base_dir == base_dirs[i]
 
 
+def test_parameterisation_free(t4l_calc):
+    """Test that the parameterisation of benzene works as expected."""
+
+    leg_type = a3.LegType.FREE
+    free_leg = a3.Leg(leg_type=leg_type, base_dir=t4l_calc.base_dir)
+
+    try:
+        # We need to save the config to the input directory
+        a3.SystemPreparationConfig(
+            forcefields={"ligand": "gaff2", "protein": "ff14SB", "water": "tip3p"}
+        ).save_pickle(t4l_calc.input_dir, leg_type)
+        # Parameterise benzene
+        free_leg.parameterise_input(slurm=False)
+
+        # Check that the expected files are produced
+        expected_files = ["free_param.rst7", "free_param.prm7"]
+        assert all([file in os.listdir(free_leg.input_dir) for file in expected_files])
+
+        # Check that the ligand is uncharged
+        bss_lig = BSS.IO.readMolecules(f"{free_leg.input_dir}/free_param.*")[0]
+        assert bss_lig.charge().value() == 0
+
+        # Check that they have properties that only charged molecules should have
+        expected_properties = ["charge", "LJ"]
+        assert all(
+            [
+                prop in bss_lig._sire_object.property_keys()
+                for prop in expected_properties
+            ]
+        )
+
+        # Check that the charge on the first atom is as expected
+        assert (
+            pytest.approx(bss_lig.getAtoms()[0].charge().value(), abs=1e-6) == -0.1300
+        )
+
+    # Always delete Leg.pkl
+    finally:
+        os.remove(f"{free_leg.base_dir}/Leg.pkl")
+
+
+def test_parameterisation_bound(t4l_calc):
+    """Test that the parameterisation of benzene and T4L works as expected."""
+    leg_type = a3.LegType.BOUND
+    bound_leg = a3.Leg(leg_type=leg_type, base_dir=t4l_calc.base_dir)
+
+    try:
+        # We need to save the config to the input directory
+        a3.SystemPreparationConfig(
+            forcefields={"ligand": "gaff2", "protein": "ff14SB", "water": "tip3p"}
+        ).save_pickle(t4l_calc.input_dir, leg_type)
+        # Parameterise benzene
+        assert leg_type == a3.LegType.BOUND
+        assert bound_leg.leg_type == leg_type
+        bound_leg.parameterise_input(slurm=False)
+
+        # Check that the expected files are produced
+        expected_files = ["bound_param.rst7", "bound_param.prm7"]
+        assert all([file in os.listdir(bound_leg.input_dir) for file in expected_files])
+
+        # Check that the ligand is uncharged
+        bss_sys = BSS.IO.readMolecules(f"{bound_leg.input_dir}/bound_param.*")
+        bss_lig = bss_sys[0]
+        assert bss_lig.charge().value() == 0
+
+        # Check that they have properties that only charged molecules should have
+        expected_properties = ["charge", "LJ"]
+        assert all(
+            [
+                prop in bss_lig._sire_object.property_keys()
+                for prop in expected_properties
+            ]
+        )
+
+        # Check that the charge on the first atom is as expected
+        assert (
+            pytest.approx(bss_lig.getAtoms()[0].charge().value(), abs=1e-6) == -0.1300
+        )
+
+        # Check that the protein has +9 charge
+        bss_prot = bss_sys[1]
+        assert round(bss_prot.charge().value()) == 9
+
+    # Always delete Leg.pkl
+    finally:
+        os.remove(f"{bound_leg.base_dir}/Leg.pkl")
+
+
 class TestCalcSetup:
     """
     Test the setup of a calculation and all sub-simulation runners.

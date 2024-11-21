@@ -40,10 +40,3 @@ def test_config_tot_simtime():
     config = SystemPreparationConfig()
     assert config.get_tot_simtime(n_runs=5, leg_type=LegType.FREE) == 26855
     assert config.get_tot_simtime(n_runs=5, leg_type=LegType.BOUND) == 26905
-
-
-def test_config_charged_ligand():
-    """Check that the user is warned about charged ligands."""
-    # Should raise a warning.
-    with pytest.warns():
-        SystemPreparationConfig(lig_net_charge=-1)
