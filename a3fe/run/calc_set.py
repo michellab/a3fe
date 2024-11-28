@@ -18,7 +18,9 @@ from ..read._read_exp_dgs import read_exp_dgs as _read_exp_dgs
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._utils import SimulationRunnerIterator as _SimulationRunnerIterator
 from .calculation import Calculation as _Calculation
-from .system_prep import SystemPreparationConfig as _SystemPreparationConfig
+from ..configuration.system_preparation import (
+    SystemPreparationConfig as _SystemPreparationConfig,
+)
 
 
 class CalcSet(_SimulationRunner):
@@ -253,6 +255,7 @@ class CalcSet(_SimulationRunner):
         """
         # Read the experimental dGs into a pandas dataframe and add the extra
         # columns needed for the calculated values
+        #base_dir = "/home/roy/a3fe/a3fe/data/example_calc_set"
         all_dgs = _read_exp_dgs(exp_dgs_path, self.base_dir)
         all_dgs["calc_dg"] = _np.nan
         all_dgs["calc_er"] = _np.nan

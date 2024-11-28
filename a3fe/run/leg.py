@@ -35,7 +35,9 @@ from .enums import LegType as _LegType
 from .enums import PreparationStage as _PreparationStage
 from .enums import StageType as _StageType
 from .stage import Stage as _Stage
-from .system_prep import SystemPreparationConfig as _SystemPreparationConfig
+from ..configuration.system_preparation import (
+    SystemPreparationConfig as _SystemPreparationConfig,
+)
 
 
 class Leg(_SimulationRunner):

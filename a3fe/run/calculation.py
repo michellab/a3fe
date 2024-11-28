@@ -13,7 +13,9 @@ from ._simulation_runner import SimulationRunner as _SimulationRunner
 from .enums import LegType as _LegType
 from .enums import PreparationStage as _PreparationStage
 from .leg import Leg as _Leg
-from .system_prep import SystemPreparationConfig as _SystemPreparationConfig
+from ..configuration.system_preparation import (
+    SystemPreparationConfig as _SystemPreparationConfig,
+)
 
 
 class Calculation(_SimulationRunner):
