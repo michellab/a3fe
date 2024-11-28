@@ -1148,11 +1148,11 @@ def plot_against_exp(
 
     # Add molecule names as labels (use last part of calc_base_dir)
     for i, full_name in enumerate(all_results["calc_base_dir"]):
-        short_name = _os.path.basename(full_name)  # 获取路径的最后部分
+        short_name = _os.path.basename(full_name)  # keep the last part of the path
         ax.text(
             all_results["exp_dg"].iloc[i],
             all_results["calc_dg"].iloc[i],
-            short_name,  # 使用短名字作为标签
+            short_name,  # use the short name as the label
             fontsize=6,
             ha="right",
             va="bottom",

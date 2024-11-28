@@ -255,7 +255,7 @@ class CalcSet(_SimulationRunner):
         """
         # Read the experimental dGs into a pandas dataframe and add the extra
         # columns needed for the calculated values
-        #base_dir = "/home/roy/a3fe/a3fe/data/example_calc_set"
+        # base_dir = "/home/roy/a3fe/a3fe/data/example_calc_set"
         all_dgs = _read_exp_dgs(exp_dgs_path, self.base_dir)
         all_dgs["calc_dg"] = _np.nan
         all_dgs["calc_er"] = _np.nan
