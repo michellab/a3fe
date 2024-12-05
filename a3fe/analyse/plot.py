@@ -1140,31 +1140,16 @@ def plot_against_exp(
         lw=0.5,
     )
     ax.scatter(x=all_results["exp_dg"], y=all_results["calc_dg"], s=50, zorder=100)
-    ax.set_ylim([-25, 0])
-    ax.set_xlim([-25, 0])
+    ax.set_ylim([-18, 0])
+    ax.set_xlim([-18, 0])
     ax.set_aspect("equal")
     ax.set_xlabel(r"Experimental $\Delta G^o_{\mathrm{Bind}}$ / kcal mol$^{-1}$")
     ax.set_ylabel(r"Calculated $\Delta G^o_{\mathrm{Bind}}$ / kcal mol$^{-1}$")
-
-    # Add molecule names as labels (use last part of calc_base_dir)
-    for i, full_name in enumerate(all_results["calc_base_dir"]):
-        short_name = _os.path.basename(full_name)  # keep the last part of the path
-        ax.text(
-            all_results["exp_dg"].iloc[i],
-            all_results["calc_dg"].iloc[i],
-            short_name,  # use the short name as the label
-            fontsize=6,
-            ha="right",
-            va="bottom",
-            color="red",
-            zorder=101,
-        )
-
     # 1 kcal mol-1
     ax.fill_between(
-        x=[-30, 0],
-        y2=[-29, 1],
-        y1=[-31, -1],
+        x=[-25, 0],
+        y2=[-24, 1],
+        y1=[-26, -1],
         lw=0,
         zorder=-10,
         alpha=0.5,
@@ -1172,9 +1157,9 @@ def plot_against_exp(
     )
     # 2 kcal mol-1
     ax.fill_between(
-        x=[-30, 0],
-        y2=[-28, 2],
-        y1=[-32, -2],
+        x=[-25, 0],
+        y2=[-23, 2],
+        y1=[-27, -2],
         lw=0,
         zorder=-10,
         color="darkorange",
@@ -1191,7 +1176,7 @@ def plot_against_exp(
             ["R$^2$", "MUE", r"Spearman $\rho$", r"Kendall $\tau$"],
         ):
             stats_text += f"{label}: {stats[stat][0]:.2f}$^{{{stats[stat][1]:.2f}}}_{{{stats[stat][2]:.2f}}}$\n"
-        ax.text(0.05, 0.55, stats_text, transform=ax.transAxes)
+        ax.text(0.55, 0, stats_text, transform=ax.transAxes)
 
     if offset:
         name = f"{output_dir}/overall_results_offset.png"
