@@ -201,8 +201,9 @@ class VirtualQueue:
             """This inner function is defined so that we can pass self._logger
             to the decorator"""
             # Get job ids of currently running jobs. This assumes no array jobs.
+            # Only read running, pending, suspended, and completing jobs (R, PD, S, CG).
             commands = [
-                ["squeue", "-h", "-u", _getpass.getuser()],
+                ["squeue", "-h", "-u", _getpass.getuser(), "-t", "R,PD,S,CG"],
                 ["awk", "{print $1}"],
                 ["grep", "-v", "-E", "'\\[|_'"],
                 ["paste", "-s", "-d,", "-"],

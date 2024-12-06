@@ -2,6 +2,12 @@
 Change Log
 ===============
 
+0.2.1
+====================
+
+- Fixed issue https://github.com/michellab/a3fe/issues/14 where all jobs in the slurm queue were assumed to be
+  pending or running. This caused problems when completed jobs remained in the queue.
+
 0.2.0
 ====================
 
