@@ -416,6 +416,13 @@ class CalcSet(_SimulationRunner):
         # Calculate statistics and plot if experimental dGs are provided
         if compare_to_exp:
 
+            # Check that we have experimental dGs for all calculations
+            if all_dgs["exp_dg"].isnull().any():
+                raise ValueError(
+                    "Experimental free energy changes must be provided for all "
+                    "calculations if comparing to experimental values"
+                )
+
             # Exclude rows with NaN
             all_dgs.dropna(inplace=True)
 
