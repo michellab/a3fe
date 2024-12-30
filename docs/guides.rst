@@ -276,3 +276,4 @@ Since A3FE 0.2.0, ABFE calculations with charged ligands are supported using a c
     cutoff type = PME
     cutoff distance = 10 * angstrom
 
+The default `template_config.cfg` uses reaction field instead of PME. This is faster (around twice as fast for some of our systems) and has been shown to give equivalent results for neutral ligands in RBFE calculations - see https://pubs.acs.org/doi/full/10.1021/acs.jcim.0c01424 .
