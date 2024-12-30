@@ -210,10 +210,14 @@ class CalcSet(_SimulationRunner):
         -------
         None
         """
-        self._logger.info("Determining optimal lambda windows for each stage of every calculation...")
+        self._logger.info(
+            "Determining optimal lambda windows for each stage of every calculation..."
+        )
 
         for calc in self.calcs:
-            self._logger.info(f"Determining optimal lambda windows for {calc.base_dir}...")
+            self._logger.info(
+                f"Determining optimal lambda windows for {calc.base_dir}..."
+            )
             calc.get_optimal_lam_vals(
                 simtime=simtime,
                 er_type=er_type,
@@ -309,7 +313,7 @@ class CalcSet(_SimulationRunner):
         subsampling=False,
         fraction: float = 1,
         plot_rmsds: bool = False,
-        ) -> None:
+    ) -> None:
         """
         Analyse all calculations in the set and, if the experimental free
         energies are provided, plot the free energy changes with respect
@@ -365,7 +369,9 @@ class CalcSet(_SimulationRunner):
             all_dgs["calc_base_dir"] = self.calc_paths
             # In the absence of supplied names (in the experimental dGs file),
             # use the base dir name (the stem of the path)
-            all_dgs["name"] = [calc_path.split("/")[-1] for calc_path in self.calc_paths]
+            all_dgs["name"] = [
+                calc_path.split("/")[-1] for calc_path in self.calc_paths
+            ]
             all_dgs.set_index("name", inplace=True)
             all_dgs["calc_cor"] = 0
 
@@ -385,11 +391,11 @@ class CalcSet(_SimulationRunner):
             # or if reanalysis is requested
             if calc._delta_g is None or reanalyse:
                 calc.analyse(
-                    slurm = slurm,
-                    run_nos = run_nos,
+                    slurm=slurm,
+                    run_nos=run_nos,
                     subsampling=subsampling,
-                    fraction = fraction,
-                    plot_rmsds = plot_rmsds,
+                    fraction=fraction,
+                    plot_rmsds=plot_rmsds,
                 )
 
             # Get the confidence interval
@@ -415,7 +421,6 @@ class CalcSet(_SimulationRunner):
 
         # Calculate statistics and plot if experimental dGs are provided
         if compare_to_exp:
-
             # Check that we have experimental dGs for all calculations
             if all_dgs["exp_dg"].isnull().any():
                 raise ValueError(
@@ -442,5 +447,8 @@ class CalcSet(_SimulationRunner):
 
             # Plot
             _plt_against_exp(
-                all_results=all_dgs, output_dir=self.output_dir, offset=offset, stats=stats
+                all_results=all_dgs,
+                output_dir=self.output_dir,
+                offset=offset,
+                stats=stats,
             )

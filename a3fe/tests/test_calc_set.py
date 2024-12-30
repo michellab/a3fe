@@ -6,6 +6,7 @@ import pytest
 
 import pandas as pd
 
+
 def test_calc_set_analysis(calc_set):
     """Test the analysis method of the CalcSet class."""
     # Make sure an error is raised if the exp dgs file is not supplied
@@ -34,15 +35,20 @@ def test_calc_set_analysis(calc_set):
     assert os.path.exists(os.path.join(output_dir, "results_summary.txt"))
 
     # Then, check that the results in results_summary.txt are as expected
-    results_exp = pd.read_csv(os.path.join(output_dir, "results_summary.txt"), index_col=0)
+    results_exp = pd.read_csv(
+        os.path.join(output_dir, "results_summary.txt"), index_col=0
+    )
     # Check that the results are the same once the experimental data is dropped
-    assert results_no_exp.drop(columns=["exp_dg", "exp_er"]).equals(results_exp.drop(columns=["exp_dg", "exp_er"]))
+    assert results_no_exp.drop(columns=["exp_dg", "exp_er"]).equals(
+        results_exp.drop(columns=["exp_dg", "exp_er"])
+    )
 
     # Regression test for the results
-    try:
-        assert results_exp.loc["t4l", "calc_dg"] == pytest.approx(5.0378, abs=1e-2)
-        assert results_exp.loc["t4l", "calc_er"] == pytest.approx(0.1501, abs=1e-2)
-        assert results_exp.loc["mdm2_pip2_short", "calc_dg"] == pytest.approx(8.4956, abs=1e-2)
-        assert results_exp.loc["mdm2_pip2_short", "calc_er"] == pytest.approx(0.0935, abs=1e-2)
-    except:
-        breakpoint()
+    assert results_exp.loc["t4l", "calc_dg"] == pytest.approx(5.0378, abs=1e-2)
+    assert results_exp.loc["t4l", "calc_er"] == pytest.approx(0.1501, abs=1e-2)
+    assert results_exp.loc["mdm2_pip2_short", "calc_dg"] == pytest.approx(
+        8.4956, abs=1e-2
+    )
+    assert results_exp.loc["mdm2_pip2_short", "calc_er"] == pytest.approx(
+        0.0935, abs=1e-2
+    )

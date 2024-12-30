@@ -9,7 +9,9 @@ import pandas as _pd
 import numpy as _np
 
 
-def read_exp_dgs(dgs_file: _Optional[str] = None, base_dir: _Optional[str] = None) -> _pd.DataFrame:
+def read_exp_dgs(
+    dgs_file: _Optional[str] = None, base_dir: _Optional[str] = None
+) -> _pd.DataFrame:
     """
     Read the experimental free energy changes into a pandas dataframe. If
     the dgs file is not supplied, return an empty dataframe.
@@ -36,11 +38,13 @@ def read_exp_dgs(dgs_file: _Optional[str] = None, base_dir: _Optional[str] = Non
 
     # If the dgs file is not supplied, create an empty dataframe
     if dgs_file is None:
-        results_df =  _pd.DataFrame(columns=required_columns)
+        results_df = _pd.DataFrame(columns=required_columns)
 
     else:
         # Read the dgs file
-        results_df = _pd.read_csv(dgs_file, index_col=1)  # Use the names in the index col
+        results_df = _pd.read_csv(
+            dgs_file, index_col=1
+        )  # Use the names in the index col
 
         # Check that we have the required columns
         if list(results_df.columns) != required_columns:
