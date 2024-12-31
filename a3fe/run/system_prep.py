@@ -19,7 +19,7 @@ from ._utils import check_has_wat_and_box as _check_has_wat_and_box
 from .enums import LegType as _LegType
 from .enums import PreparationStage as _PreparationStage
 
-from ..configuration.system_preparation import (
+from ..configuration.system_prep_config import (
     SystemPreparationConfig as _SystemPreparationConfig,
 )
 
