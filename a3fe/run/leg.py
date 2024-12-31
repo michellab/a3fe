@@ -215,7 +215,7 @@ class Leg(_SimulationRunner):
         cfg = (
             sysprep_config if sysprep_config is not None else _SystemPreparationConfig()
         )
-        cfg.save_pickle(self.input_dir, self.leg_type)
+        cfg.dump(self.input_dir, self.leg_type)
 
         # Create input directories, parameterise, solvate, minimise, heat and preequil, all
         # depending on the input files present.
@@ -597,7 +597,7 @@ class Leg(_SimulationRunner):
                 _subprocess.run(["cp", "-r", input_file, outdir], check=True)
 
             # Also write a pickle of the config to the output directory
-            sysprep_config.save_pickle(outdir, self.leg_type)
+            sysprep_config.dump(outdir, self.leg_type)
 
         if sysprep_config.slurm:
             if self.leg_type == _LegType.BOUND:

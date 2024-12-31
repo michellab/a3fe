@@ -6,10 +6,11 @@ __all__ = [
     "SystemPreparationConfig",
 ]
 
+import yaml as _yaml
+
 from pydantic import BaseModel as _BaseModel
 from pydantic import Field as _Field
 from pydantic import ConfigDict as _ConfigDict
-import pickle as _pkl
 
 from ..run.enums import StageType as _StageType
 from ..run.enums import LegType as _LegType
@@ -196,40 +197,38 @@ class SystemPreparationConfig(_BaseModel):
         tot_simtime += self.ensemble_equilibration_time * n_runs
         return tot_simtime
 
-    def save_pickle(self, save_dir: str, leg_type: _LegType) -> None:
+    def dump(self, save_dir: str, leg_type: _LegType) -> None:
         """
-        Save the configuration to a pickle file.
+        Save the configuration to a YAML file.
 
         Parameters
         ----------
         save_dir : str
-            Directory to save the pickle file to.
+            Directory to save the YAML file to.
 
         leg_type : LegType
-            The type of the leg. Used to name the pickle file.
+            The type of the leg. Used to name the YAML file.
         """
         # First, convert to dict
         model_dict = self.model_dump()
 
-        # Save the dict to a pickle file
+        # Save the dict to a YAML file
         save_path = save_dir + "/" + self.get_file_name(leg_type)
-        with open(save_path, "wb") as f:
-            _pkl.dump(model_dict, f)
+        with open(save_path, "w") as f:
+            _yaml.dump(model_dict, f, default_flow_style=False)
 
     @classmethod
-    def from_pickle(
-        cls, save_dir: str, leg_type: _LegType
-    ) -> "SystemPreparationConfig":
+    def load(cls, save_dir: str, leg_type: _LegType) -> "SystemPreparationConfig":
         """
-        Load the configuration from a pickle file.
+        Load the configuration from a YAML file.
 
         Parameters
         ----------
         save_dir : str
-            Directory to load the pickle file from.
+            Directory to load the YAML file from.
 
         leg_type : LegType
-            The type of the leg. Used to decide the name of the pickle
+            The type of the leg. Used to decide the name of the YAML
             file to load.
 
         Returns
@@ -238,15 +237,15 @@ class SystemPreparationConfig(_BaseModel):
             Loaded configuration.
         """
 
-        # Load the dict from the pickle file
+        # Load the dict from the YAML file
         load_path = save_dir + "/" + cls.get_file_name(leg_type)
-        with open(load_path, "rb") as f:
-            model_dict = _pkl.load(f)
+        with open(load_path, "r") as f:
+            model_dict = _yaml.load(f, Loader=_yaml.FullLoader)
 
         # Create the model from the dict
         return cls.model_validate(model_dict)
 
     @staticmethod
     def get_file_name(leg_type: _LegType) -> str:
-        """Get the name of the pickle file for the configuration."""
-        return f"system_preparation_config_{leg_type.name.lower()}.pkl"
+        """Get the name of the YAML file for the configuration."""
+        return f"system_preparation_config_{leg_type.name.lower()}.yaml"

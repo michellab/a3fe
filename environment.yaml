@@ -18,3 +18,4 @@ dependencies:
   - ambertools
   - biosimspace>2023.4
   - pydantic
+  - pyyaml

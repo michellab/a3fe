@@ -30,8 +30,8 @@ def test_config_pickle_and_load():
     """Test that the config can be pickled and loaded."""
     with TemporaryDirectory() as dirname:
         config = SystemPreparationConfig()
-        config.save_pickle(dirname, LegType.FREE)
-        config2 = SystemPreparationConfig.from_pickle(dirname, LegType.FREE)
+        config.dump(dirname, LegType.FREE)
+        config2 = SystemPreparationConfig.load(dirname, LegType.FREE)
         assert config == config2
 
 

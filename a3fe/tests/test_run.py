@@ -195,7 +195,7 @@ def test_parameterisation_free(t4l_calc):
         # We need to save the config to the input directory
         a3.SystemPreparationConfig(
             forcefields={"ligand": "gaff2", "protein": "ff14SB", "water": "tip3p"}
-        ).save_pickle(t4l_calc.input_dir, leg_type)
+        ).dump(t4l_calc.input_dir, leg_type)
         # Parameterise benzene
         free_leg.parameterise_input(slurm=False)
 
@@ -235,7 +235,7 @@ def test_parameterisation_bound(t4l_calc):
         # We need to save the config to the input directory
         a3.SystemPreparationConfig(
             forcefields={"ligand": "gaff2", "protein": "ff14SB", "water": "tip3p"}
-        ).save_pickle(t4l_calc.input_dir, leg_type)
+        ).dump(t4l_calc.input_dir, leg_type)
         # Parameterise benzene
         assert leg_type == a3.LegType.BOUND
         assert bound_leg.leg_type == leg_type

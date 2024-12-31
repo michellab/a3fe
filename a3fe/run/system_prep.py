@@ -46,7 +46,7 @@ def parameterise_input(
     parameterised_system : _BSS._SireWrappers._system.System
         Parameterised system.
     """
-    cfg = _SystemPreparationConfig.from_pickle(input_dir, leg_type)
+    cfg = _SystemPreparationConfig.load(input_dir, leg_type)
 
     print("Parameterising input...")
     # Parameterise the ligand
@@ -138,7 +138,7 @@ def solvate_input(
     solvated_system : _BSS._SireWrappers._system.System
         Solvated system.
     """
-    cfg = _SystemPreparationConfig.from_pickle(input_dir, leg_type)
+    cfg = _SystemPreparationConfig.load(input_dir, leg_type)
 
     # Load the parameterised system
     print("Loading parameterised system...")
@@ -232,7 +232,7 @@ def minimise_input(
     minimised_system : _BSS._SireWrappers._system.System
         Minimised system.
     """
-    cfg = _SystemPreparationConfig.from_pickle(input_dir, leg_type)
+    cfg = _SystemPreparationConfig.load(input_dir, leg_type)
 
     # Load the solvated system
     print("Loading solvated system...")
@@ -284,7 +284,7 @@ def heat_and_preequil_input(
     preequilibrated_system : _BSS._SireWrappers._system.System
         Pre-Equilibrated system.
     """
-    cfg = _SystemPreparationConfig.from_pickle(input_dir, leg_type)
+    cfg = _SystemPreparationConfig.load(input_dir, leg_type)
 
     # Load the minimised system
     print("Loading minimised system...")
@@ -385,7 +385,7 @@ def run_ensemble_equilibration(
     -------
     None
     """
-    cfg = _SystemPreparationConfig.from_pickle(input_dir, leg_type)
+    cfg = _SystemPreparationConfig.load(input_dir, leg_type)
 
     # Load the pre-equilibrated system
     print("Loading pre-equilibrated system...")
