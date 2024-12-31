@@ -8,6 +8,7 @@ __all__ = [
 
 from pydantic import BaseModel as _BaseModel
 from pydantic import Field as _Field
+from pydantic import ConfigDict as _ConfigDict
 import pickle as _pkl
 
 from ..run.enums import StageType as _StageType
@@ -165,13 +166,7 @@ class SystemPreparationConfig(_BaseModel):
         },
     }
 
-    class Config:
-        """
-        Pydantic model configuration.
-        """
-
-        extra = "forbid"
-        validate_assignment = True
+    model_config = _ConfigDict(extra="forbid", validate_assignment=True)
 
     def get_tot_simtime(self, n_runs: int, leg_type: _LegType) -> int:
         """
@@ -249,7 +244,7 @@ class SystemPreparationConfig(_BaseModel):
             model_dict = _pkl.load(f)
 
         # Create the model from the dict
-        return cls.parse_obj(model_dict)
+        return cls.model_validate(model_dict)
 
     @staticmethod
     def get_file_name(leg_type: _LegType) -> str:
