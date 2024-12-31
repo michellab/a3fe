@@ -24,9 +24,10 @@ from .run import (
     Simulation,
     Stage,
     StageType,
-    SystemPreparationConfig,
     enums,
 )
+
+from .configuration import SystemPreparationConfig
 
 _sys.modules["EnsEquil"] = _sys.modules["a3fe"]
 

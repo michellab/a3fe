@@ -15,7 +15,7 @@ import pytest
 
 import a3fe as a3
 from a3fe.analyse.detect_equil import dummy_check_equil_multiwindow
-from a3fe.run.system_prep import SystemPreparationConfig
+from a3fe.configuration import SystemPreparationConfig
 
 from . import RUN_SLURM_TESTS, SLURM_PRESENT
 

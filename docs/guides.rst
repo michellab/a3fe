@@ -124,7 +124,7 @@ is not killed when you log out).
 Customising Calculations
 *************************
 
-Calculation setup options, including the force fields, lambda schedules, and length of the equilibration steps, can be customised using :class:`a3fe.run.system_prep.SystemPreparationConfig`.
+Calculation setup options, including the force fields, lambda schedules, and length of the equilibration steps, can be customised using :class:`a3fe.configuration.system_preparation.SystemPreparationConfig`.
 For example, to use GAFF2 instead of OFF2 for the small molecule, set this in the config object and pass this to ``calc.setup()``:
 
 .. code-block:: python

@@ -1,4 +1,4 @@
-"""Unit and regression tests for the SystemPreparationConfig class."""
+"""Unit and regression tests for Pydantic configuration classes."""
 
 from tempfile import TemporaryDirectory
 
