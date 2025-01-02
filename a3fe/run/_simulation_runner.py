@@ -321,7 +321,7 @@ class SimulationRunner(ABC):
 
     def analyse(
         self,
-        slurm: bool = False,
+        slurm: bool = True,
         run_nos: _Optional[_List[int]] = None,
         subsampling=False,
         fraction: float = 1,
@@ -334,7 +334,7 @@ class SimulationRunner(ABC):
 
         Parameters
         ----------
-        slurm : bool, optional, default=False
+        slurm : bool, optional, default=True
             Whether to use slurm for the analysis.
         run_nos : List[int], Optional, default=None
             A list of the run numbers to analyse. If None, all runs are analysed.

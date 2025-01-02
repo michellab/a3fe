@@ -163,6 +163,73 @@ class CalcSet(_SimulationRunner):
                 )
                 raise e
 
+    def get_optimal_lam_vals(
+        self,
+        simtime: float = 0.1,
+        er_type: str = "root_var",
+        delta_er: float = 1,
+        set_relative_sim_cost: bool = True,
+        reference_sim_cost: float = 0.21,
+        run_nos: _List[int] = [1],
+    ) -> None:
+        """
+        Determine the optimal lambda windows for each stage of each leg of each
+        calculation by running short simulations at each lambda value and analysing them,
+        using only a single run. Optionally, determine the simulation cost
+        and recursively set the relative simulation cost according reference_sim_cost.
+
+        Parameters
+        ----------
+        simtime : float, Optional, default: 0.1
+            The length of the short simulations to run, in ns. If None is provided,
+            it is assumed that the simulations have already been run and the
+            optimal lambda values are extracted from the output files.
+        er_type: str, Optional, default="root_var"
+            Whether to integrate the standard error of the mean ("sem") or root
+            variance of the gradients ("root_var") to calculate the optimal
+            lambda values.
+        delta_er : float, default=1
+            If er_type == "root_var", the desired integrated root variance of the gradients
+            between each lambda value, in kcal mol^(-1). If er_type == "sem", the
+            desired integrated standard error of the mean of the gradients between each lambda
+            value, in kcal mol^(-1) ns^(1/2). A sensible default for root_var is 1 kcal mol-1,
+            and 0.1 kcal mol-1 ns^(1/2) for sem.
+        set_relative_sim_cost: bool, optional, default=True
+            Whether to recursively set the relative simulation cost for the leg and all
+            sub simulation runners according to the mean simulation cost of the leg.
+        reference_sim_cost: float, optional, default=0.16
+            The reference simulation cost to use if set_relative_sim_cost is True, in hr / ns.
+            The default of 0.21 is the average bound leg simulation cost from a test set of ligands
+            of a range of system sizes on RTX 2080s. This is used to set the relative simulation
+            cost according to average_sim_cost / reference_sim_cost.
+        run_nos : List[int], optional, default=[1]
+            The run numbers to use for the calculation. Only 1 is run by default, so by default
+            we only analyse 1. If using delta_er = "sem", more than one run must be specified.
+
+        Returns
+        -------
+        None
+        """
+        self._logger.info(
+            "Determining optimal lambda windows for each stage of every calculation..."
+        )
+
+        for calc in self.calcs:
+            self._logger.info(
+                f"Determining optimal lambda windows for {calc.base_dir}..."
+            )
+            calc.get_optimal_lam_vals(
+                simtime=simtime,
+                er_type=er_type,
+                delta_er=delta_er,
+                set_relative_sim_cost=set_relative_sim_cost,
+                reference_sim_cost=reference_sim_cost,
+                run_nos=run_nos,
+            )
+
+        # Save state
+        self._dump()
+
     def run(
         self,
         run_nos: _Optional[_List[int]] = None,
@@ -235,27 +302,78 @@ class CalcSet(_SimulationRunner):
                 self._logger.error(f"Error running calculation in {calc.base_dir}: {e}")
                 raise e
 
-    def analyse(self, exp_dgs_path: str, offset: bool) -> None:
+    def analyse(
+        self,
+        exp_dgs_path: _Optional[str] = None,
+        offset: bool = False,
+        compare_to_exp: bool = True,
+        reanalyse: bool = False,
+        slurm: bool = False,
+        run_nos: _Optional[_List[int]] = None,
+        subsampling=False,
+        fraction: float = 1,
+        plot_rmsds: bool = False,
+    ) -> None:
         """
-        Analyse all calculations in the set and plot the
-        free energy changes with respect to experiment.
+        Analyse all calculations in the set and, if the experimental free
+        energies are provided, plot the free energy changes with respect
+        to experiment.
 
         Parameters
         ----------
-        exp_dgs_path : str
+        exp_dgs_path : str, Optional, default = None
             The path to the file containing the experimental free energy
             changes. This must be a csv file with the columns:
 
             calc_base_dir, name, exp_dg, exp_err
-        offset: bool
+        offset: bool, default = False
             If True, the calculated dGs will be offset to match the average
             experimental free energies.
+        compare_to_exp : bool, optional, default=True
+            Whether to compare the calculated free energies to experimental
+            free energies. If False, only the calculated free energies will
+            be analysed. If True, correlation statistics and plots will be
+            generated.
+        reanalyse : bool, optional, default=False
+            Whether to reanalyse the data. If False, any existing data will be used
+            (e.g. if you have already analysed some calculations). If True, the
+            data will be reanalysed using the options provided. Reanalysis is useful
+            when you have changed the analysis options and want to apply them to
+            existing data.
+        slurm : bool, optional, default=False
+            Whether to use slurm for the analysis.
+        run_nos : List[int], Optional, default=None
+            A list of the run numbers to analyse. If None, all runs are analysed.
+        subsampling: bool, optional, default=False
+            If True, the free energy will be calculated by subsampling using
+            the methods contained within pymbar.
+        fraction: float, optional, default=1
+            The fraction of the data to use for analysis. For example, if
+            fraction=0.5, only the first half of the data will be used for
+            analysis. If fraction=1, all data will be used. Note that unequilibrated
+            data is discarded from the beginning of simulations in all cases.
+        plot_rmsds: bool, optional, default=False
+            Whether to plot RMSDS. This is slow and so defaults to False.
         """
-        # Read the experimental dGs into a pandas dataframe and add the extra
-        # columns needed for the calculated values
+        if compare_to_exp:
+            # Make sure that the experimental dGs are provided
+            if not exp_dgs_path:
+                raise ValueError(
+                    "Experimental free energy changes must be provided to compare to experimental values"
+                )
+
         all_dgs = _read_exp_dgs(exp_dgs_path, self.base_dir)
-        all_dgs["calc_dg"] = _np.nan
-        all_dgs["calc_er"] = _np.nan
+
+        # If experimental dgs are not provided, populate the base dir column
+        if exp_dgs_path is None:
+            all_dgs["calc_base_dir"] = self.calc_paths
+            # In the absence of supplied names (in the experimental dGs file),
+            # use the base dir name (the stem of the path)
+            all_dgs["name"] = [
+                calc_path.split("/")[-1] for calc_path in self.calc_paths
+            ]
+            all_dgs.set_index("name", inplace=True)
+            all_dgs["calc_cor"] = 0
 
         # Get the calculated dGs
         for calc in self.calcs:
@@ -269,9 +387,16 @@ class CalcSet(_SimulationRunner):
                     f"Found {len(name)} rows matching {calc.base_dir} in experimental dGs file"
                 )
 
-            # Carry out MBAR analysis if it has not been done already
-            if calc._delta_g is None:
-                calc.analyse()
+            # Carry out MBAR analysis if it has not been done already,
+            # or if reanalysis is requested
+            if calc._delta_g is None or reanalyse:
+                calc.analyse(
+                    slurm=slurm,
+                    run_nos=run_nos,
+                    subsampling=subsampling,
+                    fraction=fraction,
+                    plot_rmsds=plot_rmsds,
+                )
 
             # Get the confidence interval
             mean_free_energy = _np.mean(calc._delta_g)
@@ -294,24 +419,36 @@ class CalcSet(_SimulationRunner):
         # Save results including NaNs
         all_dgs.to_csv(_os.path.join(self.output_dir, "results_summary.txt"), sep=",")
 
-        # Exclude rows with NaN
-        all_dgs.dropna(inplace=True)
-
-        # Offset the results if required
-        if offset:
-            shift = all_dgs["exp_dg"].mean() - all_dgs["calc_dg"].mean()
-            all_dgs["calc_dg"] += shift
-
-        # Calculate statistics and save results
-        stats = _compute_stats(all_dgs)
-        name = "overall_stats_offset.txt" if offset else "overall_stats.txt"
-        with open(_os.path.join(self.output_dir, name), "wt") as ofile:
-            for stat in stats:
-                ofile.write(
-                    f"{stat}: {stats[stat][0]:.2f} ({stats[stat][1]:.2f}, {stats[stat][2]:.2f})\n"
+        # Calculate statistics and plot if experimental dGs are provided
+        if compare_to_exp:
+            # Check that we have experimental dGs for all calculations
+            if all_dgs["exp_dg"].isnull().any():
+                raise ValueError(
+                    "Experimental free energy changes must be provided for all "
+                    "calculations if comparing to experimental values"
                 )
 
-        # Plot
-        _plt_against_exp(
-            all_results=all_dgs, output_dir=self.output_dir, offset=offset, stats=stats
-        )
+            # Exclude rows with NaN
+            all_dgs.dropna(inplace=True)
+
+            # Offset the results if required
+            if offset:
+                shift = all_dgs["exp_dg"].mean() - all_dgs["calc_dg"].mean()
+                all_dgs["calc_dg"] += shift
+
+            # Calculate statistics and save results
+            stats = _compute_stats(all_dgs)
+            name = "overall_stats_offset.txt" if offset else "overall_stats.txt"
+            with open(_os.path.join(self.output_dir, name), "wt") as ofile:
+                for stat in stats:
+                    ofile.write(
+                        f"{stat}: {stats[stat][0]:.2f} ({stats[stat][1]:.2f}, {stats[stat][2]:.2f})\n"
+                    )
+
+            # Plot
+            _plt_against_exp(
+                all_results=all_dgs,
+                output_dir=self.output_dir,
+                offset=offset,
+                stats=stats,
+            )
