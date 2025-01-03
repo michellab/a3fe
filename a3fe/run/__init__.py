@@ -5,4 +5,4 @@ from .lambda_window import LamWindow
 from .leg import Leg
 from .simulation import Simulation
 from .stage import Stage
-from .system_prep import SystemPreparationConfig
+from ..configuration import SystemPreparationConfig

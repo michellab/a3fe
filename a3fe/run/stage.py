@@ -764,7 +764,9 @@ class Stage(_SimulationRunner):
         for win in self.lam_windows:
             if not win.equilibrated:
                 raise RuntimeError(
-                    "Not all lambda windows have equilibrated. Analysis cannot be performed."
+                    "Not all lambda windows have equilibrated. Analysis cannot be performed. "
+                    "If you are running non-adaptively, please use the `set_equilibration_time` method "
+                    "to set the equilibration time manually."
                 )
             if win.equil_time is None:
                 raise RuntimeError(
