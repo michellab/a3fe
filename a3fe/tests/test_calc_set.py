@@ -52,3 +52,28 @@ def test_calc_set_analysis(calc_set):
     assert results_exp.loc["mdm2_pip2_short", "calc_er"] == pytest.approx(
         0.0935, abs=1e-2
     )
+
+
+def test_calc_set_sub_sim_attrs(calc_set):
+    """Test that the attributes of the sub-simulation runners are correctly saved."""
+
+    def check_attr(sim_runner, attr_name="test_attr", value=42, force=True):
+        """Recursively check that the attribute is set for all sub-simulation runners."""
+        if force:
+            assert hasattr(sim_runner, attr_name)
+            assert getattr(sim_runner, attr_name) == value
+        else:
+            if hasattr(sim_runner, attr_name):
+                assert getattr(sim_runner, attr_name) == value
+
+        for sub_sim_runner in sim_runner._sub_sim_runners:
+            check_attr(sub_sim_runner)
+
+    # Try forcing an attribute to be set
+    calc_set.recursively_set_attr("test_attr", force=True, value=42)
+    check_attr(calc_set, attr_name="test_attr", value=42, force=True)
+
+    # Also check that we can set the equilibration time attribute
+    calc_set.set_equilibration_time(0.77)
+    check_attr(calc_set, attr_name="_equilibration_time", value=0.77, force=False)
+    check_attr(calc_set, attr_name="_equilibrated", value=True, force=False)
