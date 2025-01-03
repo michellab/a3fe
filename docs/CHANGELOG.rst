@@ -2,6 +2,12 @@
 Change Log
 ===============
 
+0.3.0
+====================
+
+- Improved CalcSet so that 1) get_optimal_lam_vals can be called directly on the CalcSet object, and 2) analyse can be called directly without requiring experimental results (by specifying compare_to_exp=False).
+- Documentation on PME vs RF slightly improved.
+
 0.2.1
 ====================
 

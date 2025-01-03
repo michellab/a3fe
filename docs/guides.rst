@@ -248,6 +248,10 @@ You can run sets of calculations using the :class:`a3fe.run.CalcSet` class. To d
     t4l,t4l,-9.06,0.5,0
     mdm2_pip2_short,mdm2_pip2_short,-2.93,0.5,0
 
+.. note::
+
+    If you do not have experimental data, you can either omit the ``exp_dgs.csv``, or supply it but leave the ``exp_dg`` and ``exp_er`` columns blank. The advantage of still supplying it is that you can still provide symmetry corrections in the ``calc_cor`` column. In both cases, you should set ``compare_to_exp = False`` in the ``calc_set.analyse()`` call.
+
 - Create, run, and analyse the set of calculations, for example for a set of non-adaptive calculations for "t4l" and "mdm2_pip2_short":
 
 .. code-block:: python
@@ -272,3 +276,4 @@ Since A3FE 0.2.0, ABFE calculations with charged ligands are supported using a c
     cutoff type = PME
     cutoff distance = 10 * angstrom
 
+The default `template_config.cfg` uses reaction field instead of PME. This is faster (around twice as fast for some of our systems) and has been shown to give equivalent results for neutral ligands in RBFE calculations - see https://pubs.acs.org/doi/full/10.1021/acs.jcim.0c01424 .
