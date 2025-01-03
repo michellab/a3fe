@@ -235,15 +235,6 @@ class SimulationRunner(ABC):
 
         return self._delta_g_er
 
-    @property
-    def is_complete(self) -> bool:
-        f"""Whether the {self.__class__.__name__} has completed."""
-        # Check if the overall_stats.dat file exists
-        if _pathlib.Path(f"{self.output_dir}/overall_stats.dat").is_file():
-            return True
-        else:
-            return False
-
     def __str__(self) -> str:
         return self.__class__.__name__
 
@@ -439,7 +430,6 @@ class SimulationRunner(ABC):
     def get_results_df(
         self,
         save_csv: bool = True,
-        get_normalised_costs: bool = False,
         add_sub_sim_runners: bool = True,
     ) -> _pd.DataFrame:
         """

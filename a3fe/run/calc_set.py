@@ -4,12 +4,14 @@ __all__ = ["CalcSet"]
 
 import logging as _logging
 import os as _os
-from typing import Dict as _Dict
+from typing import Dict as _Dict, Tuple as _Tuple
 from typing import Iterable as _Iterable
 from typing import List as _List
 from typing import Optional as _Optional
 
 import numpy as _np
+from pandas.core.api import DataFrame as DataFrame
+import pandas as _pd
 from scipy import stats as _stats
 
 from ..analyse.analyse_set import compute_stats as _compute_stats
@@ -452,3 +454,42 @@ class CalcSet(_SimulationRunner):
                 offset=offset,
                 stats=stats,
             )
+
+    # Avoid base class methods which aren't valid being called
+    @property
+    def delta_g(self):
+        raise AttributeError(
+            "CalcSet objects do not have a delta_g attribute."
+        )
+
+    @property
+    def delta_g_err(self):
+        raise AttributeError(
+            "CalcSet objects do not have a delta_g_err attribute."
+        )
+
+    def get_results_df(
+        self, save_csv: bool = True, add_sub_sim_runners: bool = True
+    ):
+        # TODO: Implement this method
+        raise NotImplementedError(
+            "This method is not implemented for CalcSet objects. Use the analyse method to get free energy changes."
+        )
+
+    def analyse_convergence(
+        self,
+        slurm: bool = False,
+        run_nos: _Optional[_List[int]] = None,
+        mode: str = "cumulative",
+        fraction: float = 1,
+        equilibrated: bool = True,
+    ):
+        """
+        Not implemented for CalcSet objects as convergence analysis is expensive.
+        Call the analyse_convergence method on individual calculations instead (or
+        run analyse convergence on each calculation in the set, if you're determined).
+        """
+        raise NotImplementedError(
+            "This method is not implemented for CalcSet objects (due to high computational ",
+            "expense. Call the analyse_convergence method on individual calculations instead."
+        )
