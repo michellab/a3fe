@@ -5,6 +5,7 @@ Change Log
 0.3.1
 ====================
 - Modified the SimulationRunnerIterator to ensure that the state of sub-simulation runners is saved before they are torn down. This means that setting the equilibration time at the CalcSet level will now work as expected (previously the state of the calculations was not saved, causing the analysis to fail).
+- Updated read_overlap_mat so that it works when "#Overlap" is not printed to a new line (but is included at the end of the previous line). This seems to happen when MBAR requires many iterations to converge.
 
 0.3.0
 ====================
