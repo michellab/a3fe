@@ -18,7 +18,7 @@ from ..read._read_exp_dgs import read_exp_dgs as _read_exp_dgs
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._utils import SimulationRunnerIterator as _SimulationRunnerIterator
 from .calculation import Calculation as _Calculation
-from .system_prep import SystemPreparationConfig as _SystemPreparationConfig
+from ..configuration import SystemPreparationConfig as _SystemPreparationConfig
 
 
 class CalcSet(_SimulationRunner):

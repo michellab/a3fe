@@ -2,6 +2,9 @@
 
 from enum import Enum as _Enum
 from typing import List as _List
+import yaml as _yaml
+
+from typing import Any as _Any
 
 __all__ = [
     "JobStatus",
@@ -11,7 +14,45 @@ __all__ = [
 ]
 
 
-class JobStatus(_Enum):
+class _YamlSerialisableEnum(_Enum):
+    """A base class for enums that can be serialised to and deserialised from YAML."""
+    @classmethod
+    def to_yaml(cls, dumper: _yaml.Dumper, data: _Any) -> _yaml.nodes.ScalarNode:
+        return dumper.represent_scalar(
+            f"!{cls.__name__}", f"{cls.__name__}.{data.name}"
+        )
+
+    @classmethod
+    def from_yaml(cls, loader: _yaml.Loader, node: _yaml.nodes.ScalarNode) -> _Any:
+        value = loader.construct_scalar(node)
+        enum_name, member_name = value.split(".")
+        enum_class = globals()[enum_name]
+        return enum_class[member_name]
+
+
+# Register the custom representers and constructors for _YamlSerialisableEnum
+def _yaml_enum_representer(
+    dumper: _yaml.Dumper, data: _YamlSerialisableEnum
+) -> _yaml.nodes.ScalarNode:
+    return dumper.represent_scalar(
+        f"!{data.__class__.__name__}", f"{data.__class__.__name__}.{data.name}"
+    )
+
+
+def _yaml_enum_constructor(
+    loader: _yaml.Loader, suffix: str, node: _yaml.nodes.ScalarNode
+) -> _Any:
+    value = loader.construct_scalar(node)
+    enum_name, member_name = value.split(".")
+    enum_class = globals()[enum_name]
+    return enum_class[member_name]
+
+
+_yaml.add_multi_representer(_YamlSerialisableEnum, _yaml_enum_representer)
+_yaml.add_multi_constructor("!", _yaml_enum_constructor)
+
+
+class JobStatus(_YamlSerialisableEnum):
     """An enumeration of the possible job statuses"""
 
     NONE = 0
@@ -21,7 +62,7 @@ class JobStatus(_Enum):
     KILLED = 4
 
 
-class StageType(_Enum):
+class StageType(_YamlSerialisableEnum):
     """Enumeration of the types of stage."""
 
     RESTRAIN = 1
@@ -41,14 +82,14 @@ class StageType(_Enum):
             raise ValueError("Unknown stage type.")
 
 
-class LegType(_Enum):
+class LegType(_YamlSerialisableEnum):
     """The type of leg in the calculation."""
 
     BOUND = 1
     FREE = 2
 
 
-class PreparationStage(_Enum):
+class PreparationStage(_YamlSerialisableEnum):
     """The stage of preparation of the input files."""
 
     STRUCTURES_ONLY = 1

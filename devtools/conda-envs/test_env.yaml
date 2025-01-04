@@ -23,6 +23,7 @@ dependencies:
   - gromacs
   - pydantic
   - ruff
+  - pyyaml
 
     # Testing
   - pytest
