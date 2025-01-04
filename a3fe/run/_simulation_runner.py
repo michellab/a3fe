@@ -27,6 +27,8 @@ from ..analyse.plot import plot_convergence as _plot_convergence
 from ..analyse.plot import plot_sq_sem_convergence as _plot_sq_sem_convergence
 from ._logging_formatters import _A3feFileFormatter, _A3feStreamFormatter
 
+from ..configuration import SlurmConfig as _SlurmConfig
+
 
 class SimulationRunner(ABC):
     """An abstract base class for simulation runners. Note that
@@ -51,6 +53,8 @@ class SimulationRunner(ABC):
         base_dir: _Optional[str] = None,
         input_dir: _Optional[str] = None,
         output_dir: _Optional[str] = None,
+        slurm_config: _Optional[_SlurmConfig] = None,
+        analysis_slurm_config: _Optional[_SlurmConfig] = None,
         stream_log_level: int = _logging.INFO,
         dg_multiplier: int = 1,
         ensemble_size: int = 5,
@@ -69,6 +73,14 @@ class SimulationRunner(ABC):
             Path to the output directory in which to store the
             output from the simulation. If None, this is set
             to `base_directory/output`.
+        slurm_config: SlurmConfig, default: None
+            Configuration for the SLURM job scheduler. If None, the
+            default partition is used.
+        analysis_slurm_config: SlurmConfig, default: None
+            Configuration for the SLURM job scheduler for the analysis.
+            This is helpful e.g. if you want to submit analysis to the CPU
+            partition, but the main simulation to the GPU partition. If None,
+            the standard slurm_config is used.
         stream_log_level : int, Optional, default: logging.INFO
             Logging level to use for the steam file handlers for the
             calculation object and its child objects.
@@ -141,6 +153,23 @@ class SimulationRunner(ABC):
             # Set up logging
             self._stream_log_level = stream_log_level
             self._set_up_logging()
+
+            # Create a SLURM config with the default partition if none is provided
+            if slurm_config is None:
+                default_partition = _SlurmConfig.get_default_partition()
+                self._logger.info(
+                    f"No SLURM config provided, using default partition {default_partition}"
+                )
+                self.slurm_config = _SlurmConfig(partition=default_partition)
+            else:
+                self.slurm_config = slurm_config
+
+            # Use the same SLURM config for analysis if none is provided
+            self.analysis_slurm_config = (
+                analysis_slurm_config
+                if analysis_slurm_config is not None
+                else self.slurm_config
+            )
 
             # Save state
             if dump:

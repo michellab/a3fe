@@ -27,7 +27,7 @@ from .run import (
     enums,
 )
 
-from .configuration import SystemPreparationConfig
+from .configuration import SystemPreparationConfig, SlurmConfig
 
 _sys.modules["EnsEquil"] = _sys.modules["a3fe"]
 

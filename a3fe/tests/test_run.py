@@ -398,7 +398,6 @@ class TestCalcSetup:
         """Test that setting up the calculation produced the correct stages."""
         for leg in setup_calc.legs:
             expected_input_files = {
-                "run_somd.sh",
                 "somd_1.rst7",
                 "somd.cfg",
                 "somd.prm7",
@@ -445,7 +444,6 @@ class TestCalcSetup:
         """Test that setting up the calculation produced the correct simulations."""
         for leg in setup_calc.legs:
             expected_base_files = {
-                "run_somd.sh",
                 "somd.cfg",
                 "Simulation.pkl",
                 "Simulation.log",
@@ -531,7 +529,6 @@ def test_integration_calculation(calc_slurm):
                 "somd.rst7",
                 "somd.prm7",
                 "somd.pert",
-                "run_somd.sh",
                 "somd_1.rst7",
                 "somd_2.rst7",
             ]

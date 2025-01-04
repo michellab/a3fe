@@ -150,7 +150,7 @@ class VirtualQueue:
         Parameters
         ----------
         command_list : _List[str]
-            The command to be run by sbatch.
+            The command to be run.
         slurm_file_base : str
             The base name of the slurm file to be written. This allows
             the slurm file to be checked for errors.
@@ -232,12 +232,12 @@ class VirtualQueue:
 
     def _submit_job(self, job_command_list: _List[str]) -> int:
         """
-        Submit the supplied command to slurm using sbatch.
+        Submit the supplied command to slurm.
 
         Parameters
         ----------
         job_command_list : _List[str]
-            The comands to be run by sbatch.
+            The comands to be run.
 
         Returns
         -------
@@ -253,13 +253,15 @@ class VirtualQueue:
             logger=self._logger,
         )
         def _submit_job_inner(job_command_list: _List[str]) -> int:
-            cmds = ["sbatch"] + job_command_list
             process = _subprocess.Popen(
-                cmds,
+                # " ".join(job_command_list),
+                job_command_list,
                 stdin=_subprocess.PIPE,
                 stdout=_subprocess.PIPE,
                 stderr=_subprocess.STDOUT,
                 close_fds=True,
+                env=_os.environ.copy(),
+                # shell=True,
             )
             if process.stdout is None:
                 raise ValueError("Could not get stdout from process.")

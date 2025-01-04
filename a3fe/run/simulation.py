@@ -15,20 +15,19 @@ from typing import Tuple as _Tuple
 import numpy as _np
 from sire.units import k_boltz as _k_boltz
 
-from ..read._process_slurm_files import get_slurm_file_base as _get_slurm_file_base
 from ..read._process_somd_files import read_simfile_option as _read_simfile_option
 from ..read._process_somd_files import write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._virtual_queue import Job as _Job
 from ._virtual_queue import VirtualQueue as _VirtualQueue
 from .enums import JobStatus as _JobStatus
+from ..configuration import SlurmConfig as _SlurmConfig
 
 
 class Simulation(_SimulationRunner):
     """Class to store information about a single SOMD simulation."""
 
     required_input_files = [
-        "run_somd.sh",
         "somd.cfg",
         "somd.prm7",
         "somd.rst7",
@@ -59,6 +58,8 @@ class Simulation(_SimulationRunner):
         input_dir: _Optional[str] = None,
         output_dir: _Optional[str] = None,
         stream_log_level: int = _logging.INFO,
+        slurm_config: _Optional[_SlurmConfig] = None,
+        analysis_slurm_config: _Optional[_SlurmConfig] = None,
         update_paths: bool = True,
     ) -> None:
         """
@@ -84,6 +85,13 @@ class Simulation(_SimulationRunner):
         stream_log_level : int, Optional, default: logging.INFO
             Logging level to use for the steam file handlers for the
             simulation object and its child objects.
+        slurm_config: SlurmConfig, default: None
+            Configuration for the SLURM job scheduler. If None, the
+            default partition is used.
+        analysis_slurm_config: SlurmConfig, default: None
+            Configuration for the SLURM job scheduler for the analysis.
+            This is helpful e.g. if you want to submit analysis to the CPU
+            partition, but the main simulation to the GPU partition. If None,
         update_paths: bool, Optional, default: True
             If True, if the simulation runner is loaded by unpickling, then
             update_paths() is called.
@@ -102,6 +110,8 @@ class Simulation(_SimulationRunner):
             input_dir=input_dir,
             output_dir=output_dir,
             stream_log_level=stream_log_level,
+            slurm_config=slurm_config,
+            analysis_slurm_config=analysis_slurm_config,
             update_paths=update_paths,
             dump=False,
         )
@@ -309,11 +319,10 @@ class Simulation(_SimulationRunner):
             )
 
     def _get_slurm_file_base(self) -> None:
-        """Find out what the slurm output file will be called."""
-        # Find the slurm output file
-
-        slurm_file = _os.path.join(self.input_dir, "run_somd.sh")
-        self.slurm_file_base = _get_slurm_file_base(slurm_file)
+        """Find out what the slurm output file will be called and save it."""
+        self.slurm_file_base = self.slurm_config.get_slurm_output_file_base(
+            run_dir=self.input_dir
+        )
         self._logger.debug(f"Found slurm output file basename: {self.slurm_file_base}")
 
     def run(self, runtime: float = 2.5) -> None:
@@ -344,12 +353,11 @@ class Simulation(_SimulationRunner):
         self._set_n_cycles(n_cycles)
 
         # Run SOMD - note that command excludes sbatch as this is added by the virtual queue
-        cmd_list = [
-            "--chdir",
-            f"{self.output_dir}",
-            f"{self.input_dir}/run_somd.sh",
-            f"{self.lam}",
-        ]
+        cmd = f"somd-freenrg -C somd.cfg -l {self.lam} -p CUDA"
+        cmd_list = self.slurm_config.get_submission_cmds(
+            cmd=cmd, run_dir=self.output_dir
+        )
+
         self.job = self.virtual_queue.submit(
             command_list=cmd_list, slurm_file_base=self.slurm_file_base
         )

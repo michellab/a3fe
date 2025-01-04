@@ -750,8 +750,8 @@ def get_time_series_multiwindow_mbar(
                 _submit_mbar_slurm(
                     output_dir=output_dir,
                     virtual_queue=lambda_windows[0].virtual_queue,
+                    slurm_config=lambda_windows[0].analysis_slurm_config,
                     run_nos=run_nos,
-                    run_somd_dir=lambda_windows[0].input_dir,
                     percentage_end=end_frac * 100,
                     percentage_start=start_frac * 100,
                     subsampling=False,

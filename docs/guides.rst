@@ -67,7 +67,7 @@ You can also find out which input files are required for a given preparation sta
      - free_preequil.prm7, free_preequil.rst7
      - The solvated ligand after heating and short initial equilibration steps
 
-In addition, for every preparation stage, **run_somd.sh and template_config.cfg must be present in the input
+In addition, for every preparation stage, **template_config.cfg must be present in the input
 directory.**
 
 Please note that if you are suppling parameterised input files, **the ligand must be the first molecule in the system
@@ -124,6 +124,9 @@ is not killed when you log out).
 Customising Calculations
 *************************
 
+Calculation Setup
+-----------------
+
 Calculation setup options, including the force fields, lambda schedules, and length of the equilibration steps, can be customised using :class:`a3fe.configuration.system_preparation.SystemPreparationConfig`.
 For example, to use GAFF2 instead of OFF2 for the small molecule, set this in the config object and pass this to ``calc.setup()``:
 
@@ -133,11 +136,44 @@ For example, to use GAFF2 instead of OFF2 for the small molecule, set this in th
     cfg.forcefields["ligand"] = "gaff2"
     calc_set.setup(bound_leg_sysprep_config = cfg, free_leg_sysprep_config = cfg)
 
+Individual Simulation settings
+-------------------------------
+
 To customise the specifics of how each lambda window is run (e.g. timestep), you can use the ``set_simfile_option`` method. For example, to set the timestep to 2 fs, run
 ``calc.set_simfile_option("timestep", "2 * femtosecond")``. This will change parameters from the defaults given in ``template_config.cfg`` in the ``input`` directory, and warn
-you if you are trying to set a parameter that is not present in the template config file. To see a list of available options, run ``somd-freenrg --help-config``. Note that if you
-want to change any slurm options in ``run_somd.sh``, you should modify ``run_somd.sh`` in the the calculation ``input`` directory then run ``calc.update_run_somd()`` to update all
-``run_somd.sh`` files in the calculation.
+you if you are trying to set a parameter that is not present in the template config file. To see a list of available options, run ``somd-freenrg --help-config``.
+
+SLURM Options
+-------------
+
+SLURM options can be customised using the :class:`a3fe.SlurmConfig` object. For example, to change the partition, set ``calc.slurm_config.partition = "my-cluster-gpu-partition"``. You can
+also set other options, e.g.
+
+.. code-block:: python
+
+    slurm_config = a3.SlurmConfig(
+        partition="my-cluster-gpu-partition",
+        time="12:00:00",
+    )
+
+.. note::
+
+    The molecular dynamics simulations should be run on GPUs - they are unbearably slow on CPU. However, you may want to run the MBAR analysis on CPUs to minimise submissions to the CPU queue. 
+    To do this, you can supply an ``analysis_slurm_config`` which is different to the ``slurm_config``, which will only be used for the MBAR analysis.
+
+    .. code-block:: python
+
+        analysis_slurm_config = a3.SlurmConfig(
+            partition="my-cluster-cpu-partition",
+            time="00:10:00",
+        )
+
+        calc = a3.Calculation(
+            slurm_config=slurm_config,
+            analysis_slurm_config=analysis_slurm_config,
+        )
+
+      Then make sure to set ``slurm=True`` when running the analysis, e.g. ``calc.analyse(slurm=True)``.
 
 Running Fast Non-Adaptive Calculations
 ***************************************

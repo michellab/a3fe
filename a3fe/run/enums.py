@@ -16,6 +16,7 @@ __all__ = [
 
 class _YamlSerialisableEnum(_Enum):
     """A base class for enums that can be serialised to and deserialised from YAML."""
+
     @classmethod
     def to_yaml(cls, dumper: _yaml.Dumper, data: _Any) -> _yaml.nodes.ScalarNode:
         return dumper.represent_scalar(

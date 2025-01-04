@@ -20,6 +20,7 @@ from ..analyse.detect_equil import (
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._virtual_queue import VirtualQueue as _VirtualQueue
 from .simulation import Simulation as _Simulation
+from ..configuration import SlurmConfig as _SlurmConfig
 
 
 class LamWindow(_SimulationRunner):
@@ -50,6 +51,8 @@ class LamWindow(_SimulationRunner):
         input_dir: _Optional[str] = None,
         output_dir: _Optional[str] = None,
         stream_log_level: int = _logging.INFO,
+        slurm_config: _Optional[_SlurmConfig] = None,
+        analysis_slurm_config: _Optional[_SlurmConfig] = None,
         update_paths: bool = True,
     ) -> None:
         """
@@ -103,6 +106,13 @@ class LamWindow(_SimulationRunner):
         stream_log_level : int, Optional, default: logging.INFO
             Logging level to use for the steam file handlers for the
             Ensemble object and its child objects.
+        slurm_config: SlurmConfig, default: None
+            Configuration for the SLURM job scheduler. If None, the
+            default partition is used.
+        analysis_slurm_config: SlurmConfig, default: None
+            Configuration for the SLURM job scheduler for the analysis.
+            This is helpful e.g. if you want to submit analysis to the CPU
+            partition, but the main simulation to the GPU partition. If None,
         update_paths: bool, Optional, default: True
             If true, if the simulation runner is loaded by unpickling, then
             update_paths() is called.
@@ -122,6 +132,8 @@ class LamWindow(_SimulationRunner):
             stream_log_level=stream_log_level,
             ensemble_size=ensemble_size,
             update_paths=update_paths,
+            slurm_config=slurm_config,
+            analysis_slurm_config=analysis_slurm_config,
             dump=False,
         )
 
@@ -176,6 +188,8 @@ class LamWindow(_SimulationRunner):
                         input_dir=sim_base_dir,
                         output_dir=sim_base_dir,
                         stream_log_level=stream_log_level,
+                        slurm_config=self.slurm_config,
+                        analysis_slurm_config=self.analysis_slurm_config,
                     )
                 )
 
