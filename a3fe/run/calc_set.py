@@ -10,7 +10,6 @@ from typing import List as _List
 from typing import Optional as _Optional
 
 import numpy as _np
-from pandas.core.api import DataFrame as DataFrame
 from scipy import stats as _stats
 
 from ..analyse.analyse_set import compute_stats as _compute_stats
