@@ -51,8 +51,14 @@ For more details of the algorithms, please see [the preprint](https://doi.org/10
 Some Notes on the Implementation
 *********************************
 
-a3fe is designed to be easily adaptable to any SLURM cluster. The SLURM submission settings can be tailored by modifying
-the header of ``run_somd.sh`` in the input directory.
+a3fe is designed to be easily adaptable to any SLURM cluster. The SLURM submission settings can be tailored by modifying 
+the :class:`a3fe.SlurmConfig` of your calculation (or other simulation runner). For example, to change the partition:
+
+.. code-block:: python
+
+    calc.slurm_config.partition = "my-cluster-gpu-partition"
+
+If you don't supply a partition to the SlurmConfig, a3fe will use the default partition.
 
 If the input is not parameterised, a3fe will parameterise your input with ff14SB, OFF 2.0.0, and TIP3P by default. See 
 :ref:`preparing input<preparing-input>`. By default, a3fe will solvate your system in a rhombic dodecahedral box with 150 mM NaCl

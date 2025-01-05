@@ -53,6 +53,7 @@ from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._virtual_queue import VirtualQueue as _VirtualQueue
 from .enums import StageType as _StageType
 from .lambda_window import LamWindow as _LamWindow
+from ..configuration.slurm_config import SlurmConfig as _SlurmConfig
 
 
 class Stage(_SimulationRunner):
@@ -86,6 +87,8 @@ class Stage(_SimulationRunner):
         input_dir: _Optional[str] = None,
         output_dir: _Optional[str] = None,
         stream_log_level: int = _logging.INFO,
+        slurm_config: _Optional[_SlurmConfig] = None,
+        analysis_slurm_config: _Optional[_SlurmConfig] = None,
         update_paths: bool = True,
     ) -> None:
         """
@@ -127,6 +130,13 @@ class Stage(_SimulationRunner):
         stream_log_level : int, Optional, default: logging.INFO
             Logging level to use for the steam file handlers for the
             Ensemble object and its child objects.
+        slurm_config: SlurmConfig, default: None
+            Configuration for the SLURM job scheduler. If None, the
+            default partition is used.
+        analysis_slurm_config: SlurmConfig, default: None
+            Configuration for the SLURM job scheduler for the analysis.
+            This is helpful e.g. if you want to submit analysis to the CPU
+            partition, but the main simulation to the GPU partition. If None,
         update_paths: bool, Optional, default: True
             If True, if the simulation runner is loaded by unpickling, then
             update_paths() is called.
@@ -144,6 +154,8 @@ class Stage(_SimulationRunner):
             input_dir=input_dir,
             output_dir=output_dir,
             stream_log_level=stream_log_level,
+            slurm_config=slurm_config,
+            analysis_slurm_config=analysis_slurm_config,
             ensemble_size=ensemble_size,
             update_paths=update_paths,
             dump=False,
@@ -182,6 +194,8 @@ class Stage(_SimulationRunner):
                         base_dir=lam_base_dir,
                         input_dir=self.input_dir,
                         stream_log_level=self.stream_log_level,
+                        slurm_config=self.slurm_config,
+                        analysis_slurm_config=self.analysis_slurm_config,
                     )
                 )
 
@@ -241,8 +255,8 @@ class Stage(_SimulationRunner):
         - :math:`t_{\\mathrm{Optimal, k}}` is the calculated optimal runtime for lambda window :math:`k`
         - :math:`t_{\\mathrm{Current}, k}` is the current runtime for lambda window :math:`k`
         - :math:`C` is the runtime constant
-        - :math:`\sigma_{\\mathrm{Current}}(\\Delta \\widehat{F}_k)` is the current uncertainty in the free energy change contribution for lambda window :math:`k`. This is estimated from inter-run deviations.
-        - :math:`\Delta \\widehat{F}_k` is the free energy change contribution for lambda window :math:`k`
+        - :math:`\\sigma_{\\mathrm{Current}}(\\Delta \\widehat{F}_k)` is the current uncertainty in the free energy change contribution for lambda window :math:`k`. This is estimated from inter-run deviations.
+        - :math:`\\Delta \\widehat{F}_k` is the free energy change contribution for lambda window :math:`k`
 
         Parameters
         ----------
@@ -793,11 +807,11 @@ class Stage(_SimulationRunner):
                     equilibrated=True,
                 )
             else:
-                jobs, mbar_outfiles, tmp_simfiles = _submit_mbar_slurm(
+                jobs, mbar_outfiles, tmp_files = _submit_mbar_slurm(
                     output_dir=self.output_dir,
                     virtual_queue=self.virtual_queue,
+                    slurm_config=self.analysis_slurm_config,
                     run_nos=run_nos,
-                    run_somd_dir=self.input_dir,
                     percentage_end=fraction * 100,
                     percentage_start=0,
                     subsampling=subsampling,
@@ -810,7 +824,7 @@ class Stage(_SimulationRunner):
                     jobs=jobs,
                     mbar_out_files=mbar_outfiles,
                     virtual_queue=self.virtual_queue,
-                    tmp_simfiles=tmp_simfiles,
+                    tmp_files=tmp_files,
                 )
 
             mean_free_energy = _np.mean(free_energies)
@@ -1064,8 +1078,8 @@ class Stage(_SimulationRunner):
                     _submit_mbar_slurm(
                         output_dir=self.output_dir,
                         virtual_queue=self.virtual_queue,
+                        slurm_config=self.analysis_slurm_config,
                         run_nos=run_nos,
-                        run_somd_dir=self.input_dir,
                         percentage_end=end_percent,
                         percentage_start=start_percent,
                         subsampling=False,
@@ -1082,7 +1096,7 @@ class Stage(_SimulationRunner):
                         jobs=jobs,
                         mbar_out_files=mbar_outfiles,
                         virtual_queue=self.virtual_queue,
-                        tmp_simfiles=tmp_simfiles,
+                        tmp_files=tmp_simfiles,
                     )
                 )
 
@@ -1217,6 +1231,8 @@ class Stage(_SimulationRunner):
                 base_dir=lam_base_dir,
                 input_dir=self.input_dir,
                 stream_log_level=self.stream_log_level,
+                slurm_config=self.slurm_config,
+                analysis_slurm_config=self.analysis_slurm_config,
             )
             # Overwrite the default equilibration detection algorithm
             new_lam_win.check_equil = old_lam_vals_attrs["check_equil"]

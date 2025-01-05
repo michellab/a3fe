@@ -22,7 +22,6 @@ import pandas as _pd
 from ..analyse.plot import plot_convergence as _plot_convergence
 from ..analyse.plot import plot_rmsds as _plot_rmsds
 from ..analyse.plot import plot_sq_sem_convergence as _plot_sq_sem_convergence
-from ..read._process_slurm_files import get_slurm_file_base as _get_slurm_file_base
 from ..read._process_somd_files import read_simfile_option as _read_simfile_option
 from ..read._process_somd_files import write_simfile_option as _write_simfile_option
 from . import system_prep as _system_prep
@@ -35,7 +34,10 @@ from .enums import LegType as _LegType
 from .enums import PreparationStage as _PreparationStage
 from .enums import StageType as _StageType
 from .stage import Stage as _Stage
-from ..configuration import SystemPreparationConfig as _SystemPreparationConfig
+from ..configuration import (
+    SystemPreparationConfig as _SystemPreparationConfig,
+    SlurmConfig as _SlurmConfig,
+)
 
 
 class Leg(_SimulationRunner):
@@ -49,7 +51,6 @@ class Leg(_SimulationRunner):
         required_input_files[leg_type] = {}
         for prep_stage in _PreparationStage:
             required_input_files[leg_type][prep_stage] = [
-                "run_somd.sh",
                 "template_config.cfg",
             ] + prep_stage.get_simulation_input_files(leg_type)
 
@@ -68,6 +69,8 @@ class Leg(_SimulationRunner):
         base_dir: _Optional[str] = None,
         input_dir: _Optional[str] = None,
         stream_log_level: int = _logging.INFO,
+        slurm_config: _Optional[_SlurmConfig] = None,
+        analysis_slurm_config: _Optional[_SlurmConfig] = None,
         update_paths: bool = True,
     ) -> None:
         """
@@ -103,6 +106,13 @@ class Leg(_SimulationRunner):
         stream_log_level : int, Optional, default: logging.INFO
             Logging level to use for the steam file handlers for the
             calculation object and its child objects.
+        slurm_config: SlurmConfig, default: None
+            Configuration for the SLURM job scheduler. If None, the
+            default partition is used.
+        analysis_slurm_config: SlurmConfig, default: None
+            Configuration for the SLURM job scheduler for the analysis.
+            This is helpful e.g. if you want to submit analysis to the CPU
+            partition, but the main simulation to the GPU partition. If None,
         update_paths: bool, optional, default: True
             if true, if the simulation runner is loaded by unpickling, then
             update_paths() is called.
@@ -118,6 +128,8 @@ class Leg(_SimulationRunner):
             base_dir=base_dir,
             input_dir=input_dir,
             stream_log_level=stream_log_level,
+            slurm_config=slurm_config,
+            analysis_slurm_config=analysis_slurm_config,
             ensemble_size=ensemble_size,
             update_paths=update_paths,
             dump=False,
@@ -265,6 +277,8 @@ class Leg(_SimulationRunner):
                         "input", "output"
                     ),
                     stream_log_level=self.stream_log_level,
+                    slurm_config=self.slurm_config,
+                    analysis_slurm_config=self.analysis_slurm_config,
                 )
             )
 
@@ -775,9 +789,6 @@ class Leg(_SimulationRunner):
             for file in _glob.glob(f"{stage_input_dir}/lambda_*"):
                 _subprocess.run(["rm", "-rf", file], check=True)
 
-            # Copy the run_somd.sh script to the stage input directory
-            _shutil.copy(f"{self.input_dir}/run_somd.sh", stage_input_dir)
-
             # Copy the final coordinates from the ensemble equilibration stage to the stage input directory
             # and, if this is the bound stage, also copy over the restraints
             for i in range(self.ensemble_size):
@@ -871,31 +882,9 @@ class Leg(_SimulationRunner):
         -------
         None
         """
-        # Write the slurm script
-        # Get the header from run_somd.sh
-        header_lines = []
-        with open(f"{self.input_dir}/run_somd.sh", "r") as file:
-            for line in file.readlines():
-                if line.startswith("#SBATCH") or line.startswith("#!/bin/bash"):
-                    header_lines.append(line)
-                else:
-                    break
-
-        # Add lines to run the python function and write out
-        header_lines.append(
-            f"\npython -c 'from a3fe.run.system_prep import {sys_prep_fn.__name__}; {sys_prep_fn.__name__}()'"
-        )
-        slurm_file = f"{run_dir}/{job_name}.sh"
-        with open(slurm_file, "w") as file:
-            file.writelines(header_lines)
-
-        # Submit to the virtual queue
-        cmd_list = [
-            "--chdir",
-            f"{run_dir}",
-            f"{run_dir}/{job_name}.sh",
-        ]  # The virtual queue adds sbatch
-        slurm_file_base = _get_slurm_file_base(slurm_file)
+        cmd = f"python -c 'from a3fe.run.system_prep import {sys_prep_fn.__name__}; {sys_prep_fn.__name__}()'"
+        cmd_list = self.slurm_config.get_submission_cmds(cmd=cmd, run_dir=run_dir)
+        slurm_file_base = self.slurm_config.get_slurm_output_file_base(run_dir=run_dir)
         job = self.virtual_queue.submit(cmd_list, slurm_file_base=slurm_file_base)
         self._logger.info(f"Submitted job {job}")
         self.jobs.append(job)
@@ -938,8 +927,8 @@ class Leg(_SimulationRunner):
         - :math:`t_{\\mathrm{Optimal, k}}` is the calculated optimal runtime for lambda window :math:`k`
         - :math:`t_{\\mathrm{Current}, k}` is the current runtime for lambda window :math:`k`
         - :math:`C` is the runtime constant
-        - :math:`\sigma_{\\mathrm{Current}}(\\Delta \\widehat{F}_k)` is the current uncertainty in the free energy change contribution for lambda window :math:`k`. This is estimated from inter-run deviations.
-        - :math:`\Delta \\widehat{F}_k` is the free energy change contribution for lambda window :math:`k`
+        - :math:`\\sigma_{\\mathrm{Current}}(\\Delta \\widehat{F}_k)` is the current uncertainty in the free energy change contribution for lambda window :math:`k`. This is estimated from inter-run deviations.
+        - :math:`\\Delta \\widehat{F}_k` is the free energy change contribution for lambda window :math:`k`
 
         Parameters
         ----------

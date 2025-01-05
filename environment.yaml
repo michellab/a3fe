@@ -1,4 +1,4 @@
-name: a3fe
+name: a3fe-feature-decouple-2
 channels:
 
   - conda-forge

@@ -5,7 +5,6 @@ __all__ = ["Calculation"]
 
 import logging as _logging
 import os as _os
-import shutil as _shutil
 from typing import List as _List
 from typing import Optional as _Optional
 
@@ -13,7 +12,10 @@ from ._simulation_runner import SimulationRunner as _SimulationRunner
 from .enums import LegType as _LegType
 from .enums import PreparationStage as _PreparationStage
 from .leg import Leg as _Leg
-from ..configuration import SystemPreparationConfig as _SystemPreparationConfig
+from ..configuration import (
+    SystemPreparationConfig as _SystemPreparationConfig,
+    SlurmConfig as _SlurmConfig,
+)
 
 
 class Calculation(_SimulationRunner):
@@ -23,7 +25,6 @@ class Calculation(_SimulationRunner):
     """
 
     required_input_files = [
-        "run_somd.sh",
         "protein.pdb",
         "ligand.sdf",
         "template_config.cfg",
@@ -40,6 +41,8 @@ class Calculation(_SimulationRunner):
         input_dir: _Optional[str] = None,
         base_dir: _Optional[str] = None,
         stream_log_level: int = _logging.INFO,
+        slurm_config: _Optional[_SlurmConfig] = None,
+        analysis_slurm_config: _Optional[_SlurmConfig] = None,
         update_paths: bool = True,
     ) -> None:
         """
@@ -78,6 +81,13 @@ class Calculation(_SimulationRunner):
         stream_log_level : int, Optional, default: logging.INFO
             Logging level to use for the steam file handlers for the
             calculation object and its child objects.
+        slurm_config: SlurmConfig, default: None
+            Configuration for the SLURM job scheduler. If None, the
+            default partition is used.
+        analysis_slurm_config: SlurmConfig, default: None
+            Configuration for the SLURM job scheduler for the analysis.
+            This is helpful e.g. if you want to submit analysis to the CPU
+            partition, but the main simulation to the GPU partition. If None,
         update_paths: bool, Optional, default: True
             If True, if the simulation runner is loaded by unpickling, then
             update_paths() is called.
@@ -93,6 +103,8 @@ class Calculation(_SimulationRunner):
             stream_log_level=stream_log_level,
             ensemble_size=ensemble_size,
             update_paths=update_paths,
+            slurm_config=slurm_config,
+            analysis_slurm_config=analysis_slurm_config,
             dump=False,
         )
 
@@ -196,6 +208,8 @@ class Calculation(_SimulationRunner):
                 input_dir=self.input_dir,
                 base_dir=_os.path.join(self.base_dir, leg_type.name.lower()),
                 stream_log_level=self.stream_log_level,
+                slurm_config=self.slurm_config,
+                analysis_slurm_config=self.analysis_slurm_config,
             )
             self.legs.append(leg)
             leg.setup(configs[leg_type])
@@ -304,8 +318,8 @@ class Calculation(_SimulationRunner):
         - :math:`t_{\\mathrm{Optimal, k}}` is the calculated optimal runtime for lambda window :math:`k`
         - :math:`t_{\\mathrm{Current}, k}` is the current runtime for lambda window :math:`k`
         - :math:`C` is the runtime constant
-        - :math:`\sigma_{\\mathrm{Current}}(\\Delta \\widehat{F}_k)` is the current uncertainty in the free energy change contribution for lambda window :math:`k`. This is estimated from inter-run deviations.
-        - :math:`\Delta \\widehat{F}_k` is the free energy change contribution for lambda window :math:`k`
+        - :math:`\\sigma_{\\mathrm{Current}}(\\Delta \\widehat{F}_k)` is the current uncertainty in the free energy change contribution for lambda window :math:`k`. This is estimated from inter-run deviations.
+        - :math:`\\Delta \\widehat{F}_k` is the free energy change contribution for lambda window :math:`k`
 
         Parameters
         ----------
@@ -338,16 +352,3 @@ class Calculation(_SimulationRunner):
         super().run(
             run_nos=run_nos, adaptive=adaptive, runtime=runtime, parallel=parallel
         )
-
-    def update_run_somd(self) -> None:
-        """
-        Overwrite the run_somd.sh script in all simulation output dirs with
-        the version currently in the calculation input dir.
-        """
-        master_run_somd = _os.path.join(self.input_dir, "run_somd.sh")
-        for leg in self.legs:
-            for stage in leg.stages:
-                _shutil.copy(master_run_somd, stage.input_dir)
-                for lambda_window in stage.lam_windows:
-                    for simulation in lambda_window.sims:
-                        _shutil.copy(master_run_somd, simulation.input_dir)

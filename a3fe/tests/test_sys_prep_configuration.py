@@ -1,4 +1,4 @@
-"""Unit and regression tests for Pydantic configuration classes."""
+"""Unit and regression tests for the SystemPreparationConfig class."""
 
 from tempfile import TemporaryDirectory
 
@@ -26,7 +26,7 @@ def test_incorrect_config_mod():
         config.ensemble_equilibration_time = -1
 
 
-def test_config_pickle_and_load():
+def test_config_dump_and_load():
     """Test that the config can be pickled and loaded."""
     with TemporaryDirectory() as dirname:
         config = SystemPreparationConfig()

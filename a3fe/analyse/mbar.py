@@ -15,7 +15,6 @@ from typing import Tuple as _Tuple
 
 import numpy as _np
 
-from ..read._process_slurm_files import get_slurm_file_base as _get_slurm_file_base
 from ..read._process_somd_files import read_mbar_gradients as _read_mbar_gradients
 from ..read._process_somd_files import read_mbar_result as _read_mbar_result
 from ..read._process_somd_files import (
@@ -23,6 +22,8 @@ from ..read._process_somd_files import (
 )
 from ..run._virtual_queue import Job as _Job
 from ..run._virtual_queue import VirtualQueue as _VirtualQueue
+
+from ..configuration import SlurmConfig as _SlurmConfig
 
 
 def run_mbar(
@@ -127,8 +128,8 @@ def run_mbar(
 def submit_mbar_slurm(
     output_dir: str,
     virtual_queue: _VirtualQueue,
+    slurm_config: _SlurmConfig,
     run_nos: _List[int],
-    run_somd_dir: str,
     percentage_end: float = 100,
     percentage_start: float = 0,
     subsampling: bool = False,
@@ -144,11 +145,10 @@ def submit_mbar_slurm(
         The path to the output directory
     virtual_queue : VirtualQueue
         The virtual queue to submit the MBAR jobs to.
+    slurm_config: SlurmConfig
+        The SLURM configuration to use for the jobs.
     run_nos : List[int]
         The run numbers to use for MBAR.
-    run_somd_dir : str
-        The directory in which to find the `run_somd.sh` script, from
-        which the slurm header will be copied.
     percentage_end : float, Optional, default: 100
         The percentage of data after which to truncate the datafiles.
         For example, if 100, the full datafile will be used. If 50, only
@@ -175,11 +175,11 @@ def submit_mbar_slurm(
         The paths to the MBAR output files, which will be created
         once the jobs complete.
 
-    tmp_simfiles : List[str]
-        The paths to the temporary truncated simfiles, so that they can be
-        cleaned up later.
+    tmp_files : List[str]
+        The paths to temporary files (truncated simfiles and submission scripts),
+        so that they can be cleaned up later.
     """
-    tmp_simfiles = _prepare_simfiles(
+    tmp_files = _prepare_simfiles(
         output_dir=output_dir,
         run_nos=run_nos,
         percentage_end=percentage_end,
@@ -187,23 +187,17 @@ def submit_mbar_slurm(
         equilibrated=equilibrated,
     )
 
-    # Read the slurm header
-    # Get the header from run_somd.sh
-    header_lines = []
-    with open(f"{run_somd_dir}/run_somd.sh", "r") as file:
-        for line in file.readlines():
-            if line.startswith("#SBATCH") or line.startswith("#!/bin/bash"):
-                header_lines.append(line)
-            else:
-                break
-
     # Add MBAR command and run for each run.
     mbar_out_files = []
     jobs = []
+
     for run_no in run_nos:
-        # Get the name of the output file
+        # Get the name of the output files - the first for the MBAR output, and the second for the SLURM output
         outfile = f"{output_dir}/freenrg-MBAR-run_{str(run_no).zfill(2)}_{round(percentage_end, 3)}_end_{round(percentage_start, 3)}_start.dat"
         mbar_out_files.append(outfile)
+        slurm_outfile = f"slurm_freenrg-MBAR-run_{str(run_no).zfill(2)}_{round(percentage_end, 3)}_end_{round(percentage_start, 3)}_start.out"
+        slurm_config.output = slurm_outfile
+
         # Create the command.
         cmd_list = [
             "analyse_freenrg",
@@ -219,21 +213,19 @@ def submit_mbar_slurm(
         if subsampling:
             cmd_list.append("--subsampling")
         slurm_cmd = " ".join(cmd_list)
-        slurm_lines = header_lines + [slurm_cmd]
-        # Write the slurm file
-        slurm_file = f"{output_dir}/freenrg-MBAR-run_{str(run_no).zfill(2)}_{round(percentage_end, 3)}_end_{round(percentage_start, 3)}_start.sh"
-        with open(slurm_file, "w") as file:
-            file.writelines(slurm_lines)
 
-        # Submit to the virtual queue
-        cmd_list = [
-            "--chdir",
-            f"{output_dir}",
-            f"{slurm_file}",
-        ]  # The virtual queue adds sbatch
-        slurm_file_base = _get_slurm_file_base(slurm_file)
-        job = virtual_queue.submit(cmd_list, slurm_file_base=slurm_file_base)
-        # Update the virtual queue to submit the job
+        # Create and submit the job
+        script_name = f"{output_dir}/freenrg-MBAR-run_{str(run_no).zfill(2)}_{round(percentage_end, 3)}_end_{round(percentage_start, 3)}_start"
+        submission_args = slurm_config.get_submission_cmds(
+            slurm_cmd, output_dir, script_name
+        )
+        job = virtual_queue.submit(
+            submission_args,
+            slurm_file_base=slurm_config.get_slurm_output_file_base(output_dir),
+        )
+        tmp_files += [script_name + ".sh", _os.path.join(output_dir, slurm_outfile)]
+
+        # Update the virtual queue to submit the job to the real queue
         virtual_queue.update()
         jobs.append(job)
 
@@ -244,7 +236,7 @@ def submit_mbar_slurm(
                 _sleep(30)
                 virtual_queue.update()
 
-    return jobs, mbar_out_files, tmp_simfiles
+    return jobs, mbar_out_files, tmp_files
 
 
 def collect_mbar_slurm(
@@ -254,7 +246,7 @@ def collect_mbar_slurm(
     mbar_out_files: _List[str],
     virtual_queue: _VirtualQueue,
     delete_outfiles: bool = False,
-    tmp_simfiles: _List[str] = [],
+    tmp_files: _List[str] = [],
 ) -> _Tuple[_np.ndarray, _np.ndarray, _List[str], _Dict[str, _Dict[str, _np.ndarray]]]:
     """
     Collect the results from MBAR slurm jobs.
@@ -274,9 +266,9 @@ def collect_mbar_slurm(
     delete_outfiles : bool, Optional, default: False
         Whether to delete the MBAR analysis output files after the free
         energy change and errors have been extracted.
-    tmp_simfiles : List[str], Optional, default: []
-        The paths to the temporary truncated simfiles, so that they can be
-        cleaned up later.
+    tmp_files : List[str], Optional, default: []
+        The paths to temporary files (truncated simfiles and submission scripts),
+        so that they can be cleaned up later.
 
     Returns
     -------
@@ -324,8 +316,8 @@ def collect_mbar_slurm(
         mbar_out_files = []
 
     # Clean up temporary simfiles
-    for tmp_simfile in tmp_simfiles:
-        _subprocess.run(["rm", tmp_simfile])
+    for tmp_file in tmp_files:
+        _subprocess.run(["rm", tmp_file])
 
     return free_energies, errors, mbar_out_files, mbar_grads
 

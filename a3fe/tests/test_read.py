@@ -15,8 +15,6 @@ from ..read._process_somd_files import (
     write_truncated_sim_datafile,
 )
 
-from ..read._process_slurm_files import get_slurm_file_base
-
 
 def test_read_mbar_result():
     """Test that the read_mbar_result function works correctly"""
@@ -114,17 +112,3 @@ def test_write_truncated_sim_datafile_end_and_start():
             lines = f.readlines()
         assert lines[13].split()[0] == "5000"
         assert lines[-2].split()[0] == "9000"
-
-
-def test_process_slurm_file_base():
-    """
-    Test that the SLURM file base name is correctly extracted from a SLURM file.
-    """
-    slurm_file_base = get_slurm_file_base("a3fe/data/example_run_dir/input/run_somd.sh")
-    assert slurm_file_base == "a3fe/data/example_run_dir/input/somd-array-gpu-"
-
-    # Test alternative formatting
-    slurm_file_base = get_slurm_file_base(
-        "a3fe/data/alternative_input/alternative_run_somd.sh"
-    )
-    assert slurm_file_base == "a3fe/data/alternative_input/somd-array-gpu-"

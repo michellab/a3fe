@@ -96,7 +96,7 @@ def t4l_calc():
         )
 
         # Copy over remaining input files
-        for file in ["run_somd.sh", "template_config.cfg"]:
+        for file in ["template_config.cfg"]:
             subprocess.run(
                 [
                     "cp",
