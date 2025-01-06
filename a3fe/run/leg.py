@@ -37,6 +37,7 @@ from .stage import Stage as _Stage
 from ..configuration import (
     SystemPreparationConfig as _SystemPreparationConfig,
     SlurmConfig as _SlurmConfig,
+    SomdConfig as _SomdConfig,
 )
 
 
@@ -51,7 +52,6 @@ class Leg(_SimulationRunner):
         required_input_files[leg_type] = {}
         for prep_stage in _PreparationStage:
             required_input_files[leg_type][prep_stage] = [
-                "template_config.cfg",
             ] + prep_stage.get_simulation_input_files(leg_type)
 
     required_stages = {
@@ -71,6 +71,7 @@ class Leg(_SimulationRunner):
         stream_log_level: int = _logging.INFO,
         slurm_config: _Optional[_SlurmConfig] = None,
         analysis_slurm_config: _Optional[_SlurmConfig] = None,
+        engine_config: _Optional[_SomdConfig] = None,
         update_paths: bool = True,
     ) -> None:
         """
@@ -113,6 +114,8 @@ class Leg(_SimulationRunner):
             Configuration for the SLURM job scheduler for the analysis.
             This is helpful e.g. if you want to submit analysis to the CPU
             partition, but the main simulation to the GPU partition. If None,
+        engine_config: SomdConfig, default: None
+            Configuration for the SOMD engine. If None, the default configuration is used.
         update_paths: bool, optional, default: True
             if true, if the simulation runner is loaded by unpickling, then
             update_paths() is called.
@@ -130,6 +133,7 @@ class Leg(_SimulationRunner):
             stream_log_level=stream_log_level,
             slurm_config=slurm_config,
             analysis_slurm_config=analysis_slurm_config,
+            engine_config=engine_config,
             ensemble_size=ensemble_size,
             update_paths=update_paths,
             dump=False,
@@ -279,6 +283,7 @@ class Leg(_SimulationRunner):
                     stream_log_level=self.stream_log_level,
                     slurm_config=self.slurm_config,
                     analysis_slurm_config=self.analysis_slurm_config,
+                    engine_config=self.engine_config,
                 )
             )
 
@@ -736,16 +741,11 @@ class Leg(_SimulationRunner):
 
         # If we have a charged ligand, make sure that SOMD is using PME
         if lig_charge != 0:
-            try:
-                cuttoff_type = _read_simfile_option(
-                    f"{self.input_dir}/template_config.cfg", "cutoff type"
-                )
-            except ValueError:  # Will get this if the option is not present (but the default is not PME)
-                cuttoff_type = None
-            if cuttoff_type != "PME":
+            cutoff_type = self.engine_config.cutoff_type
+            if cutoff_type != "PME":
                 raise ValueError(
                     f"The ligand has a non-zero charge ({lig_charge}), so SOMD must use PME for the electrostatics. "
-                    "Please set the 'cutoff type' option in the somd.cfg file to 'PME'."
+                    "Please set the 'cutoff type' option in the engine_config to 'PME'."
                 )
 
             self._logger.info(
@@ -808,19 +808,24 @@ class Leg(_SimulationRunner):
                         restraint_file, f"{stage_input_dir}/restraint_{i + 1}.txt"
                     )
 
-            # Update the template-config.cfg file with the perturbed residue number generated
+            # Update the somd.cfg file with the perturbed residue number generated
             # by BSS, as well as the restraints options
-            _shutil.copy(f"{self.input_dir}/template_config.cfg", stage_input_dir)
+            
+            # generate the somd.cfg file
+            config_path = self.engine_config.get_somd_config(
+                run_dir=stage_input_dir,
+                config_name="somd"
+            )
 
             try:
                 use_boresch_restraints = _read_simfile_option(
-                    f"{stage_input_dir}/somd.cfg", "use boresch restraints"
+                    config_path, "use boresch restraints"
                 )
             except ValueError:
                 use_boresch_restraints = False
             try:
                 turn_on_receptor_ligand_restraints_mode = _read_simfile_option(
-                    f"{stage_input_dir}/somd.cfg",
+                    config_path,
                     "turn on receptor-ligand restraints mode",
                 )
             except ValueError:
@@ -837,24 +842,14 @@ class Leg(_SimulationRunner):
 
             for option, value in options_to_write.items():
                 _write_simfile_option(
-                    f"{stage_input_dir}/template_config.cfg", option, value
+                    config_path, option, value
                 )
-
-            # Now overwrite the SOMD generated config file with the updated template
-            _subprocess.run(
-                [
-                    "mv",
-                    f"{stage_input_dir}/template_config.cfg",
-                    f"{stage_input_dir}/somd.cfg",
-                ],
-                check=True,
-            )
 
             # Set the default lambda windows based on the leg and stage types
             lam_vals = config.lambda_values[self.leg_type][stage_type]
             lam_vals_str = ", ".join([str(lam_val) for lam_val in lam_vals])
             _write_simfile_option(
-                f"{stage_input_dir}/somd.cfg", "lambda array", lam_vals_str
+                config_path, "lambda array", lam_vals_str
             )
 
         # We no longer need to store the large BSS restraint classes.

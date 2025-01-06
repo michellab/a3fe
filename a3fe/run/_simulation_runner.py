@@ -28,7 +28,7 @@ from ..analyse.plot import plot_sq_sem_convergence as _plot_sq_sem_convergence
 from ._logging_formatters import _A3feFileFormatter, _A3feStreamFormatter
 
 from ..configuration import SlurmConfig as _SlurmConfig
-
+from ..configuration import SomdConfig as _SomdConfig
 
 class SimulationRunner(ABC):
     """An abstract base class for simulation runners. Note that
@@ -55,6 +55,7 @@ class SimulationRunner(ABC):
         output_dir: _Optional[str] = None,
         slurm_config: _Optional[_SlurmConfig] = None,
         analysis_slurm_config: _Optional[_SlurmConfig] = None,
+        engine_config: _Optional[_SomdConfig] = None,
         stream_log_level: int = _logging.INFO,
         dg_multiplier: int = 1,
         ensemble_size: int = 5,
@@ -81,6 +82,8 @@ class SimulationRunner(ABC):
             This is helpful e.g. if you want to submit analysis to the CPU
             partition, but the main simulation to the GPU partition. If None,
             the standard slurm_config is used.
+        engine_config: SomdConfig, default: None
+            Configuration for the SOMD engine. If None, the default configuration is used.
         stream_log_level : int, Optional, default: logging.INFO
             Logging level to use for the steam file handlers for the
             calculation object and its child objects.
@@ -170,6 +173,12 @@ class SimulationRunner(ABC):
                 if analysis_slurm_config is not None
                 else self.slurm_config
             )
+
+            # Create the SOMD config with default values if none is provided
+            if engine_config is None:
+                self.engine_config = _SomdConfig()
+            else:
+                self.engine_config = engine_config
 
             # Save state
             if dump:

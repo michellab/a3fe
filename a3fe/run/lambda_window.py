@@ -21,6 +21,7 @@ from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._virtual_queue import VirtualQueue as _VirtualQueue
 from .simulation import Simulation as _Simulation
 from ..configuration import SlurmConfig as _SlurmConfig
+from ..configuration import SomdConfig as _SomdConfig
 
 
 class LamWindow(_SimulationRunner):
@@ -53,6 +54,7 @@ class LamWindow(_SimulationRunner):
         stream_log_level: int = _logging.INFO,
         slurm_config: _Optional[_SlurmConfig] = None,
         analysis_slurm_config: _Optional[_SlurmConfig] = None,
+        engine_config: _Optional[_SomdConfig] = None,
         update_paths: bool = True,
     ) -> None:
         """
@@ -113,6 +115,8 @@ class LamWindow(_SimulationRunner):
             Configuration for the SLURM job scheduler for the analysis.
             This is helpful e.g. if you want to submit analysis to the CPU
             partition, but the main simulation to the GPU partition. If None,
+        engine_config: SomdConfig, default: None
+            Configuration for the SOMD engine. If None, the default configuration is used.
         update_paths: bool, Optional, default: True
             If true, if the simulation runner is loaded by unpickling, then
             update_paths() is called.
@@ -134,6 +138,7 @@ class LamWindow(_SimulationRunner):
             update_paths=update_paths,
             slurm_config=slurm_config,
             analysis_slurm_config=analysis_slurm_config,
+            engine_config=engine_config,
             dump=False,
         )
 
@@ -190,6 +195,7 @@ class LamWindow(_SimulationRunner):
                         stream_log_level=stream_log_level,
                         slurm_config=self.slurm_config,
                         analysis_slurm_config=self.analysis_slurm_config,
+                        engine_config=self.engine_config,
                     )
                 )
 

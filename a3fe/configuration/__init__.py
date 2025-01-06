@@ -2,3 +2,4 @@
 
 from .system_prep_config import SystemPreparationConfig
 from .slurm_config import SlurmConfig
+from .engine_config import SomdConfig

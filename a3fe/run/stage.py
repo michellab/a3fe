@@ -54,6 +54,7 @@ from ._virtual_queue import VirtualQueue as _VirtualQueue
 from .enums import StageType as _StageType
 from .lambda_window import LamWindow as _LamWindow
 from ..configuration.slurm_config import SlurmConfig as _SlurmConfig
+from ..configuration.engine_config import SomdConfig as _SomdConfig
 
 
 class Stage(_SimulationRunner):
@@ -89,6 +90,7 @@ class Stage(_SimulationRunner):
         stream_log_level: int = _logging.INFO,
         slurm_config: _Optional[_SlurmConfig] = None,
         analysis_slurm_config: _Optional[_SlurmConfig] = None,
+        engine_config: _Optional[_SomdConfig] = None,
         update_paths: bool = True,
     ) -> None:
         """
@@ -137,6 +139,8 @@ class Stage(_SimulationRunner):
             Configuration for the SLURM job scheduler for the analysis.
             This is helpful e.g. if you want to submit analysis to the CPU
             partition, but the main simulation to the GPU partition. If None,
+        engine_config: SomdConfig, default: None
+            Configuration for the SOMD engine. If None, the default configuration is used.
         update_paths: bool, Optional, default: True
             If True, if the simulation runner is loaded by unpickling, then
             update_paths() is called.
@@ -156,6 +160,7 @@ class Stage(_SimulationRunner):
             stream_log_level=stream_log_level,
             slurm_config=slurm_config,
             analysis_slurm_config=analysis_slurm_config,
+            engine_config=engine_config,
             ensemble_size=ensemble_size,
             update_paths=update_paths,
             dump=False,
@@ -196,6 +201,7 @@ class Stage(_SimulationRunner):
                         stream_log_level=self.stream_log_level,
                         slurm_config=self.slurm_config,
                         analysis_slurm_config=self.analysis_slurm_config,
+                        engine_config=self.engine_config,
                     )
                 )
 
