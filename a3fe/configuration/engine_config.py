@@ -81,7 +81,7 @@ class SomdConfig(_BaseModel):
         description="Frequency of energy output"
     )
     extra_options: _Dict[str, str] = _Field(
-        default_factory=_Dict,
+        default_factory=dict,
         description="Extra options to pass to the SOMD engine"
     )
     model_config = _ConfigDict(validate_assignment=True)
@@ -92,6 +92,8 @@ class SomdConfig(_BaseModel):
 
         Parameters
         ----------
+        #content : str
+            Content to write to the configuration file.
         run_dir : str
             Directory to write the configuration file to.
 
@@ -135,6 +137,7 @@ class SomdConfig(_BaseModel):
             "### Alchemistry ###",
             f"perturbed residue number = {self.perturbed_residue_number}",
             f"energy frequency = {self.energy_frequency}",
+            "",
         ]
         # Add any extra options
         if self.extra_options:

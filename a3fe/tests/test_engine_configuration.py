@@ -64,7 +64,7 @@ def test_get_somd_config():
             "cutoff distance = 10.0 * angstrom\n"
             "\n"
             "### Trajectory ###\n"
-            "buffered coordinates frequency = 500\n"
+            "buffered coordinates frequency = 5000\n"
             "center solute = True\n"
             "\n"
             "### Minimisation ###\n"
@@ -72,7 +72,7 @@ def test_get_somd_config():
             "\n"
             "### Alchemistry ###\n"
             "perturbed residue number = 1\n"
-            "energy frequency = 500\n"
+            "energy frequency = 200\n"
         )
 
         with open(config_path, "r") as f:

@@ -22,7 +22,7 @@ class SlurmConfig(_BaseModel):
     Pydantic model for holding a SLURM configuration.
     """
 
-    partition: str = _Field("default", description="SLURM partition to submit to.")
+    partition: str = _Field("main", description="SLURM partition to submit to.")
     time: str = _Field("24:00:00", description="Time limit for the SLURM job.")
     gres: str = _Field("gpu:1", description="Resources to request - normally one GPU.")
     nodes: int = _Field(1, ge=1)
@@ -80,7 +80,7 @@ class SlurmConfig(_BaseModel):
         with open(script_path, "w") as f:
             f.write(script)
 
-        return ["rbatch", f"--chdir={run_dir}", script_path]
+        return ["sbatch", f"--chdir={run_dir}", script_path]
 
     def get_slurm_output_file_base(self, run_dir: str) -> str:
         """
