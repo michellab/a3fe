@@ -405,7 +405,3 @@ class LamWindow(_SimulationRunner):
 
     def setup(self) -> None:
         raise NotImplementedError("LamWindows are set up when they are created")
-
-    @property
-    def is_complete(self) -> bool:
-        raise NotImplementedError()

@@ -137,7 +137,7 @@ def read_overlap_mat(outfile: str) -> _np.ndarray:
     overlap_mat = []
     in_overlap_mat = False
     for line in lines:
-        if line.startswith("#Overlap matrix"):
+        if "#Overlap matrix" in line:
             in_overlap_mat = True
             continue
         if line.startswith("#"):

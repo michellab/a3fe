@@ -8,6 +8,7 @@ import os as _os
 import shutil as _shutil
 from typing import List as _List
 from typing import Optional as _Optional
+from pathlib import Path as _Path
 
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from .enums import LegType as _LegType
@@ -153,6 +154,15 @@ class Calculation(_SimulationRunner):
             self._prep_stage = min_prep_stage
 
         return self._prep_stage
+
+    @property
+    def is_complete(self) -> bool:
+        f"""Whether the {self.__class__.__name__} has completed."""
+        # Check if the overall_stats.dat file exists
+        if _Path(f"{self.output_dir}/overall_stats.dat").is_file():
+            return True
+
+        return False
 
     def setup(
         self,
