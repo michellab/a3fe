@@ -22,7 +22,7 @@ class SlurmConfig(_BaseModel):
     Pydantic model for holding a SLURM configuration.
     """
 
-    partition: str = _Field("main", description="SLURM partition to submit to.")
+    partition: str = _Field("default", description="SLURM partition to submit to.")
     time: str = _Field("24:00:00", description="Time limit for the SLURM job.")
     gres: str = _Field("gpu:1", description="Resources to request - normally one GPU.")
     nodes: int = _Field(1, ge=1)
