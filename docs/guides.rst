@@ -67,6 +67,9 @@ You can also find out which input files are required for a given preparation sta
      - free_preequil.prm7, free_preequil.rst7
      - The solvated ligand after heating and short initial equilibration steps
 
+The default simulation engine is SOMD ``engine_config = a3.SomdConfig()``,the details of its configuration could be customised freely.
+For example, ``engine_config = a3.SomdConfig(constants="hbonds", cutoff_type="PME", integrator="langevinmiddle", thermostat=False...)``
+But you can also use Gromacs ``engine_config = a3.GromacsConfig()``.
 
 Please note that if you are suppling parameterised input files, **the ligand must be the first molecule in the system
 and the ligand must be named "LIG"**. The former can be achieved by reordering the system with BioSimSpace, and the latter
@@ -189,8 +192,8 @@ three replicates. Note that this is expected to produce an erroneously favourabl
   cfg.runtime_npt = 50 # ps
   cfg.ensemble_equilibration_time = 100 # ps
   calc = a3.Calculation(ensemble_size = 3)
-  calc_set.setup(bound_leg_sysprep_config = cfg, free_leg_sysprep_config = cfg)
-  calc_set.run(adaptive = False, runtime=0.1) # ns
+  calc.setup(bound_leg_sysprep_config = cfg, free_leg_sysprep_config = cfg)
+  calc.run(adaptive = False, runtime=0.1) # ns
   calc.wait() # Wait for the simulations to finish
   calc.set_equilibration_time(1) # Discard the first ns of simulation time
   calc.analyse() # Fast analyses

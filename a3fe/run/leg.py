@@ -22,8 +22,6 @@ import pandas as _pd
 from ..analyse.plot import plot_convergence as _plot_convergence
 from ..analyse.plot import plot_rmsds as _plot_rmsds
 from ..analyse.plot import plot_sq_sem_convergence as _plot_sq_sem_convergence
-from ..read._process_somd_files import read_simfile_option as _read_simfile_option
-from ..read._process_somd_files import write_simfile_option as _write_simfile_option
 from . import system_prep as _system_prep
 from ._restraint import A3feRestraint as _A3feRestraint
 from ._simulation_runner import SimulationRunner as _SimulationRunner
@@ -812,45 +810,23 @@ class Leg(_SimulationRunner):
             # by BSS, as well as the restraints options
             
             # generate the somd.cfg file
-            config_path = self.engine_config.get_somd_config(
+            somd_config = self.engine_config.get_somd_config(
                 run_dir=stage_input_dir,
                 config_name="somd"
             )
-
-            try:
-                use_boresch_restraints = _read_simfile_option(
-                    config_path, "use boresch restraints"
-                )
-            except ValueError:
-                use_boresch_restraints = False
-            try:
-                turn_on_receptor_ligand_restraints_mode = _read_simfile_option(
-                    config_path,
-                    "turn on receptor-ligand restraints mode",
-                )
-            except ValueError:
-                turn_on_receptor_ligand_restraints_mode = False
-
-            # Now write simfile options
-            options_to_write = {
-                "perturbed_residue number": str(perturbed_resnum),
-                "use boresch restraints": use_boresch_restraints,
-                "turn on receptor-ligand restraints mode": turn_on_receptor_ligand_restraints_mode,
-                # This automatically uses the co-alchemical ion approach when there is a charge difference
-                "charge difference": str(-lig_charge),
-            }
-
-            for option, value in options_to_write.items():
-                _write_simfile_option(
-                    config_path, option, value
-                )
-
+            
+            # Set configuration options
+            somd_config.perturbed_residue_number = perturbed_resnum
+            somd_config.use_boresch_restraints = self.leg_type == _LegType.BOUND
+            somd_config.turn_on_receptor_ligand_restraints_mode = self.leg_type == _LegType.BOUND
+            somd_config.charge_difference = -lig_charge  # Use co-alchemical ion approach when there is a charge difference
+            
             # Set the default lambda windows based on the leg and stage types
             lam_vals = config.lambda_values[self.leg_type][stage_type]
-            lam_vals_str = ", ".join([str(lam_val) for lam_val in lam_vals])
-            _write_simfile_option(
-                config_path, "lambda array", lam_vals_str
-            )
+            somd_config.lambda_array = lam_vals
+            
+            # Write the updated configuration
+            somd_config.write(stage_input_dir)
 
         # We no longer need to store the large BSS restraint classes.
         self._lighten_restraints()

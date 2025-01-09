@@ -2,6 +2,7 @@
 
 from tempfile import TemporaryDirectory
 import os
+import logging
 
 from a3fe import SomdConfig
 
@@ -13,7 +14,7 @@ def create_test_input_dir():
     return temp_dir
 
 def test_create_config():
-    """Test that the config can be created."""
+    """Test that the config can be created with different parameters."""
     with create_test_input_dir() as input_dir:
         # Test with integer runtime
         config = SomdConfig(
@@ -28,17 +29,26 @@ def test_create_config():
             input_dir=input_dir
         )
         assert isinstance(config, SomdConfig)
+        
+        # Test with custom stream_log_level
+        config = SomdConfig(
+            runtime=1,
+            input_dir=input_dir,
+            stream_log_level=logging.DEBUG
+        )
+        assert config._stream_log_level == logging.DEBUG
 
-def test_config_pickle_and_load():
-    """Test that the config can be pickled and loaded."""
+def test_config_yaml_save_and_load():
+    """Test that the config can be saved to and loaded from YAML."""
     with create_test_input_dir() as input_dir:
         with TemporaryDirectory() as dirname:
             config = SomdConfig(
                 runtime=1,  # Integer runtime
                 input_dir=input_dir
             )
-            config.dump(dirname)
-            config2 = SomdConfig.load(dirname)
+            yaml_path = os.path.join(dirname, "config.yaml")
+            config.dump(yaml_path)
+            config2 = SomdConfig.load(yaml_path)
             assert config == config2
 
 def test_get_somd_config():
@@ -124,7 +134,7 @@ def test_constraint_validation():
             pass
 
 def test_cutoff_type_validation():
-    """Test cutoff type validation."""
+    """Test cutoff type and related parameters validation."""
     with create_test_input_dir() as input_dir:
         # Test PME cutoff type
         config = SomdConfig(
@@ -149,7 +159,7 @@ def test_cutoff_type_validation():
 def test_integrator_thermostat_validation():
     """Test integrator and thermostat validation."""
     with create_test_input_dir() as input_dir:
-        # Valid configuration
+        # Test valid configuration
         config = SomdConfig(
             integrator="langevinmiddle",
             thermostat=False,
@@ -159,7 +169,7 @@ def test_integrator_thermostat_validation():
         assert config.integrator == "langevinmiddle"
         assert config.thermostat is False
 
-        # Invalid configuration
+        # Test invalid configuration
         try:
             SomdConfig(
                 integrator="langevinmiddle",

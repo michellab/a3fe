@@ -201,7 +201,7 @@ class Stage(_SimulationRunner):
                         stream_log_level=self.stream_log_level,
                         slurm_config=self.slurm_config,
                         analysis_slurm_config=self.analysis_slurm_config,
-                        engine_config=self.engine_config,
+                        engine_config=self.engine_config.copy() if self.engine_config else None,
                     )
                 )
 

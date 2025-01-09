@@ -7,7 +7,6 @@ import logging as _logging
 import os as _os
 import pathlib as _pathlib
 import subprocess as _subprocess
-from decimal import Decimal as _Decimal
 from typing import List as _List
 from typing import Optional as _Optional
 from typing import Tuple as _Tuple
@@ -222,17 +221,14 @@ class Simulation(_SimulationRunner):
         """
 
         timestep = None  # ns
-        nmoves = None  # number of moves per cycle
         nrg_freq = None  # number of timesteps between energy calculations
         timestep = float(
             _read_simfile_option(self.simfile_path, "timestep").split()[0]
         )  # Need to remove femtoseconds from the end
-        nmoves = float(_read_simfile_option(self.simfile_path, "nmoves"))
         nrg_freq = float(_read_simfile_option(self.simfile_path, "energy frequency"))
 
         self.timestep = timestep / 1_000_000  # fs to ns
         self.nrg_freq = nrg_freq
-        self.time_per_cycle = timestep * nmoves / 1_000_000  # fs to ns
 
     def _select_input_files(self) -> None:
         """Select the correct rst7 and, if supplied, restraints,
@@ -342,19 +338,6 @@ class Simulation(_SimulationRunner):
         -------
         None
         """
-        # Need to make sure that runtime is a multiple of the time per cycle
-        # otherwise actual time could be quite different from requested runtime
-        remainder = _Decimal(str(runtime)) % _Decimal(str(self.time_per_cycle))
-        if round(float(remainder), 4) != 0:
-            raise ValueError(
-                (
-                    "Runtime must be a multiple of the time per cycle. "
-                    f"Runtime is {runtime} ns, and time per cycle is {self.time_per_cycle} ns."
-                )
-            )
-        # Need to modify the config file to set the correction n_cycles
-        n_cycles = round(runtime / self.time_per_cycle)
-        self._set_n_cycles(n_cycles)
 
         # Run SOMD - note that command excludes sbatch as this is added by the virtual queue
         cmd = f"somd-freenrg -C somd.cfg -l {self.lam} -p CUDA"
@@ -500,31 +483,6 @@ class Simulation(_SimulationRunner):
                 self._logger.info(f"Deleting {file}")
                 _subprocess.run(["rm", file])
 
-    def _set_n_cycles(self, n_cycles: int) -> None:
-        """
-        Set the number of cycles in the SOMD config file.
-
-        Parameters
-        ----------
-        n_cycles : int
-            Number of cycles to set in the config file.
-
-        Returns
-        -------
-        None
-        """
-        # Find the line with n_cycles and replace
-        with open(_os.path.join(self.input_dir, "somd.cfg"), "r") as ifile:
-            lines = ifile.readlines()
-            for i, line in enumerate(lines):
-                if line.startswith("ncycles ="):
-                    lines[i] = "ncycles = " + str(n_cycles) + "\n"
-                    break
-
-        # Now write the new file
-        with open(_os.path.join(self.input_dir, "somd.cfg"), "w+") as ofile:
-            for line in lines:
-                ofile.write(line)
 
     def read_gradients(
         self, equilibrated_only: bool = False, endstate: bool = False

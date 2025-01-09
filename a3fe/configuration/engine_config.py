@@ -4,9 +4,9 @@ __all__ = [
     "SomdConfig",
 ]
 
-import yaml as _yaml
 import os as _os
-from typing import Dict as _Dict, Literal as _Literal, List as _List, Union as _Union, Optional as _Optional
+import logging as _logging
+from typing import Dict as _Dict, Literal as _Literal, List as _List, Union as _Union, Optional as _Optional, Any as _Any
 from math import isclose as _isclose        
 from pydantic import (
     BaseModel as _BaseModel, 
@@ -17,8 +17,10 @@ from pydantic import (
     field_validator as _field_validator
 )
 
+from ._engine_runner_config import EngineRunnerConfig as _EngineRunnerConfig
 
-class SomdConfig(_BaseModel):
+
+class SomdConfig(_EngineRunnerConfig, _BaseModel):
     """
     Pydantic model for holding SOMD engine configuration.
     """
@@ -88,10 +90,14 @@ class SomdConfig(_BaseModel):
                 f"Runtime must be a multiple of the time per cycle. "
                 f"Runtime: {self.runtime} ns, Time per cycle: {time_per_cycle} ns."
             )
-        # Need to modify the config file to set the correction n_cycles
-        n_cycles = self._calculate_ncycles(self.runtime, time_per_cycle)
-        self._set_n_cycles(n_cycles)
-        print(f"Updated ncycles to {n_cycles} in somd.cfg")
+        
+        # Only try to modify the config file if it exists
+        cfg_file = _os.path.join(self.input_dir, "somd.cfg")
+        if _os.path.exists(cfg_file):
+            # Need to modify the config file to set the correction n_cycles
+            n_cycles = self._calculate_ncycles(self.runtime, time_per_cycle)
+            self._set_n_cycles(n_cycles)
+            print(f"Updated ncycles to {n_cycles} in somd.cfg")
 
     constraint: str = _Field("hbonds", description="Constraint type, must be hbonds or all-bonds")
 
@@ -181,10 +187,34 @@ class SomdConfig(_BaseModel):
             return 12.0  # Default for cutoffperiodic
         return v  # Default for PME (10.0)
 
-    def __init__(self, **data):
-        super().__init__(**data)
+    model_config = _ConfigDict(arbitrary_types_allowed=True)
+    
+    def __init__(self, stream_log_level: int = _logging.INFO, **data):
+        _BaseModel.__init__(self, **data)
+        _EngineRunnerConfig.__init__(self, stream_log_level=stream_log_level)
         self._validate_runtime_and_update_config()
 
+    def get_config(self) -> _Dict[str, _Any]:
+        """
+        Get the SOMD configuration as a dictionary.
+
+        Returns
+        -------
+        config : Dict[str, Any]
+            The SOMD configuration dictionary.
+        """
+        return self.model_dump()
+
+    def get_file_name(self) -> str:
+        """
+        Get the name of the SOMD configuration file.
+
+        Returns
+        -------
+        file_name : str
+            The name of the SOMD configuration file.
+        """
+        return "somd.cfg"
 
     ### Trajectory ###
     buffered_coords_freq: int = _Field(
@@ -248,7 +278,6 @@ class SomdConfig(_BaseModel):
         default_factory=dict,
         description="Extra options to pass to the SOMD engine"
     )
-    model_config = _ConfigDict(validate_assignment=True)
 
     def get_somd_config(self, run_dir: str, config_name: str = "somd_config") -> str:
         """
@@ -311,44 +340,3 @@ class SomdConfig(_BaseModel):
             f.write("\n".join(config_lines) + "\n")
 
         return config_path
-
-    def dump(self, save_dir: str) -> None:
-        """
-        Dumps the configuration to a YAML file.
-
-        Parameters
-        ----------
-        save_dir : str
-            Directory to save the YAML file to.
-        """
-        model_dict = self.model_dump()
-        
-        save_path = save_dir + "/" + self.get_file_name()
-        with open(save_path, "w") as f:
-            _yaml.dump(model_dict, f, default_flow_style=False)
-
-    @classmethod
-    def load(cls, load_dir: str) -> "SomdConfig":
-        """
-        Loads the configuration from a YAML file.
-
-        Parameters
-        ----------
-        load_dir : str
-            Directory to load the YAML file from.
-
-        Returns
-        -------
-        SomdConfig
-            The loaded configuration.
-        """
-        with open(load_dir + "/" + cls.get_file_name(), "r") as f:
-            model_dict = _yaml.safe_load(f)
-        return cls(**model_dict)
-
-    @staticmethod
-    def get_file_name() -> str:
-        """
-        Get the name of the SOMD configuration file.
-        """
-        return "somd_config.yaml"
