@@ -298,22 +298,18 @@ class SomdConfig(_EngineRunnerConfig, _BaseModel):
             if line and not line.startswith("#") and "=" in line:
                 key, value = [x.strip() for x in line.split("=", 1)]
                 
-                # 处理 lambda array
                 if key == "lambda array":
                     value = [float(x.strip()) for x in value.split(",")]
-                # 处理带星号的值（如 "12*angstrom"）
                 elif "*" in value:
                     value = value.split("*")[0].strip()
                     try:
                         value = float(value)
                     except ValueError:
                         pass
-                # 处理布尔值
                 elif value.lower() == "true":
                     value = True
                 elif value.lower() == "false":
                     value = False
-                # 处理其他数值
                 else:
                     try:
                         if "." in value:
@@ -321,9 +317,7 @@ class SomdConfig(_EngineRunnerConfig, _BaseModel):
                         elif value.isdigit():
                             value = int(value)
                     except ValueError:
-                        pass  # 保持为字符串
-                
-                # 处理键名中的空格
+                        pass
                 key = key.replace(" ", "_")
                 config_dict[key] = value
 
