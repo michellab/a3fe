@@ -5,6 +5,7 @@ __all__ = [
 ]
 
 import os as _os
+from decimal import Decimal as _Decimal
 import logging as _logging
 from typing import Dict as _Dict, Literal as _Literal, List as _List, Union as _Union, Optional as _Optional, Any as _Any
 from math import isclose as _isclose        
@@ -12,127 +13,48 @@ from pydantic import (
     BaseModel as _BaseModel, 
     Field as _Field, 
     ConfigDict as _ConfigDict, 
-    validator as _validator, 
-    root_validator as _root_validator,
-    field_validator as _field_validator
+    field_validator as _field_validator, 
+    model_validator as _model_validator,
+    ValidationInfo as _ValidationInfo
 )
-
 from ._engine_runner_config import EngineRunnerConfig as _EngineRunnerConfig
 
-
+DEFAULT_LAM_VALS_SOMD = {
+    "BOUND": {
+        "RESTRAIN": [0.0, 1.0],
+        "DISCHARGE": [0.0, 0.291, 0.54, 0.776, 1.0],
+        "VANISH": [
+            0.0, 0.026, 0.054, 0.083, 0.111, 0.14, 0.173, 0.208, 
+            0.247, 0.286, 0.329, 0.373, 0.417, 0.467, 0.514, 
+            0.564, 0.623, 0.696, 0.833, 1.0,
+        ],
+    },
+    "FREE": {
+        "DISCHARGE": [0.0, 0.222, 0.447, 0.713, 1.0],
+        "VANISH": [
+            0.0, 0.026, 0.055, 0.09, 0.126, 0.164, 0.202, 0.239,
+            0.276, 0.314, 0.354, 0.396, 0.437, 0.478, 0.518,
+            0.559, 0.606, 0.668, 0.762, 1.0,
+        ],
+    },
+}
 class SomdConfig(_EngineRunnerConfig, _BaseModel):
     """
     Pydantic model for holding SOMD engine configuration.
-    """
-    
+    """ 
     ### Integrator - ncycles modified as required by a3fe ###
     nmoves: int = _Field(25000, description="Number of moves per cycle")
     timestep: float = _Field(4.0, description="Timestep in femtoseconds(fs)")
-    runtime: _Union[int, float] = _Field(..., description="Runtime in nanoseconds(ns)")
+    runtime: _Union[int, float] = _Field(5.0, description="Runtime in nanoseconds(ns)")
 
-    input_dir: str = _Field(..., description="Input directory containing simulation config files")
-    @staticmethod
-    def _calculate_ncycles(runtime: float, time_per_cycle: float) -> int:
-        """
-        Calculate the number of cycles given a runtime and time per cycle.
-
-        Parameters
-        ----------
-        runtime : float
-            Runtime in nanoseconds.
-        time_per_cycle : float
-            Time per cycle in nanoseconds.
-
-        Returns
-        -------
-        int
-            Number of cycles.
-        """
-        return round(runtime / time_per_cycle)
-
-    def _set_n_cycles(self, n_cycles: int) -> None:
-        """
-        Set the number of cycles in the SOMD config file.
-
-        Parameters
-        ----------
-        n_cycles : int
-            Number of cycles to set in the somd config file.
-        """
-        with open(_os.path.join(self.input_dir, "somd.cfg"), "r") as ifile:
-            lines = ifile.readlines()
-        for i, line in enumerate(lines):
-            if line.startswith("ncycles ="):
-                lines[i] = "ncycles = " + str(n_cycles) + "\n"
-                break
-        #Now write the new file
-        with open(_os.path.join(self.input_dir, "somd.cfg"), "w+") as ofile:
-            for line in lines:
-                ofile.write(line)
-
-    def _validate_runtime_and_update_config(self) -> None:
-        """
-        Validate the runtime and update the simulation configuration.
-
-        Need to make sure that runtime is a multiple of the time per cycle
-        otherwise actual time could be quite different from requested runtime
-
-        Raises
-        ------
-        ValueError
-            If runtime is not a multiple of the time per cycle.
-        """
-        time_per_cycle = self.timestep * self.nmoves / 1_000_000  # Convert fs to ns
-        # Convert both to float for division
-        remainder = float(self.runtime) / float(time_per_cycle)
-        if not _isclose(remainder - round(remainder), 0, abs_tol=1e-5):
-            raise ValueError(
-                f"Runtime must be a multiple of the time per cycle. "
-                f"Runtime: {self.runtime} ns, Time per cycle: {time_per_cycle} ns."
-            )
-        
-        # Only try to modify the config file if it exists
-        cfg_file = _os.path.join(self.input_dir, "somd.cfg")
-        if _os.path.exists(cfg_file):
-            # Need to modify the config file to set the correction n_cycles
-            n_cycles = self._calculate_ncycles(self.runtime, time_per_cycle)
-            self._set_n_cycles(n_cycles)
-            print(f"Updated ncycles to {n_cycles} in somd.cfg")
-
-    constraint: str = _Field("hbonds", description="Constraint type, must be hbonds or all-bonds")
-
-    @_validator('constraint')
-    def _check_constraint(cls, v):
-        if v not in ['hbonds', 'all-bonds']:
-            raise ValueError('constraint must be hbonds or all-bonds')
-        return v
-
-    hydrogen_mass_factor: float = _Field(
-        3.0, 
-        alias="hydrogen mass repartitioning factor",
-        description="Hydrogen mass repartitioning factor"
-    )
+    ### Constraints ###
+    constraint: str = _Field("hbonds", description="Constraint type, must be hbonds or allbonds")
+    hydrogen_mass_factor: float = _Field(3.0, alias="hydrogen mass repartitioning factor", description="Hydrogen mass repartitioning factor")
     integrator: _Literal["langevinmiddle", "leapfrogverlet"] = _Field("langevinmiddle", description="Integration algorithm")
-    # Thermostatting already handled by langevin integrator
-    thermostat: bool = _Field(False, description="Enable thermostat")
-
-    @_root_validator(pre=True)
-    def _validate_integrator_thermostat(cls, v):
-        '''
-        Make sure that if integrator is 'langevinmiddle' then thermostat must be False
-        '''
-        integrator = v.get('integrator')
-        thermostat = v.get('thermostat', False)  # Default to False if not provided
-
-        if integrator == "langevinmiddle" and thermostat is not False:
-            raise ValueError("thermostat must be False when integrator is langevinmiddle")
-        return v
     
-    inverse_friction: float = _Field(
-        1.0, 
-        description="Inverse friction in picoseconds",
-        alias="inverse friction"
-    )
+    ### Thermostatting already handled by langevin integrator
+    thermostat: bool = _Field(False, description="Enable thermostat")
+    inverse_friction: float = _Field(1.0, description="Inverse friction in picoseconds", alias="inverse friction")
     temperature: float = _Field(25.0, description="Temperature in Celsius")
 
     ### Barostat ###
@@ -140,146 +62,144 @@ class SomdConfig(_EngineRunnerConfig, _BaseModel):
     pressure: float = _Field(1.0, description="Pressure in atm")
 
     ### Non-Bonded Interactions ###
-    cutoff_type: _Literal["PME", "cutoffperiodic"] = _Field(
-        "PME",
-        description="Type of cutoff to use. Options: PME, cutoffperiodic"
+    cutoff_type: _Literal["cutoffperiodic", "PME"] = _Field("cutoffperiodic", description="Type of cutoff to use. Options: PME, cutoffperiodic")
+    cutoff_distance: float = _Field(12.0, alias="cutoff distance", ge=6.0, le=18.0, description="Cutoff distance in angstroms (6-18). Default 12.0 for cutoffperiodic and 10.0 for PME")
+    reaction_field_dielectric: float = _Field(78.3, alias="reaction field dielectric",
+        description="Reaction field dielectric constant (only for cutoffperiodic). "
+                    "If cutoff type is PME, this value is ignored"
     )
-    cutoff_distance: float = _Field(
-        10.0,  # Default to PME cutoff distance
-        alias="cutoff distance",
-        description="Cutoff distance in angstroms"
-    )
-    reaction_field_dielectric: float | None = _Field(
-        None,
-        alias="reaction field dielectric",
-        description="Reaction field dielectric constant(only for cutoffperiodic)"
-    )
-    @_validator('cutoff_type')
-    def _check_cutoff_type(cls, v):
-        if v not in ['PME', 'cutoffperiodic']:
-            raise ValueError('cutoff type must be PME or cutoffperiodic')
-        return v
-    
-    @_validator('cutoff_distance', always=True)
-    def _set_cutoff_distance(cls, v, values):
-        if values.get('cutoff_type') == 'PME':
-            return 10.0 if v is None else v
-        elif values.get('cutoff_type') == 'cutoffperiodic':
-            return 12.0 if v is None else v
-        return v
-    
-    @_validator('reaction_field_dielectric',always=True)
-    def _set_reaction_field_dielectric(cls, v, values):
-        cutoff_type = values.get('cutoff_type')
-        if cutoff_type == 'PME' and v is not None:
-            raise ValueError('reaction field dielectric should not be provided when cutoff type is PME')
-        elif cutoff_type == 'cutoffperiodic' and v is None:
-            return 78.3  # Default dielectric constant for cutoffperiodic
-        return v
-
-    @_field_validator("cutoff_distance", mode="before")
-    def _validate_cutoff_distance(cls, v, values):
-        """
-        Validate cutoff distance based on cutoff type.
-        """
-        cutoff_type = values.data.get("cutoff_type")
-        if cutoff_type == "cutoffperiodic":
-            return 12.0  # Default for cutoffperiodic
-        return v  # Default for PME (10.0)
-
-    model_config = _ConfigDict(arbitrary_types_allowed=True)
-    
-    def __init__(self, stream_log_level: int = _logging.INFO, **data):
-        _BaseModel.__init__(self, **data)
-        _EngineRunnerConfig.__init__(self, stream_log_level=stream_log_level)
-        self._validate_runtime_and_update_config()
-
-    def get_config(self) -> _Dict[str, _Any]:
-        """
-        Get the SOMD configuration as a dictionary.
-
-        Returns
-        -------
-        config : Dict[str, Any]
-            The SOMD configuration dictionary.
-        """
-        return self.model_dump()
-
-    def get_file_name(self) -> str:
-        """
-        Get the name of the SOMD configuration file.
-
-        Returns
-        -------
-        file_name : str
-            The name of the SOMD configuration file.
-        """
-        return "somd.cfg"
-
     ### Trajectory ###
-    buffered_coords_freq: int = _Field(
-        5000,
-        alias="buffered coordinates frequency",
-        description="Frequency of buffered coordinates output"
-    )
-    center_solute: bool = _Field(
-        True,
-        alias="center solute",
-        description="Center solute in box"
-    )
+    buffered_coords_freq: int = _Field(5000,alias="buffered coordinates frequency",description="Frequency of buffered coordinates output")
+    center_solute: bool = _Field(True, alias="center solute", description="Center solute in box")
 
     ### Minimisation ###
     minimise: bool = _Field(True, description="Perform energy minimisation")
 
     ### Restraints ###
-    use_boresch_restraints: bool = _Field(
-        False,
-        description="UseBoresch restraints mode"
-    )
-    receptor_ligand_restraints: bool = _Field(
-        False,
-        description="Turn on receptor-ligand restraints mode"
-    )
+    use_boresch_restraints: bool = _Field(False, description="Use Boresch restraints mode")
+    turn_on_receptor_ligand_restraints: bool = _Field(False, description="Turn on receptor-ligand restraints mode")
 
     ### Alchemistry - restraints added by a3fe ###
-    perturbed_residue_number: int = _Field(
-        1,
-        alias="perturbed residue number",
-        description="Residue number to perturb"
-    )
-    energy_frequency: int = _Field(
-        200,
-        alias="energy frequency",
-        description="Frequency of energy output"
-    )
-
+    perturbed_residue_number: int = _Field(1,alias="perturbed residue number",ge=1, description="Residue number to perturb. Must be >= 1")
+    energy_frequency: int = _Field(200,alias="energy frequency",description="Frequency of energy output")
+    ligand_charge: int = _Field(0, description="Net charge of the ligand. If non-zero, must use PME for electrostatics.")
+    
     ### Lambda ###
-    lambda_array: _List[float] = _Field(
-        default_factory=list,
-        description="Lambda array for alchemical perturbation, varies from 0.0 to 1.0 across stages"
-    )
-    lambda_val: _Optional[float] = _Field(
-        None,
-        description="Lambda value for current stage"
-    )
+    lambda_array: _List[float] = _Field(default_factory=list,description="Lambda array for alchemical perturbation, varies from 0.0 to 1.0 across stages")
+    lambda_val: _Optional[float] = _Field(None, description="Lambda value for current stage")
 
     ### Alchemical files ###
-    morphfile: _Optional[str] = _Field(
-        None, description="Path to morph file containing alchemical transformation"
-    )
-    topfile: _Optional[str] = _Field(
-        None, description="Path to topology file for the system"
-    )
-    crdfile: _Optional[str] = _Field(
-        None, description="Path to coordinate file for the system"
-    )
-    
-    extra_options: _Dict[str, str] = _Field(
-        default_factory=dict,
-        description="Extra options to pass to the SOMD engine"
-    )
+    morphfile: _Optional[str] = _Field(None, description="Path to morph file containing alchemical transformation")
+    topfile: _Optional[str] = _Field(None, description="Path to topology file for the system")
+    crdfile: _Optional[str] = _Field(None, description="Path to coordinate file for the system")
 
-    def get_somd_config(self, run_dir: str, config_name: str = "somd_config") -> str:
+    boresch_restraints_dictionary: _Optional[str] = _Field(
+        None, 
+        #alias="boresch restraints dictionary",
+        description="Optional string to hold boresch restraints dictionary content"
+    )    
+    ### Extra options ###
+    extra_options: _Dict[str, str] = _Field(default_factory=dict, description="Extra options to pass to the SOMD engine")    
+
+    @_field_validator('runtime')
+    def validate_runtime(cls, v: float, info: _ValidationInfo) -> float:
+        """Validate that runtime is a multiple of time per cycle using Decimal for precise division"""
+        data = info.data
+        if not ('timestep' in data and 'nmoves' in data):
+            return v
+        
+        time_per_cycle = _Decimal(str(data['timestep'])) * _Decimal(str(data['nmoves'])) / _Decimal('1000000')
+        runtime_decimal = _Decimal(str(v))
+        
+        if runtime_decimal % time_per_cycle != 0:
+            raise ValueError(
+                f"Runtime must be a multiple of the time per cycle. "
+                f"Runtime: {v} ns, Time per cycle: {float(time_per_cycle)} ns"
+            )
+        return float(v)
+
+    @_model_validator(mode="after")
+    def _check_cutoff_values(self):
+        """
+        Issue warnings if the user supplies certain contradictory or unusual combos.
+        """
+        cutoff_type = self.cutoff_type
+        cutoff_distance = self.cutoff_distance
+        rfd = self.reaction_field_dielectric
+
+        # 1) Only warn if user set reaction_field_dielectric != 78.3
+        if cutoff_type == "cutoffperiodic" and rfd != 78.3:
+            warnings.warn(
+                "You have cutoff_type=cutoffperiodic but set a reaction_field_dielectric. "
+                f"This value ({rfd}) will be ignored by the engine."
+            )
+
+        # 2) Only warn if user picks e.g. cutoff_distance < 6 or > 18
+        if cutoff_type == "PME" and not (6.0 <= cutoff_distance <= 18.0):
+            warnings.warn(
+                f"For PME, we recommend cutoff_distance in [6.0, 18.0], but you have {cutoff_distance}."
+                "we'll still accept it."
+            )
+        return self
+   
+    @_field_validator('constraint')
+    def _check_constraint(cls, v):
+        if v not in ['hbonds', 'allbonds']:
+            raise ValueError('constraint must be hbonds or allbonds')
+        return v    
+
+    @_field_validator('hydrogen_mass_factor')
+    def _check_hmf_range(cls, v):
+        if not (1.0 <= v <= 4.0):
+            raise ValueError('hydrogen_mass_factor must be between 1 and 4.')
+        return v
+
+    @_model_validator(mode="before")
+    def _validate_integrator_and_thermo(cls,v):
+        integrator = v.get("integrator")
+        thermostat = v.get("thermostat")
+        temperature = v.get("temperature", 25.0)  # Use default value if None
+        pressure = v.get("pressure", 1.0)  # Use default value if None
+    
+        # 1) integrator='langevinmiddle' => thermostat must be False
+        # 2) integrator='leapfrogverlet' => thermostat must be True
+        if integrator == "langevinmiddle" and thermostat is True:
+            raise ValueError("If integrator is 'langevinmiddle', thermostat must be False.")
+        elif integrator == "leapfrogverlet" and thermostat is False:
+            raise ValueError("If integrator is 'leapfrogverlet', thermostat must be True.")
+
+        # check temperature is in range [-200, 1000]
+        if not (-200 <= temperature <= 1000):
+            raise ValueError(f"Temperature must be between -200 and 1000 Celsius, got {temperature}")
+
+        # check pressure is in range [0, 1000] atm
+        if not (0 <= pressure <= 1000):
+            raise ValueError("pressure must be in range [0, 1000] atm.")
+
+        return v
+
+    @_model_validator(mode="after")
+    def _check_charge_and_cutoff(self):
+        """
+        Validate that if ligand_charge != 0, then cutoff_type must be PME.
+        """
+        ligand_charge = self.ligand_charge
+        cutoff_type = self.cutoff_type
+        
+        if ligand_charge != 0 and cutoff_type != "PME":
+            raise ValueError(
+                "Ligand charge is non-zero. Must use PME for electrostatics."
+            )
+        
+        return self
+
+    def get_file_name(self) -> str:
+        """
+        Get the name of the SOMD configuration file.
+        """
+        return "somd.cfg"
+
+    def get_somd_config(self, run_dir: str) -> str:
         """
         Generates the SOMD configuration file and returns its path.
 
@@ -287,16 +207,8 @@ class SomdConfig(_EngineRunnerConfig, _BaseModel):
         ----------
         run_dir : str
             Directory to write the configuration file to.
-
-        config_name : str, optional, default="somd_config"
-            Name of the configuration file to write. Note that when running many jobs from the
-            same directory, this should be unique to avoid overwriting the config file.
-
-        Returns
-        -------
-        str
-            Path to the generated configuration file.
         """
+        config_filename = self.get_file_name()
         # First, generate the configuration string
         config_lines = [
             "### Integrator ###",
@@ -316,6 +228,11 @@ class SomdConfig(_EngineRunnerConfig, _BaseModel):
             "### Non-Bonded Interactions ###",
             f"cutoff type = {self.cutoff_type}",
             f"cutoff distance = {self.cutoff_distance} * angstrom",
+        ]
+        if self.cutoff_type == "cutoffperiodic" and self.reaction_field_dielectric is not None:
+            config_lines.append(f"reaction field dielectric = {self.reaction_field_dielectric}")    
+
+        config_lines.extend([
             "",
             "### Trajectory ###",
             f"buffered coordinates frequency = {self.buffered_coords_freq}",
@@ -326,8 +243,36 @@ class SomdConfig(_EngineRunnerConfig, _BaseModel):
             "",
             "### Alchemistry ###",
             f"perturbed residue number = {self.perturbed_residue_number}",
-            f"energy frequency = {self.energy_frequency}"
-        ]
+            f"energy frequency = {self.energy_frequency}",
+            f"ligand charge = {self.ligand_charge}",    
+            "",
+            "### Restraints ###",
+            f"use boresch restraints = {self.use_boresch_restraints}",
+            f"turn on receptor-ligand restraints mode = {self.turn_on_receptor_ligand_restraints}"
+        ])
+        # 2) Lambda parameters
+        config_lines.extend(["", "### Lambda / Alchemical Settings ###"])
+        
+        if self.lambda_array:
+            lambda_str = ", ".join(str(x) for x in self.lambda_array)
+            config_lines.append(f"lambda array = {lambda_str}")
+        if self.lambda_val is not None:
+            config_lines.append(f"lambda_val = {self.lambda_val}")
+
+        # 3) Alchemical files path
+        config_lines.extend(["", "### Alchemical Files ###"])
+        if self.morphfile:
+            config_lines.append(f"morphfile = {self.morphfile}")
+        if self.topfile:
+            config_lines.append(f"topfile = {self.topfile}")
+        if self.crdfile:
+            config_lines.append(f"crdfile = {self.crdfile}")
+
+        # 5) Boresch restraints 
+        if self.boresch_restraints_dictionary is not None:
+            config_lines.extend(["", "### Boresch Restraints Dictionary ###"])
+            config_lines.append(f"boresch restraints dictionary = {self.boresch_restraints_dictionary}")
+
         # Add any extra options
         if self.extra_options:
             config_lines.extend(["", "### Extra Options ###"])
@@ -335,8 +280,51 @@ class SomdConfig(_EngineRunnerConfig, _BaseModel):
                 config_lines.append(f"{key} = {value}")
 
         # Write the configuration to a file
-        config_path = _os.path.join(run_dir, f"{config_name}.cfg")
+        config_path = _os.path.join(run_dir, config_filename)
         with open(config_path, "w") as f:
             f.write("\n".join(config_lines) + "\n")
-
+        
         return config_path
+
+    @classmethod
+    def _from_config_file(cls, config_path: str) -> "SomdConfig":
+        """Create a SomdConfig instance from an existing configuration file."""
+        with open(config_path, "r") as f:
+            config_content = f.read()
+
+        config_dict = {}
+        for line in config_content.split("\n"):
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, value = [x.strip() for x in line.split("=", 1)]
+                
+                # 处理 lambda array
+                if key == "lambda array":
+                    value = [float(x.strip()) for x in value.split(",")]
+                # 处理带星号的值（如 "12*angstrom"）
+                elif "*" in value:
+                    value = value.split("*")[0].strip()
+                    try:
+                        value = float(value)
+                    except ValueError:
+                        pass
+                # 处理布尔值
+                elif value.lower() == "true":
+                    value = True
+                elif value.lower() == "false":
+                    value = False
+                # 处理其他数值
+                else:
+                    try:
+                        if "." in value:
+                            value = float(value)
+                        elif value.isdigit():
+                            value = int(value)
+                    except ValueError:
+                        pass  # 保持为字符串
+                
+                # 处理键名中的空格
+                key = key.replace(" ", "_")
+                config_dict[key] = value
+
+        return cls(**config_dict)
