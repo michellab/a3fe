@@ -48,7 +48,6 @@ from ..analyse.plot import plot_overlap_mats as _plot_overlap_mats
 from ..analyse.plot import plot_rmsds as _plot_rmsds
 from ..analyse.plot import plot_sq_sem_convergence as _plot_sq_sem_convergence
 from ..analyse.process_grads import GradientData as _GradientData
-from ..read._process_somd_files import write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._virtual_queue import VirtualQueue as _VirtualQueue
 from .enums import StageType as _StageType
@@ -201,7 +200,7 @@ class Stage(_SimulationRunner):
                         stream_log_level=self.stream_log_level,
                         slurm_config=self.slurm_config,
                         analysis_slurm_config=self.analysis_slurm_config,
-                        engine_config=self.engine_config.copy() if self.engine_config else None,
+                        engine_config=self.engine_config.copy(),
                     )
                 )
 
@@ -1164,9 +1163,9 @@ class Stage(_SimulationRunner):
         _os.rename(self.output_dir, _os.path.join(base_dir, save_name))
 
     def set_simfile_option(self, option: str, value: str) -> None:
-        """Set the value of an option in the simulation configuration file."""
-        simfile = _os.path.join(self.input_dir, "somd.cfg")
-        _write_simfile_option(simfile, option, value, logger=self._logger)
+
+        setattr(self.engine_config, option, value)
+        self.engine_config.get_somd_config(self.input_dir)
         super().set_simfile_option(option, value)
 
     def wait(self) -> None:
@@ -1214,13 +1213,10 @@ class Stage(_SimulationRunner):
             raise RuntimeError("Can't update while ensemble is running")
         if _os.path.isdir(self.output_dir):
             self._mv_output(save_name)
-        # Update the list of lambda windows in the simfile
-        _write_simfile_option(
-            simfile=f"{self.input_dir}/somd.cfg",
-            option="lambda array",
-            value=", ".join([str(lam) for lam in self.lam_vals]),
-        )
-        # Store the previous lambda window attributes that we want to preserve
+
+        self.engine_config.lambda_array = ", ".join([str(lam) for lam in self.lam_vals])
+        self.engine_config.get_somd_config(self.input_dir)
+        
         old_lam_vals_attrs = self.lam_windows[0].__dict__
         self._logger.info("Deleting old lambda windows and creating new ones...")
         self._sub_sim_runners = []
@@ -1239,6 +1235,7 @@ class Stage(_SimulationRunner):
                 stream_log_level=self.stream_log_level,
                 slurm_config=self.slurm_config,
                 analysis_slurm_config=self.analysis_slurm_config,
+                engine_config=self.engine_config.copy(),
             )
             # Overwrite the default equilibration detection algorithm
             new_lam_win.check_equil = old_lam_vals_attrs["check_equil"]

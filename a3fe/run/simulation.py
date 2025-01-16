@@ -14,8 +14,6 @@ from typing import Tuple as _Tuple
 import numpy as _np
 from sire.units import k_boltz as _k_boltz
 
-from ..read._process_somd_files import read_simfile_option as _read_simfile_option
-from ..read._process_somd_files import write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._virtual_queue import Job as _Job
 from ._virtual_queue import VirtualQueue as _VirtualQueue
@@ -132,7 +130,7 @@ class Simulation(_SimulationRunner):
             # as well as the restraints if necessary
             self._update_simfile()
             # Now read useful parameters from the simulation file options
-            self._add_attributes_from_simfile()
+            #self._add_attributes_from_simfile()
             # Get slurm file base
             self._get_slurm_file_base()
 
@@ -213,26 +211,13 @@ class Simulation(_SimulationRunner):
             if not _os.path.isfile(_os.path.join(self.input_dir, file)):
                 raise FileNotFoundError("Required input file " + file + " not found.")
 
-    def _add_attributes_from_simfile(self) -> None:
-        """
-        Read the SOMD simulation option file and
-        add useful attributes to the Simulation object.
-        All times in ns.
-        """
-
-        timestep = None  # ns
-        nrg_freq = None  # number of timesteps between energy calculations
-        timestep = float(
-            _read_simfile_option(self.simfile_path, "timestep").split()[0]
-        )  # Need to remove femtoseconds from the end
-        nrg_freq = float(_read_simfile_option(self.simfile_path, "energy frequency"))
-
-        self.timestep = timestep / 1_000_000  # fs to ns
-        self.nrg_freq = nrg_freq
-
     def _select_input_files(self) -> None:
         """Select the correct rst7 and, if supplied, restraints,
         according to the run number."""
+
+        # First ensure the most up-to-date SOMD configuration is loaded
+        self.engine_config.get_somd_config(self.input_dir)
+
         # Check if we have multiple rst7 files, or only one
         rst7_files = _glob.glob(_os.path.join(self.input_dir, "*.rst7"))
         if len(rst7_files) == 0:
@@ -279,44 +264,7 @@ class Simulation(_SimulationRunner):
         """Set the lambda value in the simulation file, as well as some
         paths to input files."""
 
-        # Check that the lambda value has been set
-        if not hasattr(self, "lam"):
-            raise AttributeError("Lambda value not set for simulation")
-
-        # Check that the set lambda value is in the list of lamvals in the simfile
-        lamvals = [
-            float(lam_val)
-            for lam_val in _read_simfile_option(
-                self.simfile_path, "lambda array"
-            ).split(",")
-        ]
-        if self.lam not in lamvals:
-            raise ValueError(
-                f"Lambda value {self.lam} not in list of lambda values in simfile"
-            )
-
-        # Set the lambda value in the simfile
-        _write_simfile_option(self.simfile_path, "lambda_val", str(self.lam))
-
-        # Set the paths to the input files
-        input_paths = {
-            "morphfile": "somd.pert",
-            "topfile": "somd.prm7",
-            "crdfile": "somd.rst7",
-        }
-
-        for option, name in input_paths.items():
-            _write_simfile_option(
-                self.simfile_path, option, _os.path.join(self.input_dir, name)
-            )
-
-        # Add the restraints file if it exists
-        if _os.path.isfile(_os.path.join(self.input_dir, "restraint.txt")):
-            with open(_os.path.join(self.input_dir, "restraint.txt"), "r") as f:
-                restraint = f.readlines()[0].split("=")[1]
-            _write_simfile_option(
-                self.simfile_path, "boresch restraints dictionary", restraint
-            )
+        self.engine_config.write_somd_config(self.output_dir, self.lam)
 
     def _get_slurm_file_base(self) -> None:
         """Find out what the slurm output file will be called and save it."""
@@ -338,6 +286,23 @@ class Simulation(_SimulationRunner):
         -------
         None
         """
+        # update engine_config
+        self.engine_config.lambda_val = self.lam
+        self.engine_config.morphfile = _os.path.join(self.input_dir, "somd.pert")
+        self.engine_config.topfile = _os.path.join(self.input_dir, "somd.prm7")
+        self.engine_config.crdfile = _os.path.join(self.input_dir, "somd.rst7")
+        
+        # if restraint file exists, read and set
+        restraint_file = _os.path.join(self.input_dir, "restraint.txt")
+        if _os.path.isfile(restraint_file):
+            with open(restraint_file, "r") as f:
+                content = f.read().strip()
+                if "=" in content:
+                    restraint = content.split("=", 1)[1].strip()
+                    self.engine_config.boresch_restraints_dictionary = restraint
+
+        # write config to output directory
+        self.engine_config.write_somd_config(self.output_dir, self.lam)
 
         # Run SOMD - note that command excludes sbatch as this is added by the virtual queue
         cmd = f"somd-freenrg -C somd.cfg -l {self.lam} -p CUDA"
@@ -560,7 +525,7 @@ class Simulation(_SimulationRunner):
     def update_paths(self, old_sub_path: str, new_sub_path: str) -> None:
         """
         Replace the old sub-path with the new sub-path in the base, input, and output directory
-        paths. Also update the slurm file base and the paths in the simfile.
+        paths. Also update the slurm file base.
 
         Parameters
         ----------
@@ -571,8 +536,7 @@ class Simulation(_SimulationRunner):
         """
         super().update_paths(old_sub_path, new_sub_path)
 
-        # Also need to update the slurm file base and the paths in the simfile
-        self.simfile_path = _os.path.join(self.base_dir, "somd.cfg")
+        # Also need to update the slurm file base
         if self.slurm_file_base:
             self.slurm_file_base = self.slurm_file_base.replace(
                 old_sub_path, new_sub_path
@@ -585,13 +549,41 @@ class Simulation(_SimulationRunner):
             "crdfile": "somd.rst7",
         }
         for option, name in input_paths.items():
-            _write_simfile_option(
-                self.simfile_path, option, _os.path.join(self.input_dir, name)
-            )
+            setattr(self.engine_config, option, _os.path.join(self.input_dir, name))
+            
+        # Write updated config to file
+        self.engine_config.write_somd_config(self.output_dir, self.lam)
 
     def set_simfile_option(self, option: str, value: str) -> None:
         """Set the value of an option in the simulation configuration file."""
-        _write_simfile_option(self.simfile_path, option, value, logger=self._logger)
+        # Read the simfile and check if the option is already present
+        with open(self.simfile_path, "r") as f:
+            lines = f.readlines()
+        option_line_idx = None
+        for i, line in enumerate(lines):
+            if line.split("=")[0].strip() == option:
+                option_line_idx = i
+                break
+
+        # If the option is not present, append it to the end of the file
+        if option_line_idx is None:
+            self._logger.warning(
+                f"Option {option} not found in simfile {self.simfile_path}. Appending new option to the end of the file."
+            )
+
+            # Ensure the previous line ends with a newline
+            if lines[-1][-1] != "\n":
+                lines[-1] += "\n"
+
+            lines.append(f"{option} = {value}\n")
+
+        # Otherwise, replace the line with the new value
+        else:
+            lines[option_line_idx] = f"{option} = {value}\n"
+
+        # Write the updated simfile
+        with open(self.simfile_path, "w") as f:
+            f.writelines(lines)
 
     def analyse(self) -> None:
         raise NotImplementedError(

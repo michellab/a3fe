@@ -6,42 +6,65 @@ __all__ = [
 
 import os as _os
 from decimal import Decimal as _Decimal
-import logging as _logging
-from typing import Dict as _Dict, Literal as _Literal, List as _List, Union as _Union, Optional as _Optional, Any as _Any
-from math import isclose as _isclose        
+from typing import Dict as _Dict, Literal as _Literal, List as _List, Union as _Union, Optional as _Optional
 from pydantic import (
     BaseModel as _BaseModel, 
     Field as _Field, 
-    ConfigDict as _ConfigDict, 
     field_validator as _field_validator, 
     model_validator as _model_validator,
     ValidationInfo as _ValidationInfo
 )
 from ._engine_runner_config import EngineRunnerConfig as _EngineRunnerConfig
 
-DEFAULT_LAM_VALS_SOMD = {
-    "BOUND": {
-        "RESTRAIN": [0.0, 1.0],
-        "DISCHARGE": [0.0, 0.291, 0.54, 0.776, 1.0],
-        "VANISH": [
-            0.0, 0.026, 0.054, 0.083, 0.111, 0.14, 0.173, 0.208, 
-            0.247, 0.286, 0.329, 0.373, 0.417, 0.467, 0.514, 
-            0.564, 0.623, 0.696, 0.833, 1.0,
-        ],
-    },
-    "FREE": {
-        "DISCHARGE": [0.0, 0.222, 0.447, 0.713, 1.0],
-        "VANISH": [
-            0.0, 0.026, 0.055, 0.09, 0.126, 0.164, 0.202, 0.239,
-            0.276, 0.314, 0.354, 0.396, 0.437, 0.478, 0.518,
-            0.559, 0.606, 0.668, 0.762, 1.0,
-        ],
-    },
-}
+def _get_default_lambda_array(leg: str = "BOUND", stage: str = "VANISH") -> _List[float]:
+    
+    default_values = {
+        "BOUND": {
+            "RESTRAIN": [0.0, 1.0],
+            "DISCHARGE": [0.0, 0.291, 0.54, 0.776, 1.0],
+            "VANISH": [
+                0.0, 0.026, 0.054, 0.083, 0.111, 0.14, 0.173, 0.208,
+                0.247, 0.286, 0.329, 0.373, 0.417, 0.467, 0.514,
+                0.564, 0.623, 0.696, 0.833, 1.0,
+            ],
+        },
+        "FREE": {
+            "DISCHARGE": [0.0, 0.222, 0.447, 0.713, 1.0],
+            "VANISH": [
+                0.0, 0.026, 0.055, 0.09, 0.126, 0.164, 0.202, 0.239,
+                0.276, 0.314, 0.354, 0.396, 0.437, 0.478, 0.518,
+                0.559, 0.606, 0.668, 0.762, 1.0,
+            ],
+        },
+    }   
+    return default_values[leg][stage]
+
 class SomdConfig(_EngineRunnerConfig, _BaseModel):
     """
     Pydantic model for holding SOMD engine configuration.
     """ 
+    default_lambda_values: _Dict[str, _Dict[str, _List[float]]] = _Field(
+        default={
+            "BOUND": {
+                "RESTRAIN": [0.0, 1.0],
+                "DISCHARGE": [0.0, 0.291, 0.54, 0.776, 1.0],
+                "VANISH": [
+                    0.0, 0.026, 0.054, 0.083, 0.111, 0.14, 0.173, 0.208,
+                    0.247, 0.286, 0.329, 0.373, 0.417, 0.467, 0.514,
+                    0.564, 0.623, 0.696, 0.833, 1.0,
+                ],
+            },
+            "FREE": {
+                "DISCHARGE": [0.0, 0.222, 0.447, 0.713, 1.0],
+                "VANISH": [
+                    0.0, 0.026, 0.055, 0.09, 0.126, 0.164, 0.202, 0.239,
+                    0.276, 0.314, 0.354, 0.396, 0.437, 0.478, 0.518,
+                    0.559, 0.606, 0.668, 0.762, 1.0,
+                ],
+            },
+        },
+        description="Default lambda values for each leg and stage type"
+    )
     ### Integrator - ncycles modified as required by a3fe ###
     nmoves: int = _Field(25000, description="Number of moves per cycle")
     timestep: float = _Field(4.0, description="Timestep in femtoseconds(fs)")
@@ -83,9 +106,13 @@ class SomdConfig(_EngineRunnerConfig, _BaseModel):
     perturbed_residue_number: int = _Field(1,alias="perturbed residue number",ge=1, description="Residue number to perturb. Must be >= 1")
     energy_frequency: int = _Field(200,alias="energy frequency",description="Frequency of energy output")
     ligand_charge: int = _Field(0, description="Net charge of the ligand. If non-zero, must use PME for electrostatics.")
+    charge_difference: int = _Field(0, description="Charge difference between the ligand and the system. If non-zero, must use co-alchemical ion approach.")
     
     ### Lambda ###
-    lambda_array: _List[float] = _Field(default_factory=list,description="Lambda array for alchemical perturbation, varies from 0.0 to 1.0 across stages")
+    lambda_array: _List[float] = _Field(
+        default_factory=_get_default_lambda_array,
+        description="Lambda array for alchemical perturbation, varies from 0.0 to 1.0 across stages"
+    )
     lambda_val: _Optional[float] = _Field(None, description="Lambda value for current stage")
 
     ### Alchemical files ###
@@ -129,19 +156,25 @@ class SomdConfig(_EngineRunnerConfig, _BaseModel):
 
         # 1) Only warn if user set reaction_field_dielectric != 78.3
         if cutoff_type == "cutoffperiodic" and rfd != 78.3:
-            warnings.warn(
+            self._logger.warning(
                 "You have cutoff_type=cutoffperiodic but set a reaction_field_dielectric. "
                 f"This value ({rfd}) will be ignored by the engine."
             )
 
         # 2) Only warn if user picks e.g. cutoff_distance < 6 or > 18
         if cutoff_type == "PME" and not (6.0 <= cutoff_distance <= 18.0):
-            warnings.warn(
-                f"For PME, we recommend cutoff_distance in [6.0, 18.0], but you have {cutoff_distance}."
+            self._logger.warning(
+                f"For PME, we recommend cutoff_distance in [6.0, 18.0], but you have {cutoff_distance}. "
                 "we'll still accept it."
             )
         return self
-   
+    
+    @_model_validator(mode="after")
+    def _check_charge_difference(self):
+        if self.charge_difference != 0 and self.cutoff_type != "PME":
+            raise ValueError("Charge difference is non-zero but cutoff type is not PME.")
+        return self
+
     @_field_validator('constraint')
     def _check_constraint(cls, v):
         if v not in ['hbonds', 'allbonds']:
@@ -244,7 +277,8 @@ class SomdConfig(_EngineRunnerConfig, _BaseModel):
             "### Alchemistry ###",
             f"perturbed residue number = {self.perturbed_residue_number}",
             f"energy frequency = {self.energy_frequency}",
-            f"ligand charge = {self.ligand_charge}",    
+            f"ligand charge = {self.ligand_charge}",
+            f"charge difference = {self.charge_difference}",
             "",
             "### Restraints ###",
             f"use boresch restraints = {self.use_boresch_restraints}",
@@ -254,8 +288,8 @@ class SomdConfig(_EngineRunnerConfig, _BaseModel):
         config_lines.extend(["", "### Lambda / Alchemical Settings ###"])
         
         if self.lambda_array:
-            lambda_str = ", ".join(str(x) for x in self.lambda_array)
-            config_lines.append(f"lambda array = {lambda_str}")
+            lambda_str = f"[{', '.join(str(x) for x in self.lambda_array)}]"
+            config_lines.append(f"lambda_array = {lambda_str}")
         if self.lambda_val is not None:
             config_lines.append(f"lambda_val = {self.lambda_val}")
 
@@ -322,3 +356,14 @@ class SomdConfig(_EngineRunnerConfig, _BaseModel):
                 config_dict[key] = value
 
         return cls(**config_dict)
+
+    def write_somd_config(self, output_dir: str, lam: float) -> str:
+        """
+        Write out the SOMD configuration file with the current settings.
+        """
+        self.lambda_val = lam
+
+        # Generate somd.cfg file using the current configuration
+        config_path = self.get_somd_config(run_dir=output_dir)
+
+        return config_path

@@ -7,7 +7,6 @@ import logging as _logging
 import os as _os
 import pathlib as _pathlib
 import pickle as _pkl
-import shutil as _shutil
 import subprocess as _subprocess
 from abc import ABC
 from itertools import count as _count
@@ -30,6 +29,7 @@ from ._logging_formatters import _A3feFileFormatter, _A3feStreamFormatter
 
 from ..configuration import SlurmConfig as _SlurmConfig
 from ..configuration import SomdConfig as _SomdConfig
+from .._version import __version__ as _version
 
 class SimulationRunner(ABC):
     """An abstract base class for simulation runners. Note that
@@ -100,6 +100,11 @@ class SimulationRunner(ABC):
         dump: bool, Optional, default: True
             If True, the state of the simulation runner is saved to a pickle file.
         """
+        # Set the version of the simulation runner
+        self._logger = _logging.getLogger(self.__class__.__name__)
+        self._version = _version
+        self._logger.info(f"Initializing simulation runner with A3fe version: {self._version}")
+
         # Set up the directories (which may be overwritten if the
         # simulation runner is subsequently loaded from a pickle file)
         # Make sure that we always use absolute paths
@@ -176,13 +181,9 @@ class SimulationRunner(ABC):
             )
 
             # Create the SOMD config with default values if none is provided
-            if engine_config is None:
-                self.engine_config = _SomdConfig(
-                    runtime=2.5,  # Default runtime of 2.5 ns
-                    input_dir=self.input_dir  # Use the simulation runner's input directory
-                )
-            else:
-                self.engine_config = engine_config
+            self.engine_config = engine_config if engine_config is not None else _SomdConfig(
+                input_dir=self.input_dir  # Use the simulation runner's input directory
+            )
 
             # Save state
             if dump:
@@ -1086,78 +1087,3 @@ class SimulationRunner(ABC):
 
         # Record that the object was loaded from a pickle file
         self.loaded_from_pickle = True
-
-    def _update_logging_options(
-        self,
-        stream_log_level: _Optional[int] = None,
-        file_log_level: _Optional[int] = None,
-        track_time: bool = False,
-    ) -> None:
-        """
-        Update logging options for this simulation runner and all sub-runners recursively.
-
-        Parameters
-        ----------
-        stream_log_level : int, Optional
-            The log level for the stream handler. If None, keeps current level.
-        file_log_level : int, Optional
-            The log level for the file handler. If None, keeps current level.
-        track_time : bool, default=False
-            Whether to track time for logging operations.
-        """
-        if stream_log_level is not None:
-            self.recursively_set_attr("stream_log_level", stream_log_level, force=True)
-            
-        if hasattr(self, "_logger"):
-            # Update existing logger settings
-            for handler in self._logger.handlers:
-                if isinstance(handler, _logging.StreamHandler) and stream_log_level is not None:
-                    handler.setLevel(stream_log_level)
-                elif isinstance(handler, _logging.FileHandler) and file_log_level is not None:
-                    handler.setLevel(file_log_level)
-            
-            # Add time tracking if requested
-            if track_time:
-                self._logger.track_time = True
-                
-        # Recursively update sub-runners
-        if hasattr(self, "_sub_sim_runners"):
-            for sub_runner in self._sub_sim_runners:
-                sub_runner._update_logging_options(
-                    stream_log_level=stream_log_level,
-                    file_log_level=file_log_level,
-                    track_time=track_time
-                )
-
-    def _copy_to_test(self, test_dir: str) -> None:
-        """
-        Copy generated files to a test directory for validation.
-
-        Parameters
-        ----------
-        test_dir : str
-            Path to the test directory where files should be copied.
-        """
-        if not _os.path.exists(test_dir):
-            _os.makedirs(test_dir)
-
-        self._logger.info(f"Copying generated files to test directory: {test_dir}")
-
-        # Copy all files from the run directory to test directory
-        for root, _, files in _os.walk(self.run_dir):
-            for file in files:
-                src_path = _os.path.join(root, file)
-                # Get relative path from run_dir
-                rel_path = _os.path.relpath(src_path, self.run_dir)
-                dst_path = _os.path.join(test_dir, rel_path)
-                
-                # Create destination directory if it doesn't exist
-                dst_dir = _os.path.dirname(dst_path)
-                if not _os.path.exists(dst_dir):
-                    _os.makedirs(dst_dir)
-                
-                # Copy the file
-                _shutil.copy2(src_path, dst_path)
-                self._logger.debug(f"Copied {rel_path} to test directory")
-
-        self._logger.info("Finished copying files to test directory")

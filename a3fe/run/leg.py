@@ -253,7 +253,7 @@ class Leg(_SimulationRunner):
             system = self.run_ensemble_equilibration(sysprep_config=cfg)
 
         # Write input files
-        self.write_input_files(system, config=cfg)
+        self.setup_stages(system, config=cfg)
 
         # Make sure the stored restraints reflect the restraints used. TODO:
         # make this more robust my using the SOMD functionality to extract
@@ -281,7 +281,7 @@ class Leg(_SimulationRunner):
                     stream_log_level=self.stream_log_level,
                     slurm_config=self.slurm_config,
                     analysis_slurm_config=self.analysis_slurm_config,
-                    engine_config=self.engine_config,
+                    engine_config=self.engine_config.copy() if self.engine_config else None
                 )
             )
 
@@ -717,13 +717,13 @@ class Leg(_SimulationRunner):
         else:  # Free leg
             return pre_equilibrated_system
 
-    def write_input_files(
+    def setup_stages(
         self,
         pre_equilibrated_system: _BSS._SireWrappers._system.System,  # type: ignore
         config: _SystemPreparationConfig,
-    ) -> None:
+    ) -> _Dict[_StageType, _SomdConfig]:
         """
-        Write the required input files to all of the stage input directories.
+        Set up the SOMD configurations for each stage of the leg.
 
         Parameters
         ----------
@@ -732,24 +732,21 @@ class Leg(_SimulationRunner):
             are then used as input for each of the individual runs.
         config: SystemPreparationConfig
             Configuration object for the setup of the leg.
+
+        Returns
+        -------
+        Dict[StageType, SomdConfig]
+            Dictionary mapping stage types to their SOMD configurations
         """
         # Get the charge of the ligand
         lig = _get_single_mol(pre_equilibrated_system, "LIG")
         lig_charge = round(lig.charge().value())
 
-        # If we have a charged ligand, make sure that SOMD is using PME
-        if lig_charge != 0:
-            cutoff_type = self.engine_config.cutoff_type
-            if cutoff_type != "PME":
-                raise ValueError(
-                    f"The ligand has a non-zero charge ({lig_charge}), so SOMD must use PME for the electrostatics. "
-                    "Please set the 'cutoff type' option in the engine_config to 'PME'."
-                )
-
+        if lig_charge != 0:   
             self._logger.info(
-                f"Ligand has charge {lig_charge}. Using co-alchemical ion approach to maintain neutrality."
+                f"The ligand has a charge of {lig_charge}. Using co-alchemical ion approach to maintain neutrality. "
+                "Please note: The cutoff type should be PME and the cutoff length can be adjusted to other values, e.g., 10 Å."
             )
-
         # Figure out where the ligand is in the system
         perturbed_resnum = pre_equilibrated_system.getIndex(lig) + 1
 
@@ -759,9 +756,10 @@ class Leg(_SimulationRunner):
         if not hasattr(self, "stage_input_dirs"):
             raise AttributeError("No stage input directories have been set.")
 
+        stage_configs = {}
         for stage_type, stage_input_dir in self.stage_input_dirs.items():
             self._logger.info(
-                f"Writing input files for {self.leg_type.name} leg {stage_type.name} stage"
+                f"Setting up {self.leg_type.name} leg {stage_type.name} stage"
             )
             restraint = self.restraints[0] if self.leg_type == _LegType.BOUND else None
             protocol = _BSS.Protocol.FreeEnergy(
@@ -805,31 +803,24 @@ class Leg(_SimulationRunner):
                     _shutil.copy(
                         restraint_file, f"{stage_input_dir}/restraint_{i + 1}.txt"
                     )
-
-            # Update the somd.cfg file with the perturbed residue number generated
-            # by BSS, as well as the restraints options
-            
-            # generate the somd.cfg file
-            somd_config = self.engine_config.get_somd_config(
-                run_dir=stage_input_dir,
-                config_name="somd"
-            )
+            # Create a new config for this stage
+            stage_config = self.engine_config.copy()
             
             # Set configuration options
-            somd_config.perturbed_residue_number = perturbed_resnum
-            somd_config.use_boresch_restraints = self.leg_type == _LegType.BOUND
-            somd_config.turn_on_receptor_ligand_restraints_mode = self.leg_type == _LegType.BOUND
-            somd_config.charge_difference = -lig_charge  # Use co-alchemical ion approach when there is a charge difference
+            stage_config.perturbed_residue_number = perturbed_resnum
+            stage_config.use_boresch_restraints = self.leg_type == _LegType.BOUND
+            stage_config.turn_on_receptor_ligand_restraints = self.leg_type == _LegType.BOUND
+            stage_config.charge_difference = -lig_charge  # Use co-alchemical ion approach when there is a charge difference
             
-            # Set the default lambda windows based on the leg and stage types
-            lam_vals = config.lambda_values[self.leg_type][stage_type]
-            somd_config.lambda_array = lam_vals
+            # Set lambda values from default dictionary
+            stage_config.lambda_array = stage_config.default_lambda_values[self.leg_type.config_key][stage_type.config_key]
             
-            # Write the updated configuration
-            somd_config.write(stage_input_dir)
+            stage_configs[stage_type] = stage_config
 
         # We no longer need to store the large BSS restraint classes.
         self._lighten_restraints()
+        
+        return stage_configs
 
     def _run_slurm(
         self, sys_prep_fn: _Callable, wait: bool, run_dir: str, job_name: str

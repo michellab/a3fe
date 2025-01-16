@@ -2,7 +2,6 @@
 
 from tempfile import TemporaryDirectory
 import os
-import logging
 import pytest
 
 from a3fe import SomdConfig
@@ -74,6 +73,35 @@ def test_charge_cutoff_validation(charge, cutoff, should_pass):
     else:
         with pytest.raises(ValueError):
             SomdConfig(ligand_charge=charge, cutoff_type=cutoff, runtime=1)
+
+def test_charge_difference_validation():
+    """Test that charge difference validation works correctly."""
+
+    #test charge_difference=0, any cutoff_type
+    valid_config_cutoff = SomdConfig(
+        charge_difference=0,
+        cutoff_type="cutoffperiodic",
+        runtime=1
+    )
+    assert valid_config_cutoff.charge_difference == 0
+    assert valid_config_cutoff.cutoff_type == "cutoffperiodic"
+
+
+    valid_config_charge = SomdConfig(
+        charge_difference=1,
+        cutoff_type="PME",
+        runtime=1
+    )
+    assert valid_config_charge.charge_difference == 1
+    assert valid_config_charge.cutoff_type == "PME"
+
+    with pytest.raises(ValueError):
+        SomdConfig(
+            charge_difference=1,
+            cutoff_type="cutoffperiodic",
+            runtime=1
+        )
+
 
 def test_get_somd_config_with_extra_options():
     """

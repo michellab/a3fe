@@ -82,12 +82,20 @@ class StageType(_YamlSerialisableEnum):
         else:
             raise ValueError("Unknown stage type.")
 
+    @property
+    def config_key(self) -> str:
+        return self.name
+
 
 class LegType(_YamlSerialisableEnum):
     """The type of leg in the calculation."""
 
     BOUND = 1
     FREE = 2
+
+    @property
+    def config_key(self) -> str:
+        return self.name
 
 
 class PreparationStage(_YamlSerialisableEnum):

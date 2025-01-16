@@ -13,7 +13,6 @@ from ._simulation_runner import SimulationRunner as _SimulationRunner
 from .enums import LegType as _LegType
 from .enums import PreparationStage as _PreparationStage
 from .leg import Leg as _Leg
-from .._version import __version__ as _version
 from ..configuration import (
     SystemPreparationConfig as _SystemPreparationConfig,
     SlurmConfig as _SlurmConfig,
@@ -100,10 +99,7 @@ class Calculation(_SimulationRunner):
         Returns
         -------
         None
-        """
-        # Store the version
-        self.version = _version
-        
+        """      
         super().__init__(
             base_dir=base_dir,
             input_dir=input_dir,
@@ -129,8 +125,6 @@ class Calculation(_SimulationRunner):
             # Save the state and update log
             self._update_log()
             self._dump()
-
-        self._logger.info(f"Initializing calculation with A3fe version: {self.version}")
 
     @property
     def legs(self) -> _List[_Leg]:
@@ -198,22 +192,13 @@ class Calculation(_SimulationRunner):
         """
 
         if self.setup_complete:
-            self._logger.debug("Setup already complete. Skipping...")
+            self._logger.info("Setup already complete. Skipping...")
             return
 
         configs = {
             _LegType.BOUND: bound_leg_sysprep_config,
             _LegType.FREE: free_leg_sysprep_config,
         }
-
-        # Set up logging options for detailed setup tracking
-        self._update_logging_options(
-            stream_log_level=self.stream_log_level,
-            file_log_level=_logging.DEBUG,  # Always keep detailed logs in file
-            track_time=True  # Track time during setup
-        )
-        
-        self._logger.info(f"Setting up calculation with A3fe version: {self.version}")
         
         self._logger.info("Starting calculation setup...")
         setup_start = _time.time()
