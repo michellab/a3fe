@@ -263,7 +263,23 @@ class Simulation(_SimulationRunner):
     def _update_simfile(self) -> None:
         """Set the lambda value in the simulation file, as well as some
         paths to input files."""
+        
+        # update engine_config
+        self.engine_config.lambda_val = self.lam
+        self.engine_config.morphfile = _os.path.join(self.input_dir, "somd.pert")
+        self.engine_config.topfile = _os.path.join(self.input_dir, "somd.prm7")
+        self.engine_config.crdfile = _os.path.join(self.input_dir, "somd.rst7")
+        
+        # if restraint file exists, read and set
+        restraint_file = _os.path.join(self.input_dir, "restraint.txt")
+        if _os.path.isfile(restraint_file):
+            with open(restraint_file, "r") as f:
+                content = f.read().strip()
+                if "=" in content:
+                    restraint = content.split("=", 1)[1].strip()
+                    self.engine_config.boresch_restraints_dictionary = restraint
 
+        # Write updated config to file
         self.engine_config.write_somd_config(self.output_dir, self.lam)
 
     def _get_slurm_file_base(self) -> None:
@@ -286,23 +302,8 @@ class Simulation(_SimulationRunner):
         -------
         None
         """
-        # update engine_config
-        self.engine_config.lambda_val = self.lam
-        self.engine_config.morphfile = _os.path.join(self.input_dir, "somd.pert")
-        self.engine_config.topfile = _os.path.join(self.input_dir, "somd.prm7")
-        self.engine_config.crdfile = _os.path.join(self.input_dir, "somd.rst7")
-        
-        # if restraint file exists, read and set
-        restraint_file = _os.path.join(self.input_dir, "restraint.txt")
-        if _os.path.isfile(restraint_file):
-            with open(restraint_file, "r") as f:
-                content = f.read().strip()
-                if "=" in content:
-                    restraint = content.split("=", 1)[1].strip()
-                    self.engine_config.boresch_restraints_dictionary = restraint
-
-        # write config to output directory
-        self.engine_config.write_somd_config(self.output_dir, self.lam)
+        #update somd.cfg with the necessary configurations
+        self._update_simfile()
 
         # Run SOMD - note that command excludes sbatch as this is added by the virtual queue
         cmd = f"somd-freenrg -C somd.cfg -l {self.lam} -p CUDA"

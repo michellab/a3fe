@@ -363,6 +363,8 @@ class SomdConfig(_EngineRunnerConfig, _BaseModel):
         """
         self.lambda_val = lam
 
+        if self.boresch_restraints_dictionary:
+            self.use_boresch_restraints = True
         # Generate somd.cfg file using the current configuration
         config_path = self.get_somd_config(run_dir=output_dir)
 
