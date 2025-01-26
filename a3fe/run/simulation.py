@@ -375,7 +375,7 @@ class Simulation(_SimulationRunner):
                 .strip()
                 .split()[0]
             )
-            return step * self.timestep  # ns
+            return step * (self.engine_config.timestep/1_000_000)  # ns
 
     def get_tot_gpu_time(self) -> float:
         """
@@ -543,7 +543,7 @@ class Simulation(_SimulationRunner):
                 steps.append(step)
                 grads.append(grad)
 
-        times = [x * self.timestep for x in steps]  # Timestep already in ns
+        times = [x * (self.engine_config.timestep/1_000_000) for x in steps]  # Timestep already in ns
 
         times_arr = _np.array(times)
         grads_arr = _np.array(grads)

@@ -205,7 +205,7 @@ class SomdConfig(_EngineRunnerConfig, _BaseModel):
         config_lines = [
             "### Integrator ###",
             f"timestep = {self.timestep} * femtosecond",
-            f"runtime = {self.runtime} * nanosecond",
+            #f"runtime = {self.runtime} * nanosecond",
             f"nmoves = {self.nmoves}",
             f"constraint = {self.constraint}",
             f"hydrogen mass repartitioning factor = {self.hydrogen_mass_factor}",

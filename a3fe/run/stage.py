@@ -367,6 +367,12 @@ class Stage(_SimulationRunner):
                 self._logger.info(
                     f"Starting {self}. Adaptive equilibration = {adaptive}..."
                 )
+                # set runtime for all simulations before calculating nmoves
+                for win in self.lam_windows:
+                    for sim in win.sims:
+                        sim.engine_config.runtime = runtime
+                        self._logger.debug(f"Set runtime to {runtime} ns for {sim}")
+
             elif adaptive:
                 self._logger.info(
                     f"Starting {self}. Adaptive equilibration = {adaptive}..."
