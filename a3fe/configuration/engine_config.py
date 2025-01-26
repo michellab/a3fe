@@ -102,25 +102,27 @@ class SomdConfig(_EngineRunnerConfig, _BaseModel):
     @property
     def nmoves(self) -> int:
         """
-        Calculate number of moves per cycle based on runtime and timestep.
-        runtime is in nanoseconds (ns)
-        timestep is in femtoseconds (fs)
-        Returns number of moves needed per cycle
-        Raises ValueError if runtime cannot be exactly divided by timestep
+        Make sure runtime is a multiple of timestep
         """
         # Convert runtime to femtoseconds (ns -> fs)
         runtime_fs = _Decimal(str(self.runtime)) * _Decimal('1000000')
         timestep = _Decimal(str(self.timestep))
         
-        # Check if division is exact
-        nmoves = runtime_fs / timestep
-        if not nmoves.is_integer():
+        # Check if runtime is a multiple of timestep
+        remainder = runtime_fs % timestep
+        if round(float(remainder), 4) != 0:
             raise ValueError(
-                f"Runtime must be a multiple of timestep. "
-                f"Runtime: {self.runtime} ns, timestep: {self.timestep} fs"
+                (
+                    "Runtime must be a multiple of the timestep. "
+                    f"Runtime is {self.runtime} ns ({runtime_fs} fs), "
+                    f"and timestep is {self.timestep} fs."
+                )
             )
+            
+        # Calculate the number of moves
+        nmoves = round(float(runtime_fs) / float(timestep))
         
-        return int(nmoves)
+        return nmoves
 
     @_model_validator(mode="after")
     def _check_cutoff_values(self):
@@ -204,6 +206,7 @@ class SomdConfig(_EngineRunnerConfig, _BaseModel):
             "### Integrator ###",
             f"timestep = {self.timestep} * femtosecond",
             f"runtime = {self.runtime} * nanosecond",
+            f"nmoves = {self.nmoves}",
             f"constraint = {self.constraint}",
             f"hydrogen mass repartitioning factor = {self.hydrogen_mass_factor}",
             f"integrator = {self.integrator}",
