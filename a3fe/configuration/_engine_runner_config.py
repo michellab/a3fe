@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import yaml as _yaml
+from abc import ABC as _ABC, abstractmethod
 from pydantic import BaseModel as _BaseModel
-from typing import Any as _Any
-from typing import Dict as _Dict
+from typing import Any as _Any, Dict as _Dict
 
-class EngineRunnerConfig(_BaseModel):
+
+class EngineRunnerConfig(_BaseModel, _ABC):
     """Base class for engine runner configurations."""
 
     def get_config(self) -> _Dict[str, _Any]:
@@ -16,49 +17,58 @@ class EngineRunnerConfig(_BaseModel):
         """
         pass
 
+    @abstractmethod
     def get_file_name(self) -> str:
         """
         Get the name of the configuration file.
         """
         pass
     
-    def dump(self, file_path: str) -> None:
+    def dump(self, save_dir: str) -> None:
         """
         Dump the configuration to a YAML file using `self.model_dump()`.
 
         Parameters
         ----------
-        file_path : str
-            Path to dump the configuration to.
+        save_dir : str
+            Directory to dump the configuration to.
         """
-        try:
-            config = self.model_dump()
-            with open(file_path, "w") as f:
-                _yaml.safe_dump(config, f)
-        except Exception as e:
-            print(f"Error dumping configuration: {e}")
-            return
-        print(f"Configuration dumped to {file_path}")
+        model_dict = self.model_dump()
+
+        save_path = save_dir + "/" + self.get_file_name()
+        with open(save_path, "w") as f:
+            _yaml.dump(model_dict, f, default_flow_style=False)
+
 
     @classmethod
-    def load(cls, file_path: str) -> EngineRunnerConfig:
+    def load(cls, load_dir: str) -> EngineRunnerConfig:
         """
         Load a configuration from a YAML file.
 
         Parameters
         ----------
-        file_path : str
-            Path to load the configuration from.
+        load_dir : str
+            Directory to load the configuration from.
 
         Returns
         -------
         config : EngineRunnerConfig
             The loaded configuration.
+        """ 
+        with open(load_dir + "/" + cls.get_file_name(), "r") as f:
+            model_dict = _yaml.safe_load(f)
+        return cls(**model_dict)
+
+    @abstractmethod
+    def write_config(self, simfile_path: str) -> None:
         """
-        try: 
-            with open(file_path, "r") as f:
-                config_dict = _yaml.safe_load(f)
-        except Exception as e:
-            print(f"Error loading configuration: {e}")
-            return
-        return cls(**config_dict)
+        Write the configuration to a file.
+        """
+        pass
+
+    @abstractmethod
+    def get_run_cmd(self) -> str:
+        """
+        Get the command to run the simulation.
+        """
+        pass

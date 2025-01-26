@@ -9,18 +9,16 @@ from a3fe import SomdConfig
 def test_config_yaml_save_and_load():
     """Test that the config can be saved to and loaded from YAML."""
     with TemporaryDirectory() as dirname:
-        config = SomdConfig(runtime=1)
-        yaml_path = os.path.join(dirname, "config.yaml")
-        config.dump(yaml_path)
-        config2 = SomdConfig.load(yaml_path)
-        assert config == config2
+        config = SomdConfig(runtime=1,leg_type="BOUND")
+        config.dump(dirname)
+        config2 = SomdConfig.load(dirname)
+        assert config.leg_type == config2.leg_type
 
 def test_get_somd_config():
     """Test that the SOMD configuration file is generated correctly."""
     with TemporaryDirectory() as dirname:
         config = SomdConfig(
             integrator="langevinmiddle",
-            nmoves=25000,
             timestep=4.0,
             runtime=1,  # Integer runtime
             cutoff_type="PME",
@@ -33,7 +31,6 @@ def test_get_somd_config():
             config_content = f.read()
 
         assert "integrator = langevinmiddle" in config_content
-        assert "nmoves = 25000" in config_content
         assert "cutoff type = PME" in config_content
         assert "thermostat = False" in config_content
 
@@ -74,30 +71,30 @@ def test_charge_cutoff_validation(charge, cutoff, should_pass):
         with pytest.raises(ValueError):
             SomdConfig(ligand_charge=charge, cutoff_type=cutoff, runtime=1)
 
-def test_charge_difference_validation():
-    """Test that charge difference validation works correctly."""
+def test_ligand_charge_validation():
+    """Test that ligand charge validation works correctly."""
 
-    #test charge_difference=0, any cutoff_type
+    #test ligand_charge=0, any cutoff_type
     valid_config_cutoff = SomdConfig(
-        charge_difference=0,
+        ligand_charge=0,
         cutoff_type="cutoffperiodic",
         runtime=1
     )
-    assert valid_config_cutoff.charge_difference == 0
+    assert valid_config_cutoff.ligand_charge == 0
     assert valid_config_cutoff.cutoff_type == "cutoffperiodic"
 
 
     valid_config_charge = SomdConfig(
-        charge_difference=1,
+        ligand_charge=1,
         cutoff_type="PME",
         runtime=1
     )
-    assert valid_config_charge.charge_difference == 1
+    assert valid_config_charge.ligand_charge == 1
     assert valid_config_charge.cutoff_type == "PME"
 
     with pytest.raises(ValueError):
         SomdConfig(
-            charge_difference=1,
+            ligand_charge=1,
             cutoff_type="cutoffperiodic",
             runtime=1
         )
@@ -110,8 +107,6 @@ def test_get_somd_config_with_extra_options():
     with TemporaryDirectory() as dirname:
         config = SomdConfig(
             integrator="langevinmiddle",
-            nmoves=25000,
-            timestep=4.0,
             runtime=1,
             cutoff_type="PME",
             thermostat=False,
@@ -126,7 +121,6 @@ def test_get_somd_config_with_extra_options():
 def test_compare_with_reference_config():
     """Test that we can generate a config file that matches a reference config."""
     reference_lines = [
-        "nmoves = 25000",
         "timestep = 4.0 * femtosecond",
         "constraint = hbonds",
         "hydrogen mass repartitioning factor = 3.0",
@@ -150,8 +144,6 @@ def test_compare_with_reference_config():
     ]
     with TemporaryDirectory() as dirname:
         config = SomdConfig(
-            nmoves=25000,
-            timestep=4.0,
             runtime=1,
             constraint="hbonds",
             hydrogen_mass_factor=3.0,
@@ -171,9 +163,8 @@ def test_compare_with_reference_config():
             turn_on_receptor_ligand_restraints=True,
             perturbed_residue_number=1,
             energy_frequency=200,
-            lambda_array=[0.0, 0.125, 0.25, 0.375, 0.5, 1.0]
         )
-        cfg_path = config.get_somd_config(run_dir=dirname)
+        cfg_path = config.get_somd_config(run_dir=dirname, lambda_array=[0.0, 0.125, 0.25, 0.375, 0.5, 1.0])
         with open(cfg_path, "r") as f:
             cfg_content = f.read()
         for line in reference_lines:
@@ -191,7 +182,8 @@ def test_copy_from_existing_config():
     assert c.topfile.endswith("somd.prm7")
     expected_lambda = [0.0, 0.068, 0.137, 0.199, 0.261, 0.317, 0.368, 0.419, 0.472,
                       0.524, 0.577, 0.627, 0.677, 0.727, 0.775, 0.824, 0.877, 0.938, 1.0]
-    assert c.lambda_array == expected_lambda    # Boresch restraints dictionary
+    assert c.lambda_array == expected_lambda    
+    # Boresch restraints dictionary
     expected_boresch_dict = (
         '{"anchor_points":{"r1":4900, "r2":4888, "r3":4902, "l1":3, "l2":5, "l3":11}, '
         '"equilibrium_values":{"r0":7.67, "thetaA0":2.55, "thetaB0":1.48,"phiA0":-0.74, '

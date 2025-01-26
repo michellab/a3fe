@@ -50,7 +50,7 @@ from ..analyse.plot import plot_sq_sem_convergence as _plot_sq_sem_convergence
 from ..analyse.process_grads import GradientData as _GradientData
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._virtual_queue import VirtualQueue as _VirtualQueue
-from .enums import StageType as _StageType
+from .enums import StageType as _StageType, LegType as _LegType
 from .lambda_window import LamWindow as _LamWindow
 from ..configuration.slurm_config import SlurmConfig as _SlurmConfig
 from ..configuration.engine_config import SomdConfig as _SomdConfig
@@ -78,6 +78,7 @@ class Stage(_SimulationRunner):
     def __init__(
         self,
         stage_type: _StageType,
+        leg_type: _LegType,
         equil_detection: str = "multiwindow",
         runtime_constant: _Optional[float] = 0.005,
         relative_simulation_cost: float = 1,
@@ -151,6 +152,7 @@ class Stage(_SimulationRunner):
         # Set the stage type first, as this is required for __str__,
         # and threrefore the super().__init__ call
         self.stage_type = stage_type
+        self.leg_type = leg_type
 
         super().__init__(
             base_dir=base_dir,
@@ -189,6 +191,8 @@ class Stage(_SimulationRunner):
                 self.lam_windows.append(
                     _LamWindow(
                         lam=lam_val,
+                        leg_type=self.leg_type,
+                        stage_type=self.stage_type,
                         lam_val_weight=lam_val_weights[i],
                         virtual_queue=self.virtual_queue,
                         equil_detection=self.equil_detection,
@@ -1214,8 +1218,14 @@ class Stage(_SimulationRunner):
         if _os.path.isdir(self.output_dir):
             self._mv_output(save_name)
 
-        self.engine_config.lambda_array = ", ".join([str(lam) for lam in self.lam_vals])
-        self.engine_config.get_somd_config(self.input_dir)
+        self.engine_config.write_config(
+            _os.path.join(self.output_dir, "somd.cfg"),
+            lambda_array=self.lam_vals,
+            morphfile=_os.path.join(self.input_dir, "somd.pert"),
+            topfile=_os.path.join(self.input_dir, "somd.prm7"),
+            crdfile=_os.path.join(self.input_dir, "somd.rst7"),
+            restraint=self.restraint,
+        )
         
         old_lam_vals_attrs = self.lam_windows[0].__dict__
         self._logger.info("Deleting old lambda windows and creating new ones...")

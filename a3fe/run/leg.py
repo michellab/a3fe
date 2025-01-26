@@ -124,6 +124,7 @@ class Leg(_SimulationRunner):
         """
         # Set the leg type, as this is needed in the superclass constructor
         self.leg_type = leg_type
+        self.stage_type = self.required_stages[leg_type]
 
         super().__init__(
             base_dir=base_dir,
@@ -253,7 +254,7 @@ class Leg(_SimulationRunner):
             system = self.run_ensemble_equilibration(sysprep_config=cfg)
 
         # Write input files
-        self.setup_stages(system, config=cfg)
+        self.setup_systemprep_stages(system, config=cfg)
 
         # Make sure the stored restraints reflect the restraints used. TODO:
         # make this more robust my using the SOMD functionality to extract
@@ -268,11 +269,12 @@ class Leg(_SimulationRunner):
             self.stages.append(
                 _Stage(
                     stage_type=stage_type,
+                    leg_type=self.leg_type,
                     equil_detection=self.equil_detection,
                     runtime_constant=self.runtime_constant,
                     relative_simulation_cost=self.relative_simulation_cost,
                     ensemble_size=self.ensemble_size,
-                    lambda_values=cfg.lambda_values[self.leg_type][stage_type],
+                    lambda_values=self.engine_config.default_lambda_values[self.leg_type][stage_type],
                     base_dir=self.stage_input_dirs[stage_type].replace("/input", ""),
                     input_dir=self.stage_input_dirs[stage_type],
                     output_dir=self.stage_input_dirs[stage_type].replace(
@@ -281,7 +283,7 @@ class Leg(_SimulationRunner):
                     stream_log_level=self.stream_log_level,
                     slurm_config=self.slurm_config,
                     analysis_slurm_config=self.analysis_slurm_config,
-                    engine_config=self.engine_config.copy() if self.engine_config else None
+                    engine_config=self.engine_config.copy()
                 )
             )
 
@@ -717,13 +719,13 @@ class Leg(_SimulationRunner):
         else:  # Free leg
             return pre_equilibrated_system
 
-    def setup_stages(
+    def setup_systemprep_stages(
         self,
         pre_equilibrated_system: _BSS._SireWrappers._system.System,  # type: ignore
         config: _SystemPreparationConfig,
     ) -> _Dict[_StageType, _SomdConfig]:
         """
-        Set up the SOMD configurations for each stage of the leg.
+        Set up the engine configurations for each stage of the leg.
 
         Parameters
         ----------
@@ -735,8 +737,8 @@ class Leg(_SimulationRunner):
 
         Returns
         -------
-        Dict[StageType, SomdConfig]
-            Dictionary mapping stage types to their SOMD configurations
+        Dict[StageType, EngineConfig]
+            Dictionary mapping stage types to their Engine configurations
         """
         # Get the charge of the ligand
         lig = _get_single_mol(pre_equilibrated_system, "LIG")
@@ -803,19 +805,10 @@ class Leg(_SimulationRunner):
                     _shutil.copy(
                         restraint_file, f"{stage_input_dir}/restraint_{i + 1}.txt"
                     )
-            # Create a new config for this stage
-            stage_config = self.engine_config.copy()
-            
-            # Set configuration options
-            stage_config.perturbed_residue_number = perturbed_resnum
-            stage_config.use_boresch_restraints = self.leg_type == _LegType.BOUND
-            stage_config.turn_on_receptor_ligand_restraints = self.leg_type == _LegType.BOUND
-            stage_config.charge_difference = -lig_charge  # Use co-alchemical ion approach when there is a charge difference
-            
             # Set lambda values from default dictionary
-            stage_config.lambda_array = stage_config.default_lambda_values[self.leg_type.config_key][stage_type.config_key]
+            self.engine_config.lambda_array = self.engine_config.default_lambda_values[self.leg_type][stage_type]
             
-            stage_configs[stage_type] = stage_config
+            stage_configs[stage_type] = self.engine_config.copy()
 
         # We no longer need to store the large BSS restraint classes.
         self._lighten_restraints()

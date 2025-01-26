@@ -22,6 +22,7 @@ from ._virtual_queue import VirtualQueue as _VirtualQueue
 from .simulation import Simulation as _Simulation
 from ..configuration import SlurmConfig as _SlurmConfig
 from ..configuration import SomdConfig as _SomdConfig
+from .enums import LegType as _LegType, StageType as _StageType
 
 
 class LamWindow(_SimulationRunner):
@@ -39,6 +40,8 @@ class LamWindow(_SimulationRunner):
     def __init__(
         self,
         lam: float,
+        leg_type: _LegType,
+        stage_type: _StageType,
         virtual_queue: _VirtualQueue,
         lam_val_weight: _Optional[float] = None,
         block_size: float = 1,
@@ -128,6 +131,8 @@ class LamWindow(_SimulationRunner):
         # Set the lamdbda value first, as this is required for __str__,
         # and therefore the super().__init__ call
         self.lam = lam
+        self.leg_type = leg_type
+        self.stage_type = stage_type
 
         super().__init__(
             base_dir=base_dir,
@@ -187,6 +192,8 @@ class LamWindow(_SimulationRunner):
                 self.sims.append(
                     _Simulation(
                         lam=lam,
+                        leg_type=self.leg_type,
+                        stage_type=self.stage_type,
                         run_no=run_no,
                         virtual_queue=virtual_queue,
                         base_dir=sim_base_dir,

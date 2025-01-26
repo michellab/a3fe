@@ -103,7 +103,7 @@ class SimulationRunner(ABC):
         # Set the version of the simulation runner
         self._logger = _logging.getLogger(self.__class__.__name__)
         self._version = _version
-        self._logger.info(f"Initializing simulation runner with A3fe version: {self._version}")
+        self._logger.debug(f"Initializing simulation runner with A3fe version: {self._version}")
 
         # Set up the directories (which may be overwritten if the
         # simulation runner is subsequently loaded from a pickle file)
