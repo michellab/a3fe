@@ -14,10 +14,11 @@ from .enums import LegType as _LegType
 from .enums import PreparationStage as _PreparationStage
 from .leg import Leg as _Leg
 from ..configuration import (
-    SystemPreparationConfig as _SystemPreparationConfig,
+    _BaseSystemPreparationConfig,
     SlurmConfig as _SlurmConfig,
     SomdConfig as _SomdConfig,
 )
+from .enums import EngineType as _EngineType
 
 
 class Calculation(_SimulationRunner):
@@ -45,6 +46,7 @@ class Calculation(_SimulationRunner):
         slurm_config: _Optional[_SlurmConfig] = None,
         analysis_slurm_config: _Optional[_SlurmConfig] = None,
         engine_config: _Optional[_SomdConfig] = None,
+        engine_type: _EngineType = _EngineType.SOMD,
         update_paths: bool = True,
     ) -> None:
         """
@@ -92,6 +94,8 @@ class Calculation(_SimulationRunner):
             partition, but the main simulation to the GPU partition. If None,
         engine_config: SomdConfig, default: None
             Configuration for the SOMD engine. If None, the default configuration is used.
+        engine_type: EngineType, default: EngineType.SOMD
+            The type of engine to use for the production simulations.
         update_paths: bool, Optional, default: True
             If True, if the simulation runner is loaded by unpickling, then
             update_paths() is called.
@@ -99,7 +103,7 @@ class Calculation(_SimulationRunner):
         Returns
         -------
         None
-        """      
+        """
         super().__init__(
             base_dir=base_dir,
             input_dir=input_dir,
@@ -110,6 +114,7 @@ class Calculation(_SimulationRunner):
             slurm_config=slurm_config,
             analysis_slurm_config=analysis_slurm_config,
             engine_config=engine_config.copy() if engine_config else None,
+            engine_type=engine_type,
             dump=False,
         )
 
@@ -173,8 +178,8 @@ class Calculation(_SimulationRunner):
 
     def setup(
         self,
-        bound_leg_sysprep_config: _Optional[_SystemPreparationConfig] = None,
-        free_leg_sysprep_config: _Optional[_SystemPreparationConfig] = None,
+        bound_leg_sysprep_config: _Optional[_BaseSystemPreparationConfig] = None,
+        free_leg_sysprep_config: _Optional[_BaseSystemPreparationConfig] = None,
     ) -> None:
         """
         Set up the calculation. This involves parametrising, equilibrating, and
@@ -183,10 +188,10 @@ class Calculation(_SimulationRunner):
 
         Parameters
         ----------
-        bound_leg_sysprep_config: SystemPreparationConfig, opttional, default = None
+        bound_leg_sysprep_config: BaseSystemPreparationConfig, opttional, default = None
             The system preparation configuration to use for the bound leg. If None, the default
             configuration is used.
-        free_leg_sysprep_config: SystemPreparationConfig, opttional, default = None
+        free_leg_sysprep_config: BaseSystemPreparationConfig, opttional, default = None
             The system preparation configuration to use for the free leg. If None, the default
             configuration is used.
         """
@@ -199,7 +204,7 @@ class Calculation(_SimulationRunner):
             _LegType.BOUND: bound_leg_sysprep_config,
             _LegType.FREE: free_leg_sysprep_config,
         }
-        
+
         self._logger.info("Starting calculation setup...")
         setup_start = _time.time()
 
@@ -208,7 +213,7 @@ class Calculation(_SimulationRunner):
         for leg_type in reversed(Calculation.required_legs):
             self._logger.info(f"Setting up {leg_type.name.lower()} leg...")
             leg_start = _time.time()
-            
+
             leg = _Leg(
                 leg_type=leg_type,
                 equil_detection=self.equil_detection,
@@ -221,10 +226,11 @@ class Calculation(_SimulationRunner):
                 slurm_config=self.slurm_config,
                 analysis_slurm_config=self.analysis_slurm_config,
                 engine_config=self.engine_config,
+                engine_type=self.engine_type,
             )
             self.legs.append(leg)
             leg.setup(configs[leg_type])
-            
+
             self._logger.debug(
                 f"Completed {leg_type.name.lower()} leg setup in {_time.time() - leg_start:.2f}s"
             )

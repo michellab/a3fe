@@ -20,7 +20,8 @@ from ._virtual_queue import VirtualQueue as _VirtualQueue
 from .enums import JobStatus as _JobStatus
 from ..configuration import SlurmConfig as _SlurmConfig
 from ..configuration import SomdConfig as _SomdConfig
-from .enums import LegType as _LegType, StageType as _StageType
+from .enums import EngineType as _EngineType
+
 
 class Simulation(_SimulationRunner):
     """Class to store information about a single SOMD simulation."""
@@ -49,8 +50,6 @@ class Simulation(_SimulationRunner):
 
     def __init__(
         self,
-        leg_type: _LegType,
-        stage_type: _StageType,
         lam: float,
         run_no: int,
         virtual_queue: _VirtualQueue,
@@ -61,6 +60,7 @@ class Simulation(_SimulationRunner):
         slurm_config: _Optional[_SlurmConfig] = None,
         analysis_slurm_config: _Optional[_SlurmConfig] = None,
         engine_config: _Optional[_SomdConfig] = None,
+        engine_type: _EngineType = _EngineType.SOMD,
         update_paths: bool = True,
     ) -> None:
         """
@@ -95,6 +95,8 @@ class Simulation(_SimulationRunner):
             partition, but the main simulation to the GPU partition. If None,
         engine_config: SomdConfig, default: None
             Configuration for the SOMD engine. If None, the default configuration is used.
+        engine_type: EngineType, default: EngineType.SOMD
+            The type of engine to use for the production simulations.
         update_paths: bool, Optional, default: True
             If True, if the simulation runner is loaded by unpickling, then
             update_paths() is called.
@@ -105,8 +107,6 @@ class Simulation(_SimulationRunner):
         """
         # Set the lambda value and run number first, as these are
         # required for __str__, and therefore the super().__init__ call
-        self.leg_type = leg_type
-        self.stage_type = stage_type
         self.lam = lam
         self.run_no = run_no
 
@@ -118,9 +118,15 @@ class Simulation(_SimulationRunner):
             slurm_config=slurm_config,
             analysis_slurm_config=analysis_slurm_config,
             engine_config=engine_config,
+            engine_type=engine_type,
             update_paths=update_paths,
             dump=False,
         )
+
+        if self.lam not in self.engine_config.lamvals:
+            raise ValueError(
+                f"Lambda value {self.lam} not in list of lambda values: {self.engine_config.lamvals}"
+            )
 
         if not self.loaded_from_pickle:
             self.virtual_queue = virtual_queue
@@ -131,9 +137,6 @@ class Simulation(_SimulationRunner):
             self.simfile_path = _os.path.join(self.base_dir, "somd.cfg")
             # Select the correct rst7 and, if supplied, restraints
             self._select_input_files()
-            # Now set lambda value and some paths in the simfile,
-            # as well as the restraints if necessary
-            self._update_simfile()
             # Get slurm file base
             self._get_slurm_file_base()
 
@@ -260,63 +263,14 @@ class Simulation(_SimulationRunner):
         else:
             self._logger.debug("No restraint file found")
 
-    def _update_simfile(self) -> None:
-        """Set the lambda value in the simulation file, as well as some
-        paths to input files."""
-        
-        # Check the lambda value has been set
-        if not hasattr(self, "lam"):
-            raise AttributeError("Lambda value not set for simulation")
-
-        # Get lambda values from engine config's default values and check that the set lambda value is in the list
-        lamvals = self.engine_config.default_lambda_values[self.leg_type][self.stage_type]
-        lamvals = [float(lam) for lam in lamvals]  # make sure all values are floats
-        if self.lam not in lamvals:
-            raise ValueError(
-                f"Lambda value {self.lam} not in list of lambda values for {self.leg_type} {self.stage_type}: {lamvals}"
-            )
-            
-        # Set restraints configuration
-        use_boresch_restraints = (
-            self.leg_type == _LegType.BOUND and 
-            self.stage_type in (_StageType.VANISH, _StageType.DISCHARGE, _StageType.RESTRAIN)
-        )
-        self.engine_config.use_boresch_restraints = str(use_boresch_restraints)
-        
-        turn_on_receptor_ligand_restraints = (
-            self.leg_type == _LegType.BOUND and 
-            self.stage_type == _StageType.RESTRAIN
-        )
-        self.engine_config.turn_on_receptor_ligand_restraints = str(turn_on_receptor_ligand_restraints)
-        
-        restraint = None
-        #if restraint file exists, read and set
-        if self.leg_type == _LegType.BOUND:
-            restraint_file = _os.path.join(self.input_dir, "restraint.txt")
-            if _os.path.isfile(restraint_file):
-                with open(restraint_file, "r") as f:
-                    content = f.read().strip()
-                    if "=" in content:
-                        restraint = content.split("=", 1)[1].strip()
-                        self.engine_config.boresch_restraints_dictionary = restraint
-
-        # Write updated config to file using the new write_config method
-        self.engine_config.write_config(
-            _os.path.join(self.output_dir, "somd.cfg"),
-            morphfile=_os.path.join(self.input_dir, "somd.pert"),
-            topfile=_os.path.join(self.input_dir, "somd.prm7"),
-            crdfile=_os.path.join(self.input_dir, "somd.rst7"),
-            lambda_array=lamvals,
-            lambda_val=self.lam,
-            restraint=restraint,
-        )
-
-    def _get_slurm_file_base(self) -> None:
-        """Find out what the slurm output file will be called and save it."""
-        self.slurm_file_base = self.slurm_config.get_slurm_output_file_base(
+    @property
+    def slurm_file_base(self) -> str:
+        """Get the base name of the SLURM output file."""
+        slurm_file_base = self.slurm_config.get_slurm_output_file_base(
             run_dir=self.input_dir
         )
         self._logger.debug(f"Found slurm output file basename: {self.slurm_file_base}")
+        return slurm_file_base
 
     def run(self, runtime: float = 2.5) -> None:
         """
@@ -331,10 +285,17 @@ class Simulation(_SimulationRunner):
         -------
         None
         """
-        #update somd.cfg with the necessary configurations
-        self._update_simfile()
+        # Write updated config to file
+        self.engine_config.write_config(
+            run_dir=self.output_dir,
+            lambda_val=self.lam,
+            runtime=runtime,
+            top_file="somd.rst7",  # TODO - make generic
+            coord_file="somd.prm7",  # TODO - make generic
+            morph_file="somd.pert",  # TODO - make generic
+        )
 
-        # Run SOMD - note that command excludes sbatch as this is added by the virtual queue
+        # Get the commands to run the simulation
         cmd = self.engine_config.get_run_cmd(self.lam)
         cmd_list = self.slurm_config.get_submission_cmds(
             cmd=cmd, run_dir=self.output_dir
@@ -375,7 +336,7 @@ class Simulation(_SimulationRunner):
                 .strip()
                 .split()[0]
             )
-            return step * (self.engine_config.timestep/1_000_000)  # ns
+            return step * (self.engine_config.timestep / 1_000_000)  # ns
 
     def get_tot_gpu_time(self) -> float:
         """
@@ -443,8 +404,6 @@ class Simulation(_SimulationRunner):
 
     @property
     def slurm_output_files(self) -> _List[str]:
-        if not hasattr(self, "slurm_file_base"):
-            self._get_slurm_file_base()
         return _glob.glob(f"{self.slurm_file_base}*")
 
     def kill(self) -> None:
@@ -477,7 +436,6 @@ class Simulation(_SimulationRunner):
             for file in _pathlib.Path(self.output_dir).glob(del_file):
                 self._logger.info(f"Deleting {file}")
                 _subprocess.run(["rm", file])
-
 
     def read_gradients(
         self, equilibrated_only: bool = False, endstate: bool = False
@@ -543,7 +501,9 @@ class Simulation(_SimulationRunner):
                 steps.append(step)
                 grads.append(grad)
 
-        times = [x * (self.engine_config.timestep/1_000_000) for x in steps]  # Timestep already in ns
+        times = [
+            x * (self.engine_config.timestep / 1_000_000) for x in steps
+        ]  # Timestep already in ns
 
         times_arr = _np.array(times)
         grads_arr = _np.array(grads)

@@ -21,7 +21,7 @@ from ..read._read_exp_dgs import read_exp_dgs as _read_exp_dgs
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._utils import SimulationRunnerIterator as _SimulationRunnerIterator
 from .calculation import Calculation as _Calculation
-from ..configuration import SystemPreparationConfig as _SystemPreparationConfig
+from ..configuration.system_prep_config import _BaseSystemPreparationConfig
 
 
 class CalcSet(_SimulationRunner):
@@ -156,18 +156,18 @@ class CalcSet(_SimulationRunner):
 
     def setup(
         self,
-        bound_leg_sysprep_config: _Optional[_SystemPreparationConfig] = None,
-        free_leg_sysprep_config: _Optional[_SystemPreparationConfig] = None,
+        bound_leg_sysprep_config: _Optional[_BaseSystemPreparationConfig] = None,
+        free_leg_sysprep_config: _Optional[_BaseSystemPreparationConfig] = None,
     ) -> None:
         """
         Set up all calculations sequentially.
 
         Parameters
         ----------
-        bound_leg_sysprep_config: SystemPreparationConfig, opttional, default = None
+        bound_leg_sysprep_config: _BaseSystemPreparationConfig, opttional, default = None
             The system preparation configuration to use for the bound leg. If None, the default
             configuration is used.
-        free_leg_sysprep_config: SystemPreparationConfig, opttional, default = None
+        free_leg_sysprep_config: _BaseSystemPreparationConfig, opttional, default = None
             The system preparation configuration to use for the free leg. If None, the default
             configuration is used.
         """

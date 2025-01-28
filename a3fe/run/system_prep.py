@@ -18,14 +18,19 @@ from ..read._process_bss_systems import rename_lig as _rename_lig
 from ._utils import check_has_wat_and_box as _check_has_wat_and_box
 from .enums import LegType as _LegType
 from .enums import PreparationStage as _PreparationStage
+from .enums import EngineType as _EngineType
+
 
 from ..configuration.system_prep_config import (
-    SystemPreparationConfig as _SystemPreparationConfig,
+    ENGINE_TYPE_TO_SYSPREP_CONFIG as _ENGINE_TYPE_TO_SYSPREP_CONFIG,
 )
 
 
 def parameterise_input(
-    leg_type: _LegType, input_dir: str, output_dir: str
+    leg_type: _LegType,
+    engine_type: _EngineType,
+    input_dir: str,
+    output_dir: str,
 ) -> _BSS._SireWrappers._system.System:  # type: ignore
     """
     Paramaterise the input structure, using Open Force Field v.2.0 'Sage'
@@ -36,6 +41,8 @@ def parameterise_input(
     ----------
     leg_type : LegType
         The type of the leg.
+    engine_type: EngineType
+        The type of the engine to use for production (GROMACS is always used for preparation.)
     input_dir : str
         The path to the input directory, where the required files are located.
     output_dir : str
@@ -46,7 +53,7 @@ def parameterise_input(
     parameterised_system : _BSS._SireWrappers._system.System
         Parameterised system.
     """
-    cfg = _SystemPreparationConfig.load(input_dir, leg_type)
+    cfg = _ENGINE_TYPE_TO_SYSPREP_CONFIG[engine_type].load(input_dir, leg_type)
 
     print("Parameterising input...")
     # Parameterise the ligand
@@ -116,7 +123,10 @@ def parameterise_input(
 
 
 def solvate_input(
-    leg_type: _LegType, input_dir: str, output_dir: str
+    leg_type: _LegType,
+    engine_type: _EngineType,
+    input_dir: str,
+    output_dir: str,
 ) -> _BSS._SireWrappers._system.System:  # type: ignore
     """
     Determine an appropriate (rhombic dodecahedron)
@@ -128,6 +138,8 @@ def solvate_input(
     ----------
     leg_type : LegType
         The type of the leg.
+    engine_type: EngineType
+        The type of the engine to use for production (GROMACS is always used for preparation.)
     input_dir : str
         The path to the input directory, where the required files are located.
     output_dir : str
@@ -138,7 +150,7 @@ def solvate_input(
     solvated_system : _BSS._SireWrappers._system.System
         Solvated system.
     """
-    cfg = _SystemPreparationConfig.load(input_dir, leg_type)
+    cfg = _ENGINE_TYPE_TO_SYSPREP_CONFIG[engine_type].load(input_dir, leg_type)
 
     # Load the parameterised system
     print("Loading parameterised system...")
@@ -213,7 +225,10 @@ def solvate_input(
 
 
 def minimise_input(
-    leg_type: _LegType, input_dir: str, output_dir: str
+    leg_type: _LegType,
+    engine_type: _EngineType,
+    input_dir: str,
+    output_dir: str,
 ) -> _BSS._SireWrappers._system.System:  # type: ignore
     """
     Minimise the input structure with GROMACS.
@@ -222,6 +237,8 @@ def minimise_input(
     ----------
     leg_type : LegType
         The type of the leg.
+    engine_type: EngineType
+        The type of the engine to use for production (GROMACS is always used for preparation.)
     input_dir : str
         The path to the input directory, where the required files are located.
     output_dir : str
@@ -232,7 +249,7 @@ def minimise_input(
     minimised_system : _BSS._SireWrappers._system.System
         Minimised system.
     """
-    cfg = _SystemPreparationConfig.load(input_dir, leg_type)
+    cfg = _ENGINE_TYPE_TO_SYSPREP_CONFIG[engine_type].load(input_dir, leg_type)
 
     # Load the solvated system
     print("Loading solvated system...")
@@ -265,7 +282,10 @@ def minimise_input(
 
 
 def heat_and_preequil_input(
-    leg_type: _LegType, input_dir: str, output_dir: str
+    leg_type: _LegType,
+    engine_type: _EngineType,
+    input_dir: str,
+    output_dir: str,
 ) -> _BSS._SireWrappers._system.System:  # type: ignore
     """
     Heat the input structure from 0 to 298.15 K with GROMACS.
@@ -274,6 +294,8 @@ def heat_and_preequil_input(
     ----------
     leg_type : LegType
         The type of the leg.
+    engine_type: EngineType
+        The type of the engine to use for production (GROMACS is always used for preparation.)
     input_dir : str
         The path to the input directory, where the required files are located.
     output_dir : str
@@ -284,7 +306,7 @@ def heat_and_preequil_input(
     preequilibrated_system : _BSS._SireWrappers._system.System
         Pre-Equilibrated system.
     """
-    cfg = _SystemPreparationConfig.load(input_dir, leg_type)
+    cfg = _ENGINE_TYPE_TO_SYSPREP_CONFIG[engine_type].load(input_dir, leg_type)
 
     # Load the minimised system
     print("Loading minimised system...")
@@ -364,7 +386,10 @@ def heat_and_preequil_input(
 
 
 def run_ensemble_equilibration(
-    leg_type: _LegType, input_dir: str, output_dir: str, short: bool = False
+    leg_type: _LegType,
+    engine_type: _EngineType,
+    input_dir: str,
+    output_dir: str,
 ) -> None:
     """
     Run the ensemble equilibration for the given leg type.
@@ -373,19 +398,18 @@ def run_ensemble_equilibration(
     ----------
     leg_type : LegType
         The type of the leg.
+    engine_type: EngineType
+        The type of the engine to use for production (GROMACS is always used for preparation.)
     input_dir : str
         The path to the input directory, where the required files are located.
     output_dir : str
         The path to the output directory, where the files will be saved.
-    short : bool, optional, default=False
-        Whether to run the short version of the ensemble equilibration, by default False.
-        This is used during testing. The short runtime is 0.1 ns.
 
     Returns
     -------
     None
     """
-    cfg = _SystemPreparationConfig.load(input_dir, leg_type)
+    cfg = _ENGINE_TYPE_TO_SYSPREP_CONFIG[engine_type].load(input_dir, leg_type)
 
     # Load the pre-equilibrated system
     print("Loading pre-equilibrated system...")
@@ -496,71 +520,3 @@ def run_process(
         raise _BSS._Exceptions.ThirdPartyError("The final system is None.")
 
     return system
-
-
-# Partial versions of functions for use with slurm. Avoid using functools partial
-# due to issues with getting the name of the fn.
-
-
-def slurm_parameterise_bound() -> None:
-    """Parameterise the input structures for the bound leg"""
-    parameterise_input(leg_type=_LegType.BOUND, input_dir=".", output_dir=".")
-
-
-def slurm_parameterise_free() -> None:
-    """Parameterise the input structures for the free leg"""
-    parameterise_input(leg_type=_LegType.FREE, input_dir=".", output_dir=".")
-
-
-def slurm_solvate_bound() -> None:
-    """Perform solvation for the bound leg input."""
-    solvate_input(leg_type=_LegType.BOUND, input_dir=".", output_dir=".")
-
-
-def slurm_solvate_free() -> None:
-    """Perform solvation for the free leg input."""
-    solvate_input(_LegType.FREE, input_dir=".", output_dir=".")
-
-
-def slurm_minimise_bound() -> None:
-    """Perform minimisation for the bound leg"""
-    minimise_input(leg_type=_LegType.BOUND, input_dir=".", output_dir=".")
-
-
-def slurm_minimise_free() -> None:
-    """Perform minimisation for the free leg"""
-    minimise_input(leg_type=_LegType.FREE, input_dir=".", output_dir=".")
-
-
-def slurm_heat_and_preequil_bound() -> None:
-    """Perform heating and minimisation for the bound leg"""
-    heat_and_preequil_input(leg_type=_LegType.BOUND, input_dir=".", output_dir=".")
-
-
-def slurm_heat_and_preequil_free() -> None:
-    """Perform heating and minimisation for the free leg"""
-    heat_and_preequil_input(leg_type=_LegType.FREE, input_dir=".", output_dir=".")
-
-
-def slurm_ensemble_equilibration_bound() -> None:
-    """Perform ensemble equilibration for the bound leg"""
-    run_ensemble_equilibration(leg_type=_LegType.BOUND, input_dir=".", output_dir=".")
-
-
-def slurm_ensemble_equilibration_free() -> None:
-    """Perform ensemble equilibration for the free leg"""
-    run_ensemble_equilibration(leg_type=_LegType.FREE, input_dir=".", output_dir=".")
-
-
-def slurm_ensemble_equilibration_bound_short() -> None:
-    """Perform ensemble equilibration for the bound leg"""
-    run_ensemble_equilibration(
-        leg_type=_LegType.BOUND, input_dir=".", output_dir=".", short=True
-    )
-
-
-def slurm_ensemble_equilibration_free_short() -> None:
-    """Perform ensemble equilibration for the free leg"""
-    run_ensemble_equilibration(
-        leg_type=_LegType.FREE, input_dir=".", output_dir=".", short=True
-    )

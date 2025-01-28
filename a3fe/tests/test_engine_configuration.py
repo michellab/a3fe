@@ -6,13 +6,15 @@ import pytest
 
 from a3fe import SomdConfig
 
+
 def test_config_yaml_save_and_load():
     """Test that the config can be saved to and loaded from YAML."""
     with TemporaryDirectory() as dirname:
-        config = SomdConfig(runtime=1,leg_type="BOUND")
+        config = SomdConfig(runtime=1, leg_type="BOUND")
         config.dump(dirname)
         config2 = SomdConfig.load(dirname)
         assert config.leg_type == config2.leg_type
+
 
 def test_get_somd_config():
     """Test that the SOMD configuration file is generated correctly."""
@@ -22,8 +24,8 @@ def test_get_somd_config():
             timestep=4.0,
             runtime=1,  # Integer runtime
             cutoff_type="PME",
-            thermostat=False
-            )
+            thermostat=False,
+        )
         config_path = config.get_somd_config(run_dir=dirname)
         assert config_path == os.path.join(dirname, "somd.cfg")
 
@@ -34,12 +36,16 @@ def test_get_somd_config():
         assert "cutoff type = PME" in config_content
         assert "thermostat = False" in config_content
 
-@pytest.mark.parametrize("integrator,thermostat,should_pass", [
-    ("langevinmiddle", False, True),
-    ("langevinmiddle", True, False),
-    ("leapfrogverlet", True, True),
-    ("leapfrogverlet", False, False),
-])
+
+@pytest.mark.parametrize(
+    "integrator,thermostat,should_pass",
+    [
+        ("langevinmiddle", False, True),
+        ("langevinmiddle", True, False),
+        ("leapfrogverlet", True, True),
+        ("leapfrogverlet", False, False),
+    ],
+)
 def test_integrator_thermostat_validation(integrator, thermostat, should_pass):
     """Test integrator and thermostat combination validation."""
     if should_pass:
@@ -50,14 +56,18 @@ def test_integrator_thermostat_validation(integrator, thermostat, should_pass):
         with pytest.raises(ValueError):
             SomdConfig(integrator=integrator, thermostat=thermostat, runtime=1)
 
-@pytest.mark.parametrize("charge,cutoff,should_pass", [
-    (0, "cutoffperiodic", True),
-    (0, "PME", True),
-    (1, "PME", True),
-    (-1, "PME", True),
-    (1, "cutoffperiodic", False),
-    (-1, "cutoffperiodic", False),
-])
+
+@pytest.mark.parametrize(
+    "charge,cutoff,should_pass",
+    [
+        (0, "cutoffperiodic", True),
+        (0, "PME", True),
+        (1, "PME", True),
+        (-1, "PME", True),
+        (1, "cutoffperiodic", False),
+        (-1, "cutoffperiodic", False),
+    ],
+)
 def test_charge_cutoff_validation(charge, cutoff, should_pass):
     """
     Test ligand charge & cutoff type combination validation:
@@ -71,33 +81,23 @@ def test_charge_cutoff_validation(charge, cutoff, should_pass):
         with pytest.raises(ValueError):
             SomdConfig(ligand_charge=charge, cutoff_type=cutoff, runtime=1)
 
+
 def test_ligand_charge_validation():
     """Test that ligand charge validation works correctly."""
 
-    #test ligand_charge=0, any cutoff_type
+    # test ligand_charge=0, any cutoff_type
     valid_config_cutoff = SomdConfig(
-        ligand_charge=0,
-        cutoff_type="cutoffperiodic",
-        runtime=1
+        ligand_charge=0, cutoff_type="cutoffperiodic", runtime=1
     )
     assert valid_config_cutoff.ligand_charge == 0
     assert valid_config_cutoff.cutoff_type == "cutoffperiodic"
 
-
-    valid_config_charge = SomdConfig(
-        ligand_charge=1,
-        cutoff_type="PME",
-        runtime=1
-    )
+    valid_config_charge = SomdConfig(ligand_charge=1, cutoff_type="PME", runtime=1)
     assert valid_config_charge.ligand_charge == 1
     assert valid_config_charge.cutoff_type == "PME"
 
     with pytest.raises(ValueError):
-        SomdConfig(
-            ligand_charge=1,
-            cutoff_type="cutoffperiodic",
-            runtime=1
-        )
+        SomdConfig(ligand_charge=1, cutoff_type="cutoffperiodic", runtime=1)
 
 
 def test_get_somd_config_with_extra_options():
@@ -110,13 +110,14 @@ def test_get_somd_config_with_extra_options():
             runtime=1,
             cutoff_type="PME",
             thermostat=False,
-            extra_options={"custom_option": "value"}
+            extra_options={"custom_option": "value"},
         )
         path = config.get_somd_config(run_dir=dirname)
         with open(path, "r") as f:
             content = f.read()
         assert "### Extra Options ###" in content
         assert "custom_option = value" in content
+
 
 def test_compare_with_reference_config():
     """Test that we can generate a config file that matches a reference config."""
@@ -140,7 +141,7 @@ def test_compare_with_reference_config():
         "turn on receptor-ligand restraints mode = True",
         "perturbed residue number = 1",
         "energy frequency = 200",
-        "lambda array = 0.0, 0.125, 0.25, 0.375, 0.5, 1.0"
+        "lambda array = 0.0, 0.125, 0.25, 0.375, 0.5, 1.0",
     ]
     with TemporaryDirectory() as dirname:
         config = SomdConfig(
@@ -164,11 +165,14 @@ def test_compare_with_reference_config():
             perturbed_residue_number=1,
             energy_frequency=200,
         )
-        cfg_path = config.get_somd_config(run_dir=dirname, lambda_array=[0.0, 0.125, 0.25, 0.375, 0.5, 1.0])
+        cfg_path = config.get_somd_config(
+            run_dir=dirname, lambda_array=[0.0, 0.125, 0.25, 0.375, 0.5, 1.0]
+        )
         with open(cfg_path, "r") as f:
             cfg_content = f.read()
         for line in reference_lines:
             assert line in cfg_content, f"Expected '{line}' in generated config."
+
 
 def test_copy_from_existing_config():
     """Test that we can copy from an existing somd.cfg file."""
@@ -180,9 +184,28 @@ def test_copy_from_existing_config():
     assert c.use_boresch_restraints is True
     assert c.turn_on_receptor_ligand_restraints is False
     assert c.topfile.endswith("somd.prm7")
-    expected_lambda = [0.0, 0.068, 0.137, 0.199, 0.261, 0.317, 0.368, 0.419, 0.472,
-                      0.524, 0.577, 0.627, 0.677, 0.727, 0.775, 0.824, 0.877, 0.938, 1.0]
-    assert c.lambda_array == expected_lambda    
+    expected_lambda = [
+        0.0,
+        0.068,
+        0.137,
+        0.199,
+        0.261,
+        0.317,
+        0.368,
+        0.419,
+        0.472,
+        0.524,
+        0.577,
+        0.627,
+        0.677,
+        0.727,
+        0.775,
+        0.824,
+        0.877,
+        0.938,
+        1.0,
+    ]
+    assert c.lambda_array == expected_lambda
     # Boresch restraints dictionary
     expected_boresch_dict = (
         '{"anchor_points":{"r1":4900, "r2":4888, "r3":4902, "l1":3, "l2":5, "l3":11}, '

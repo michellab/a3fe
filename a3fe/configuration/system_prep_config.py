@@ -3,10 +3,12 @@ Configuration classes for system preparation.
 """
 
 __all__ = [
-    "SystemPreparationConfig",
+    "SomdSystemPreparationConfig",
 ]
 
 import yaml as _yaml
+
+from abc import ABC as _ABC
 
 from pydantic import BaseModel as _BaseModel
 from pydantic import Field as _Field
@@ -14,9 +16,12 @@ from pydantic import ConfigDict as _ConfigDict
 
 from ..run.enums import StageType as _StageType
 from ..run.enums import LegType as _LegType
+from ..run.enums import EngineType as _EngineType
+
+from typing import List as _List, Dict as _Dict
 
 
-class SystemPreparationConfig(_BaseModel):
+class _BaseSystemPreparationConfig(_ABC, _BaseModel):
     """
     Pydantic model for holding system preparation configuration.
 
@@ -50,11 +55,8 @@ class SystemPreparationConfig(_BaseModel):
         points. The default atom selection is f'resname {ligand_resname} and not name H*'.
         Uses the mdanalysis atom selection language. For example, 'not name O*' will result
         in an atom selection of f'resname {ligand_resname} and not name H* and not name O*'.
-    use_same_restraints: bool
-        If True, the same restraints will be used for all of the bound leg repeats - by default
-        , the restraints generated for the first repeat are used. This allows meaningful
-        comparison between repeats for the bound leg. If False, the unique restraints are
-        generated for each repeat.
+    lambda_values: dict[legtype, dict[stagetype, list[float]]]
+        the lambda values to use for each stage of each leg.
     """
 
     slurm: bool = _Field(True)
@@ -76,11 +78,60 @@ class SystemPreparationConfig(_BaseModel):
         "",
         description="Atom selection to append to the ligand selection during restraint searching.",
     )
-    use_same_restraints: bool = _Field(
-        True,
-        description="Whether to use the same restraints for all repeats of the bound leg. Note "
-        "that this should be used if you plan to run adaptively.",
-    )
+    lambda_values: _Dict[_LegType, _Dict[_StageType, _List[float]]] = {
+        _LegType.BOUND: {
+            _StageType.RESTRAIN: [0.0, 1.0],
+            _StageType.DISCHARGE: [0.0, 0.291, 0.54, 0.776, 1.0],
+            _StageType.VANISH: [
+                0.0,
+                0.026,
+                0.054,
+                0.083,
+                0.111,
+                0.14,
+                0.173,
+                0.208,
+                0.247,
+                0.286,
+                0.329,
+                0.373,
+                0.417,
+                0.467,
+                0.514,
+                0.564,
+                0.623,
+                0.696,
+                0.833,
+                1.0,
+            ],
+        },
+        _LegType.FREE: {
+            _StageType.DISCHARGE: [0.0, 0.222, 0.447, 0.713, 1.0],
+            _StageType.VANISH: [
+                0.0,
+                0.026,
+                0.055,
+                0.09,
+                0.126,
+                0.164,
+                0.202,
+                0.239,
+                0.276,
+                0.314,
+                0.354,
+                0.396,
+                0.437,
+                0.478,
+                0.518,
+                0.559,
+                0.606,
+                0.668,
+                0.762,
+                1.0,
+            ],
+        },
+    }
+
     model_config = _ConfigDict(extra="forbid", validate_assignment=True)
 
     def get_tot_simtime(self, n_runs: int, leg_type: _LegType) -> int:
@@ -132,7 +183,7 @@ class SystemPreparationConfig(_BaseModel):
             _yaml.dump(model_dict, f, default_flow_style=False)
 
     @classmethod
-    def load(cls, save_dir: str, leg_type: _LegType) -> "SystemPreparationConfig":
+    def load(cls, save_dir: str, leg_type: _LegType) -> "_BaseSystemPreparationConfig":
         """
         Load the configuration from a YAML file.
 
@@ -163,3 +214,102 @@ class SystemPreparationConfig(_BaseModel):
     def get_file_name(leg_type: _LegType) -> str:
         """Get the name of the YAML file for the configuration."""
         return f"system_preparation_config_{leg_type.name.lower()}.yaml"
+
+
+class SomdSystemPreparationConfig(_BaseSystemPreparationConfig):
+    """
+    Pydantic model for holding system preparation configuration
+    for running simulations with SLURM.
+
+    Attributes
+    ----------
+    slurm: bool
+        Whether to use SLURM for the preparation.
+    forcefields : dict
+        Forcefields to use for the ligand, protein, and water.
+    water_model : str
+        Water model to use.
+    ion_conc : float
+        Ion concentration in M.
+    steps : int
+        Number of steps for the minimisation.
+    runtime_short_nvt : int
+        Runtime for the short NVT equilibration in ps.
+    runtime_nvt : int
+        Runtime for the NVT equilibration in ps.
+    end_temp : float
+        End temperature for the NVT equilibration in K.
+    runtime_npt : int
+        Runtime for the NPT equilibration in ps.
+    runtime_npt_unrestrained : int
+        Runtime for the unrestrained NPT equilibration in ps.
+    ensemble_equilibration_time : int
+        Ensemble equilibration time in ps.
+    append_to_ligand_selection: str
+        If this is a bound leg, this appends the supplied string to the default atom
+        selection which chooses the atoms in the ligand to consider as potential anchor
+        points. The default atom selection is f'resname {ligand_resname} and not name H*'.
+        Uses the mdanalysis atom selection language. For example, 'not name O*' will result
+        in an atom selection of f'resname {ligand_resname} and not name H* and not name O*'.
+    lambda_values: dict[legtype, dict[stagetype, list[float]]]
+        the lambda values to use for each stage of each leg.
+    """
+
+    lambda_values: _Dict[_LegType, _Dict[_StageType, _List[float]]] = {
+        _LegType.BOUND: {
+            _StageType.RESTRAIN: [0.0, 1.0],
+            _StageType.DISCHARGE: [0.0, 0.291, 0.54, 0.776, 1.0],
+            _StageType.VANISH: [
+                0.0,
+                0.026,
+                0.054,
+                0.083,
+                0.111,
+                0.14,
+                0.173,
+                0.208,
+                0.247,
+                0.286,
+                0.329,
+                0.373,
+                0.417,
+                0.467,
+                0.514,
+                0.564,
+                0.623,
+                0.696,
+                0.833,
+                1.0,
+            ],
+        },
+        _LegType.FREE: {
+            _StageType.DISCHARGE: [0.0, 0.222, 0.447, 0.713, 1.0],
+            _StageType.VANISH: [
+                0.0,
+                0.026,
+                0.055,
+                0.09,
+                0.126,
+                0.164,
+                0.202,
+                0.239,
+                0.276,
+                0.314,
+                0.354,
+                0.396,
+                0.437,
+                0.478,
+                0.518,
+                0.559,
+                0.606,
+                0.668,
+                0.762,
+                1.0,
+            ],
+        },
+    }
+
+
+ENGINE_TYPE_TO_SYSPREP_CONFIG = {
+    _EngineType.SOMD: SomdSystemPreparationConfig,
+}

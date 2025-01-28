@@ -89,9 +89,9 @@ class LegType(_YamlSerialisableEnum):
     BOUND = 1
     FREE = 2
 
-    @property
-    def config_key(self) -> str:
-        return self.name
+
+class EngineType(_YamlSerialisableEnum):
+    SOMD = 1
 
 
 class PreparationStage(_YamlSerialisableEnum):
@@ -106,18 +106,33 @@ class PreparationStage(_YamlSerialisableEnum):
     @property
     def file_suffix(self) -> str:
         """Return the suffix to use for the files in this stage."""
-        if self == PreparationStage.STRUCTURES_ONLY:
-            return ""
-        elif self == PreparationStage.PARAMETERISED:
-            return "_param"
-        elif self == PreparationStage.SOLVATED:
-            return "_solv"
-        elif self == PreparationStage.MINIMISED:
-            return "_min"
-        elif self == PreparationStage.PREEQUILIBRATED:
-            return "_preequil"
-        else:
-            raise ValueError(f"Unknown preparation stage: {self}")
+        suffixes = {
+            PreparationStage.STRUCTURES_ONLY: "",
+            PreparationStage.PARAMETERISED: "_param",
+            PreparationStage.SOLVATED: "_solv",
+            PreparationStage.MINIMISED: "_min",
+            PreparationStage.PREEQUILIBRATED: "_preequil",
+        }
+        return suffixes[self]
+
+    @property
+    def prep_fn(self):
+        """The function to use to prepare the input files for this stage."""
+        from .system_prep import (
+            parameterise_input as _parameterise_input,
+            solvate_input as _solvate_input,
+            minimise_input as _minimise_input,
+            heat_and_preequil_input as _heat_and_preequil_input,
+        )
+
+        prep_fns = {
+            PreparationStage.STRUCTURES_ONLY: None,
+            PreparationStage.PARAMETERISED: _parameterise_input,
+            PreparationStage.SOLVATED: _solvate_input,
+            PreparationStage.MINIMISED: _minimise_input,
+            PreparationStage.PREEQUILIBRATED: _heat_and_preequil_input,
+        }
+        return prep_fns[self]
 
     def get_simulation_input_files(self, leg_type: LegType) -> _List[str]:
         """Return the input files required for the simulation in this stage."""

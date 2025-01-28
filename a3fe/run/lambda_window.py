@@ -22,7 +22,7 @@ from ._virtual_queue import VirtualQueue as _VirtualQueue
 from .simulation import Simulation as _Simulation
 from ..configuration import SlurmConfig as _SlurmConfig
 from ..configuration import SomdConfig as _SomdConfig
-from .enums import LegType as _LegType, StageType as _StageType
+from .enums import EngineType as _EngineType
 
 
 class LamWindow(_SimulationRunner):
@@ -40,8 +40,6 @@ class LamWindow(_SimulationRunner):
     def __init__(
         self,
         lam: float,
-        leg_type: _LegType,
-        stage_type: _StageType,
         virtual_queue: _VirtualQueue,
         lam_val_weight: _Optional[float] = None,
         block_size: float = 1,
@@ -58,6 +56,7 @@ class LamWindow(_SimulationRunner):
         slurm_config: _Optional[_SlurmConfig] = None,
         analysis_slurm_config: _Optional[_SlurmConfig] = None,
         engine_config: _Optional[_SomdConfig] = None,
+        engine_type: _EngineType = _EngineType.SOMD,
         update_paths: bool = True,
     ) -> None:
         """
@@ -120,6 +119,8 @@ class LamWindow(_SimulationRunner):
             partition, but the main simulation to the GPU partition. If None,
         engine_config: SomdConfig, default: None
             Configuration for the SOMD engine. If None, the default configuration is used.
+        engine_type: EngineType, default: EngineType.SOMD
+            The type of engine to use for the production simulations.
         update_paths: bool, Optional, default: True
             If true, if the simulation runner is loaded by unpickling, then
             update_paths() is called.
@@ -131,8 +132,6 @@ class LamWindow(_SimulationRunner):
         # Set the lamdbda value first, as this is required for __str__,
         # and therefore the super().__init__ call
         self.lam = lam
-        self.leg_type = leg_type
-        self.stage_type = stage_type
 
         super().__init__(
             base_dir=base_dir,
@@ -144,6 +143,7 @@ class LamWindow(_SimulationRunner):
             slurm_config=slurm_config,
             analysis_slurm_config=analysis_slurm_config,
             engine_config=engine_config,
+            engine_type=engine_type,
             dump=False,
         )
 
@@ -192,8 +192,6 @@ class LamWindow(_SimulationRunner):
                 self.sims.append(
                     _Simulation(
                         lam=lam,
-                        leg_type=self.leg_type,
-                        stage_type=self.stage_type,
                         run_no=run_no,
                         virtual_queue=virtual_queue,
                         base_dir=sim_base_dir,
@@ -202,7 +200,8 @@ class LamWindow(_SimulationRunner):
                         stream_log_level=stream_log_level,
                         slurm_config=self.slurm_config,
                         analysis_slurm_config=self.analysis_slurm_config,
-                        engine_config=self.engine_config.copy() if engine_config else None
+                        engine_config=self.engine_config.copy(),
+                        engine_type=self.engine_type,
                     )
                 )
 
