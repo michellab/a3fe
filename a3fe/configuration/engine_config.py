@@ -423,3 +423,21 @@ class SomdConfig(_EngineConfig):
 
 
 ENGINE_TYPE_TO_ENGINE_CONFIG = {_EngineType.SOMD: SomdConfig}
+
+def dump(self, save_dir: str) -> None:
+    """
+    Dump the configuration to a YAML file.
+    """
+    model_dict = self.model_dump()
+    save_path = save_dir + "/" + self.get_file_name()
+    with open(save_path, "w") as f:
+        _yaml.dump(model_dict, f, default_flow_style=False)
+
+@classmethod
+def load(cls, load_dir: str) -> "_EngineConfig":
+    """
+    Load the configuration from a YAML file.
+    """
+    with open(load_dir + "/" + cls.get_file_name(), "r") as f:
+        model_dict = _yaml.safe_load(f)
+    return cls(**model_dict)

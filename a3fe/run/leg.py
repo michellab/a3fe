@@ -449,7 +449,7 @@ class Leg(_SimulationRunner):
                 engine_type=self.engine_type,
                 run_dir=self.input_dir,
                 wait=True,
-                job_name="parameterise",
+                job_name=job_name,
             )
 
             # Check that the required input files have been produced, since slurm can fail silently
