@@ -2,6 +2,7 @@
 
 __all__ = [
     "SomdConfig",
+    "ENGINE_TYPE_TO_ENGINE_CONFIG",
 ]
 
 import os as _os
@@ -181,7 +182,7 @@ class SomdConfig(_EngineConfig):
     )
 
     ### Alchemistry - restraints added by a3fe ###
-    lambda_array: _Optional[_List[float]] = _Field(
+    lambda_values: _Optional[_List[float]] = _Field(
         None,
         description="Lambda array for alchemical perturbation, varies from 0.0 to 1.0 across stage",
     )
@@ -312,6 +313,9 @@ class SomdConfig(_EngineConfig):
         """
         self.runtime = runtime
 
+        if self.lambda_array is None:
+            raise ValueError("lambda_array must be set before writing the configuration.")
+
         config_lines = [
             "### Integrator ###",
             f"timestep = {self.timestep} * femtosecond",
@@ -348,7 +352,7 @@ class SomdConfig(_EngineConfig):
                 f"perturbed residue number = {self.perturbed_residue_number}",
                 f"energy frequency = {self.energy_frequency}",
                 f"ligand charge = {self.ligand_charge}",
-                f"lambda array = {', '.join(str(x) for x in self.lambda_array)}",
+                f"lambda array = {', '.join(str(x) for x in self.lambda_values)}",
                 f"lambda_val = {lambda_val}",
                 "\n\n### Restraints ###",
                 f"use boresch restraints = {self.use_boresch_restraints}",
@@ -379,10 +383,6 @@ class SomdConfig(_EngineConfig):
         config_path = _os.path.join(run_dir, config_filename)
         with open(config_path, "w") as f:
             f.write("\n".join(config_lines) + "\n")
-
-    @property
-    def default_lambda_values(self):
-        return ENGINE_TYPE_TO_ENGINE_CONFIG[_EngineType.SOMD].lambda_values
 
     @classmethod
     def _from_config_file(cls, config_path: str) -> "SomdConfig":
