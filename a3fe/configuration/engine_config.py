@@ -65,14 +65,10 @@ class _EngineConfig(_BaseModel, _ABC):
         config : EngineConfig
             The loaded configuration.
         """
-        for engine_type, engine_config in ENGINE_TYPE_TO_ENGINE_CONFIG.items():
-            try:
-                with open(load_dir + "/" + engine_config.get_file_name(), "r") as f:
-                    model_dict = _yaml.safe_load(f)
-                return engine_config(**model_dict)
-            except FileNotFoundError:
-                continue
-        raise FileNotFoundError(f"No configuration file found for engine type {engine_type}")
+        with open(load_dir + "/" + cls.get_file_name(), "r") as f:
+                model_dict = _yaml.safe_load(f)
+
+        return cls(**model_dict)
 
     @_abstractmethod
     def write_config(
