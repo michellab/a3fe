@@ -168,7 +168,7 @@ class Leg(_SimulationRunner):
 
             # If this is a bound leg, we want to store restraints
             if self.leg_type == _LegType.BOUND:
-                self.restraints = []
+                self.restraints: _List[_A3feRestraint] = []
 
             # Save the state and update log
             self._update_log()
@@ -260,6 +260,11 @@ class Leg(_SimulationRunner):
 
         # Write input files
         self.setup_stages(system, sys_prep_config=cfg)
+
+        # Store restraints used. Currenly (and unlike previous versions) we only allow
+        # the same restraint to be used for all.
+        first_restr = self.restraints[0]
+        self.restraints = [first_restr for _ in range(self.ensemble_size)]
 
         # Create the Stage objects, which automatically set themselves up
         for stage_type in self.required_stages[self.leg_type]:
