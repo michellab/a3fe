@@ -27,8 +27,8 @@ from ..run.enums import EngineType as _EngineType
 class _EngineConfig(_BaseModel, _ABC):
     """Base class for engine runner configurations."""
 
-    @_abstractmethod
     @staticmethod
+    @_abstractmethod
     def get_file_name() -> str:
         """
         Get the name of the configuration file.
