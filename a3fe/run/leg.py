@@ -182,7 +182,7 @@ class Leg(_SimulationRunner):
         return self._sub_sim_runners
 
     @stages.setter
-    def legs(self, value) -> None:
+    def stages(self, value) -> None:
         self._logger.info("Modifying/ creating stages")
         self._sub_sim_runners = value
 
