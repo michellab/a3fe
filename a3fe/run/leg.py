@@ -717,6 +717,8 @@ class Leg(_SimulationRunner):
             stage_config.ligand_charge = (
                 -lig_charge
             )  # Use co-alchemical ion approach when there is a charge difference
+            stage_config.lambda_values = sys_prep_config.lambda_values[self.leg_type][stage_type]
+
             stage_configs[stage_type] = stage_config
 
         # We no longer need to store the large BSS restraint classes.
