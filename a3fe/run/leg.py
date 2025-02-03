@@ -34,8 +34,10 @@ from .enums import StageType as _StageType
 from .stage import Stage as _Stage
 from ..configuration import (
     _BaseSystemPreparationConfig,
+    SomdSystemPreparationConfig as _SomdSystemPreparationConfig,
     SlurmConfig as _SlurmConfig,
     SomdConfig as _SomdConfig,
+    ENGINE_TYPE_TO_SYSPREP_CONFIG as _ENGINE_TYPE_TO_SYSPREP_CONFIG,
 )
 
 from .enums import EngineType as _EngineType
@@ -237,7 +239,7 @@ class Leg(_SimulationRunner):
         cfg = (
             sysprep_config
             if sysprep_config is not None
-            else _BaseSystemPreparationConfig()
+            else _ENGINE_TYPE_TO_SYSPREP_CONFIG[self.engine_type]()
         )
         cfg.dump(self.input_dir, self.leg_type)
 
@@ -259,7 +261,7 @@ class Leg(_SimulationRunner):
         system = self.run_ensemble_equilibration(sysprep_config=cfg)
 
         # Write input files
-        self.setup_stages(system, sys_prep_config=cfg)
+        stage_engine_configs = self.setup_stages(system, sys_prep_config=cfg)
 
         # Store restraints used. Currenly (and unlike previous versions) we only allow
         # the same restraint to be used for all.
@@ -275,9 +277,7 @@ class Leg(_SimulationRunner):
                     runtime_constant=self.runtime_constant,
                     relative_simulation_cost=self.relative_simulation_cost,
                     ensemble_size=self.ensemble_size,
-                    lambda_values=self.engine_config.default_lambda_values[
-                        self.leg_type
-                    ][stage_type],
+                    lambda_values = cfg.lambda_values[self.leg_type][stage_type],
                     base_dir=self.stage_input_dirs[stage_type].replace("/input", ""),
                     input_dir=self.stage_input_dirs[stage_type],
                     output_dir=self.stage_input_dirs[stage_type].replace(
@@ -286,7 +286,7 @@ class Leg(_SimulationRunner):
                     stream_log_level=self.stream_log_level,
                     slurm_config=self.slurm_config,
                     analysis_slurm_config=self.analysis_slurm_config,
-                    engine_config=self.engine_config.copy(),
+                    engine_config=stage_engine_configs[stage_type],
                     engine_type=self.engine_type,
                 )
             )

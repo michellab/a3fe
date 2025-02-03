@@ -123,7 +123,10 @@ class Simulation(_SimulationRunner):
             dump=False,
         )
 
-        if self.lam not in self.engine_config.lamvals:
+        if self.engine_config.lambda_values is None: # type: ignore
+            raise ValueError("No lambda values specified in engine config")
+        
+        if self.lam not in self.engine_config.lambda_values:
             raise ValueError(
                 f"Lambda value {self.lam} not in list of lambda values: {self.engine_config.lamvals}"
             )
@@ -137,8 +140,6 @@ class Simulation(_SimulationRunner):
             self.simfile_path = _os.path.join(self.base_dir, "somd.cfg")
             # Select the correct rst7 and, if supplied, restraints
             self._select_input_files()
-            # Get slurm file base
-            self._get_slurm_file_base()
 
             # Save state and update log
             self._dump()
