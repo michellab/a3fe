@@ -261,14 +261,6 @@ class Leg(_SimulationRunner):
         # Write input files
         self.setup_stages(system, sys_prep_config=cfg)
 
-        # Make sure the stored restraints reflect the restraints used. TODO:
-        # make this more robust my using the SOMD functionality to extract
-        # results from the simfiles
-        if self.leg_type == _LegType.BOUND and cfg.use_same_restraints:
-            # Use the first restraints
-            first_restr = self.restraints[0]
-            self.restraints = [first_restr for _ in range(self.ensemble_size)]
-
         # Create the Stage objects, which automatically set themselves up
         for stage_type in self.required_stages[self.leg_type]:
             self.stages.append(
@@ -717,7 +709,7 @@ class Leg(_SimulationRunner):
             stage_config.turn_on_receptor_ligand_restraints = (
                 self.leg_type == _LegType.BOUND
             )
-            stage_config.charge_difference = (
+            stage_config.ligand_charge = (
                 -lig_charge
             )  # Use co-alchemical ion approach when there is a charge difference
             stage_configs[stage_type] = stage_config

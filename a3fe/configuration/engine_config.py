@@ -64,9 +64,14 @@ class _EngineConfig(_BaseModel, _ABC):
         config : EngineConfig
             The loaded configuration.
         """
-        with open(load_dir + "/" + cls.get_file_name(), "r") as f:
-            model_dict = _yaml.safe_load(f)
-        return cls(**model_dict)
+        for engine_type, engine_config in ENGINE_TYPE_TO_ENGINE_CONFIG.items():
+            try:
+                with open(load_dir + "/" + engine_config.get_file_name(), "r") as f:
+                    model_dict = _yaml.safe_load(f)
+                return engine_config(**model_dict)
+            except FileNotFoundError:
+                continue
+        raise FileNotFoundError(f"No configuration file found for engine type {engine_type}")
 
     @_abstractmethod
     def write_config(
@@ -378,6 +383,10 @@ class SomdConfig(_EngineConfig):
         with open(config_path, "w") as f:
             f.write("\n".join(config_lines) + "\n")
 
+    @property
+    def default_lambda_values(self):
+        return ENGINE_TYPE_TO_ENGINE_CONFIG[_EngineType.SOMD].lambda_values
+
     @classmethod
     def _from_config_file(cls, config_path: str) -> "SomdConfig":
         """Create a SomdConfig instance from an existing configuration file."""
@@ -423,21 +432,3 @@ class SomdConfig(_EngineConfig):
 
 
 ENGINE_TYPE_TO_ENGINE_CONFIG = {_EngineType.SOMD: SomdConfig}
-
-def dump(self, save_dir: str) -> None:
-    """
-    Dump the configuration to a YAML file.
-    """
-    model_dict = self.model_dump()
-    save_path = save_dir + "/" + self.get_file_name()
-    with open(save_path, "w") as f:
-        _yaml.dump(model_dict, f, default_flow_style=False)
-
-@classmethod
-def load(cls, load_dir: str) -> "_EngineConfig":
-    """
-    Load the configuration from a YAML file.
-    """
-    with open(load_dir + "/" + cls.get_file_name(), "r") as f:
-        model_dict = _yaml.safe_load(f)
-    return cls(**model_dict)
