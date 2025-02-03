@@ -28,7 +28,8 @@ class _EngineConfig(_BaseModel, _ABC):
     """Base class for engine runner configurations."""
 
     @_abstractmethod
-    def get_file_name(self) -> str:
+    @staticmethod
+    def get_file_name() -> str:
         """
         Get the name of the configuration file.
         """
