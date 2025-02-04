@@ -265,8 +265,9 @@ class Leg(_SimulationRunner):
 
         # Store restraints used. Currenly (and unlike previous versions) we only allow
         # the same restraint to be used for all.
-        first_restr = self.restraints[0]
-        self.restraints = [first_restr for _ in range(self.ensemble_size)]
+        if hasattr(self, 'restraints') and self.restraints:
+            first_restr = self.restraints[0]
+            self.restraints = [first_restr for _ in range(self.ensemble_size)]
 
         # Create the Stage objects, which automatically set themselves up
         for stage_type in self.required_stages[self.leg_type]:
