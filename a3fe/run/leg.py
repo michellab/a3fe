@@ -713,7 +713,7 @@ class Leg(_SimulationRunner):
             stage_config.perturbed_residue_number = perturbed_resnum
             stage_config.use_boresch_restraints = self.leg_type == _LegType.BOUND
             stage_config.turn_on_receptor_ligand_restraints = (
-                self.leg_type == _LegType.BOUND
+                self.leg_type == _LegType.BOUND and stage_type == _StageType.RESTRAIN
             )
             stage_config.ligand_charge = (
                 -lig_charge
