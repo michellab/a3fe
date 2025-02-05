@@ -313,7 +313,7 @@ class SomdConfig(_EngineConfig):
         """
         self.runtime = runtime
 
-        if self.lambda_array is None:
+        if self.lambda_values is None:
             raise ValueError("lambda_array must be set before writing the configuration.")
 
         config_lines = [
@@ -356,11 +356,11 @@ class SomdConfig(_EngineConfig):
                 f"lambda_val = {lambda_val}",
                 "\n\n### Restraints ###",
                 f"use boresch restraints = {self.use_boresch_restraints}",
-                f"turn on receptor-ligand restraints mode = {self.turn_on_receptor_ligand_restraints}"
+                f"turn on receptor-ligand restraints mode = {self.turn_on_receptor_ligand_restraints}",
                 "\n\n###Paths###",
-                f"morphfile = {morph_file}",
-                f"topfile = {top_file}",
-                f"crdfile = {coord_file}",
+                f"morphfile = {_os.path.join(run_dir, morph_file)}",
+                f"topfile = {_os.path.join(run_dir, top_file)}",    
+                f"crdfile = {_os.path.join(run_dir, coord_file)}",
             ]
         )
 
@@ -378,7 +378,6 @@ class SomdConfig(_EngineConfig):
                 config_lines.append(f"{key} = {value}")
 
         # Write the configuration to a file
-        run_dir = _os.path.dirname(run_dir)
         config_filename = self.get_file_name()
         config_path = _os.path.join(run_dir, config_filename)
         with open(config_path, "w") as f:
