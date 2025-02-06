@@ -34,7 +34,6 @@ from .enums import StageType as _StageType
 from .stage import Stage as _Stage
 from ..configuration import (
     _BaseSystemPreparationConfig,
-    SomdSystemPreparationConfig as _SomdSystemPreparationConfig,
     SlurmConfig as _SlurmConfig,
     SomdConfig as _SomdConfig,
     ENGINE_TYPE_TO_SYSPREP_CONFIG as _ENGINE_TYPE_TO_SYSPREP_CONFIG,
