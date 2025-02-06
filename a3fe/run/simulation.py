@@ -131,6 +131,9 @@ class Simulation(_SimulationRunner):
                 f"Lambda value {self.lam} not in list of lambda values: {self.engine_config.lamvals}"
             )
 
+        self.timestep = self.engine_config.timestep
+        self.nrg_freq = self.engine_config.energy_frequency
+        
         if not self.loaded_from_pickle:
             self.virtual_queue = virtual_queue
             # Check that the input directory contains the required files
@@ -270,7 +273,7 @@ class Simulation(_SimulationRunner):
         slurm_file_base = self.slurm_config.get_slurm_output_file_base(
             run_dir=self.input_dir
         )
-        self._logger.debug(f"Found slurm output file basename: {self.slurm_file_base}")
+        self._logger.debug(f"Found slurm output file basename: {slurm_file_base}")
         return slurm_file_base
 
     def run(self, runtime: float = 2.5) -> None:
@@ -291,8 +294,8 @@ class Simulation(_SimulationRunner):
             run_dir=self.output_dir,
             lambda_val=self.lam,
             runtime=runtime,
-            top_file="somd.rst7",  # TODO - make generic
-            coord_file="somd.prm7",  # TODO - make generic
+            top_file="somd.prm7",  # TODO - make generic
+            coord_file="somd.rst7",  # TODO - make generic
             morph_file="somd.pert",  # TODO - make generic
         )
 
