@@ -96,15 +96,7 @@ def t4l_calc():
         )
 
         # Copy over remaining input files
-        for file in ["template_config.cfg"]:
-            subprocess.run(
-                [
-                    "cp",
-                    os.path.join("a3fe/data/example_run_dir/input/", file),
-                    os.path.join(dirname, "input"),
-                ],
-                check=True,
-            )
+        # No files need to be copied
 
         calc = a3.Calculation(
             base_dir=dirname,

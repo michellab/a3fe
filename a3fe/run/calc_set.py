@@ -13,6 +13,7 @@ import numpy as _np
 from scipy import stats as _stats
 
 from ..configuration import SlurmConfig as _SlurmConfig
+from ..configuration import SomdConfig as _SomdConfig
 
 from ..analyse.analyse_set import compute_stats as _compute_stats
 from ..analyse.plot import plot_against_exp as _plt_against_exp
@@ -20,7 +21,7 @@ from ..read._read_exp_dgs import read_exp_dgs as _read_exp_dgs
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._utils import SimulationRunnerIterator as _SimulationRunnerIterator
 from .calculation import Calculation as _Calculation
-from ..configuration import SystemPreparationConfig as _SystemPreparationConfig
+from ..configuration.system_prep_config import _BaseSystemPreparationConfig
 
 
 class CalcSet(_SimulationRunner):
@@ -40,6 +41,7 @@ class CalcSet(_SimulationRunner):
         stream_log_level: int = _logging.INFO,
         slurm_config: _Optional[_SlurmConfig] = None,
         analysis_slurm_config: _Optional[_SlurmConfig] = None,
+        engine_config: _Optional[_SomdConfig] = None,
         update_paths: bool = True,
     ) -> None:
         """
@@ -73,6 +75,8 @@ class CalcSet(_SimulationRunner):
             Configuration for the SLURM job scheduler for the analysis.
             This is helpful e.g. if you want to submit analysis to the CPU
             partition, but the main simulation to the GPU partition. If None,
+        engine_config: SomdConfig, default: None
+            Configuration for the SOMD engine. If None, the default configuration is used.
         update_paths: bool, Optional, default: True
             If True, if the simulation runner is loaded by unpickling, then
             update_paths() is called.
@@ -89,6 +93,7 @@ class CalcSet(_SimulationRunner):
             update_paths=update_paths,
             slurm_config=slurm_config,
             analysis_slurm_config=analysis_slurm_config,
+            engine_config=engine_config,
         )
 
         if not self.loaded_from_pickle:
@@ -106,6 +111,11 @@ class CalcSet(_SimulationRunner):
                 calc_args["slurm_config"] = self.slurm_config
             if calc_args.get("analysis_slurm_config") is None:
                 calc_args["analysis_slurm_config"] = self.analysis_slurm_config
+            self._calc_args = calc_args
+
+            # Ensure that all calculations share the same somd config by adding this if it is not present
+            if calc_args.get("engine_config") is None:
+                calc_args["engine_config"] = self.engine_config
             self._calc_args = calc_args
 
             # Check that we can load all of the calculations
@@ -146,18 +156,18 @@ class CalcSet(_SimulationRunner):
 
     def setup(
         self,
-        bound_leg_sysprep_config: _Optional[_SystemPreparationConfig] = None,
-        free_leg_sysprep_config: _Optional[_SystemPreparationConfig] = None,
+        bound_leg_sysprep_config: _Optional[_BaseSystemPreparationConfig] = None,
+        free_leg_sysprep_config: _Optional[_BaseSystemPreparationConfig] = None,
     ) -> None:
         """
         Set up all calculations sequentially.
 
         Parameters
         ----------
-        bound_leg_sysprep_config: SystemPreparationConfig, opttional, default = None
+        bound_leg_sysprep_config: _BaseSystemPreparationConfig, opttional, default = None
             The system preparation configuration to use for the bound leg. If None, the default
             configuration is used.
-        free_leg_sysprep_config: SystemPreparationConfig, opttional, default = None
+        free_leg_sysprep_config: _BaseSystemPreparationConfig, opttional, default = None
             The system preparation configuration to use for the free leg. If None, the default
             configuration is used.
         """

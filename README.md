@@ -33,7 +33,6 @@ python -m pip install --no-deps .
 - Activate your a3fe conda environment 
 - Create a base directory for the calculation and create an directory called `input` within this
 - Move your input files into the the input directory. For example, if you have parameterised AMBER-format input files, name these bound_param.rst7, bound_param.prm7, free_param.rst7, and free_param.prm7. For more details see the documentation. Alternatively, copy the example input files from a3fe/a3fe/data/example_run_dir to your input directory.
-- Copy run template_config.cfg from a3fe/a3fe/data/example_run_dir to your `input` directory.
 - In the calculation base directory, run the following python code, either through ipython or as a python script (you will likely want to run the script with `nohup`or use ipython through tmux to ensure that the calculation is not killed when you lose connection)
 
 ```python
