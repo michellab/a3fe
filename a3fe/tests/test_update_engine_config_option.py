@@ -1,5 +1,3 @@
-import pytest
-
 from a3fe.run._simulation_runner import SimulationRunner
 
 class MockSimulationRunner(SimulationRunner):
