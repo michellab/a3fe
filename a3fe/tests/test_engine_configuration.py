@@ -10,31 +10,40 @@ from a3fe import SomdConfig
 def test_config_yaml_save_and_load():
     """Test that the config can be saved to and loaded from YAML."""
     with TemporaryDirectory() as dirname:
-        config = SomdConfig(runtime=1, leg_type="BOUND")
+        config = SomdConfig(runtime=1)
         config.dump(dirname)
         config2 = SomdConfig.load(dirname)
-        assert config.leg_type == config2.leg_type
+        assert config.runtime == config2.runtime
 
 
-def test_get_somd_config():
+def test_write_config():
     """Test that the SOMD configuration file is generated correctly."""
     with TemporaryDirectory() as dirname:
         config = SomdConfig(
             integrator="langevinmiddle",
             timestep=4.0,
             runtime=1,  # Integer runtime
-            cutoff_type="PME",
-            thermostat=False,
+            constraint="hbonds",
+            hydrogen_mass_factor=3.0,
         )
-        config_path = config.get_somd_config(run_dir=dirname)
-        assert config_path == os.path.join(dirname, "somd.cfg")
+        config.lambda_values = [0.0, 0.125, 0.25, 0.375, 0.5, 1.0]
+        config_path = os.path.join(dirname, config.get_file_name())
+        config.write_config(
+            run_dir=dirname,
+            lambda_val=0.0,
+            runtime=config.runtime,
+            top_file="top.pdb",
+            coord_file="coord.pdb",
+            morph_file="morph.pdb",
+        )
+        assert os.path.exists(config_path)
 
         with open(config_path, "r") as f:
             config_content = f.read()
 
         assert "integrator = langevinmiddle" in config_content
-        assert "cutoff type = PME" in config_content
-        assert "thermostat = False" in config_content
+        assert "constraint = hbonds" in config_content
+        assert "hydrogen mass repartitioning factor = 3.0" in config_content
 
 
 @pytest.mark.parametrize(
@@ -109,11 +118,19 @@ def test_get_somd_config_with_extra_options():
             integrator="langevinmiddle",
             runtime=1,
             cutoff_type="PME",
-            thermostat=False,
             extra_options={"custom_option": "value"},
         )
-        path = config.get_somd_config(run_dir=dirname)
-        with open(path, "r") as f:
+        config.lambda_values = [0.0, 0.125, 0.25, 0.375, 0.5, 1.0]
+        config_path = os.path.join(dirname, config.get_file_name())
+        config.write_config(
+            run_dir=dirname,
+            lambda_val=0.0,
+            runtime=config.runtime,
+            top_file="somd.prm7",
+            coord_file="somd.rst7",
+            morph_file="somd.pert",
+        )
+        with open(config_path, "r") as f:
             content = f.read()
         assert "### Extra Options ###" in content
         assert "custom_option = value" in content
@@ -165,10 +182,17 @@ def test_compare_with_reference_config():
             perturbed_residue_number=1,
             energy_frequency=200,
         )
-        cfg_path = config.get_somd_config(
-            run_dir=dirname, lambda_array=[0.0, 0.125, 0.25, 0.375, 0.5, 1.0]
+        config.lambda_values = [0.0, 0.125, 0.25, 0.375, 0.5, 1.0]
+        config_path = os.path.join(dirname, config.get_file_name())
+        config.write_config(
+            run_dir=dirname,
+            lambda_val=0.0,
+            runtime=config.runtime,
+            top_file="somd.prm7",
+            coord_file="somd.rst7",
+            morph_file="somd.pert",
         )
-        with open(cfg_path, "r") as f:
+        with open(config_path, "r") as f:
             cfg_content = f.read()
         for line in reference_lines:
             assert line in cfg_content, f"Expected '{line}' in generated config."
@@ -183,7 +207,7 @@ def test_copy_from_existing_config():
 
     assert c.use_boresch_restraints is True
     assert c.turn_on_receptor_ligand_restraints is False
-    assert c.topfile.endswith("somd.prm7")
+    assert c.boresch_restraints_dictionary is not None
     expected_lambda = [
         0.0,
         0.068,
@@ -205,7 +229,7 @@ def test_copy_from_existing_config():
         0.938,
         1.0,
     ]
-    assert c.lambda_array == expected_lambda
+    assert c.lambda_values == expected_lambda
     # Boresch restraints dictionary
     expected_boresch_dict = (
         '{"anchor_points":{"r1":4900, "r2":4888, "r3":4902, "l1":3, "l2":5, "l3":11}, '
