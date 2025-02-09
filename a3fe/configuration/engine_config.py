@@ -93,8 +93,6 @@ class _EngineConfig(_BaseModel, _ABC):
         """
         pass
 
-
-# @register_engine_config(_EngineType.SOMD)
 class SomdConfig(_EngineConfig):
     """
     Pydantic model for holding SOMD engine configuration.
@@ -397,6 +395,8 @@ class SomdConfig(_EngineConfig):
 
                 if key == "lambda array":
                     value = [float(x.strip()) for x in value.split(",")]
+                    config_dict["lambda_values"] = value
+                    continue
                 elif "*" in value:
                     value = value.split("*")[0].strip()
                     try:
