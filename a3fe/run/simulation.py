@@ -130,10 +130,7 @@ class Simulation(_SimulationRunner):
             raise ValueError(
                 f"Lambda value {self.lam} not in list of lambda values: {self.engine_config.lamvals}"
             )
-
-        self.timestep = self.engine_config.timestep
-        self.nrg_freq = self.engine_config.energy_frequency
-        
+  
         if not self.loaded_from_pickle:
             self.virtual_queue = virtual_queue
             # Check that the input directory contains the required files
