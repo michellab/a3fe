@@ -264,7 +264,7 @@ class Leg(_SimulationRunner):
 
         # Store restraints used. Currenly (and unlike previous versions) we only allow
         # the same restraint to be used for all.
-        if hasattr(self, 'restraints') and self.restraints:
+        if self.leg_type == _LegType.BOUND: 
             first_restr = self.restraints[0]
             self.restraints = [first_restr for _ in range(self.ensemble_size)]
 
