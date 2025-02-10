@@ -15,7 +15,7 @@ import pytest
 
 import a3fe as a3
 from a3fe.analyse.detect_equil import dummy_check_equil_multiwindow
-from a3fe.configuration import SystemPreparationConfig
+from a3fe.configuration import SomdSystemPreparationConfig
 
 from . import RUN_SLURM_TESTS, SLURM_PRESENT
 
@@ -193,11 +193,17 @@ def test_parameterisation_free(t4l_calc):
 
     try:
         # We need to save the config to the input directory
-        a3.SystemPreparationConfig(
+        a3.SomdSystemPreparationConfig(
+            slurm=False,
             forcefields={"ligand": "gaff2", "protein": "ff14SB", "water": "tip3p"}
         ).dump(t4l_calc.input_dir, leg_type)
         # Parameterise benzene
-        free_leg.parameterise_input(slurm=False)
+        a3.PreparationStage.PARAMETERISED.prep_fn(
+            leg_type=leg_type,
+            engine_type = a3.EngineType.SOMD,
+            input_dir = t4l_calc.input_dir,
+            output_dir = free_leg.input_dir,
+        )
 
         # Check that the expected files are produced
         expected_files = ["free_param.rst7", "free_param.prm7"]
@@ -233,13 +239,19 @@ def test_parameterisation_bound(t4l_calc):
 
     try:
         # We need to save the config to the input directory
-        a3.SystemPreparationConfig(
+        a3.SomdSystemPreparationConfig(
+            slurm=False,
             forcefields={"ligand": "gaff2", "protein": "ff14SB", "water": "tip3p"}
         ).dump(t4l_calc.input_dir, leg_type)
         # Parameterise benzene
         assert leg_type == a3.LegType.BOUND
         assert bound_leg.leg_type == leg_type
-        bound_leg.parameterise_input(slurm=False)
+        a3.PreparationStage.PARAMETERISED.prep_fn(
+            leg_type=leg_type,
+            engine_type = a3.EngineType.SOMD,
+            input_dir = t4l_calc.input_dir,
+            output_dir = bound_leg.input_dir,
+        )
 
         # Check that the expected files are produced
         expected_files = ["bound_param.rst7", "bound_param.prm7"]
@@ -343,7 +355,7 @@ class TestCalcSetup:
                 setup_calc.prep_stage.name
                 == a3.run.enums.PreparationStage.PARAMETERISED.name
             )
-            cfg = SystemPreparationConfig()
+            cfg = SomdSystemPreparationConfig()
             cfg.slurm = False
             setup_calc.setup(bound_leg_sysprep_config=cfg, free_leg_sysprep_config=cfg)
             yield setup_calc
@@ -425,7 +437,7 @@ class TestCalcSetup:
                 lam_vals = {
                     float(lam.split("_")[1]) for lam in os.listdir(stage.output_dir)
                 }
-                cfg = SystemPreparationConfig()
+                cfg = SomdSystemPreparationConfig()
                 expected_lam_vals = set(
                     cfg.lambda_values[leg.leg_type][stage.stage_type]
                 )
@@ -454,7 +466,7 @@ class TestCalcSetup:
                 "somd.out",
             }
             if leg.leg_type == a3.LegType.BOUND:
-                expected_base_files.add("restraint.txt")
+                expected_base_files.add("restraint_1.txt")
             for stage in leg.stages:
                 for lam_win in stage.lam_windows:
                     for sim in lam_win.sims:
@@ -506,7 +518,7 @@ def test_integration_calculation(calc_slurm):
         calc_slurm.prep_stage.name == a3.run.enums.PreparationStage.PARAMETERISED.name
     )
     # Set very short Ensemble equilibration time.
-    cfg = SystemPreparationConfig()
+    cfg = SomdSystemPreparationConfig()
     cfg.ensemble_equilibration_time = 100  # ps
     calc_slurm.setup(bound_leg_sysprep_config=cfg, free_leg_sysprep_config=cfg)
     assert calc_slurm.setup_complete
