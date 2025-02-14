@@ -175,6 +175,10 @@ class Stage(_SimulationRunner):
                 self.lam_vals = lambda_values
             else:
                 self.lam_vals = self._get_lam_vals()
+
+            if self.engine_config is not None:
+                self.engine_config.lambda_values = self.lam_vals
+
             self.equil_detection = equil_detection
             self.runtime_constant = runtime_constant
             self.relative_simulation_cost = relative_simulation_cost
