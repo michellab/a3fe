@@ -1,1 +1,0 @@
-An example of the restraining stage of an ABFE calculation where the receptor-ligand restraints are turned on. Only the simfile.dat files required for analysis have been retained for testing purposes.
