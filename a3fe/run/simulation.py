@@ -128,7 +128,7 @@ class Simulation(_SimulationRunner):
         
         if self.lam not in self.engine_config.lambda_values:
             raise ValueError(
-                f"Lambda value {self.lam} not in list of lambda values: {self.engine_config.lamvals}"
+                f"Lambda value {self.lam} not in list of lambda values: {self.engine_config.lambda_values}"  # type: ignore
             )
   
         if not self.loaded_from_pickle:
