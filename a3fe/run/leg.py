@@ -708,6 +708,11 @@ class Leg(_SimulationRunner):
 
                     stage_config.boresch_restraints_dictionary = restraint_dict
 
+                    _shutil.copy(
+                        f"{ens_equil_output_dir}/restraint_{i + 1}.txt",
+                        f"{stage_input_dir}/restraint_{i + 1}.txt"
+                    )
+
             # Set configuration options
             stage_config.perturbed_residue_number = perturbed_resnum
             stage_config.use_boresch_restraints = self.leg_type == _LegType.BOUND
