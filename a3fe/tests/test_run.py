@@ -157,6 +157,7 @@ def test_update(restrain_stage):
     # and ensure that this is reflected in the lambda windows
     # after updating
     new_lam_vals = list(np.arange(0.0, 1.1, 0.1))
+    restrain_stage.engine_config.lambda_values = new_lam_vals
     restrain_stage.lam_vals = new_lam_vals
     restrain_stage.ensemble_size = 2
     restrain_stage.update()
@@ -466,7 +467,7 @@ class TestCalcSetup:
                 "somd.out",
             }
             if leg.leg_type == a3.LegType.BOUND:
-                expected_base_files.add("restraint_1.txt")
+                expected_base_files.add("restraint.txt")
             for stage in leg.stages:
                 for lam_win in stage.lam_windows:
                     for sim in lam_win.sims:
