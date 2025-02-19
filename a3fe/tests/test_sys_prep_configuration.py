@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
-from a3fe import LegType, SomdSystemPreparationConfig
+from a3fe import LegType, SomdSystemPreparationConfig, StageType
 
 
 def test_create_default_config():
@@ -40,3 +40,11 @@ def test_config_tot_simtime():
     config = SomdSystemPreparationConfig()
     assert config.get_tot_simtime(n_runs=5, leg_type=LegType.FREE) == 26855
     assert config.get_tot_simtime(n_runs=5, leg_type=LegType.BOUND) == 26905
+
+def test_required_stages():
+    """Test that the required stages are calculated correctly."""
+    config = SomdSystemPreparationConfig()
+    assert config.required_stages == {
+        LegType.FREE: [StageType.DISCHARGE, StageType.VANISH],
+        LegType.BOUND: [StageType.RESTRAIN, StageType.DISCHARGE, StageType.VANISH],
+    }

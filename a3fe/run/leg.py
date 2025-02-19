@@ -56,11 +56,6 @@ class Leg(_SimulationRunner):
                 [] + prep_stage.get_simulation_input_files(leg_type)
             )
 
-    required_stages = {
-        _LegType.BOUND: [_StageType.RESTRAIN, _StageType.DISCHARGE, _StageType.VANISH],
-        _LegType.FREE: [_StageType.DISCHARGE, _StageType.VANISH],
-    }
-
     def __init__(
         self,
         leg_type: _LegType,
@@ -131,7 +126,6 @@ class Leg(_SimulationRunner):
         """
         # Set the leg type, as this is needed in the superclass constructor
         self.leg_type = leg_type
-        self.stage_type = self.required_stages[leg_type]
 
         super().__init__(
             base_dir=base_dir,
@@ -147,7 +141,6 @@ class Leg(_SimulationRunner):
         )
 
         if not self.loaded_from_pickle:
-            self.stage_types = Leg.required_stages[leg_type]
             self.equil_detection = equil_detection
             self.runtime_constant = runtime_constant
             self.relative_simulation_cost = relative_simulation_cost
@@ -269,7 +262,7 @@ class Leg(_SimulationRunner):
             self.restraints = [first_restr for _ in range(self.ensemble_size)]
 
         # Create the Stage objects, which automatically set themselves up
-        for stage_type in self.required_stages[self.leg_type]:
+        for stage_type in cfg.required_stages[self.leg_type]:
             self.stages.append(
                 _Stage(
                     stage_type=stage_type,
@@ -398,9 +391,14 @@ class Leg(_SimulationRunner):
         # Save state
         self._dump()
 
-    def create_stage_input_dirs(self) -> _Dict[_StageType, str]:
+    def create_stage_input_dirs(self, sysprep_config: _BaseSystemPreparationConfig) -> _Dict[_StageType, str]:
         """
         Create the input directories for each stage.
+
+        Parameters
+        ----------
+        sysprep_config: BaseSystemPreparationConfig
+            Configuration object for the setup of the leg.
 
         Returns
         -------
@@ -409,7 +407,7 @@ class Leg(_SimulationRunner):
         """
         self._logger.info("Creating stage input directories...")
         stage_input_dirs = {}
-        for stage_type in self.stage_types:
+        for stage_type in sysprep_config.required_stages[self.leg_type]:
             input_dir = f"{self.base_dir}/{stage_type.name.lower()}/input"
             _pathlib.Path(input_dir).mkdir(parents=True, exist_ok=True)
             stage_input_dirs[stage_type] = input_dir

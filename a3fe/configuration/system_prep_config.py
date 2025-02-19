@@ -106,6 +106,22 @@ class _BaseSystemPreparationConfig(_ABC, _BaseModel):
         description="The lambda values to use for each stage of each leg.",
     )
 
+    @property
+    def required_stages(self) -> _Dict[_LegType, _List[_StageType]]:
+        """
+        Get the required stages for each leg type.
+
+        Returns
+        -------
+        Dict[LegType, List[StageType]]
+            Required stages for each leg type.
+        """
+        return {
+            leg_type: list(self.lambda_values[leg_type].keys())
+            for leg_type in self.lambda_values.keys()
+        }
+
+
     model_config = _ConfigDict(extra="forbid", validate_assignment=True)
 
     def get_tot_simtime(self, n_runs: int, leg_type: _LegType) -> int:
