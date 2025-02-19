@@ -28,9 +28,9 @@ from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._utils import get_single_mol as _get_single_mol
 from ._virtual_queue import Job as _Job
 from ._virtual_queue import VirtualQueue as _VirtualQueue
-from .enums import LegType as _LegType
-from .enums import PreparationStage as _PreparationStage
-from .enums import StageType as _StageType
+from ..configuration.enums import LegType as _LegType
+from ..configuration.enums import PreparationStage as _PreparationStage
+from ..configuration.enums import StageType as _StageType
 from .stage import Stage as _Stage
 from ..configuration import (
     _BaseSystemPreparationConfig,
@@ -39,7 +39,7 @@ from ..configuration import (
     ENGINE_TYPE_TO_SYSPREP_CONFIG as _ENGINE_TYPE_TO_SYSPREP_CONFIG,
 )
 
-from .enums import EngineType as _EngineType
+from ..configuration.enums import EngineType as _EngineType
 
 
 class Leg(_SimulationRunner):

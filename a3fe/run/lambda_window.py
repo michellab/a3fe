@@ -22,7 +22,7 @@ from ._virtual_queue import VirtualQueue as _VirtualQueue
 from .simulation import Simulation as _Simulation
 from ..configuration import SlurmConfig as _SlurmConfig
 from ..configuration import SomdConfig as _SomdConfig
-from .enums import EngineType as _EngineType
+from ..configuration.enums import EngineType as _EngineType
 
 
 class LamWindow(_SimulationRunner):

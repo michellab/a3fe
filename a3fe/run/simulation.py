@@ -17,10 +17,10 @@ from sire.units import k_boltz as _k_boltz
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._virtual_queue import Job as _Job
 from ._virtual_queue import VirtualQueue as _VirtualQueue
-from .enums import JobStatus as _JobStatus
+from ..configuration.enums import JobStatus as _JobStatus
 from ..configuration import SlurmConfig as _SlurmConfig
 from ..configuration import SomdConfig as _SomdConfig
-from .enums import EngineType as _EngineType
+from ..configuration.enums import EngineType as _EngineType
 
 
 class Simulation(_SimulationRunner):

@@ -15,9 +15,9 @@ from pydantic import BaseModel as _BaseModel
 from pydantic import Field as _Field
 from pydantic import ConfigDict as _ConfigDict
 
-from ..run.enums import StageType as _StageType
-from ..run.enums import LegType as _LegType
-from ..run.enums import EngineType as _EngineType
+from .enums import StageType as _StageType
+from .enums import LegType as _LegType
+from .enums import EngineType as _EngineType
 
 from typing import List as _List, Dict as _Dict
 

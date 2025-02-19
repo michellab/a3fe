@@ -1,6 +1,6 @@
 from .calc_set import CalcSet
 from .calculation import Calculation
-from .enums import JobStatus, LegType, PreparationStage, StageType, EngineType
+from ..configuration.enums import JobStatus, LegType, PreparationStage, StageType, EngineType
 from .lambda_window import LamWindow
 from .leg import Leg
 from .simulation import Simulation

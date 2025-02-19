@@ -10,15 +10,15 @@ from typing import List as _List
 from typing import Optional as _Optional
 
 from ._simulation_runner import SimulationRunner as _SimulationRunner
-from .enums import LegType as _LegType
-from .enums import PreparationStage as _PreparationStage
+from ..configuration.enums import LegType as _LegType
+from ..configuration.enums import PreparationStage as _PreparationStage
 from .leg import Leg as _Leg
 from ..configuration import (
     _BaseSystemPreparationConfig,
     SlurmConfig as _SlurmConfig,
     SomdConfig as _SomdConfig,
 )
-from .enums import EngineType as _EngineType
+from ..configuration.enums import EngineType as _EngineType
 
 
 class Calculation(_SimulationRunner):

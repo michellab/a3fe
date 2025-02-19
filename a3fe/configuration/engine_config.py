@@ -22,7 +22,7 @@ from pydantic import (
 
 import yaml as _yaml
 from abc import ABC as _ABC, abstractmethod as _abstractmethod
-from ..run.enums import EngineType as _EngineType
+from .enums import EngineType as _EngineType
 
 
 class _EngineConfig(_BaseModel, _ABC):

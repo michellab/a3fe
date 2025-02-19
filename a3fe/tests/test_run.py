@@ -33,7 +33,7 @@ def test_calculation_loading(calc):
     )
     assert calc.output_dir == os.path.join(calc.base_dir, "output")
     assert not calc.setup_complete
-    assert calc.prep_stage.name == a3.run.enums.PreparationStage.PARAMETERISED.name
+    assert calc.prep_stage.name == a3fe.configuration.enums.PreparationStage.PARAMETERISED.name
     assert calc.stream_log_level == logging.INFO
     # Check that pickle file exists
     assert os.path.exists(os.path.join(calc.base_dir, "Calculation.pkl"))
@@ -67,7 +67,7 @@ def test_calculation_reloading(calc):
     )
     assert calc2.output_dir == os.path.join(calc.base_dir, "output")
     assert not calc2.setup_complete
-    assert calc2.prep_stage.name == a3.run.enums.PreparationStage.PARAMETERISED.name
+    assert calc2.prep_stage.name == a3fe.configuration.enums.PreparationStage.PARAMETERISED.name
     assert calc2.stream_log_level == logging.INFO
 
 
@@ -353,7 +353,7 @@ class TestCalcSetup:
             )
             assert (
                 setup_calc.prep_stage.name
-                == a3.run.enums.PreparationStage.PARAMETERISED.name
+                == a3fe.configuration.enums.PreparationStage.PARAMETERISED.name
             )
             cfg = SomdSystemPreparationConfig()
             cfg.slurm = False
@@ -365,7 +365,7 @@ class TestCalcSetup:
         assert setup_calc.setup_complete
         assert (
             setup_calc.prep_stage.name
-            == a3.run.enums.PreparationStage.PREEQUILIBRATED.name
+            == a3fe.configuration.enums.PreparationStage.PREEQUILIBRATED.name
         )
         assert len(setup_calc.legs) == 2
         legs = [leg.leg_type for leg in setup_calc.legs]
@@ -515,7 +515,7 @@ def test_integration_calculation(calc_slurm):
 
     # Check that the preparation stages work
     assert (
-        calc_slurm.prep_stage.name == a3.run.enums.PreparationStage.PARAMETERISED.name
+        calc_slurm.prep_stage.name == a3fe.configuration.enums.PreparationStage.PARAMETERISED.name
     )
     # Set very short Ensemble equilibration time.
     cfg = SomdSystemPreparationConfig()

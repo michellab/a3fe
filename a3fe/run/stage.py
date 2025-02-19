@@ -19,7 +19,7 @@ from typing import Optional as _Optional
 from typing import Tuple as _Tuple
 from typing import Union as _Union
 
-from .enums import EngineType as _EngineType
+from ..configuration.enums import EngineType as _EngineType
 import numpy as _np
 import pandas as _pd
 import scipy.stats as _stats
@@ -51,7 +51,7 @@ from ..analyse.plot import plot_sq_sem_convergence as _plot_sq_sem_convergence
 from ..analyse.process_grads import GradientData as _GradientData
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._virtual_queue import VirtualQueue as _VirtualQueue
-from .enums import StageType as _StageType
+from ..configuration.enums import StageType as _StageType
 from .lambda_window import LamWindow as _LamWindow
 from ..configuration.slurm_config import SlurmConfig as _SlurmConfig
 from ..configuration.engine_config import SomdConfig as _SomdConfig

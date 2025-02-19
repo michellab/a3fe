@@ -16,9 +16,9 @@ import BioSimSpace.Sandpit.Exscientia as _BSS
 
 from ..read._process_bss_systems import rename_lig as _rename_lig
 from ._utils import check_has_wat_and_box as _check_has_wat_and_box
-from .enums import LegType as _LegType
-from .enums import PreparationStage as _PreparationStage
-from .enums import EngineType as _EngineType
+from ..configuration.enums import LegType as _LegType
+from ..configuration.enums import PreparationStage as _PreparationStage
+from ..configuration.enums import EngineType as _EngineType
 
 
 from ..configuration.system_prep_config import (

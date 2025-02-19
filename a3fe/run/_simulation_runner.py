@@ -31,7 +31,7 @@ from ..configuration import SlurmConfig as _SlurmConfig
 from ..configuration import SomdConfig as _SomdConfig
 from .._version import __version__ as _version
 
-from .enums import EngineType as _EngineType
+from ..configuration.enums import EngineType as _EngineType
 
 
 class SimulationRunner(ABC):
