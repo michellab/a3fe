@@ -1,0 +1,1 @@
+boresch restraints dictionary = {"anchor_points":{"r1":1293, "r2":1291, "r3":1295, "l1":19, "l2":14, "l3":20}, "equilibrium_values":{"r0":7.77, "thetaA0":2.26, "thetaB0":1.10,"phiA0":-0.23, "phiB0":-2.82, "phiC0":-0.75}, "force_constants":{"kr":6.10, "kthetaA":51.82, "kthetaB":67.26, "kphiA":31.14, "kphiB":14.25, "kphiC":23.99}}

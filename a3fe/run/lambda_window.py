@@ -352,7 +352,7 @@ class LamWindow(_SimulationRunner):
         # Get the index of the first equilibrated data point
         # Minus 1 because first energy is only written after the first nrg_freq steps
         equil_index = (
-            int(self._equil_time / (self.sims[0].timestep * self.sims[0].nrg_freq)) - 1  # type: ignore
+            int(self._equil_time / (self.sims[0].engine_config.timestep * self.sims[0].engine_config.energy_frequency)) - 1  # type: ignore
         )
 
         # Write the equilibrated data for each simulation

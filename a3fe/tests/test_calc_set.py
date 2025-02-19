@@ -44,11 +44,11 @@ def test_calc_set_analysis(calc_set):
     )
 
     # Regression test for the results
-    assert results_exp.loc["t4l", "calc_dg"] == pytest.approx(5.0378, abs=1e-2)
-    assert results_exp.loc["t4l", "calc_er"] == pytest.approx(0.1501, abs=1e-2)
-    assert results_exp.loc["mdm2_pip2_short", "calc_dg"] == pytest.approx(
-        8.4956, abs=1e-2
+    assert results_exp.loc["t4l", "calc_dg"] == pytest.approx(4.6929, abs=1e-2)
+    assert results_exp.loc["t4l", "calc_er"] == pytest.approx(0.1120, abs=1e-2)
+    assert results_exp.loc["mdm2_short", "calc_dg"] == pytest.approx(
+        7.9100, abs=1e-2
     )
-    assert results_exp.loc["mdm2_pip2_short", "calc_er"] == pytest.approx(
-        0.0935, abs=1e-2
+    assert results_exp.loc["mdm2_short", "calc_er"] == pytest.approx(
+        0.1870, abs=1e-2
     )

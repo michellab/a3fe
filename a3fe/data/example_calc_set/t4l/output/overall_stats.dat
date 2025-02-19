@@ -1,0 +1,8 @@
+###################################### Free Energies ########################################
+Mean free energy:  4.693 + /- 0.112 kcal/mol
+Free energy from run 1:  4.570 +/- 0.025 kcal/mol
+Free energy from run 2:  4.655 +/- 0.024 kcal/mol
+Free energy from run 3:  4.808 +/- 0.021 kcal/mol
+Free energy from run 4:  4.689 +/- 0.024 kcal/mol
+Free energy from run 5:  4.742 +/- 0.022 kcal/mol
+Errors are 95 % C.I.s based on the assumption of a Gaussian distribution of free energies

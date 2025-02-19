@@ -1,0 +1,39 @@
+# Analysing data contained in file(s) ['/home/roy/software/deve/a3fe/runtest/mdm2_short/bound/restrain/output/lambda_0.000/run_04/simfile_truncated_100_end_0_start.dat', '/home/roy/software/deve/a3fe/runtest/mdm2_short/bound/restrain/output/lambda_0.125/run_04/simfile_truncated_100_end_0_start.dat', '/home/roy/software/deve/a3fe/runtest/mdm2_short/bound/restrain/output/lambda_0.250/run_04/simfile_truncated_100_end_0_start.dat', '/home/roy/software/deve/a3fe/runtest/mdm2_short/bound/restrain/output/lambda_0.375/run_04/simfile_truncated_100_end_0_start.dat', '/home/roy/software/deve/a3fe/runtest/mdm2_short/bound/restrain/output/lambda_0.500/run_04/simfile_truncated_100_end_0_start.dat', '/home/roy/software/deve/a3fe/runtest/mdm2_short/bound/restrain/output/lambda_1.000/run_04/simfile_truncated_100_end_0_start.dat']
+#Overlap matrix
+0.3077 0.2043 0.1571 0.1316 0.1155 0.0838
+0.2043 0.1892 0.1731 0.1601 0.1498 0.1235
+0.1571 0.1731 0.1749 0.1723 0.1686 0.1540
+0.1316 0.1601 0.1723 0.1776 0.1797 0.1786
+0.1155 0.1498 0.1686 0.1797 0.1869 0.1995
+0.0838 0.1235 0.1540 0.1786 0.1995 0.2605
+#DG from neighbouring lambda in kcal/mol
+0.0000 0.1250 0.3754 0.0123
+0.1250 0.2500 0.2654 0.0057
+0.2500 0.3750 0.2130 0.0037
+0.3750 0.5000 0.1822 0.0029
+0.5000 1.0000 0.5612 0.0088
+#PMF from MBAR in kcal/mol
+0.0000 0.0000 0.0000
+0.1250 0.3754 0.0123
+0.2500 0.6407 0.0172
+0.3750 0.8537 0.0200
+0.5000 1.0360 0.0220
+1.0000 1.5972 0.0272
+#TI average gradients and standard deviation in kcal/mol
+0.0000 5.1218 3.0523
+0.1250 2.3374 1.1709
+0.2500 1.8121 1.0353
+0.3750 1.5448 1.0062
+0.5000 1.2159 0.8028
+1.0000 0.9243 0.6072
+#PMF from TI in kcal/mol
+0.0000 0.0000
+0.1250 0.4662
+0.2500 0.7255
+0.3750 0.9354
+0.5000 1.1079
+1.0000 1.6429
+#MBAR free energy difference in kcal/mol: 
+1.597174, 0.027240  #WARNING SUBSAMPLING DISABLED, CONSIDER RERUN WITH SUBSAMPLING OPTION
+#TI free energy difference in kcal/mol: 
+1.642949  #WARNING SUBSAMPLING DISABLED, CONSIDER RERUN WITH SUBSAMPLING OPTION 

@@ -40,7 +40,7 @@ def calc_set():
         subprocess.run(["cp", "-r", "a3fe/data/example_calc_set/", dirname], check=True)
         base_dir = os.path.join(dirname, "example_calc_set")
         calc_paths = [
-            os.path.join(base_dir, name) for name in ["mdm2_pip2_short", "t4l"]
+            os.path.join(base_dir, name) for name in ["mdm2_short", "t4l"]
         ]
         calc_set = a3.CalcSet(
             base_dir=base_dir,
