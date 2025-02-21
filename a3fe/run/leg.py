@@ -645,9 +645,11 @@ class Leg(_SimulationRunner):
                 )
 
         # Give the output files unique names
-        for i, outdir in enumerate(outdirs_to_run):
+        equil_numbers = [int(outdir.split("_")[-1]) for outdir in outdirs_to_run]
+        for equil_number, outdir in zip(equil_numbers, outdirs_to_run):
             _subprocess.run(
-                ["mv", f"{outdir}/somd.rst7", f"{outdir}/somd_{i + 1}.rst7"], check=True
+                ["mv", f"{outdir}/somd.rst7", f"{outdir}/somd_{equil_number}.rst7"],
+                check=True,
             )
 
         # Load the system and mark the ligand to be decoupled
