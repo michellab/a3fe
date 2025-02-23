@@ -2,6 +2,10 @@
 Change Log
 ===============
 
+0.3.2
+====================
+- Fix bug which caused somd.rst7 files in the ensemble equilibration directories to be incorrectly numbered in some cases.
+
 0.3.1
 ====================
 - Modified the SimulationRunnerIterator to ensure that the state of sub-simulation runners is saved before they are torn down. This means that setting the equilibration time at the CalcSet level will now work as expected (previously the state of the calculations was not saved, causing the analysis to fail).

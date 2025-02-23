@@ -675,7 +675,7 @@ def run_ensemble_equilibration(
 
     # Run - assuming that this will be in the appropriate ensemble equilibration directory
     print(
-        f"Running SOMD ensemble equilibration simulation for {cfg.ensemble_equilibration_time} ps"
+        f"Running ensemble equilibration simulation with GROMACS for {cfg.ensemble_equilibration_time} ps"
     )
     if leg_type == _LegType.BOUND:
         work_dir = output_dir
