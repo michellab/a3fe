@@ -5,6 +5,7 @@ Change Log
 0.3.2
 ====================
 - Fix bug which caused somd.rst7 files in the ensemble equilibration directories to be incorrectly numbered in some cases.
+- Fix bug which caused the output directory to be incorrectly replaced with "output" in some cases.
 
 0.3.1
 ====================
