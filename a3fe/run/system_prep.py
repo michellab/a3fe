@@ -21,9 +21,7 @@ from ..configuration.enums import PreparationStage as _PreparationStage
 from ..configuration.enums import EngineType as _EngineType
 
 
-from ..configuration.system_prep_config import (
-    ENGINE_TYPE_TO_SYSPREP_CONFIG as _ENGINE_TYPE_TO_SYSPREP_CONFIG,
-)
+from ..configuration.system_prep_config import SomdSystemPreparationConfig as _SomdSystemPreparationConfig
 
 
 def parameterise_input(
@@ -53,7 +51,7 @@ def parameterise_input(
     parameterised_system : _BSS._SireWrappers._system.System
         Parameterised system.
     """
-    cfg = _ENGINE_TYPE_TO_SYSPREP_CONFIG[engine_type].load(input_dir, leg_type)
+    cfg = _SomdSystemPreparationConfig.load(input_dir, leg_type)
 
     print("Parameterising input...")
     # Parameterise the ligand
@@ -150,7 +148,7 @@ def solvate_input(
     solvated_system : _BSS._SireWrappers._system.System
         Solvated system.
     """
-    cfg = _ENGINE_TYPE_TO_SYSPREP_CONFIG[engine_type].load(input_dir, leg_type)
+    cfg = _SomdSystemPreparationConfig.load(input_dir, leg_type)
 
     # Load the parameterised system
     print("Loading parameterised system...")
@@ -249,7 +247,7 @@ def minimise_input(
     minimised_system : _BSS._SireWrappers._system.System
         Minimised system.
     """
-    cfg = _ENGINE_TYPE_TO_SYSPREP_CONFIG[engine_type].load(input_dir, leg_type)
+    cfg = _SomdSystemPreparationConfig.load(input_dir, leg_type)
 
     # Load the solvated system
     print("Loading solvated system...")
@@ -306,7 +304,7 @@ def heat_and_preequil_input(
     preequilibrated_system : _BSS._SireWrappers._system.System
         Pre-Equilibrated system.
     """
-    cfg = _ENGINE_TYPE_TO_SYSPREP_CONFIG[engine_type].load(input_dir, leg_type)
+    cfg = _SomdSystemPreparationConfig.load(input_dir, leg_type)
 
     # Load the minimised system
     print("Loading minimised system...")
@@ -409,7 +407,7 @@ def run_ensemble_equilibration(
     -------
     None
     """
-    cfg = _ENGINE_TYPE_TO_SYSPREP_CONFIG[engine_type].load(input_dir, leg_type)
+    cfg = _SomdSystemPreparationConfig.load(input_dir, leg_type)
 
     # Load the pre-equilibrated system
     print("Loading pre-equilibrated system...")

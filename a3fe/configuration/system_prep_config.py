@@ -4,7 +4,6 @@ Configuration classes for system preparation.
 
 __all__ = [
     "SomdSystemPreparationConfig",
-    "ENGINE_TYPE_TO_SYSPREP_CONFIG",
 ]
 
 import yaml as _yaml
@@ -17,7 +16,6 @@ from pydantic import ConfigDict as _ConfigDict
 
 from .enums import StageType as _StageType
 from .enums import LegType as _LegType
-from .enums import EngineType as _EngineType
 
 from typing import List as _List, Dict as _Dict
 
@@ -214,7 +212,3 @@ class SomdSystemPreparationConfig(_BaseSystemPreparationConfig):
     Currently this doesn't modify the base settings, but it may do
     in the future.
     """
-
-ENGINE_TYPE_TO_SYSPREP_CONFIG = {
-    _EngineType.SOMD: SomdSystemPreparationConfig,
-}

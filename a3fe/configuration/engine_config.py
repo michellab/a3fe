@@ -2,7 +2,6 @@
 
 __all__ = [
     "SomdConfig",
-    "ENGINE_TYPE_TO_ENGINE_CONFIG",
 ]
 
 import os as _os
@@ -22,7 +21,6 @@ from pydantic import (
 
 import yaml as _yaml
 from abc import ABC as _ABC, abstractmethod as _abstractmethod
-from .enums import EngineType as _EngineType
 
 
 class _EngineConfig(_BaseModel, _ABC):
@@ -425,6 +423,3 @@ class SomdConfig(_EngineConfig):
         Get the command to run the simulation.
         """
         return f"somd-freenrg -C {self.get_file_name()} -l {lam} -p CUDA"
-
-
-ENGINE_TYPE_TO_ENGINE_CONFIG = {_EngineType.SOMD: SomdConfig}

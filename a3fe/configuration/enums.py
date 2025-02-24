@@ -13,7 +13,8 @@ __all__ = [
     "StageType",
     "LegType",
     "PreparationStage",
-]
+    "EngineType",
+]   
 
 
 class _YamlSerialisableEnum(_Enum):
