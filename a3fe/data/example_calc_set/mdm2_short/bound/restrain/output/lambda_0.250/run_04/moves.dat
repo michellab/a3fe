@@ -1,4 +1,4 @@
 WeightedMoves{
-  1 : weight == 1, timing = 2.85189 ms
+  1 : weight == 1, timing = 1.72178 ms
        MolecularDynamics( OpenMMFrEnergyST(), timeStep() == 4 fs, nMoves() == 50000 )
 }
