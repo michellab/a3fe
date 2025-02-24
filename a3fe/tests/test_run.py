@@ -33,7 +33,7 @@ def test_calculation_loading(calc):
     )
     assert calc.output_dir == os.path.join(calc.base_dir, "output")
     assert not calc.setup_complete
-    assert calc.prep_stage.name == a3fe.configuration.enums.PreparationStage.PARAMETERISED.name
+    assert calc.prep_stage.name == a3.configuration.enums.PreparationStage.PARAMETERISED.name
     assert calc.stream_log_level == logging.INFO
     # Check that pickle file exists
     assert os.path.exists(os.path.join(calc.base_dir, "Calculation.pkl"))
@@ -67,7 +67,7 @@ def test_calculation_reloading(calc):
     )
     assert calc2.output_dir == os.path.join(calc.base_dir, "output")
     assert not calc2.setup_complete
-    assert calc2.prep_stage.name == a3fe.configuration.enums.PreparationStage.PARAMETERISED.name
+    assert calc2.prep_stage.name == a3.configuration.enums.PreparationStage.PARAMETERISED.name
     assert calc2.stream_log_level == logging.INFO
 
 
@@ -354,7 +354,7 @@ class TestCalcSetup:
             )
             assert (
                 setup_calc.prep_stage.name
-                == a3fe.configuration.enums.PreparationStage.PARAMETERISED.name
+                == a3.configuration.enums.PreparationStage.PARAMETERISED.name
             )
             cfg = SomdSystemPreparationConfig()
             cfg.slurm = False
@@ -366,7 +366,7 @@ class TestCalcSetup:
         assert setup_calc.setup_complete
         assert (
             setup_calc.prep_stage.name
-            == a3fe.configuration.enums.PreparationStage.PREEQUILIBRATED.name
+            == a3.configuration.enums.PreparationStage.PREEQUILIBRATED.name
         )
         assert len(setup_calc.legs) == 2
         legs = [leg.leg_type for leg in setup_calc.legs]
@@ -412,7 +412,6 @@ class TestCalcSetup:
         for leg in setup_calc.legs:
             expected_input_files = {
                 "somd_1.rst7",
-                "somd.cfg",
                 "somd.prm7",
                 "somd.rst7",
                 "somd.pert",
@@ -426,8 +425,6 @@ class TestCalcSetup:
                 "virtual_queue.log",
                 "Stage.log",
             }
-            if leg.leg_type == a3.LegType.BOUND:
-                expected_input_files.add("restraint_1.txt")
 
             for stage in leg.stages:
                 input_files = set(os.listdir(stage.input_dir))
@@ -443,6 +440,9 @@ class TestCalcSetup:
                     cfg.lambda_values[leg.leg_type][stage.stage_type]
                 )
                 assert lam_vals == expected_lam_vals
+                
+                if leg.leg_type == a3.LegType.BOUND:
+                    assert stage.engine_config.boresch_restraints_dictionary is not None
 
     def test_setup_calc_lam(self, setup_calc):
         """Test that setting up the calculation produced the correct lambda windows."""
@@ -457,7 +457,6 @@ class TestCalcSetup:
         """Test that setting up the calculation produced the correct simulations."""
         for leg in setup_calc.legs:
             expected_base_files = {
-                "somd.cfg",
                 "Simulation.pkl",
                 "Simulation.log",
                 "somd.prm7",
@@ -466,13 +465,14 @@ class TestCalcSetup:
                 "somd.err",
                 "somd.out",
             }
-            if leg.leg_type == a3.LegType.BOUND:
-                expected_base_files.add("restraint.txt")
             for stage in leg.stages:
                 for lam_win in stage.lam_windows:
                     for sim in lam_win.sims:
                         base_dir_files = set(os.listdir(sim.base_dir))
                         assert base_dir_files == expected_base_files
+
+                        if leg.leg_type == a3.LegType.BOUND:
+                            assert sim.engine_config.boresch_restraints_dictionary is not None
 
 
 ######################## Tests Requiring SLURM ########################
@@ -516,7 +516,7 @@ def test_integration_calculation(calc_slurm):
 
     # Check that the preparation stages work
     assert (
-        calc_slurm.prep_stage.name == a3fe.configuration.enums.PreparationStage.PARAMETERISED.name
+        calc_slurm.prep_stage.name == a3.configuration.enums.PreparationStage.PARAMETERISED.name
     )
     # Set very short Ensemble equilibration time.
     cfg = SomdSystemPreparationConfig()

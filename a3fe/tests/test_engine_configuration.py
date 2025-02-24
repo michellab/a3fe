@@ -32,9 +32,9 @@ def test_write_config():
             run_dir=dirname,
             lambda_val=0.0,
             runtime=config.runtime,
-            top_file="top.pdb",
-            coord_file="coord.pdb",
-            morph_file="morph.pdb",
+            top_file="somd.prm7",
+            coord_file="somd.rst7",
+            morph_file="somd.pert",
         )
         assert os.path.exists(config_path)
 
