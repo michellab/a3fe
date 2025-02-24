@@ -351,11 +351,11 @@ class TestCalcSetup:
 
     @pytest.fixture
     def setup_calc_with_input_path(self, setup_calc):
-        """Based on the setup_calc fixture, 
+        """Based on the setup_calc fixture,
         create a new calculation with a temporary directory containing "input"."""
         temp_parent_dir = "input_temp_a3fe"
         os.makedirs(temp_parent_dir, exist_ok=True)
-        
+
         with TemporaryDirectory(prefix="temp_input_", dir=temp_parent_dir) as dirname:
             # Copy the example input directory to the temporary directory
             subprocess.run(
@@ -502,8 +502,11 @@ class TestCalcSetup:
         for leg in setup_calc_with_input_path.legs:
             for stage in leg.stages:
                 if leg.leg_type == a3.LegType.BOUND:
-                    expected_output_dir = "output".join(stage.input_dir.rsplit("input", 1))
+                    expected_output_dir = "output".join(
+                        stage.input_dir.rsplit("input", 1)
+                    )
                     assert stage.output_dir == expected_output_dir
+
 
 ######################## Tests Requiring SLURM ########################
 
