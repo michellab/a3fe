@@ -27,7 +27,6 @@ class Simulation(_SimulationRunner):
     """Class to store information about a single SOMD simulation."""
 
     required_input_files = [
-        "somd.cfg",
         "somd.prm7",
         "somd.rst7",
         "somd.pert",
@@ -137,7 +136,6 @@ class Simulation(_SimulationRunner):
             self._validate_input()
             self.job: _Optional[_Job] = None
             self._running: bool = False
-            self.simfile_path = _os.path.join(self.base_dir, "somd.cfg")
             # Select the correct rst7 and, if supplied, restraints
             self._select_input_files()
 
@@ -405,7 +403,8 @@ class Simulation(_SimulationRunner):
 
     @property
     def slurm_output_files(self) -> _List[str]:
-        return _glob.glob(f"{self.slurm_file_base}*")
+        """Get a list of all slurm output files for this simulation."""
+        return _glob.glob(_os.path.join(self.output_dir, "slurm-*.out"))
 
     def kill(self) -> None:
         """Kill the job."""

@@ -83,7 +83,6 @@ class Stage(_SimulationRunner):
         runtime_constant: _Optional[float] = 0.005,
         relative_simulation_cost: float = 1,
         ensemble_size: int = 5,
-        lambda_values: _Optional[_List[float]] = None,
         base_dir: _Optional[str] = None,
         input_dir: _Optional[str] = None,
         output_dir: _Optional[str] = None,
@@ -118,9 +117,6 @@ class Stage(_SimulationRunner):
             for the free leg.
         ensemble_size : int, Optional, default: 5
             Number of simulations to run in the ensemble.
-        lambda_values : List[float], Optional, default: None
-            List of lambda values to use for the simulations. If None, the lambda values
-            will be read from the simfile.
         base_dir : str, Optional, default: None
             Path to the base directory. If None,
             this is set to the current working directory.
@@ -153,7 +149,7 @@ class Stage(_SimulationRunner):
         None
         """
         # Set the stage type first, as this is required for __str__,
-        # and threrefore the super().__init__ call
+        # and therefore the super().__init__ call
         self.stage_type = stage_type
 
         super().__init__(
@@ -171,13 +167,10 @@ class Stage(_SimulationRunner):
         )
 
         if not self.loaded_from_pickle:
-            if lambda_values is not None:
-                self.lam_vals = lambda_values
+            if self.engine_config.lambda_values is None:
+                self.engine_config.lambda_values = self.get_lambda_values
             else:
-                self.lam_vals = self._get_lam_vals()
-
-            if self.engine_config is not None:
-                self.engine_config.lambda_values = self.lam_vals
+                self.engine_config.lambda_values = self.engine_config.lambda_values # type: ignore
 
             self.equil_detection = equil_detection
             self.runtime_constant = runtime_constant
@@ -193,7 +186,7 @@ class Stage(_SimulationRunner):
             )
             # Creating lambda window objects sets up required input directories
             lam_val_weights = self.lam_val_weights
-            for i, lam_val in enumerate(self.lam_vals):
+            for i, lam_val in enumerate(self.engine_config.lambda_values):
                 lam_base_dir = _os.path.join(self.output_dir, f"lambda_{lam_val:.3f}")
                 self.lam_windows.append(
                     _LamWindow(
@@ -229,9 +222,14 @@ class Stage(_SimulationRunner):
         return self._sub_sim_runners
 
     @lam_windows.setter
-    def legs(self, value) -> None:
+    def lam_windows(self, value) -> None:
         self._logger.info("Modifying/ creating lambda windows")
         self._sub_sim_runners = value
+
+    @property
+    def get_lambda_values(self) -> _List[float]:
+        """Return list of lambda values from the engine configuration."""
+        return _SomdConfig._from_config_file(_os.path.join(self.input_dir, "somd.cfg")).lambda_values
 
     @property
     def lam_val_weights(self) -> _List[float]:
@@ -239,14 +237,14 @@ class Stage(_SimulationRunner):
         according to how each windows contributes to the overall free energy
         estimate, as given by TI and the trapezoidal rule."""
         lam_val_weights = []
-        for i, lam_val in enumerate(self.lam_vals):
+        for i, lam_val in enumerate(self.engine_config.lambda_values):
             if i == 0:
-                lam_val_weights.append(0.5 * (self.lam_vals[i + 1] - lam_val))
-            elif i == len(self.lam_vals) - 1:
-                lam_val_weights.append(0.5 * (lam_val - self.lam_vals[i - 1]))
+                lam_val_weights.append(0.5 * (self.engine_config.lambda_values[i + 1] - lam_val))
+            elif i == len(self.engine_config.lambda_values) - 1:
+                lam_val_weights.append(0.5 * (lam_val - self.engine_config.lambda_values[i - 1]))
             else:
                 lam_val_weights.append(
-                    0.5 * (self.lam_vals[i + 1] - self.lam_vals[i - 1])
+                    0.5 * (self.engine_config.lambda_values[i + 1] - self.engine_config.lambda_values[i - 1])
                 )
         return lam_val_weights
 
@@ -706,28 +704,6 @@ class Stage(_SimulationRunner):
         return unequilibrated_gradient_data.calculate_optimal_lam_vals(
             er_type=er_type, delta_er=delta_er, n_lam_vals=n_lam_vals
         )
-
-    def _get_lam_vals(self) -> _List[float]:
-        """
-        Return list of lambda values for the simulations,
-        based on the configuration file.
-
-        Returns
-        -------
-        lam_vals : List[float]
-            List of lambda values for the simulations.
-        """
-        # Read number of lambda windows from input file
-        lam_vals_str = []
-        with open(self.input_dir + "/somd.cfg", "r") as ifile:
-            lines = ifile.readlines()
-            for line in lines:
-                if line.startswith("lambda array ="):
-                    lam_vals_str = line.split("=")[1].split(",")
-                    break
-        lam_vals = [float(lam) for lam in lam_vals_str]
-
-        return lam_vals
 
     def analyse(
         self,
@@ -1228,7 +1204,7 @@ class Stage(_SimulationRunner):
         self._logger.info("Deleting old lambda windows and creating new ones...")
         self._sub_sim_runners = []
         lam_val_weights = self.lam_val_weights
-        for i, lam_val in enumerate(self.lam_vals):
+        for i, lam_val in enumerate(self.engine_config.lambda_values):
             lam_base_dir = _os.path.join(self.output_dir, f"lambda_{lam_val:.3f}")
             new_lam_win = _LamWindow(
                 lam=lam_val,

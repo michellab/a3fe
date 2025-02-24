@@ -36,7 +36,7 @@ from ..configuration import (
     _BaseSystemPreparationConfig,
     SlurmConfig as _SlurmConfig,
     SomdConfig as _SomdConfig,
-    ENGINE_TYPE_TO_SYSPREP_CONFIG as _ENGINE_TYPE_TO_SYSPREP_CONFIG,
+    SomdSystemPreparationConfig as _SomdSystemPreparationConfig,
 )
 
 from ..configuration.enums import EngineType as _EngineType
@@ -231,7 +231,7 @@ class Leg(_SimulationRunner):
         cfg = (
             sysprep_config
             if sysprep_config is not None
-            else _ENGINE_TYPE_TO_SYSPREP_CONFIG[self.engine_type]()
+            else _SomdSystemPreparationConfig()
         )
         cfg.dump(self.input_dir, self.leg_type)
 
@@ -239,7 +239,7 @@ class Leg(_SimulationRunner):
         # depending on the input files present.
 
         # First, create the input directories
-        self.create_stage_input_dirs()
+        self.create_stage_input_dirs(sysprep_config=cfg)
 
         # Then prepare as required according to the preparation stage
         prep_stage_order = [prep_stage for prep_stage in _PreparationStage]
@@ -270,7 +270,6 @@ class Leg(_SimulationRunner):
                     runtime_constant=self.runtime_constant,
                     relative_simulation_cost=self.relative_simulation_cost,
                     ensemble_size=self.ensemble_size,
-                    lambda_values = cfg.lambda_values[self.leg_type][stage_type],
                     base_dir=self.stage_input_dirs[stage_type].replace("/input", ""),
                     input_dir=self.stage_input_dirs[stage_type],
                     output_dir=self.stage_input_dirs[stage_type].replace(
@@ -673,9 +672,10 @@ class Leg(_SimulationRunner):
                 property_map={"velocity": "foo"},
             )  # We will run outside of BSS
 
-            # Copy input written by BSS to the stage input directory
+            # Copy input written by BSS to the stage input directory, excluding only somd.cfg
             for file in _glob.glob(f"{stage_input_dir}/lambda_0.0000/*"):
-                _shutil.copy(file, stage_input_dir)
+                if _os.path.basename(file) != "somd.cfg": 
+                    _shutil.copy(file, stage_input_dir)
             for file in _glob.glob(f"{stage_input_dir}/lambda_*"):
                 _subprocess.run(["rm", "-rf", file], check=True)
 
@@ -705,11 +705,6 @@ class Leg(_SimulationRunner):
                         )
 
                     stage_config.boresch_restraints_dictionary = restraint_dict
-
-                    _shutil.copy(
-                        f"{ens_equil_output_dir}/restraint_{i + 1}.txt",
-                        f"{stage_input_dir}/restraint_{i + 1}.txt"
-                    )
 
             # Set configuration options
             stage_config.perturbed_residue_number = perturbed_resnum
