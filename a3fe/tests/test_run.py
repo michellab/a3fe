@@ -12,7 +12,6 @@ from unittest.mock import patch
 import BioSimSpace.Sandpit.Exscientia as BSS
 import numpy as np
 import pytest
-import shutil
 
 import a3fe as a3
 from a3fe.analyse.detect_equil import dummy_check_equil_multiwindow
@@ -322,7 +321,7 @@ class TestCalcSetup:
     @pytest.fixture(scope="class")
     def setup_calc(mock_run_process):
         """Set up a calculation object completely from input files."""
-        with TemporaryDirectory() as dirname:
+        with TemporaryDirectory(prefix="temp_input_") as dirname:
             # Copy the example input directory to the temporary directory
             # as we'll create some new files there
             subprocess.run(
@@ -348,38 +347,6 @@ class TestCalcSetup:
             cfg.slurm = False
             setup_calc.setup(bound_leg_sysprep_config=cfg, free_leg_sysprep_config=cfg)
             yield setup_calc
-
-    @pytest.fixture
-    def setup_calc_with_input_path(self, setup_calc):
-        """Based on the setup_calc fixture,
-        create a new calculation with a temporary directory containing "input"."""
-        temp_parent_dir = "input_temp_a3fe"
-        os.makedirs(temp_parent_dir, exist_ok=True)
-
-        with TemporaryDirectory(prefix="temp_input_", dir=temp_parent_dir) as dirname:
-            # Copy the example input directory to the temporary directory
-            subprocess.run(
-                [
-                    "cp",
-                    "-r",
-                    "a3fe/data/example_run_dir/input",
-                    f"{dirname}/input",
-                ]
-            )
-
-            calc = a3.Calculation(
-                base_dir=dirname,
-                input_dir=f"{dirname}/input",
-                ensemble_size=1,
-                stream_log_level=logging.CRITICAL,
-            )
-            cfg = SystemPreparationConfig()
-            cfg.slurm = False
-            calc.setup(bound_leg_sysprep_config=cfg, free_leg_sysprep_config=cfg)
-            yield calc
-
-        if os.path.exists(temp_parent_dir):
-            shutil.rmtree(temp_parent_dir, ignore_errors=True)
 
     def test_setup_calc_overall(self, setup_calc, mock_run_process):
         """Test that setting up the calculation was successful at a high level."""
@@ -496,14 +463,14 @@ class TestCalcSetup:
                         base_dir_files = set(os.listdir(sim.base_dir))
                         assert base_dir_files == expected_base_files
 
-    def test_stage_output_path_replacement(self, setup_calc_with_input_path):
+    def test_stage_output_path_replacement(self, setup_calc):
         """Test that stage output paths are correctly derived from input paths by only
         replacing the last 'input' with 'output'."""
-        for leg in setup_calc_with_input_path.legs:
+        for leg in setup_calc.legs:
             for stage in leg.stages:
                 if leg.leg_type == a3.LegType.BOUND:
-                    expected_output_dir = "output".join(
-                        stage.input_dir.rsplit("input", 1)
+                    expected_output_dir = os.path.join(
+                        os.path.dirname(stage.input_dir), "output"
                     )
                     assert stage.output_dir == expected_output_dir
 

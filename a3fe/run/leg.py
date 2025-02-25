@@ -259,12 +259,13 @@ class Leg(_SimulationRunner):
                     relative_simulation_cost=self.relative_simulation_cost,
                     ensemble_size=self.ensemble_size,
                     lambda_values=cfg.lambda_values[self.leg_type][stage_type],
-                    base_dir=self.stage_input_dirs[stage_type].rsplit("/input", 1)[0],
+                    base_dir=_os.path.dirname(
+                        _os.path.dirname(self.stage_input_dirs[stage_type])
+                    ),
                     input_dir=self.stage_input_dirs[stage_type],
-                    output_dir="/".join(
-                        self.stage_input_dirs[stage_type].split("/")[:-1]
-                    )
-                    + "/output",
+                    output_dir=_os.path.join(
+                        _os.path.dirname(self.stage_input_dirs[stage_type]), "output"
+                    ),
                     stream_log_level=self.stream_log_level,
                 )
             )
