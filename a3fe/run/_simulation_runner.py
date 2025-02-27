@@ -185,7 +185,7 @@ class SimulationRunner(ABC):
             self.analysis_slurm_config = (
                 analysis_slurm_config
                 if analysis_slurm_config is not None
-                else self.slurm_config
+                else self.slurm_config.copy()
             )
 
             # Create the SOMD config with default values if none is provided

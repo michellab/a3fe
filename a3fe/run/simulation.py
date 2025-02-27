@@ -404,7 +404,7 @@ class Simulation(_SimulationRunner):
     @property
     def slurm_output_files(self) -> _List[str]:
         """Get a list of all slurm output files for this simulation."""
-        return _glob.glob(_os.path.join(self.output_dir, "slurm-*.out"))
+        return _glob.glob(f"{self.slurm_file_base}*")
 
     def kill(self) -> None:
         """Kill the job."""
