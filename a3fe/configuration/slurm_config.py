@@ -80,7 +80,7 @@ class SlurmConfig(_BaseModel):
         with open(script_path, "w") as f:
             f.write(script)
 
-        return ["rbatch", f"--chdir={run_dir}", script_path]
+        return ["sbatch", f"--chdir={run_dir}", script_path]
 
     def get_slurm_output_file_base(self, run_dir: str) -> str:
         """

@@ -19,6 +19,7 @@ from typing import Optional as _Optional
 from typing import Tuple as _Tuple
 from typing import Union as _Union
 
+from ..configuration.enums import EngineType as _EngineType
 import numpy as _np
 import pandas as _pd
 import scipy.stats as _stats
@@ -48,12 +49,12 @@ from ..analyse.plot import plot_overlap_mats as _plot_overlap_mats
 from ..analyse.plot import plot_rmsds as _plot_rmsds
 from ..analyse.plot import plot_sq_sem_convergence as _plot_sq_sem_convergence
 from ..analyse.process_grads import GradientData as _GradientData
-from ..read._process_somd_files import write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._virtual_queue import VirtualQueue as _VirtualQueue
-from .enums import StageType as _StageType
+from ..configuration.enums import StageType as _StageType
 from .lambda_window import LamWindow as _LamWindow
 from ..configuration.slurm_config import SlurmConfig as _SlurmConfig
+from ..configuration.engine_config import SomdConfig as _SomdConfig
 
 
 class Stage(_SimulationRunner):
@@ -82,13 +83,14 @@ class Stage(_SimulationRunner):
         runtime_constant: _Optional[float] = 0.005,
         relative_simulation_cost: float = 1,
         ensemble_size: int = 5,
-        lambda_values: _Optional[_List[float]] = None,
         base_dir: _Optional[str] = None,
         input_dir: _Optional[str] = None,
         output_dir: _Optional[str] = None,
         stream_log_level: int = _logging.INFO,
         slurm_config: _Optional[_SlurmConfig] = None,
         analysis_slurm_config: _Optional[_SlurmConfig] = None,
+        engine_config: _Optional[_SomdConfig] = None,
+        engine_type: _EngineType = _EngineType.SOMD,
         update_paths: bool = True,
     ) -> None:
         """
@@ -115,9 +117,6 @@ class Stage(_SimulationRunner):
             for the free leg.
         ensemble_size : int, Optional, default: 5
             Number of simulations to run in the ensemble.
-        lambda_values : List[float], Optional, default: None
-            List of lambda values to use for the simulations. If None, the lambda values
-            will be read from the simfile.
         base_dir : str, Optional, default: None
             Path to the base directory. If None,
             this is set to the current working directory.
@@ -137,6 +136,10 @@ class Stage(_SimulationRunner):
             Configuration for the SLURM job scheduler for the analysis.
             This is helpful e.g. if you want to submit analysis to the CPU
             partition, but the main simulation to the GPU partition. If None,
+        engine_config: SomdConfig, default: None
+            Configuration for the SOMD engine. If None, the default configuration is used.
+        engine_type: EngineType, default: EngineType.SOMD
+            The type of engine to use for the production simulations.
         update_paths: bool, Optional, default: True
             If True, if the simulation runner is loaded by unpickling, then
             update_paths() is called.
@@ -146,7 +149,7 @@ class Stage(_SimulationRunner):
         None
         """
         # Set the stage type first, as this is required for __str__,
-        # and threrefore the super().__init__ call
+        # and therefore the super().__init__ call
         self.stage_type = stage_type
 
         super().__init__(
@@ -156,16 +159,19 @@ class Stage(_SimulationRunner):
             stream_log_level=stream_log_level,
             slurm_config=slurm_config,
             analysis_slurm_config=analysis_slurm_config,
+            engine_config=engine_config,
+            engine_type=engine_type,
             ensemble_size=ensemble_size,
             update_paths=update_paths,
             dump=False,
         )
 
         if not self.loaded_from_pickle:
-            if lambda_values is not None:
-                self.lam_vals = lambda_values
+            if self.engine_config.lambda_values is None:
+                self.engine_config.lambda_values = self.get_lambda_values
             else:
-                self.lam_vals = self._get_lam_vals()
+                self.engine_config.lambda_values = self.engine_config.lambda_values # type: ignore
+
             self.equil_detection = equil_detection
             self.runtime_constant = runtime_constant
             self.relative_simulation_cost = relative_simulation_cost
@@ -180,7 +186,7 @@ class Stage(_SimulationRunner):
             )
             # Creating lambda window objects sets up required input directories
             lam_val_weights = self.lam_val_weights
-            for i, lam_val in enumerate(self.lam_vals):
+            for i, lam_val in enumerate(self.engine_config.lambda_values):
                 lam_base_dir = _os.path.join(self.output_dir, f"lambda_{lam_val:.3f}")
                 self.lam_windows.append(
                     _LamWindow(
@@ -196,6 +202,8 @@ class Stage(_SimulationRunner):
                         stream_log_level=self.stream_log_level,
                         slurm_config=self.slurm_config,
                         analysis_slurm_config=self.analysis_slurm_config,
+                        engine_config=self.engine_config.copy(),
+                        engine_type=self.engine_type,
                     )
                 )
 
@@ -214,9 +222,14 @@ class Stage(_SimulationRunner):
         return self._sub_sim_runners
 
     @lam_windows.setter
-    def legs(self, value) -> None:
+    def lam_windows(self, value) -> None:
         self._logger.info("Modifying/ creating lambda windows")
         self._sub_sim_runners = value
+
+    @property
+    def get_lambda_values(self) -> _List[float]:
+        """Return list of lambda values from the engine configuration."""
+        return _SomdConfig._from_config_file(_os.path.join(self.input_dir, "somd.cfg")).lambda_values
 
     @property
     def lam_val_weights(self) -> _List[float]:
@@ -224,14 +237,14 @@ class Stage(_SimulationRunner):
         according to how each windows contributes to the overall free energy
         estimate, as given by TI and the trapezoidal rule."""
         lam_val_weights = []
-        for i, lam_val in enumerate(self.lam_vals):
+        for i, lam_val in enumerate(self.engine_config.lambda_values):
             if i == 0:
-                lam_val_weights.append(0.5 * (self.lam_vals[i + 1] - lam_val))
-            elif i == len(self.lam_vals) - 1:
-                lam_val_weights.append(0.5 * (lam_val - self.lam_vals[i - 1]))
+                lam_val_weights.append(0.5 * (self.engine_config.lambda_values[i + 1] - lam_val))
+            elif i == len(self.engine_config.lambda_values) - 1:
+                lam_val_weights.append(0.5 * (lam_val - self.engine_config.lambda_values[i - 1]))
             else:
                 lam_val_weights.append(
-                    0.5 * (self.lam_vals[i + 1] - self.lam_vals[i - 1])
+                    0.5 * (self.engine_config.lambda_values[i + 1] - self.engine_config.lambda_values[i - 1])
                 )
         return lam_val_weights
 
@@ -358,6 +371,7 @@ class Stage(_SimulationRunner):
                 self._logger.info(
                     f"Starting {self}. Adaptive equilibration = {adaptive}..."
                 )
+
             elif adaptive:
                 self._logger.info(
                     f"Starting {self}. Adaptive equilibration = {adaptive}..."
@@ -690,28 +704,6 @@ class Stage(_SimulationRunner):
         return unequilibrated_gradient_data.calculate_optimal_lam_vals(
             er_type=er_type, delta_er=delta_er, n_lam_vals=n_lam_vals
         )
-
-    def _get_lam_vals(self) -> _List[float]:
-        """
-        Return list of lambda values for the simulations,
-        based on the configuration file.
-
-        Returns
-        -------
-        lam_vals : List[float]
-            List of lambda values for the simulations.
-        """
-        # Read number of lambda windows from input file
-        lam_vals_str = []
-        with open(self.input_dir + "/somd.cfg", "r") as ifile:
-            lines = ifile.readlines()
-            for line in lines:
-                if line.startswith("lambda array ="):
-                    lam_vals_str = line.split("=")[1].split(",")
-                    break
-        lam_vals = [float(lam) for lam in lam_vals_str]
-
-        return lam_vals
 
     def analyse(
         self,
@@ -1158,9 +1150,8 @@ class Stage(_SimulationRunner):
         _os.rename(self.output_dir, _os.path.join(base_dir, save_name))
 
     def set_simfile_option(self, option: str, value: str) -> None:
-        """Set the value of an option in the simulation configuration file."""
-        simfile = _os.path.join(self.input_dir, "somd.cfg")
-        _write_simfile_option(simfile, option, value, logger=self._logger)
+        setattr(self.engine_config, option, value)
+        self.engine_config.get_somd_config(self.input_dir)
         super().set_simfile_option(option, value)
 
     def wait(self) -> None:
@@ -1208,18 +1199,12 @@ class Stage(_SimulationRunner):
             raise RuntimeError("Can't update while ensemble is running")
         if _os.path.isdir(self.output_dir):
             self._mv_output(save_name)
-        # Update the list of lambda windows in the simfile
-        _write_simfile_option(
-            simfile=f"{self.input_dir}/somd.cfg",
-            option="lambda array",
-            value=", ".join([str(lam) for lam in self.lam_vals]),
-        )
-        # Store the previous lambda window attributes that we want to preserve
+
         old_lam_vals_attrs = self.lam_windows[0].__dict__
         self._logger.info("Deleting old lambda windows and creating new ones...")
         self._sub_sim_runners = []
         lam_val_weights = self.lam_val_weights
-        for i, lam_val in enumerate(self.lam_vals):
+        for i, lam_val in enumerate(self.engine_config.lambda_values):
             lam_base_dir = _os.path.join(self.output_dir, f"lambda_{lam_val:.3f}")
             new_lam_win = _LamWindow(
                 lam=lam_val,
@@ -1233,6 +1218,7 @@ class Stage(_SimulationRunner):
                 stream_log_level=self.stream_log_level,
                 slurm_config=self.slurm_config,
                 analysis_slurm_config=self.analysis_slurm_config,
+                engine_config=self.engine_config.copy(),
             )
             # Overwrite the default equilibration detection algorithm
             new_lam_win.check_equil = old_lam_vals_attrs["check_equil"]

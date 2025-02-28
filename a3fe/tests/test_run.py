@@ -15,7 +15,7 @@ import pytest
 
 import a3fe as a3
 from a3fe.analyse.detect_equil import dummy_check_equil_multiwindow
-from a3fe.configuration import SystemPreparationConfig
+from a3fe.configuration import SomdSystemPreparationConfig
 
 from . import RUN_SLURM_TESTS, SLURM_PRESENT
 
@@ -33,7 +33,7 @@ def test_calculation_loading(calc):
     )
     assert calc.output_dir == os.path.join(calc.base_dir, "output")
     assert not calc.setup_complete
-    assert calc.prep_stage.name == a3.run.enums.PreparationStage.PARAMETERISED.name
+    assert calc.prep_stage.name == a3.configuration.enums.PreparationStage.PARAMETERISED.name
     assert calc.stream_log_level == logging.INFO
     # Check that pickle file exists
     assert os.path.exists(os.path.join(calc.base_dir, "Calculation.pkl"))
@@ -67,7 +67,7 @@ def test_calculation_reloading(calc):
     )
     assert calc2.output_dir == os.path.join(calc.base_dir, "output")
     assert not calc2.setup_complete
-    assert calc2.prep_stage.name == a3.run.enums.PreparationStage.PARAMETERISED.name
+    assert calc2.prep_stage.name == a3.configuration.enums.PreparationStage.PARAMETERISED.name
     assert calc2.stream_log_level == logging.INFO
 
 
@@ -157,6 +157,7 @@ def test_update(restrain_stage):
     # and ensure that this is reflected in the lambda windows
     # after updating
     new_lam_vals = list(np.arange(0.0, 1.1, 0.1))
+    restrain_stage.engine_config.lambda_values = new_lam_vals
     restrain_stage.lam_vals = new_lam_vals
     restrain_stage.ensemble_size = 2
     restrain_stage.update()
@@ -193,11 +194,17 @@ def test_parameterisation_free(t4l_calc):
 
     try:
         # We need to save the config to the input directory
-        a3.SystemPreparationConfig(
+        a3.SomdSystemPreparationConfig(
+            slurm=False,
             forcefields={"ligand": "gaff2", "protein": "ff14SB", "water": "tip3p"}
         ).dump(t4l_calc.input_dir, leg_type)
         # Parameterise benzene
-        free_leg.parameterise_input(slurm=False)
+        a3.PreparationStage.PARAMETERISED.prep_fn(
+            leg_type=leg_type,
+            engine_type = a3.EngineType.SOMD,
+            input_dir = t4l_calc.input_dir,
+            output_dir = free_leg.input_dir,
+        )
 
         # Check that the expected files are produced
         expected_files = ["free_param.rst7", "free_param.prm7"]
@@ -233,13 +240,19 @@ def test_parameterisation_bound(t4l_calc):
 
     try:
         # We need to save the config to the input directory
-        a3.SystemPreparationConfig(
+        a3.SomdSystemPreparationConfig(
+            slurm=False,
             forcefields={"ligand": "gaff2", "protein": "ff14SB", "water": "tip3p"}
         ).dump(t4l_calc.input_dir, leg_type)
         # Parameterise benzene
         assert leg_type == a3.LegType.BOUND
         assert bound_leg.leg_type == leg_type
-        bound_leg.parameterise_input(slurm=False)
+        a3.PreparationStage.PARAMETERISED.prep_fn(
+            leg_type=leg_type,
+            engine_type = a3.EngineType.SOMD,
+            input_dir = t4l_calc.input_dir,
+            output_dir = bound_leg.input_dir,
+        )
 
         # Check that the expected files are produced
         expected_files = ["bound_param.rst7", "bound_param.prm7"]
@@ -341,9 +354,9 @@ class TestCalcSetup:
             )
             assert (
                 setup_calc.prep_stage.name
-                == a3.run.enums.PreparationStage.PARAMETERISED.name
+                == a3.configuration.enums.PreparationStage.PARAMETERISED.name
             )
-            cfg = SystemPreparationConfig()
+            cfg = SomdSystemPreparationConfig()
             cfg.slurm = False
             setup_calc.setup(bound_leg_sysprep_config=cfg, free_leg_sysprep_config=cfg)
             yield setup_calc
@@ -353,7 +366,7 @@ class TestCalcSetup:
         assert setup_calc.setup_complete
         assert (
             setup_calc.prep_stage.name
-            == a3.run.enums.PreparationStage.PREEQUILIBRATED.name
+            == a3.configuration.enums.PreparationStage.PREEQUILIBRATED.name
         )
         assert len(setup_calc.legs) == 2
         legs = [leg.leg_type for leg in setup_calc.legs]
@@ -399,7 +412,6 @@ class TestCalcSetup:
         for leg in setup_calc.legs:
             expected_input_files = {
                 "somd_1.rst7",
-                "somd.cfg",
                 "somd.prm7",
                 "somd.rst7",
                 "somd.pert",
@@ -413,8 +425,6 @@ class TestCalcSetup:
                 "virtual_queue.log",
                 "Stage.log",
             }
-            if leg.leg_type == a3.LegType.BOUND:
-                expected_input_files.add("restraint_1.txt")
 
             for stage in leg.stages:
                 input_files = set(os.listdir(stage.input_dir))
@@ -425,11 +435,14 @@ class TestCalcSetup:
                 lam_vals = {
                     float(lam.split("_")[1]) for lam in os.listdir(stage.output_dir)
                 }
-                cfg = SystemPreparationConfig()
+                cfg = SomdSystemPreparationConfig()
                 expected_lam_vals = set(
                     cfg.lambda_values[leg.leg_type][stage.stage_type]
                 )
                 assert lam_vals == expected_lam_vals
+                
+                if leg.leg_type == a3.LegType.BOUND:
+                    assert stage.engine_config.boresch_restraints_dictionary is not None
 
     def test_setup_calc_lam(self, setup_calc):
         """Test that setting up the calculation produced the correct lambda windows."""
@@ -444,7 +457,6 @@ class TestCalcSetup:
         """Test that setting up the calculation produced the correct simulations."""
         for leg in setup_calc.legs:
             expected_base_files = {
-                "somd.cfg",
                 "Simulation.pkl",
                 "Simulation.log",
                 "somd.prm7",
@@ -453,13 +465,14 @@ class TestCalcSetup:
                 "somd.err",
                 "somd.out",
             }
-            if leg.leg_type == a3.LegType.BOUND:
-                expected_base_files.add("restraint.txt")
             for stage in leg.stages:
                 for lam_win in stage.lam_windows:
                     for sim in lam_win.sims:
                         base_dir_files = set(os.listdir(sim.base_dir))
                         assert base_dir_files == expected_base_files
+
+                        if leg.leg_type == a3.LegType.BOUND:
+                            assert sim.engine_config.boresch_restraints_dictionary is not None
 
 
 ######################## Tests Requiring SLURM ########################
@@ -503,10 +516,10 @@ def test_integration_calculation(calc_slurm):
 
     # Check that the preparation stages work
     assert (
-        calc_slurm.prep_stage.name == a3.run.enums.PreparationStage.PARAMETERISED.name
+        calc_slurm.prep_stage.name == a3.configuration.enums.PreparationStage.PARAMETERISED.name
     )
     # Set very short Ensemble equilibration time.
-    cfg = SystemPreparationConfig()
+    cfg = SomdSystemPreparationConfig()
     cfg.ensemble_equilibration_time = 100  # ps
     calc_slurm.setup(bound_leg_sysprep_config=cfg, free_leg_sysprep_config=cfg)
     assert calc_slurm.setup_complete

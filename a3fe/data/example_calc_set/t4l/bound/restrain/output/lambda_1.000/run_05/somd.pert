@@ -1,5 +1,6 @@
 version 1
 molecule LIG
+    atom
         name           C
         initial_type   C1
         final_type     C1
@@ -8,46 +9,52 @@ molecule LIG
         initial_charge -0.13000
         final_charge   -0.13000
     endatom
+    atom
         name           C1CB
-        initial_type   C1
-        final_type     C1
+        initial_type   C5
+        final_type     C5
         initial_LJ     3.48065 0.08688
         final_LJ       3.48065 0.08688
         initial_charge -0.13000
         final_charge   -0.13000
     endatom
+    atom
         name           CFNO
-        initial_type   C1
-        final_type     C1
+        initial_type   C6
+        final_type     C6
         initial_LJ     3.48065 0.08688
         final_LJ       3.48065 0.08688
         initial_charge -0.13000
         final_charge   -0.13000
     endatom
+    atom
         name           CG8F
-        initial_type   C1
-        final_type     C1
+        initial_type   C4
+        final_type     C4
         initial_LJ     3.48065 0.08688
         final_LJ       3.48065 0.08688
         initial_charge -0.13000
         final_charge   -0.13000
     endatom
+    atom
         name           CHBR
-        initial_type   C1
-        final_type     C1
+        initial_type   C2
+        final_type     C2
         initial_LJ     3.48065 0.08688
         final_LJ       3.48065 0.08688
         initial_charge -0.13000
         final_charge   -0.13000
     endatom
+    atom
         name           CPOI
-        initial_type   C1
-        final_type     C1
+        initial_type   C3
+        final_type     C3
         initial_LJ     3.48065 0.08688
         final_LJ       3.48065 0.08688
         initial_charge -0.13000
         final_charge   -0.13000
     endatom
+    atom
         name           H
         initial_type   H1
         final_type     H1
@@ -56,43 +63,49 @@ molecule LIG
         initial_charge 0.13000
         final_charge   0.13000
     endatom
+    atom
         name           H6B9
-        initial_type   H1
-        final_type     H1
+        initial_type   H2
+        final_type     H2
         initial_LJ     2.57258 0.01561
         final_LJ       2.57258 0.01561
         initial_charge 0.13000
         final_charge   0.13000
     endatom
+    atom
         name           HAK1
-        initial_type   H1
-        final_type     H1
+        initial_type   H5
+        final_type     H5
         initial_LJ     2.57258 0.01561
         final_LJ       2.57258 0.01561
         initial_charge 0.13000
         final_charge   0.13000
     endatom
+    atom
         name           HM80
-        initial_type   H1
-        final_type     H1
+        initial_type   H3
+        final_type     H3
         initial_LJ     2.57258 0.01561
         final_LJ       2.57258 0.01561
         initial_charge 0.13000
         final_charge   0.13000
     endatom
+    atom
         name           HO2R
-        initial_type   H1
-        final_type     H1
+        initial_type   H4
+        final_type     H4
         initial_LJ     2.57258 0.01561
         final_LJ       2.57258 0.01561
         initial_charge 0.13000
         final_charge   0.13000
     endatom
+    atom
         name           HVRJ
-        initial_type   H1
-        final_type     H1
+        initial_type   H6
+        final_type     H6
         initial_LJ     2.57258 0.01561
         final_LJ       2.57258 0.01561
         initial_charge 0.13000
         final_charge   0.13000
     endatom
+endmolecule

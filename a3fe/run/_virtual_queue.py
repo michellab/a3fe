@@ -12,7 +12,7 @@ from typing import Optional as _Optional
 
 from ._logging_formatters import _A3feFileFormatter, _A3feStreamFormatter
 from ._utils import retry as _retry
-from .enums import JobStatus as _JobStatus
+from ..configuration.enums import JobStatus as _JobStatus
 
 
 @_dataclass

@@ -1,0 +1,86 @@
+OPENMM_PLUGIN_DIR = /home/roy/mambaforge/envs/openbiosim-dev/lib/plugins
+
+Loading configuration information from file somd.cfg
+
+Running a somd-freenrg calculation using files /home/roy/software/deve/a3fe/runtest/mdm2_short/bound/restrain/output/lambda_1.000/run_05/somd.prm7, /home/roy/software/deve/a3fe/runtest/mdm2_short/bound/restrain/output/lambda_1.000/run_05/somd.rst7 and /home/roy/software/deve/a3fe/runtest/mdm2_short/bound/restrain/output/lambda_1.000/run_05/somd.pert.
+Using parameters:
+===============
+barostat == True
+boresch restraints dictionary == {'anchor_points': {'r1': 1293, 'r2': 1291, 'r3': 1295, 'l1': 20, 'l2': 7, 'l3': 19}, 'equilibrium_values': {'r0': 7.32, 'thetaA0': 2.14, 'thetaB0': 1.65, 'phiA0': 0.06, 'phiB0': 2.07, 'phiC0': 1.89}, 'force_constants': {'kr': 4.54, 'kthetaA': 68.52, 'kthetaB': 31.44, 'kphiA': 36.45, 'kphiB': 12.12, 'kphiC': 45.76}}
+buffered coordinates frequency == 5000
+center solute == True
+charge difference == 0
+constraint == hbonds
+crdfile == /home/roy/software/deve/a3fe/runtest/mdm2_short/bound/restrain/output/lambda_1.000/run_05/somd.rst7
+cutoff distance == 12 Å
+cutoff type == cutoffperiodic
+energy frequency == 200
+hydrogen mass repartitioning factor == 3.0
+integrator == langevinmiddle
+inverse friction == 1 ps
+lambda array == (0.0, 0.125, 0.25, 0.375, 0.5, 1.0)
+lambda_val == 1.0
+ligand charge == 1
+minimise == True
+morphfile == /home/roy/software/deve/a3fe/runtest/mdm2_short/bound/restrain/output/lambda_1.000/run_05/somd.pert
+nmoves == 50000
+perturbed residue number == 1
+platform == CUDA
+pressure == 1.01325e-26 g Å-1 ps-2
+reaction field dielectric == 78.3
+temperature == 25°C
+thermostat == False
+timestep == 0.004 ps
+topfile == /home/roy/software/deve/a3fe/runtest/mdm2_short/bound/restrain/output/lambda_1.000/run_05/somd.prm7
+turn on receptor-ligand restraints mode == True
+use boresch restraints == True
+===============
+### Running Single Topology Molecular Dynamics Free Energy (v0.2) on batou ###
+###================Setting up calculation=====================###
+New run. Loading input and creating restart
+lambda is 1.0
+Create the System...
+Selecting dummy groups
+In "turn on receptor-ligand restraints mode". Lambda will be used to scale
+                  the strength of protein-ligand restraints. Ensure that a dummy pert file mapping
+                  the original parameters for all ligand atoms to themselves has been supplied.
+Setting up Boresch restraints...
+Boresch restraints dictionary = {'anchor_points': {'r1': 1293, 'r2': 1291, 'r3': 1295, 'l1': 20, 'l2': 7, 'l3': 19}, 'equilibrium_values': {'r0': 7.32, 'thetaA0': 2.14, 'thetaB0': 1.65, 'phiA0': 0.06, 'phiB0': 2.07, 'phiC0': 1.89}, 'force_constants': {'kr': 4.54, 'kthetaA': 68.52, 'kthetaB': 31.44, 'kphiA': 36.45, 'kphiB': 12.12, 'kphiC': 45.76}}
+Boresch anchor points:
+r1=Atom( N:1294  [  40.29,   29.07,   34.57] )
+r2=Atom( C:1292  [  41.23,   28.21,   34.25] )
+r3=Atom( CA:1296 [  39.09,   29.45,   33.70] )
+l1=Atom( CMEC:21 [  34.16,   30.21,   30.22] )
+l2=Atom( C6B9:8  [  33.31,   30.05,   31.49] )
+l3=Atom( C9SX:20 [  34.23,   31.72,   29.87] )
+Applying Hydrogen Mass repartition to input using a factor of 3.0 
+Creating force fields... 
+Setting up moves...
+Created one MD move that uses OpenMM for all molecules on GPU device 0
+Saving restart
+Setting up sim file. 
+There are 25023 atoms in the group 
+###===========================================================###
+
+Initial energy: -74330.8 kcal mol-1
+###=======================Minimisation========================###
+Running minimization.
+Tolerance for minimization: 1
+Maximum number of minimization iterations: 1000
+Energy after the minimization: -93368.7 kcal mol-1
+Energy minimization done.
+###===========================================================###
+
+###====================somd-freenrg run=======================###
+Starting somd-freenrg run...
+50000 moves 1 cycles, 200 ps simulation time
+
+Cycle =  1 
+
+Backing up previous restart
+Saving new restart
+Simulation took 68 s 
+###===========================================================###
+
+Clearing buffers...
+Starting somd-freenrg: number of threads equals 20

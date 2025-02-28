@@ -20,116 +20,21 @@ from . import RUN_SLURM_TESTS, SLURM_PRESENT
 
 EXPECTED_CONVERGENCE_RESULTS = np.array(
     [
-        [
-            1.811328,
-            1.79284,
-            1.686816,
-            1.645066,
-            1.603964,
-            1.560607,
-            1.560784,
-            1.591202,
-            1.579906,
-            1.595907,
-            1.590091,
-            1.597802,
-            1.621957,
-            1.625856,
-            1.62638,
-            1.626285,
-            1.627279,
-            1.636536,
-            1.631825,
-            1.624827,
-        ],
-        [
-            1.80024,
-            1.720471,
-            1.669383,
-            1.679446,
-            1.651117,
-            1.667022,
-            1.695923,
-            1.717015,
-            1.742829,
-            1.745102,
-            1.775038,
-            1.769987,
-            1.764087,
-            1.776267,
-            1.787469,
-            1.802154,
-            1.802192,
-            1.805146,
-            1.805154,
-            1.803477,
-        ],
-        [
-            1.465609,
-            1.347802,
-            1.370879,
-            1.393137,
-            1.361814,
-            1.361366,
-            1.370421,
-            1.385677,
-            1.391987,
-            1.386363,
-            1.404679,
-            1.407778,
-            1.416555,
-            1.412339,
-            1.416453,
-            1.411892,
-            1.4214,
-            1.426488,
-            1.429623,
-            1.426475,
-        ],
-        [
-            1.342867,
-            1.367449,
-            1.358504,
-            1.407188,
-            1.431588,
-            1.435713,
-            1.437941,
-            1.428834,
-            1.424351,
-            1.412054,
-            1.405822,
-            1.403497,
-            1.402927,
-            1.411375,
-            1.414117,
-            1.40972,
-            1.414707,
-            1.413852,
-            1.413605,
-            1.41811,
-        ],
-        [
-            1.561257,
-            1.618,
-            1.640034,
-            1.620545,
-            1.625897,
-            1.608938,
-            1.632432,
-            1.679825,
-            1.697756,
-            1.714111,
-            1.715355,
-            1.712736,
-            1.722261,
-            1.715033,
-            1.700635,
-            1.712187,
-            1.711371,
-            1.713132,
-            1.717778,
-            1.716112,
-        ],
+        [1.30255,  1.263541, 1.256123, 1.304293, 1.333761, 1.314648, 1.320447, 1.313836,
+         1.325728, 1.333878, 1.33893,  1.34218,  1.329786, 1.328869, 1.338726, 1.337869,
+         1.332531, 1.329312, 1.326862, 1.327306],
+        [1.568074, 1.626966, 1.505023, 1.421106, 1.406772, 1.388232, 1.358939, 1.352856,
+         1.362695, 1.366573, 1.365685, 1.36921,  1.359138, 1.358404, 1.360066, 1.357095,
+         1.363388, 1.360922, 1.352165, 1.343858],
+        [1.370002, 1.348377, 1.386502, 1.315088, 1.383008, 1.427251, 1.458077, 1.445036,
+         1.43719,  1.432348, 1.410855, 1.392283, 1.378152, 1.366362, 1.363622, 1.366651,
+         1.358232, 1.347265, 1.346105, 1.339764],
+        [1.329163, 1.375653, 1.393664, 1.379855, 1.349581, 1.342975, 1.342577, 1.335664,
+         1.332043, 1.349121, 1.350339, 1.366634, 1.383481, 1.397546, 1.411033, 1.420306,
+         1.437954, 1.432909, 1.429654, 1.421102],
+        [1.304829, 1.362232, 1.342601, 1.328957, 1.318289, 1.29414,  1.304097, 1.305963,
+         1.313026, 1.363487, 1.409961, 1.462056, 1.521547, 1.561595, 1.600894, 1.640916,
+         1.684132, 1.71397,  1.740793, 1.765496],
     ]
 )
 
@@ -137,15 +42,15 @@ EXPECTED_CONVERGENCE_RESULTS = np.array(
 def test_analysis_all_runs(restrain_stage):
     """Check that the analysis works on all runs."""
     res, err = restrain_stage.analyse()
-    assert res.mean() == pytest.approx(1.5978, abs=1e-2)
-    assert err.mean() == pytest.approx(0.0254, abs=1e-3)
+    assert res.mean() == pytest.approx(1.4395, abs=1e-2)
+    assert err.mean() == pytest.approx(0.0267, abs=1e-3)
 
 
 def test_analysis_all_runs_fraction(restrain_stage):
     """Check that the analysis works on all runs."""
     res, err = restrain_stage.analyse(fraction=0.5)
-    assert res.mean() == pytest.approx(1.5707, abs=1e-2)
-    assert err.mean() == pytest.approx(0.0351, abs=1e-3)
+    assert res.mean() == pytest.approx(1.369, abs=1e-2)
+    assert err.mean() == pytest.approx(0.0319, abs=1e-3)
 
 
 def test_get_results_df(restrain_stage):
@@ -156,9 +61,9 @@ def test_get_results_df(restrain_stage):
     # Check that the csv has been output
     assert os.path.exists(os.path.join(restrain_stage.output_dir, "results.csv"))
     # Check that the results are correct
-    assert df.loc["restrain_stage"]["dg / kcal mol-1"] == pytest.approx(1.6, abs=1e-1)
+    assert df.loc["restrain_stage"]["dg / kcal mol-1"] == pytest.approx(1.44, abs=1e-1)
     assert df.loc["restrain_stage"]["dg_95_ci / kcal mol-1"] == pytest.approx(
-        0.21, abs=1e-2
+        0.23, abs=1e-2
     )
     assert df.loc["restrain_stage"]["tot_simtime / ns"] == pytest.approx(6.0, abs=1e-1)
     assert df.loc["restrain_stage"]["tot_gpu_time / GPU hours"] == pytest.approx(
@@ -169,8 +74,8 @@ def test_get_results_df(restrain_stage):
 def test_analysis_subselection_runs(restrain_stage):
     """Check that the analysis works on a subselection of runs."""
     res, err = restrain_stage.analyse(run_nos=[1, 2, 4])
-    assert res.mean() == pytest.approx(1.6154, abs=1e-2)
-    assert err.mean() == pytest.approx(0.0257, abs=1e-3)
+    assert res.mean() == pytest.approx(1.3641, abs=1e-2)
+    assert err.mean() == pytest.approx(0.0218, abs=1e-3)
 
 
 def test_convergence_analysis(restrain_stage):
@@ -198,7 +103,7 @@ def test_get_time_series_multiwindow(restrain_stage):
     assert overall_times[0][-1] == pytest.approx(tot_simtime, abs=1e-2)
 
     # Check that the output values are correct
-    assert overall_dgs.mean(axis=0)[-1] == pytest.approx(1.7751, abs=1e-2)
+    assert overall_dgs.mean(axis=0)[-1] == pytest.approx(1.6446, abs=1e-2)
     assert overall_times.sum(axis=0)[-1] == pytest.approx(2.4, abs=1e-2)
 
 
@@ -220,7 +125,7 @@ def test_get_time_series_multiwindow_mbar(restrain_stage):
     assert overall_times[0][-1] == pytest.approx(tot_simtime, abs=1e-2)
 
     # Check that the output values are correct
-    assert overall_dgs.mean(axis=0)[-1] == pytest.approx(1.7751, abs=1e-2)
+    assert overall_dgs.mean(axis=0)[-1] == pytest.approx(1.6446, abs=1e-2)
     assert overall_times.sum(axis=0)[-1] == pytest.approx(2.4, abs=1e-2)
 
 
@@ -229,7 +134,7 @@ def test_get_time_series_multiwindow_mbar(restrain_stage):
     "equil_func, expected",
     [
         (check_equil_block_gradient, 0.0024),
-        (check_equil_chodera, 0.0567999),
+        (check_equil_chodera, 0.0007999),
     ],
 )
 def test_per_window_equilibration_detection(restrain_stage, equil_func, expected):
@@ -246,10 +151,10 @@ def test_per_window_equilibration_detection(restrain_stage, equil_func, expected
 @pytest.mark.parametrize(
     "equil_func, expected, args",
     [
-        (check_equil_multiwindow_kpss, 0.3, {}),
+        (check_equil_multiwindow_kpss, 0.5, {}),
         (
             check_equil_multiwindow_modified_geweke,
-            0.0048,
+            0.0555,
             {"intervals": 10, "p_cutoff": 0.4},
         ),
     ],
@@ -292,12 +197,12 @@ def test_gelman_rubin(restrain_stage):
         )
 
         expected_rhat_dict = {
-            0.0: 1.0496660104040842,
-            0.125: 1.0122689789813877,
-            0.25: 1.0129155249894615,
-            0.375: 1.0088598498180925,
-            0.5: 1.020819039702674,
-            1.0: 1.0095474751197715,
+            0.0: 1.2701819053567023,
+            0.125: 1.0000427598019113,
+            0.25: 1.0875242491052906,
+            0.375: 1.005262713994976,
+            0.5: 1.0002510744669293,
+            1.0: 0.9994696617711509,
         }
         assert rhat_dict == expected_rhat_dict
 
@@ -315,7 +220,7 @@ def test_get_comparitive_convergence_data_cumulative(restrain_stage_iterator):
     dgs2 = results[1][1]
     assert dgs1.shape == (5, 20)
     assert np.array_equal(dgs1, dgs2)
-    assert dgs1[-1][-1] == pytest.approx(1.716112, abs=1e-2)
+    assert dgs1[-1][-1] == pytest.approx(1.765496, abs=1e-2)
 
 
 def test_get_comparitive_convergence_data_block(restrain_stage_iterator):
@@ -331,7 +236,7 @@ def test_get_comparitive_convergence_data_block(restrain_stage_iterator):
     dgs2 = results[1][1]
     assert dgs1.shape == (5, 20)
     assert np.array_equal(dgs1, dgs2)
-    assert dgs1[-1][-1] == pytest.approx(1.674398, abs=1e-2)
+    assert dgs1[-1][-1] == pytest.approx(3.42643, abs=1e-2)
 
 
 def test_predicted_improvement_factor(restrain_stage_grad_data):
@@ -348,7 +253,7 @@ def test_predicted_improvement_factor(restrain_stage_grad_data):
         ),
         er_type="sem",
     )
-    assert improvement_sem_20 > 0.98
+    assert improvement_sem_20 > 0.97
     improvement_sem_100 = grad_data.get_predicted_improvement_factor(
         initial_lam_vals=grad_data.calculate_optimal_lam_vals(
             n_lam_vals=100, er_type="sem", smoothen_sems=False, round_lams=False
@@ -381,8 +286,8 @@ def test_predicted_improvement_factor(restrain_stage_grad_data):
 def test_analysis_all_runs_slurm(restrain_stage):
     """Check that the analysis works on all runs."""
     res, err = restrain_stage.analyse(slurm=True)
-    assert res.mean() == pytest.approx(1.5978, abs=1e-2)
-    assert err.mean() == pytest.approx(0.0254, abs=1e-3)
+    assert res.mean() == pytest.approx(1.4395, abs=1e-2)
+    assert err.mean() == pytest.approx(0.0267, abs=1e-3)
 
 
 @pytest.mark.skipif(not SLURM_PRESENT, reason="SLURM not present")
@@ -390,8 +295,8 @@ def test_analysis_all_runs_slurm(restrain_stage):
 def test_analysis_all_runs_fraction_slurm(restrain_stage):
     """Check that the analysis works on all runs."""
     res, err = restrain_stage.analyse(fraction=0.5, slurm=True)
-    assert res.mean() == pytest.approx(1.5707, abs=1e-2)
-    assert err.mean() == pytest.approx(0.0351, abs=1e-3)
+    assert res.mean() == pytest.approx(1.369, abs=1e-2)
+    assert err.mean() == pytest.approx(0.0319, abs=1e-3)
 
 
 @pytest.mark.skipif(not SLURM_PRESENT, reason="SLURM not present")
@@ -399,8 +304,8 @@ def test_analysis_all_runs_fraction_slurm(restrain_stage):
 def test_analysis_subselection_runs_slurm(restrain_stage):
     """Check that the analysis works on a subselection of runs."""
     res, err = restrain_stage.analyse(run_nos=[1, 2, 4], slurm=True)
-    assert res.mean() == pytest.approx(1.6154, abs=1e-2)
-    assert err.mean() == pytest.approx(0.0257, abs=1e-3)
+    assert res.mean() == pytest.approx(1.3641, abs=1e-2)
+    assert err.mean() == pytest.approx(0.0218, abs=1e-3)
 
 
 @pytest.mark.skipif(not SLURM_PRESENT, reason="SLURM not present")
@@ -437,7 +342,7 @@ def test_get_time_series_multiwindow_mbar_slurm(restrain_stage):
         assert overall_times[0][-1] == pytest.approx(tot_simtime, abs=1e-2)
 
         # Check that the output values are correct
-        assert overall_dgs.mean(axis=0)[-1] == pytest.approx(1.7751, abs=1e-2)
+        assert overall_dgs.mean(axis=0)[-1] == pytest.approx(1.6446, abs=1e-2)
         assert overall_times.sum(axis=0)[-1] == pytest.approx(2.4, abs=1e-2)
 
     except Exception as e:

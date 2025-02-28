@@ -7,7 +7,6 @@ import logging as _logging
 import os as _os
 import pathlib as _pathlib
 import subprocess as _subprocess
-from decimal import Decimal as _Decimal
 from typing import List as _List
 from typing import Optional as _Optional
 from typing import Tuple as _Tuple
@@ -15,20 +14,19 @@ from typing import Tuple as _Tuple
 import numpy as _np
 from sire.units import k_boltz as _k_boltz
 
-from ..read._process_somd_files import read_simfile_option as _read_simfile_option
-from ..read._process_somd_files import write_simfile_option as _write_simfile_option
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._virtual_queue import Job as _Job
 from ._virtual_queue import VirtualQueue as _VirtualQueue
-from .enums import JobStatus as _JobStatus
+from ..configuration.enums import JobStatus as _JobStatus
 from ..configuration import SlurmConfig as _SlurmConfig
+from ..configuration import SomdConfig as _SomdConfig
+from ..configuration.enums import EngineType as _EngineType
 
 
 class Simulation(_SimulationRunner):
     """Class to store information about a single SOMD simulation."""
 
     required_input_files = [
-        "somd.cfg",
         "somd.prm7",
         "somd.rst7",
         "somd.pert",
@@ -60,6 +58,8 @@ class Simulation(_SimulationRunner):
         stream_log_level: int = _logging.INFO,
         slurm_config: _Optional[_SlurmConfig] = None,
         analysis_slurm_config: _Optional[_SlurmConfig] = None,
+        engine_config: _Optional[_SomdConfig] = None,
+        engine_type: _EngineType = _EngineType.SOMD,
         update_paths: bool = True,
     ) -> None:
         """
@@ -92,6 +92,10 @@ class Simulation(_SimulationRunner):
             Configuration for the SLURM job scheduler for the analysis.
             This is helpful e.g. if you want to submit analysis to the CPU
             partition, but the main simulation to the GPU partition. If None,
+        engine_config: SomdConfig, default: None
+            Configuration for the SOMD engine. If None, the default configuration is used.
+        engine_type: EngineType, default: EngineType.SOMD
+            The type of engine to use for the production simulations.
         update_paths: bool, Optional, default: True
             If True, if the simulation runner is loaded by unpickling, then
             update_paths() is called.
@@ -112,26 +116,28 @@ class Simulation(_SimulationRunner):
             stream_log_level=stream_log_level,
             slurm_config=slurm_config,
             analysis_slurm_config=analysis_slurm_config,
+            engine_config=engine_config,
+            engine_type=engine_type,
             update_paths=update_paths,
             dump=False,
         )
 
+        if self.engine_config.lambda_values is None: # type: ignore
+            raise ValueError("No lambda values specified in engine config")
+        
+        if self.lam not in self.engine_config.lambda_values:
+            raise ValueError(
+                f"Lambda value {self.lam} not in list of lambda values: {self.engine_config.lambda_values}"  # type: ignore
+            )
+  
         if not self.loaded_from_pickle:
             self.virtual_queue = virtual_queue
             # Check that the input directory contains the required files
             self._validate_input()
             self.job: _Optional[_Job] = None
             self._running: bool = False
-            self.simfile_path = _os.path.join(self.base_dir, "somd.cfg")
             # Select the correct rst7 and, if supplied, restraints
             self._select_input_files()
-            # Now set lambda value and some paths in the simfile,
-            # as well as the restraints if necessary
-            self._update_simfile()
-            # Now read useful parameters from the simulation file options
-            self._add_attributes_from_simfile()
-            # Get slurm file base
-            self._get_slurm_file_base()
 
             # Save state and update log
             self._dump()
@@ -210,29 +216,10 @@ class Simulation(_SimulationRunner):
             if not _os.path.isfile(_os.path.join(self.input_dir, file)):
                 raise FileNotFoundError("Required input file " + file + " not found.")
 
-    def _add_attributes_from_simfile(self) -> None:
-        """
-        Read the SOMD simulation option file and
-        add useful attributes to the Simulation object.
-        All times in ns.
-        """
-
-        timestep = None  # ns
-        nmoves = None  # number of moves per cycle
-        nrg_freq = None  # number of timesteps between energy calculations
-        timestep = float(
-            _read_simfile_option(self.simfile_path, "timestep").split()[0]
-        )  # Need to remove femtoseconds from the end
-        nmoves = float(_read_simfile_option(self.simfile_path, "nmoves"))
-        nrg_freq = float(_read_simfile_option(self.simfile_path, "energy frequency"))
-
-        self.timestep = timestep / 1_000_000  # fs to ns
-        self.nrg_freq = nrg_freq
-        self.time_per_cycle = timestep * nmoves / 1_000_000  # fs to ns
-
     def _select_input_files(self) -> None:
         """Select the correct rst7 and, if supplied, restraints,
         according to the run number."""
+
         # Check if we have multiple rst7 files, or only one
         rst7_files = _glob.glob(_os.path.join(self.input_dir, "*.rst7"))
         if len(rst7_files) == 0:
@@ -275,59 +262,18 @@ class Simulation(_SimulationRunner):
         else:
             self._logger.debug("No restraint file found")
 
-    def _update_simfile(self) -> None:
-        """Set the lambda value in the simulation file, as well as some
-        paths to input files."""
-
-        # Check that the lambda value has been set
-        if not hasattr(self, "lam"):
-            raise AttributeError("Lambda value not set for simulation")
-
-        # Check that the set lambda value is in the list of lamvals in the simfile
-        lamvals = [
-            float(lam_val)
-            for lam_val in _read_simfile_option(
-                self.simfile_path, "lambda array"
-            ).split(",")
-        ]
-        if self.lam not in lamvals:
-            raise ValueError(
-                f"Lambda value {self.lam} not in list of lambda values in simfile"
-            )
-
-        # Set the lambda value in the simfile
-        _write_simfile_option(self.simfile_path, "lambda_val", str(self.lam))
-
-        # Set the paths to the input files
-        input_paths = {
-            "morphfile": "somd.pert",
-            "topfile": "somd.prm7",
-            "crdfile": "somd.rst7",
-        }
-
-        for option, name in input_paths.items():
-            _write_simfile_option(
-                self.simfile_path, option, _os.path.join(self.input_dir, name)
-            )
-
-        # Add the restraints file if it exists
-        if _os.path.isfile(_os.path.join(self.input_dir, "restraint.txt")):
-            with open(_os.path.join(self.input_dir, "restraint.txt"), "r") as f:
-                restraint = f.readlines()[0].split("=")[1]
-            _write_simfile_option(
-                self.simfile_path, "boresch restraints dictionary", restraint
-            )
-
-    def _get_slurm_file_base(self) -> None:
-        """Find out what the slurm output file will be called and save it."""
-        self.slurm_file_base = self.slurm_config.get_slurm_output_file_base(
+    @property
+    def slurm_file_base(self) -> str:
+        """Get the base name of the SLURM output file."""
+        slurm_file_base = self.slurm_config.get_slurm_output_file_base(
             run_dir=self.input_dir
         )
-        self._logger.debug(f"Found slurm output file basename: {self.slurm_file_base}")
+        self._logger.debug(f"Found slurm output file basename: {slurm_file_base}")
+        return slurm_file_base
 
     def run(self, runtime: float = 2.5) -> None:
         """
-        Run a SOMD simulation.
+        Run a simulation.
 
         Parameters
         ----------
@@ -338,22 +284,18 @@ class Simulation(_SimulationRunner):
         -------
         None
         """
-        # Need to make sure that runtime is a multiple of the time per cycle
-        # otherwise actual time could be quite different from requested runtime
-        remainder = _Decimal(str(runtime)) % _Decimal(str(self.time_per_cycle))
-        if round(float(remainder), 4) != 0:
-            raise ValueError(
-                (
-                    "Runtime must be a multiple of the time per cycle. "
-                    f"Runtime is {runtime} ns, and time per cycle is {self.time_per_cycle} ns."
-                )
-            )
-        # Need to modify the config file to set the correction n_cycles
-        n_cycles = round(runtime / self.time_per_cycle)
-        self._set_n_cycles(n_cycles)
+        # Write updated config to file
+        self.engine_config.write_config(
+            run_dir=self.output_dir,
+            lambda_val=self.lam,
+            runtime=runtime,
+            top_file="somd.prm7",  # TODO - make generic
+            coord_file="somd.rst7",  # TODO - make generic
+            morph_file="somd.pert",  # TODO - make generic
+        )
 
-        # Run SOMD - note that command excludes sbatch as this is added by the virtual queue
-        cmd = f"somd-freenrg -C somd.cfg -l {self.lam} -p CUDA"
+        # Get the commands to run the simulation
+        cmd = self.engine_config.get_run_cmd(self.lam)
         cmd_list = self.slurm_config.get_submission_cmds(
             cmd=cmd, run_dir=self.output_dir
         )
@@ -393,7 +335,7 @@ class Simulation(_SimulationRunner):
                 .strip()
                 .split()[0]
             )
-            return step * self.timestep  # ns
+            return step * (self.engine_config.timestep / 1_000_000)  # ns
 
     def get_tot_gpu_time(self) -> float:
         """
@@ -461,9 +403,8 @@ class Simulation(_SimulationRunner):
 
     @property
     def slurm_output_files(self) -> _List[str]:
-        if not hasattr(self, "slurm_file_base"):
-            self._get_slurm_file_base()
-        return _glob.glob(f"{self.slurm_file_base}*")
+        """Get a list of all slurm output files for this simulation."""
+        return _glob.glob(_os.path.join(self.output_dir, "slurm-*.out"))
 
     def kill(self) -> None:
         """Kill the job."""
@@ -495,32 +436,6 @@ class Simulation(_SimulationRunner):
             for file in _pathlib.Path(self.output_dir).glob(del_file):
                 self._logger.info(f"Deleting {file}")
                 _subprocess.run(["rm", file])
-
-    def _set_n_cycles(self, n_cycles: int) -> None:
-        """
-        Set the number of cycles in the SOMD config file.
-
-        Parameters
-        ----------
-        n_cycles : int
-            Number of cycles to set in the config file.
-
-        Returns
-        -------
-        None
-        """
-        # Find the line with n_cycles and replace
-        with open(_os.path.join(self.input_dir, "somd.cfg"), "r") as ifile:
-            lines = ifile.readlines()
-            for i, line in enumerate(lines):
-                if line.startswith("ncycles ="):
-                    lines[i] = "ncycles = " + str(n_cycles) + "\n"
-                    break
-
-        # Now write the new file
-        with open(_os.path.join(self.input_dir, "somd.cfg"), "w+") as ofile:
-            for line in lines:
-                ofile.write(line)
 
     def read_gradients(
         self, equilibrated_only: bool = False, endstate: bool = False
@@ -586,7 +501,9 @@ class Simulation(_SimulationRunner):
                 steps.append(step)
                 grads.append(grad)
 
-        times = [x * self.timestep for x in steps]  # Timestep already in ns
+        times = [
+            x * (self.engine_config.timestep / 1_000_000) for x in steps
+        ]  # Timestep already in ns
 
         times_arr = _np.array(times)
         grads_arr = _np.array(grads)
@@ -598,7 +515,6 @@ class Simulation(_SimulationRunner):
     def update_paths(self, old_sub_path: str, new_sub_path: str) -> None:
         """
         Replace the old sub-path with the new sub-path in the base, input, and output directory
-        paths. Also update the slurm file base and the paths in the simfile.
 
         Parameters
         ----------
@@ -608,28 +524,6 @@ class Simulation(_SimulationRunner):
             The new sub-path to replace the old sub-path with.
         """
         super().update_paths(old_sub_path, new_sub_path)
-
-        # Also need to update the slurm file base and the paths in the simfile
-        self.simfile_path = _os.path.join(self.base_dir, "somd.cfg")
-        if self.slurm_file_base:
-            self.slurm_file_base = self.slurm_file_base.replace(
-                old_sub_path, new_sub_path
-            )
-
-        # Now we can easily change the paths in the simfile
-        input_paths = {
-            "morphfile": "somd.pert",
-            "topfile": "somd.prm7",
-            "crdfile": "somd.rst7",
-        }
-        for option, name in input_paths.items():
-            _write_simfile_option(
-                self.simfile_path, option, _os.path.join(self.input_dir, name)
-            )
-
-    def set_simfile_option(self, option: str, value: str) -> None:
-        """Set the value of an option in the simulation configuration file."""
-        _write_simfile_option(self.simfile_path, option, value, logger=self._logger)
 
     def analyse(self) -> None:
         raise NotImplementedError(

@@ -24,10 +24,10 @@ from .run import (
     Simulation,
     Stage,
     StageType,
-    enums,
+    EngineType,
 )
 
-from .configuration import SystemPreparationConfig, SlurmConfig
+from .configuration import SomdSystemPreparationConfig, SlurmConfig, SomdConfig, enums
 
 _sys.modules["EnsEquil"] = _sys.modules["a3fe"]
 

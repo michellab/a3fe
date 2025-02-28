@@ -1,1 +1,0 @@
-../../../input/run_somd.sh
