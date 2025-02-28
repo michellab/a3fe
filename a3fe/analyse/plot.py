@@ -544,6 +544,8 @@ def plot_equilibration_time(lam_windows: _List["LamWindows"], output_dir: str) -
         transparent=False,
     )
 
+    _plt.close(fig)
+
 
 def plot_overlap_mat(
     ax: _plt.Axes,
@@ -734,6 +736,8 @@ def plot_overlap_mats(
         else f"{output_dir}/predicted_overlap_mats"
     )
     fig.savefig(name)
+
+    _plt.close(fig)
 
 
 def plot_convergence(
