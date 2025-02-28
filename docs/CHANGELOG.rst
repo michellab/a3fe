@@ -5,6 +5,7 @@ Change Log
 0.3.2
 ====================
 - Fix bug which caused somd.rst7 files in the ensemble equilibration directories to be incorrectly numbered in some cases.
+- Ensure that all plotting resources get closed after analysis to avoid continually increasing memory usage.
 
 0.3.1
 ====================
