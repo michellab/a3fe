@@ -321,7 +321,7 @@ class TestCalcSetup:
     @pytest.fixture(scope="class")
     def setup_calc(mock_run_process):
         """Set up a calculation object completely from input files."""
-        with TemporaryDirectory() as dirname:
+        with TemporaryDirectory(prefix="temp_input_") as dirname:
             # Copy the example input directory to the temporary directory
             # as we'll create some new files there
             subprocess.run(
@@ -462,6 +462,17 @@ class TestCalcSetup:
                     for sim in lam_win.sims:
                         base_dir_files = set(os.listdir(sim.base_dir))
                         assert base_dir_files == expected_base_files
+
+    def test_stage_output_path_replacement(self, setup_calc):
+        """Test that stage output paths are correctly derived from input paths by only
+        replacing the last 'input' with 'output'."""
+        for leg in setup_calc.legs:
+            for stage in leg.stages:
+                if leg.leg_type == a3.LegType.BOUND:
+                    expected_output_dir = os.path.join(
+                        os.path.dirname(stage.input_dir), "output"
+                    )
+                    assert stage.output_dir == expected_output_dir
 
 
 ######################## Tests Requiring SLURM ########################
