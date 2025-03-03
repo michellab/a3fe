@@ -13,12 +13,10 @@ from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ..configuration.enums import LegType as _LegType
 from ..configuration.enums import PreparationStage as _PreparationStage
 from .leg import Leg as _Leg
-from ..configuration import (
-    _BaseSystemPreparationConfig,
-    SlurmConfig as _SlurmConfig,
-    SomdConfig as _SomdConfig,
-)
-from ..configuration.enums import EngineType as _EngineType
+from ..configuration import _BaseSystemPreparationConfig
+from ..configuration import SlurmConfig as _SlurmConfig
+from ..configuration import _EngineConfig
+from ..configuration import EngineType as _EngineType
 
 
 class Calculation(_SimulationRunner):
@@ -45,7 +43,7 @@ class Calculation(_SimulationRunner):
         stream_log_level: int = _logging.INFO,
         slurm_config: _Optional[_SlurmConfig] = None,
         analysis_slurm_config: _Optional[_SlurmConfig] = None,
-        engine_config: _Optional[_SomdConfig] = None,
+        engine_config: _Optional[_EngineConfig] = None,
         engine_type: _EngineType = _EngineType.SOMD,
         update_paths: bool = True,
     ) -> None:
@@ -92,8 +90,8 @@ class Calculation(_SimulationRunner):
             Configuration for the SLURM job scheduler for the analysis.
             This is helpful e.g. if you want to submit analysis to the CPU
             partition, but the main simulation to the GPU partition. If None,
-        engine_config: SomdConfig, default: None
-            Configuration for the SOMD engine. If None, the default configuration is used.
+        engine_config: EngineConfig, default: None
+            Configuration for the engine. If None, the default configuration is used.
         engine_type: EngineType, default: EngineType.SOMD
             The type of engine to use for the production simulations.
         update_paths: bool, Optional, default: True

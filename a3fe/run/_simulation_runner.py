@@ -28,10 +28,9 @@ from ..analyse.plot import plot_sq_sem_convergence as _plot_sq_sem_convergence
 from ._logging_formatters import _A3feFileFormatter, _A3feStreamFormatter
 
 from ..configuration import SlurmConfig as _SlurmConfig
-from ..configuration import SomdConfig as _SomdConfig
+from ..configuration import EngineType as _EngineType
+from ..configuration import _EngineConfig
 from .._version import __version__ as _version
-
-from ..configuration.enums import EngineType as _EngineType
 
 
 class SimulationRunner(ABC):
@@ -59,7 +58,7 @@ class SimulationRunner(ABC):
         output_dir: _Optional[str] = None,
         slurm_config: _Optional[_SlurmConfig] = None,
         analysis_slurm_config: _Optional[_SlurmConfig] = None,
-        engine_config: _Optional[_SomdConfig] = None,
+        engine_config: _Optional[_EngineConfig] = None,
         engine_type: _EngineType = _EngineType.SOMD,
         stream_log_level: int = _logging.INFO,
         dg_multiplier: int = 1,
@@ -87,8 +86,8 @@ class SimulationRunner(ABC):
             This is helpful e.g. if you want to submit analysis to the CPU
             partition, but the main simulation to the GPU partition. If None,
             the standard slurm_config is used.
-        engine_config: SomdConfig, default: None
-            Configuration for the SOMD engine. If None, the default configuration is used.
+        engine_config: EngineConfig, default: None
+            Configuration for the engine. If None, the default configuration is used.
         engine_type: EngineType, default: EngineType.SOMD
             The type of engine to use for the production simulations.
         stream_log_level : int, Optional, default: logging.INFO
@@ -192,7 +191,7 @@ class SimulationRunner(ABC):
             self.engine_config = (
                 engine_config
                 if engine_config is not None
-                else _SomdConfig(
+                else engine_type.engine_config(
                     input_dir=self.input_dir  # Use the simulation runner's input directory
                 )
             )

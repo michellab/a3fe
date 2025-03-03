@@ -17,10 +17,10 @@ from sire.units import k_boltz as _k_boltz
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._virtual_queue import Job as _Job
 from ._virtual_queue import VirtualQueue as _VirtualQueue
-from ..configuration.enums import JobStatus as _JobStatus
+from ..configuration import JobStatus as _JobStatus
 from ..configuration import SlurmConfig as _SlurmConfig
-from ..configuration import SomdConfig as _SomdConfig
-from ..configuration.enums import EngineType as _EngineType
+from ..configuration import _EngineConfig
+from ..configuration import EngineType as _EngineType
 
 
 class Simulation(_SimulationRunner):
@@ -58,7 +58,7 @@ class Simulation(_SimulationRunner):
         stream_log_level: int = _logging.INFO,
         slurm_config: _Optional[_SlurmConfig] = None,
         analysis_slurm_config: _Optional[_SlurmConfig] = None,
-        engine_config: _Optional[_SomdConfig] = None,
+        engine_config: _Optional[_EngineConfig] = None,
         engine_type: _EngineType = _EngineType.SOMD,
         update_paths: bool = True,
     ) -> None:
@@ -92,8 +92,8 @@ class Simulation(_SimulationRunner):
             Configuration for the SLURM job scheduler for the analysis.
             This is helpful e.g. if you want to submit analysis to the CPU
             partition, but the main simulation to the GPU partition. If None,
-        engine_config: SomdConfig, default: None
-            Configuration for the SOMD engine. If None, the default configuration is used.
+        engine_config: EngineConfig, default: None
+            Configuration for the engine. If None, the default configuration is used.
         engine_type: EngineType, default: EngineType.SOMD
             The type of engine to use for the production simulations.
         update_paths: bool, Optional, default: True
@@ -122,14 +122,14 @@ class Simulation(_SimulationRunner):
             dump=False,
         )
 
-        if self.engine_config.lambda_values is None: # type: ignore
+        if self.engine_config.lambda_values is None:  # type: ignore
             raise ValueError("No lambda values specified in engine config")
-        
+
         if self.lam not in self.engine_config.lambda_values:
             raise ValueError(
                 f"Lambda value {self.lam} not in list of lambda values: {self.engine_config.lambda_values}"  # type: ignore
             )
-  
+
         if not self.loaded_from_pickle:
             self.virtual_queue = virtual_queue
             # Check that the input directory contains the required files

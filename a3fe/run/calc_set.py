@@ -13,7 +13,8 @@ import numpy as _np
 from scipy import stats as _stats
 
 from ..configuration import SlurmConfig as _SlurmConfig
-from ..configuration import SomdConfig as _SomdConfig
+from ..configuration import _EngineConfig
+from ..configuration import _BaseSystemPreparationConfig
 
 from ..analyse.analyse_set import compute_stats as _compute_stats
 from ..analyse.plot import plot_against_exp as _plt_against_exp
@@ -21,7 +22,6 @@ from ..read._read_exp_dgs import read_exp_dgs as _read_exp_dgs
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._utils import SimulationRunnerIterator as _SimulationRunnerIterator
 from .calculation import Calculation as _Calculation
-from ..configuration.system_prep_config import _BaseSystemPreparationConfig
 
 
 class CalcSet(_SimulationRunner):
@@ -41,7 +41,7 @@ class CalcSet(_SimulationRunner):
         stream_log_level: int = _logging.INFO,
         slurm_config: _Optional[_SlurmConfig] = None,
         analysis_slurm_config: _Optional[_SlurmConfig] = None,
-        engine_config: _Optional[_SomdConfig] = None,
+        engine_config: _Optional[_EngineConfig] = None,
         update_paths: bool = True,
     ) -> None:
         """
@@ -75,8 +75,8 @@ class CalcSet(_SimulationRunner):
             Configuration for the SLURM job scheduler for the analysis.
             This is helpful e.g. if you want to submit analysis to the CPU
             partition, but the main simulation to the GPU partition. If None,
-        engine_config: SomdConfig, default: None
-            Configuration for the SOMD engine. If None, the default configuration is used.
+        engine_config: EngineConfig, default: None
+            Configuration for the engine. If None, the default configuration is used.
         update_paths: bool, Optional, default: True
             If True, if the simulation runner is loaded by unpickling, then
             update_paths() is called.
