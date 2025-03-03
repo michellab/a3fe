@@ -39,9 +39,7 @@ def calc_set():
         # Copy input files to the temporary directory
         subprocess.run(["cp", "-r", "a3fe/data/example_calc_set/", dirname], check=True)
         base_dir = os.path.join(dirname, "example_calc_set")
-        calc_paths = [
-            os.path.join(base_dir, name) for name in ["mdm2_short", "t4l"]
-        ]
+        calc_paths = [os.path.join(base_dir, name) for name in ["mdm2_short", "t4l"]]
         calc_set = a3.CalcSet(
             base_dir=base_dir,
             calc_paths=calc_paths,
@@ -125,3 +123,21 @@ def a3fe_restraint():
     with open("a3fe/data/example_run_dir/input/restraint.pkl", "rb") as f:
         a3fe_restraint = pkl.load(f)
     yield a3fe_restraint
+
+
+@pytest.fixture(scope="session", params=[a3.EngineType.SOMD])
+def engine_type(request):
+    """Create an SOMD engine object to use in tests temporarily future GROMACS"""
+    return request.param
+
+
+@pytest.fixture(scope="session")
+def engine_config(engine_type):
+    """Create an engine configuration object to use in tests"""
+    return engine_type.engine_config
+
+
+@pytest.fixture(scope="session")
+def system_prep_config(engine_type):
+    """Create an system preparation configuration object to use in tests"""
+    return engine_type.system_prep_config
