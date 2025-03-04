@@ -216,6 +216,11 @@ class Stage(_SimulationRunner):
     def lam_vals(self) -> _List[float]:
         return self.engine_config.lambda_values
 
+    @lam_vals.setter
+    def lam_vals(self, value) -> None:
+        self._logger.info("Modifying/ creating lambda values")
+        self.engine_config.lambda_values = value
+
     @property
     def lam_windows(self) -> _List[_LamWindow]:
         return self._sub_sim_runners
