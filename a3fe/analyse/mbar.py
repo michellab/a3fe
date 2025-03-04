@@ -74,7 +74,7 @@ def run_mbar(
         The gradients of the free energies obtained from the MBAR results (not TI),
         for each run.
     """
-    tmp_simfiles = _prepare_simfiles(
+    tmp_files = _prepare_simfiles(
         output_dir=output_dir,
         run_nos=run_nos,
         percentage_end=percentage_end,
@@ -119,8 +119,8 @@ def run_mbar(
         mbar_out_files = []
 
     # Clean up temporary simfiles
-    for tmp_simfile in tmp_simfiles:
-        _subprocess.run(["rm", tmp_simfile])
+    for tmp_file in tmp_files:
+        _subprocess.run(["rm", tmp_file])
 
     return free_energies, errors, mbar_out_files, mbar_grads
 
@@ -179,6 +179,9 @@ def submit_mbar_slurm(
         The paths to temporary files (truncated simfiles and submission scripts),
         so that they can be cleaned up later.
     """
+    # Create a copy of the SLURM configuration to avoid modifying the original
+    slurm_config = slurm_config.copy()
+    
     tmp_files = _prepare_simfiles(
         output_dir=output_dir,
         run_nos=run_nos,
@@ -352,18 +355,18 @@ def _prepare_simfiles(
         )
 
     # Create temporary truncated simfiles
-    tmp_simfiles = []  # Clean these up afterwards
+    tmp_files = []  # Clean these up afterwards
     for simfile in simfiles:
-        tmp_simfile = _os.path.join(
+        tmp_file = _os.path.join(
             _os.path.dirname(simfile),
             f"simfile_truncated_{round(percentage_end, 3)}_end_{round(percentage_start, 3)}_start.dat",
         )
-        tmp_simfiles.append(tmp_simfile)
+        tmp_files.append(tmp_file)
         _write_truncated_sim_datafile(
             simfile,
-            tmp_simfile,
+            tmp_file,
             fraction_final=percentage_end / 100,
             fraction_initial=percentage_start / 100,
         )
 
-    return tmp_simfiles
+    return tmp_files
