@@ -141,3 +141,33 @@ def engine_config(engine_type):
 def system_prep_config(engine_type):
     """Create an system preparation configuration object to use in tests"""
     return engine_type.system_prep_config
+
+
+# Integration test configuration
+class IntegrationTestHooks:
+    """Integration test hook functions collection class."""
+    
+    @staticmethod
+    def configure(config):
+        """Set up pytest integration test markers."""
+        config.addinivalue_line("markers", "integration: mark a test as an integration test")
+    
+    @staticmethod
+    def add_options(parser):
+        """Add integration test command line options."""
+        parser.addoption("--run-integration", action="store_true", default=False, help="run integration tests")
+    
+    @staticmethod
+    def modify_items(config, items):
+        """If the --run-integration option is not specified, skip all tests marked with integration."""
+        if not config.getoption("--run-integration"):
+            skip_integration = pytest.mark.skip(reason="need --run-integration option to run")
+            for item in items:
+                if "integration" in item.keywords:
+                    item.add_marker(skip_integration)
+
+
+# Export the class methods as hook functions
+pytest_configure = IntegrationTestHooks.configure
+pytest_addoption = IntegrationTestHooks.add_options
+pytest_collection_modifyitems = IntegrationTestHooks.modify_items

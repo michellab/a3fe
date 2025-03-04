@@ -76,7 +76,8 @@ jobs:
         # conda setup requires this special shell
         shell: bash -l {0}
         run: |
-          pytest -v --cov=a3fe --cov-report=xml --color=yes a3fe/tests/
+          # use -m "not integration" to exclude all integration tests
+          pytest -v --cov=a3fe --cov-report=xml --color=yes a3fe/tests/ -m "not integration"
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4.0.1
