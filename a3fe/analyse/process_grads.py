@@ -134,7 +134,8 @@ class GradientData:
 
         # Get the statistical inefficiencies in units of simulation time
         stat_ineffs_all_winds = (
-            _np.array(stat_ineffs_all_winds) * lam_winds[0].sims[0].engine_config.timestep
+            _np.array(stat_ineffs_all_winds)
+            * lam_winds[0].sims[0].engine_config.timestep
         )  # Timestep should be same for all sims
 
         # Get the SEMs of the free energy changes from the inter-run SEMs of the gradients
@@ -760,7 +761,7 @@ def get_time_series_multiwindow_mbar(
             )
 
         for frac_job in frac_jobs:
-            jobs, mbar_outfiles, tmp_simfiles = frac_job
+            jobs, mbar_outfiles, tmp_files = frac_job
             results.append(
                 _collect_mbar_slurm(
                     output_dir=output_dir,
@@ -768,7 +769,7 @@ def get_time_series_multiwindow_mbar(
                     jobs=jobs,
                     mbar_out_files=mbar_outfiles,
                     virtual_queue=lambda_windows[0].virtual_queue,
-                    tmp_simfiles=tmp_simfiles,
+                    tmp_files=tmp_files,
                     delete_outfiles=True,
                 )
             )

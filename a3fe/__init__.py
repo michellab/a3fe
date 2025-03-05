@@ -16,18 +16,22 @@ from ._version import __version__
 from .run import (
     CalcSet,
     Calculation,
-    JobStatus,
     LamWindow,
     Leg,
-    LegType,
-    PreparationStage,
     Simulation,
     Stage,
-    StageType,
-    EngineType,
 )
 
-from .configuration import SomdSystemPreparationConfig, SlurmConfig, SomdConfig, enums
+from .configuration import (
+    SlurmConfig,
+    _EngineConfig,
+    EngineType,
+    JobStatus,
+    LegType,
+    PreparationStage,
+    StageType,
+    enums,
+)
 
 _sys.modules["EnsEquil"] = _sys.modules["a3fe"]
 
