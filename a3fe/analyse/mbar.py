@@ -181,7 +181,7 @@ def submit_mbar_slurm(
     """
     # Create a copy of the SLURM configuration to avoid modifying the original
     slurm_config = slurm_config.copy()
-    
+
     tmp_files = _prepare_simfiles(
         output_dir=output_dir,
         run_nos=run_nos,

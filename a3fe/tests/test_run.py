@@ -16,7 +16,6 @@ import pytest
 import a3fe as a3
 from a3fe.analyse.detect_equil import dummy_check_equil_multiwindow
 
-from . import RUN_SLURM_TESTS, SLURM_PRESENT
 
 LEGS_WITH_STAGES = {"bound": ["discharge", "vanish"], "free": ["discharge", "vanish"]}
 

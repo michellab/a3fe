@@ -10,12 +10,10 @@ See README.md in this directory for more information on running these tests.
 """
 
 import os
-from glob import glob
 import pytest
 import subprocess
 from tempfile import TemporaryDirectory
 import logging
-import shutil
 
 import a3fe as a3
 from a3fe.tests import SLURM_PRESENT, RUN_SLURM_TESTS
@@ -26,6 +24,7 @@ LEGS_WITH_STAGES = {
     "bound": ["discharge", "vanish", "restrain"],
     "free": ["discharge", "vanish"],
 }
+
 
 @pytest.fixture(scope="module")
 def slurm_calc():
@@ -40,7 +39,7 @@ def slurm_calc():
                 f"{temp_dir}/input",
             ]
         )
-        
+
         calc = a3.Calculation(
             base_dir=temp_dir,
             input_dir=f"{temp_dir}/input",
@@ -58,21 +57,21 @@ def slurm_calc():
 @pytest.mark.skipif(not RUN_SLURM_TESTS, reason="RUN_SLURM_TESTS is False")
 class TestSlurmIntegration:
     """Test class for SLURM integration tests."""
-    
+
     def _get_test_config(self, system_prep_config):
         """Get the system preparation configuration for testing"""
         cfg = system_prep_config()
         cfg.runtime_npt_unrestrained = 20  # ps very short for testing
         cfg.runtime_npt = 20  # ps
-        cfg.ensemble_equilibration_time = 20  # ps 
+        cfg.ensemble_equilibration_time = 20  # ps
         return cfg
-        
+
     def _setup_calculation(self, calc, system_prep_config):
         """Check that the calculation object is setup already."""
         if not calc.setup_complete:
             cfg = self._get_test_config(system_prep_config)
             calc.setup(bound_leg_sysprep_config=cfg, free_leg_sysprep_config=cfg)
-        
+
         assert calc.setup_complete
         return calc
 
@@ -99,7 +98,7 @@ class TestSlurmIntegration:
                 assert os.path.exists(stage_dir)
                 output_dir = os.path.join(stage_dir, "output")
                 assert os.path.exists(output_dir)
-    
+
     @pytest.mark.integration
     def test_slurm_non_adaptive_run(self, slurm_calc, system_prep_config):
         """
@@ -120,7 +119,7 @@ class TestSlurmIntegration:
                 for lam_win in stage.lam_windows:
                     lam_win._equilibrated = True
                     lam_win._equil_time = 0
-        
+
         # Check that the simulation time for each lambda window is correct
         for leg in calc.legs:
             for stage in leg.stages:
@@ -130,21 +129,26 @@ class TestSlurmIntegration:
         # Run analysis with error handling
         try:
             calc.analyse()
-            
+
             # Check that the output file exists
-            assert os.path.exists(os.path.join(calc.base_dir, "output", "overall_stats.dat"))
-            
+            assert os.path.exists(
+                os.path.join(calc.base_dir, "output", "overall_stats.dat")
+            )
+
             # Check that the free energy change is reasonable
-            with open(os.path.join(calc.base_dir, "output", "overall_stats.dat"), "r") as f:
+            with open(
+                os.path.join(calc.base_dir, "output", "overall_stats.dat"), "r"
+            ) as f:
                 try:
                     dg = float(f.readlines()[1].split(" ")[3])
                     assert dg < -5
                     assert dg > -25
                 except (IndexError, ValueError) as e:
                     pytest.fail(f"Failed to parse free energy value: {str(e)}")
-                    
+
         except FileNotFoundError as e:
             import warnings
+
             warnings.warn(f"SLURM job file not found: {str(e)}")
 
     @pytest.mark.integration
@@ -183,23 +187,28 @@ class TestSlurmIntegration:
                 for lam_win in stage.lam_windows:
                     lam_win._equilibrated = True
                     lam_win._equil_time = 0
-        
+
         # Run analysis with error handling
         try:
             calc.analyse()
-            
+
             # Check that the analysis output file exists
-            assert os.path.exists(os.path.join(calc.base_dir, "output", "overall_stats.dat"))
-            
+            assert os.path.exists(
+                os.path.join(calc.base_dir, "output", "overall_stats.dat")
+            )
+
             # Check that the free energy change is reasonable
-            with open(os.path.join(calc.base_dir, "output", "overall_stats.dat"), "r") as f:
+            with open(
+                os.path.join(calc.base_dir, "output", "overall_stats.dat"), "r"
+            ) as f:
                 try:
                     dg = float(f.readlines()[1].split(" ")[3])
                     assert dg < -5
                     assert dg > -25
                 except (IndexError, ValueError) as e:
                     pytest.fail(f"Failed to parse free energy value: {str(e)}")
-                    
+
         except FileNotFoundError as e:
             import warnings
+
             warnings.warn(f"SLURM job file not found: {str(e)}")
