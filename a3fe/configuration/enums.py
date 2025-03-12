@@ -95,14 +95,12 @@ class LegType(_YamlSerialisableEnum):
 
 class EngineType(_YamlSerialisableEnum):
     SOMD = 1
-    # GROMACS = 2
 
     @property
     def engine_config(self) -> _EngineConfig:
         """Return the configuration class for the engine."""
         engine_configs = {
             EngineType.SOMD: _SomdConfig,
-            # EngineType.GROMACS: _GromacsConfig,
         }
         return engine_configs[self]
 
@@ -115,7 +113,6 @@ class EngineType(_YamlSerialisableEnum):
         """Return the system preparation configuration class."""
         system_prep_configs = {
             EngineType.SOMD: _SomdSystemPreparationConfig,
-            # EngineType.GROMACS: _GromacsSystemPreparationConfig,
         }
         return system_prep_configs[self]
 

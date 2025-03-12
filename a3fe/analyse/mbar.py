@@ -179,8 +179,6 @@ def submit_mbar_slurm(
         The paths to temporary files (truncated simfiles and submission scripts),
         so that they can be cleaned up later.
     """
-    # Create a copy of the SLURM configuration to avoid modifying the original
-    slurm_config = slurm_config.copy()
 
     tmp_files = _prepare_simfiles(
         output_dir=output_dir,
