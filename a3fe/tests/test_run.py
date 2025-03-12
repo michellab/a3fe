@@ -335,7 +335,7 @@ class TestCalcSetup:
 
     @staticmethod
     @pytest.fixture(scope="class")
-    def setup_calc(mock_run_process, system_prep_config):
+    def setup_calc(mock_run_process, system_prep_config, engine_type):
         """Set up a calculation object completely from input files."""
         with TemporaryDirectory() as dirname:
             # Copy the example input directory to the temporary directory
@@ -354,6 +354,7 @@ class TestCalcSetup:
                 input_dir=f"{dirname}/input",
                 ensemble_size=1,
                 stream_log_level=logging.CRITICAL,  # Silence the logging
+                engine_type=engine_type,
             )
             assert (
                 setup_calc.prep_stage.name

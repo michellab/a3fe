@@ -14,12 +14,7 @@ SLURM_PRESENT = False if shutil.which("sbatch") is None else True
 GROMACS_PRESENT = False if shutil.which("gmx") is None else True
 
 # See if the user wants to run the slurm tests
-RUN_SLURM_TESTS = True
-if os.environ.get("RUN_SLURM_TESTS") == "False":
-    RUN_SLURM_TESTS = False
-elif os.environ.get("RUN_SLURM_TESTS") is None:
-    # Default to not running SLURM tests unless explicitly enabled
-    RUN_SLURM_TESTS = False
+RUN_SLURM_TESTS = os.environ.get("RUN_SLURM_TESTS") not in [None, "False"]
 
 # Make sure that we're in the correct directory and raise an error if not
 if not os.path.exists("a3fe"):

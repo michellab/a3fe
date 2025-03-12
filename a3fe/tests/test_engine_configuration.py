@@ -14,7 +14,7 @@ def test_config_yaml_save_and_load(engine_config):
         assert config.runtime == config2.runtime
 
 
-def test_write_config(engine_config):
+def test_write_config_somd(engine_config):
     """Test that the somd configuration file is generated correctly."""
     with TemporaryDirectory() as dirname:
         config = engine_config(
@@ -53,7 +53,7 @@ def test_write_config(engine_config):
         ("leapfrogverlet", False, False),
     ],
 )
-def test_integrator_thermostat_validation(
+def test_integrator_thermostat_validation_somd(
     engine_config, integrator, thermostat, should_pass
 ):
     """Test integrator and thermostat combination validation."""
@@ -109,12 +109,12 @@ def test_ligand_charge_validation(engine_config):
         engine_config(ligand_charge=1, cutoff_type="cutoffperiodic", runtime=1)
 
 
-def test_get_somd_config_with_extra_options(engine_config):
+def test_get_somd_config_with_extra_options(somd_engine_config):
     """
     Test SOMD config generation with some extra_options.
     """
     with TemporaryDirectory() as dirname:
-        config = engine_config(
+        config = somd_engine_config(
             integrator="langevinmiddle",
             runtime=1,
             cutoff_type="PME",
@@ -136,7 +136,7 @@ def test_get_somd_config_with_extra_options(engine_config):
         assert "custom_option = value" in content
 
 
-def test_compare_with_reference_config(engine_config):
+def test_compare_with_reference_config(somd_engine_config):
     """Test that we can generate a config file that matches a reference config."""
     reference_lines = [
         "timestep = 4.0 * femtosecond",
@@ -161,7 +161,7 @@ def test_compare_with_reference_config(engine_config):
         "lambda array = 0.0, 0.125, 0.25, 0.375, 0.5, 1.0",
     ]
     with TemporaryDirectory() as dirname:
-        config = engine_config(
+        config = somd_engine_config(
             runtime=1,
             constraint="hbonds",
             hydrogen_mass_factor=3.0,
@@ -198,12 +198,15 @@ def test_compare_with_reference_config(engine_config):
             assert line in cfg_content, f"Expected '{line}' in generated config."
 
 
-def test_copy_from_existing_config(engine_config):
+def test_copy_from_existing_config(somd_engine_config):
     """Test that we can copy from an existing somd.cfg file."""
-    reference_config = "/home/roy/software/deve/a3fe/a3fe/data/example_run_dir/bound/discharge/output/lambda_0.000/run_01/somd.cfg"
+    reference_config = os.path.join(
+        "a3fe", "data", "example_run_dir", "bound", "discharge",
+        "output", "lambda_0.000", "run_01", "somd.cfg"
+    )
     if not os.path.isfile(reference_config):
         pytest.skip("Reference config not found, skipping test.")
-    c = engine_config._from_config_file(reference_config)
+    c = somd_engine_config._from_config_file(reference_config)
 
     assert c.use_boresch_restraints is True
     assert c.turn_on_receptor_ligand_restraints is False

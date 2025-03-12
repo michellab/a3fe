@@ -22,7 +22,7 @@ Integration tests are skipped by default. There are several ways to control whic
 
 2. To run a specific integration test:
    ```bash
-   RUN_SLURM_TESTS=1 pytest a3fe/tests/tests_run_integration.py::TestSlurmIntegration::test_slurm_calculation_setup -v
+   RUN_SLURM_TESTS=1 pytest a3fe/tests/test_run_integration.py::TestSlurmIntegration::test_slurm_calculation_setup --run-integration -v
    ```
 
 ## Test Description

@@ -143,6 +143,12 @@ def system_prep_config(engine_type):
     return engine_type.system_prep_config
 
 
+@pytest.fixture(scope="session")
+def somd_engine_config():
+    """Create a SOMD-specific engine configuration for tests"""
+    return a3.EngineType.SOMD.engine_config
+
+
 # Integration test configuration
 class IntegrationTestHooks:
     """Integration test hook functions collection class."""
