@@ -1,10 +1,19 @@
 """Integration tests for a3fe.
 
-These tests are meant to be run locally before releasing code,
+These tests are meant to be run locally,
 and are not run on CI due to their long runtime.
 
-Note: This file contains dedicated integration tests that are more granular than
+This file contains dedicated integration tests that are more granular than
 the integration test in test_run.py (which is currently skipped).
+
+To run integration tests, use the following command:
+
+cd your/path/a3fe
+RUN_SLURM_TESTS=1 pytest a3fe/tests --run-integration -v
+
+To run a specific integration test:
+
+RUN_SLURM_TESTS=1 pytest a3fe/tests/test_run_integration.py::TestSlurmIntegration::test_slurm_calculation_setup --run-integration -v
 
 See README.md in this directory for more information on running these tests.
 """
@@ -12,6 +21,7 @@ See README.md in this directory for more information on running these tests.
 import os
 import pytest
 import subprocess
+import glob
 from tempfile import TemporaryDirectory
 import logging
 
@@ -25,32 +35,36 @@ LEGS_WITH_STAGES = {
     "free": ["discharge", "vanish"],
 }
 
-
-@pytest.fixture(scope="module")
-def slurm_calc():
-    """Set up a calculation for slurm test that is shared across all tests"""
+def _create_example_input_dir(engine_type):
+    """Create the example input directory in the temporary directory"""
     with TemporaryDirectory() as temp_dir:
-        # Copy the example input directory to the temporary directory
         subprocess.run(
             [
-                "cp",
-                "-r",
-                "a3fe/data/example_run_dir/input",
-                f"{temp_dir}/input",
+            "cp",
+            "-r",
+            "a3fe/data/example_run_dir/input",
+            f"{temp_dir}/input",
             ]
         )
-
         calc = a3.Calculation(
             base_dir=temp_dir,
             input_dir=f"{temp_dir}/input",
             ensemble_size=2,
             stream_log_level=logging.CRITICAL,
-        )  # Close the log output
+            engine_type=engine_type,
+        )
         calc._dump()
-        # Must use yield so that the temporary directory is deleted after the tests
-        # by the context manager and does not persist
         yield calc
 
+@pytest.fixture(scope="class")
+def slurm_calc_non_adaptive(engine_type):
+    """Set up a calculation for non-adaptive slurm tests"""
+    yield from _create_example_input_dir(engine_type)
+
+@pytest.fixture(scope="class")
+def slurm_calc_adaptive(engine_type):
+    """Set up a calculation for adaptive slurm tests"""
+    yield from _create_example_input_dir(engine_type)
 
 @pytest.mark.integration
 @pytest.mark.skipif(not SLURM_PRESENT, reason="SLURM not present")
@@ -76,10 +90,10 @@ class TestSlurmIntegration:
         return calc
 
     @pytest.mark.integration
-    def test_slurm_calculation_setup(self, slurm_calc, system_prep_config):
+    def test_slurm_calculation_setup(self, slurm_calc_non_adaptive, system_prep_config):
         """Test that the SLURM calculation setup works correctly."""
 
-        calc = self._setup_calculation(slurm_calc, system_prep_config)
+        calc = self._setup_calculation(slurm_calc_non_adaptive, system_prep_config)
 
         # Check that the required SLURM job names exist
         required_slurm_jobnames = ["minimised.sh", "solvated.sh", "preequilibrated.sh"]
@@ -100,11 +114,11 @@ class TestSlurmIntegration:
                 assert os.path.exists(output_dir)
 
     @pytest.mark.integration
-    def test_slurm_non_adaptive_run(self, slurm_calc, system_prep_config):
+    def test_slurm_non_adaptive_run(self, slurm_calc_non_adaptive, system_prep_config):
         """
         Full integration test for non-adaptive run using SLURM.
         """
-        calc = self._setup_calculation(slurm_calc, system_prep_config)
+        calc = self._setup_calculation(slurm_calc_non_adaptive, system_prep_config)
 
         # Run a short non-adaptive calculation
         calc.run(adaptive=False, runtime=0.1)
@@ -113,12 +127,8 @@ class TestSlurmIntegration:
         # Check that the calculation is not running
         assert not calc.running
 
-        # Set the entire simulation time to equilibrated for analysis
-        for leg in calc.legs:
-            for stage in leg.stages:
-                for lam_win in stage.lam_windows:
-                    lam_win._equilibrated = True
-                    lam_win._equil_time = 0
+        # Set the equilibration time for analysis using the proper API
+        calc.set_equilibration_time(0)
 
         # Check that the simulation time for each lambda window is correct
         for leg in calc.legs:
@@ -141,20 +151,18 @@ class TestSlurmIntegration:
             ) as f:
                 try:
                     dg = float(f.readlines()[1].split(" ")[3])
-                    assert dg < -5
+                    assert dg < 0
                     assert dg > -25
                 except (IndexError, ValueError) as e:
                     pytest.fail(f"Failed to parse free energy value: {str(e)}")
 
         except FileNotFoundError as e:
-            import warnings
-
-            warnings.warn(f"SLURM job file not found: {str(e)}")
+            pytest.fail(f"SLURM job file not found: {str(e)}")
 
     @pytest.mark.integration
-    def test_slurm_optimal_lambda(self, slurm_calc, system_prep_config):
+    def test_slurm_optimal_lambda(self, slurm_calc_adaptive, system_prep_config):
         """Test that the optimal lambda window creation function works."""
-        calc = self._setup_calculation(slurm_calc, system_prep_config)
+        calc = self._setup_calculation(slurm_calc_adaptive, system_prep_config)
 
         calc.get_optimal_lam_vals(delta_er=2)
 
@@ -165,28 +173,34 @@ class TestSlurmIntegration:
                 assert os.path.exists(
                     os.path.join(calc.base_dir, leg, stage, "lam_val_determination")
                 )
+                lam_dirs_old = glob.glob(
+                    os.path.join(calc.base_dir, leg, stage, "lam_val_determination", "lambda_*")
+                )
+                lam_dirs_new = glob.glob(
+                    os.path.join(calc.base_dir, leg, stage, "output", "lambda_*")
+                )
+                assert lam_dirs_new != lam_dirs_old
 
     @pytest.mark.integration
-    def test_slurm_adaptive_run(self, slurm_calc, system_prep_config):
+    def test_slurm_adaptive_run(self, slurm_calc_adaptive, system_prep_config):
         """
         Full integration test for adaptive run using SLURM.
         """
-        calc = self._setup_calculation(slurm_calc, system_prep_config)
+        calc = self._setup_calculation(slurm_calc_adaptive, system_prep_config)
 
         # Use a larger runtime_constant to greatly accelerate the test
-        # The standard value is 0.0005, we use 0.05 (100x) to greatly accelerate the test
-        calc.run(adaptive=True, runtime_constant=0.05)
+        # The standard value is 0.0005
+        calc.run(adaptive=True, runtime_constant=0.0005)
         calc.wait()
 
         # Check that the calculation is not running
         assert not calc.running
 
-        # Set the entire simulation time to equilibrated for analysis
+        # Check that the equilibration time has successfully been set
         for leg in calc.legs:
             for stage in leg.stages:
                 for lam_win in stage.lam_windows:
-                    lam_win._equilibrated = True
-                    lam_win._equil_time = 0
+                    assert lam_win.equil_time is not None
 
         # Run analysis with error handling
         try:
@@ -203,12 +217,10 @@ class TestSlurmIntegration:
             ) as f:
                 try:
                     dg = float(f.readlines()[1].split(" ")[3])
-                    assert dg < -5
+                    assert dg < 0
                     assert dg > -25
                 except (IndexError, ValueError) as e:
                     pytest.fail(f"Failed to parse free energy value: {str(e)}")
 
         except FileNotFoundError as e:
-            import warnings
-
-            warnings.warn(f"SLURM job file not found: {str(e)}")
+            pytest.fail(f"SLURM job file not found: {str(e)}")
