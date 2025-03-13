@@ -35,15 +35,16 @@ LEGS_WITH_STAGES = {
     "free": ["discharge", "vanish"],
 }
 
+
 def _create_example_input_dir(engine_type):
     """Create the example input directory in the temporary directory"""
     with TemporaryDirectory() as temp_dir:
         subprocess.run(
             [
-            "cp",
-            "-r",
-            "a3fe/data/example_run_dir/input",
-            f"{temp_dir}/input",
+                "cp",
+                "-r",
+                "a3fe/data/example_run_dir/input",
+                f"{temp_dir}/input",
             ]
         )
         calc = a3.Calculation(
@@ -56,15 +57,18 @@ def _create_example_input_dir(engine_type):
         calc._dump()
         yield calc
 
+
 @pytest.fixture(scope="class")
 def slurm_calc_non_adaptive(engine_type):
     """Set up a calculation for non-adaptive slurm tests"""
     yield from _create_example_input_dir(engine_type)
 
+
 @pytest.fixture(scope="class")
 def slurm_calc_adaptive(engine_type):
     """Set up a calculation for adaptive slurm tests"""
     yield from _create_example_input_dir(engine_type)
+
 
 @pytest.mark.integration
 @pytest.mark.skipif(not SLURM_PRESENT, reason="SLURM not present")
@@ -174,7 +178,9 @@ class TestSlurmIntegration:
                     os.path.join(calc.base_dir, leg, stage, "lam_val_determination")
                 )
                 lam_dirs_old = glob.glob(
-                    os.path.join(calc.base_dir, leg, stage, "lam_val_determination", "lambda_*")
+                    os.path.join(
+                        calc.base_dir, leg, stage, "lam_val_determination", "lambda_*"
+                    )
                 )
                 lam_dirs_new = glob.glob(
                     os.path.join(calc.base_dir, leg, stage, "output", "lambda_*")

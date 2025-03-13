@@ -201,8 +201,15 @@ def test_compare_with_reference_config(somd_engine_config):
 def test_copy_from_existing_config(somd_engine_config):
     """Test that we can copy from an existing somd.cfg file."""
     reference_config = os.path.join(
-        "a3fe", "data", "example_run_dir", "bound", "discharge",
-        "output", "lambda_0.000", "run_01", "somd.cfg"
+        "a3fe",
+        "data",
+        "example_run_dir",
+        "bound",
+        "discharge",
+        "output",
+        "lambda_0.000",
+        "run_01",
+        "somd.cfg",
     )
     if not os.path.isfile(reference_config):
         pytest.skip("Reference config not found, skipping test.")
