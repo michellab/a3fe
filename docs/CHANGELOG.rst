@@ -2,6 +2,13 @@
 Change Log
 ===============
 
+0.4.0
+====================
+
+- Decoupled SOMD and removing run_somd.sh and template_config.cfg. Replaced with a3fe.configuration.slurm_config.SlurmConfig and a3fe.configuration.engine_config.SomdConfig. 
+- And system preparation saved as a readable yaml file. 
+- Separated system preparation configuration from system preparation and configured SOMD with a3fe.configuration.system_prep_config.SomdSystemPreparationConfig.
+
 0.3.0
 ====================
 

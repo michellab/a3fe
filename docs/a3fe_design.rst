@@ -30,6 +30,8 @@ runners when they are present in the base directory. For example, running ``calc
 an pre-prepared calculation will load the previous calculation, overwriting any arguments supplied to Calculation().
 The current state of a simulation runner can be written to the pickle file with the save() method, e.g. ``calc.save()``.
 
+The system preparation saves a yaml file in the input directory.(e.g. system_preparation_config_bound.yaml), which allows users to check the detailed settings used during system preparation.
+
 Algorithms
 ***********
 
@@ -46,7 +48,7 @@ a3fe implements agorithms for:
 - Adaptive allocation of simulation time to minimise the inter-run uncertainty (e.g. ``calc.run(adaptive=True)``)
 - Adaptive equilibration detection (see :func:`a3fe.analyse.detect_equil.check_equil_multiwindow_paired_t`, used when ``calc.run(adaptive=True)`` is specified)
 
-For more details of the algorithms, please see [the preprint](https://doi.org/10.26434/chemrxiv-2024-3ft7f).
+For more details of the algorithms, please see (https://pubs.acs.org/doi/10.1021/acs.jctc.4c00806).
 
 Some Notes on the Implementation
 *********************************

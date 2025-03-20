@@ -504,7 +504,7 @@ class Leg(_SimulationRunner):
             ]:
                 _subprocess.run(["cp", "-r", input_file, outdir], check=True)
 
-            # Also write a pickle of the config to the output directory
+            # Also write a yaml file of the config to the output directory
             sysprep_config.dump(outdir, self.leg_type)
 
         fn = _system_prep.run_ensemble_equilibration
