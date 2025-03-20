@@ -65,7 +65,7 @@ class _EngineConfig(_BaseModel, _ABC):
             The loaded configuration.
         """
         with open(load_dir + "/" + cls.get_file_name(), "r") as f:
-                model_dict = _yaml.safe_load(f)
+            model_dict = _yaml.safe_load(f)
 
         return cls(**model_dict)
 
@@ -90,6 +90,7 @@ class _EngineConfig(_BaseModel, _ABC):
         Get the command to run the simulation.
         """
         pass
+
 
 class SomdConfig(_EngineConfig):
     """
@@ -310,7 +311,9 @@ class SomdConfig(_EngineConfig):
         self.runtime = runtime
 
         if self.lambda_values is None:
-            raise ValueError("lambda_array must be set before writing the configuration.")
+            raise ValueError(
+                "lambda_array must be set before writing the configuration."
+            )
 
         config_lines = [
             "### Integrator ###",
@@ -355,7 +358,7 @@ class SomdConfig(_EngineConfig):
                 f"turn on receptor-ligand restraints mode = {self.turn_on_receptor_ligand_restraints}",
                 "\n\n###Paths###",
                 f"morphfile = {_os.path.join(run_dir, morph_file)}",
-                f"topfile = {_os.path.join(run_dir, top_file)}",    
+                f"topfile = {_os.path.join(run_dir, top_file)}",
                 f"crdfile = {_os.path.join(run_dir, coord_file)}",
             ]
         )
