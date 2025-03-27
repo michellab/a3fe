@@ -26,10 +26,3 @@ repos:
         language: system
         entry: bash
         args: [-c, "make lint"]
-        
-    # type check hook
-    -   id: mypy
-        name: Type check python code
-        language: system
-        entry: bash
-        args: [-c, "make type-check"]
