@@ -23,6 +23,7 @@ dependencies:
   - gromacs
   - pydantic
   - ruff
+  - conda-forge::mkl
 
     # Testing
   - pytest
