@@ -23,6 +23,7 @@ dependencies:
   - gromacs
   - pydantic
   - ruff
+  - mkl>=2022.1.0
 
     # Testing
   - pytest
