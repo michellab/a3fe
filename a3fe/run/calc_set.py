@@ -156,19 +156,15 @@ class CalcSet(_SimulationRunner):
 
     def setup(
         self,
-        bound_leg_sysprep_config: _Optional[_BaseSystemPreparationConfig] = None,
-        free_leg_sysprep_config: _Optional[_BaseSystemPreparationConfig] = None,
+        sysprep_config: _Optional[_BaseSystemPreparationConfig] = None,
     ) -> None:
         """
         Set up all calculations sequentially.
 
         Parameters
         ----------
-        bound_leg_sysprep_config: _BaseSystemPreparationConfig, opttional, default = None
-            The system preparation configuration to use for the bound leg. If None, the default
-            configuration is used.
-        free_leg_sysprep_config: _BaseSystemPreparationConfig, opttional, default = None
-            The system preparation configuration to use for the free leg. If None, the default
+        sysprep_config: _BaseSystemPreparationConfig, opttional, default = None
+            The system preparation configuration to use for all calculations. If None, the default
             configuration is used.
         """
         for calc in self.calcs:
@@ -179,10 +175,7 @@ class CalcSet(_SimulationRunner):
                 continue
             try:
                 self._logger.info(f"Setting up calculation in {calc.base_dir}")
-                calc.setup(
-                    bound_leg_sysprep_config=bound_leg_sysprep_config,
-                    free_leg_sysprep_config=free_leg_sysprep_config,
-                )
+                calc.setup(sysprep_config=sysprep_config)
                 self._logger.info(f"Calculation in {calc.base_dir} successfully set up")
 
             except Exception as e:

@@ -30,8 +30,6 @@ class Calculation(_SimulationRunner):
         "ligand.sdf",
     ]  # Waters.pdb is optional
 
-    required_legs = [_LegType.FREE, _LegType.BOUND]
-
     def __init__(
         self,
         equil_detection: str = "multiwindow",
@@ -143,7 +141,7 @@ class Calculation(_SimulationRunner):
         # Check backwards, as we care about the most advanced preparation stage
         for prep_stage in reversed(_PreparationStage):
             files_absent = False
-            for leg_type in Calculation.required_legs:
+            for leg_type in [_LegType.FREE, _LegType.BOUND]:
                 for file in _Leg.required_input_files[leg_type][prep_stage]:
                     if not _os.path.isfile(f"{self.input_dir}/{file}"):
                         files_absent = True
@@ -176,8 +174,7 @@ class Calculation(_SimulationRunner):
 
     def setup(
         self,
-        bound_leg_sysprep_config: _Optional[_BaseSystemPreparationConfig] = None,
-        free_leg_sysprep_config: _Optional[_BaseSystemPreparationConfig] = None,
+        sysprep_config: _Optional[_BaseSystemPreparationConfig] = None,
     ) -> None:
         """
         Set up the calculation. This involves parametrising, equilibrating, and
@@ -186,11 +183,9 @@ class Calculation(_SimulationRunner):
 
         Parameters
         ----------
-        bound_leg_sysprep_config: BaseSystemPreparationConfig, opttional, default = None
-            The system preparation configuration to use for the bound leg. If None, the default
-            configuration is used.
-        free_leg_sysprep_config: BaseSystemPreparationConfig, opttional, default = None
-            The system preparation configuration to use for the free leg. If None, the default
+        sysprep_config: BaseSystemPreparationConfig, optional, default = None
+            The system preparation configuration to use for all legs. The required legs
+            and stages will be determined from this configuration. If None, the default
             configuration is used.
         """
 
@@ -198,17 +193,12 @@ class Calculation(_SimulationRunner):
             self._logger.info("Setup already complete. Skipping...")
             return
 
-        configs = {
-            _LegType.BOUND: bound_leg_sysprep_config,
-            _LegType.FREE: free_leg_sysprep_config,
-        }
-
         self._logger.info("Starting calculation setup...")
         setup_start = _time.time()
 
         # Set up the legs
         self.legs = []
-        for leg_type in reversed(Calculation.required_legs):
+        for leg_type in reversed(sysprep_config.required_legs):
             self._logger.info(f"Setting up {leg_type.name.lower()} leg...")
             leg_start = _time.time()
 
@@ -227,7 +217,7 @@ class Calculation(_SimulationRunner):
                 engine_type=self.engine_type,
             )
             self.legs.append(leg)
-            leg.setup(configs[leg_type])
+            leg.setup(sysprep_config)
 
             self._logger.debug(
                 f"Completed {leg_type.name.lower()} leg setup in {_time.time() - leg_start:.2f}s"

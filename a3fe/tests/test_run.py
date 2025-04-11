@@ -362,7 +362,7 @@ class TestCalcSetup:
             )
             cfg = system_prep_config()
             cfg.slurm = False
-            setup_calc.setup(bound_leg_sysprep_config=cfg, free_leg_sysprep_config=cfg)
+            setup_calc.setup(sysprep_config=cfg)
             yield setup_calc
 
     def test_setup_calc_overall(self, setup_calc, mock_run_process):

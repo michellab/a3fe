@@ -139,6 +139,18 @@ class _BaseSystemPreparationConfig(_ABC, _BaseModel):
             for leg_type in self.lambda_values.keys()
         }
 
+    @property
+    def required_legs(self) -> _List[_LegType]:
+        """
+        Get the required legs for the calculation.
+
+        Returns
+        -------
+        List[LegType]
+            Required legs for the calculation, determined from lambda_values.
+        """
+        return list(self.lambda_values.keys())
+
     model_config = _ConfigDict(extra="forbid", validate_assignment=True)
 
     def get_tot_simtime(self, n_runs: int, leg_type: _LegType) -> int:
