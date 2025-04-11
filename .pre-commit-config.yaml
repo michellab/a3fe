@@ -10,7 +10,7 @@ repos:
     -   id: check-added-large-files  # prevent large files from being added
     -   id: check-merge-conflict    # check for unresolved merge conflicts
 
-# Use local commands to format, check code and type check
+# Use local commands to format and check code
 -   repo: local
     hooks:
     # code format hook

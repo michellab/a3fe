@@ -130,14 +130,19 @@ For example, to change the timestep, create a ``SomdConfig`` object and pass it 
 
 .. code-block:: python
 
-    engine_config = a3.SomdConfig(timestep=2.0) # Create configuration with custom parameters
+    engine_config = a3.SomdConfig(timestep=2.0) # fs (femtoseconds), Create configuration with custom parameters
     calc = a3.Calculation(engine_config=engine_config) # Pass to Calculation during creation
     
     # Or modify parameters after creating the Calculation
     calc = a3.Calculation()
-    calc.engine_config.timestep = 2.0
+    # Works if the calculation has not been setup yet
+    calc.engine_config.timestep = 2.0 # fs
+    # Works if the calculation has already been setup
+    calc.update_engine_config_option(timestep=2.0) # fs
+
 
 To see a complete list of available configuration options, run ``somd-freenrg --help-config``.
+or inspect the ``a3.SomdConfig`` class in the code.
 
 System Preparation Configuration
 -----------------
@@ -149,7 +154,16 @@ For example, to use GAFF2 instead of OFF2 for the small molecule, set this in th
 
     cfg = a3.SomdSystemPreparationConfig()
     cfg.forcefields["ligand"] = "gaff2"
-    calc.setup(bound_leg_sysprep_config=cfg, free_leg_sysprep_config=cfg)
+    calc.setup(sysprep_config=cfg)
+
+You can also modify ``lambda values`` in the config object and the system will only run this defined leg and stage.
+For example, to only run the bound restrain stage with specified lambda values, set:
+
+.. code-block:: python
+
+    cfg = a3.SomdSystemPreparationConfig()
+    cfg.lambda_values = {a3.LegType.BOUND: {a3.StageType.RESTRAIN: [0.0, 1.0]}}
+    calc.setup(sysprep_config=cfg)
 
 SLURM Options
 -------------
@@ -171,8 +185,6 @@ also set other options:
         analysis_slurm_config = a3.SlurmConfig(partition="my-cluster-cpu-partition", time="00:10:00")
         calc = a3.Calculation(slurm_config=slurm_config, analysis_slurm_config=analysis_slurm_config)
 
-      Then make sure to set ``slurm=True`` when running the analysis, e.g. ``calc.analyse(slurm=True)``.
-
 Running Fast Non-Adaptive Calculations
 ***************************************
 
@@ -189,7 +201,7 @@ three replicates. Note that this is expected to produce an erroneously favourabl
   cfg.runtime_npt = 50 # ps
   cfg.ensemble_equilibration_time = 100 # ps
   calc = a3.Calculation(ensemble_size = 3)
-  calc.setup(bound_leg_sysprep_config = cfg, free_leg_sysprep_config = cfg)
+  calc.setup(sysprep_config = cfg)
   calc.run(adaptive = False, runtime=0.1) # ns
   calc.wait() # Wait for the simulations to finish
   calc.set_equilibration_time(1) # Discard the first ns of simulation time
