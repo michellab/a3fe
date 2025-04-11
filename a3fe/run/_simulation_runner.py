@@ -868,8 +868,7 @@ class SimulationRunner(ABC):
 
     def update_engine_config_option(self, option: str, value: str) -> None:
         """Update an option in the engine configuration file."""
-        # TODO: Think about desired behaviour and test.
-        self.engine_config[option] = value
+        setattr(self.engine_config, option, value)
         for sub_sim_runner in self._sub_sim_runners:
             sub_sim_runner.update_engine_config_option(option, value)
 
