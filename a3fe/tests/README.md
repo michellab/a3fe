@@ -6,23 +6,26 @@ This directory contains integration tests for A3FE, which are designed to run in
 
 To run integration tests, use the following command:
 
-```bash
-cd your/path/a3fe
-RUN_SLURM_TESTS=1 pytest a3fe/tests --run-integration -v
-```
+   ```bash
+   cd your/path/a3fe
+   RUN_SLURM_TESTS=1 pytest a3fe/tests --run-integration -v
+   ```
+Or to run a specific integration test:
+   ```bash
+   RUN_SLURM_TESTS=1 pytest a3fe/tests/test_run_integration.py::TestSlurmIntegration::test_slurm_calculation_setup --run-integration -v
+   ```
 
 ## Skipping Integration Tests
 
 Integration tests are skipped by default. There are several ways to control which tests run:
 
-1. To skip all integration tests (default behavior):
+   To skip all integration tests (default behavior):
    ```bash
    pytest a3fe/tests
    ```
-
-2. To run a specific integration test:
+   Or to explicitly skip integration tests (same as deafult):
    ```bash
-   RUN_SLURM_TESTS=1 pytest a3fe/tests/test_run_integration.py::TestSlurmIntegration::test_slurm_calculation_setup --run-integration -v
+   RUN_SLUEM_TESTS=0 pytest a3fe/tests --run-integration -v
    ```
 
 ## Test Description
@@ -33,7 +36,7 @@ The integration tests will:
 3. Verify output files and results
 4. Test analysis functionality and job management features
 
-These tests use example data from a3fe/data/example_run_dir as input.
+These tests use example data from a3fe/data/example_calc_set/t4l as input.
 
 ## Notes
 1. These tests require an available SLURM environment

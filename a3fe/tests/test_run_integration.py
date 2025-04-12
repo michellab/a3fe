@@ -43,7 +43,7 @@ def _create_example_input_dir(engine_type):
             [
                 "cp",
                 "-r",
-                "a3fe/data/example_run_dir/input",
+                "a3fe/data/example_calc_set/t4l/input",
                 f"{temp_dir}/input",
             ]
         )
@@ -88,7 +88,7 @@ class TestSlurmIntegration:
         """Check that the calculation object is setup already."""
         if not calc.setup_complete:
             cfg = self._get_test_config(system_prep_config)
-            calc.setup(bound_leg_sysprep_config=cfg, free_leg_sysprep_config=cfg)
+            calc.setup(sysprep_config=cfg)
 
         assert calc.setup_complete
         return calc
@@ -202,11 +202,39 @@ class TestSlurmIntegration:
         # Check that the calculation is not running
         assert not calc.running
 
-        # Check that the equilibration time has successfully been set
-        for leg in calc.legs:
-            for stage in leg.stages:
-                for lam_win in stage.lam_windows:
-                    assert lam_win.equil_time is not None
+        # Check that the equilibration time has successfully been set and matches expected value
+        for leg_name in LEGS_WITH_STAGES.keys():
+            for stage_name in LEGS_WITH_STAGES[leg_name]:
+                # Check that the check_equil_multiwindow_paired_t.txt file exists
+                leg_path = os.path.join(calc.base_dir, leg_name)
+                stage_path = os.path.join(leg_path, stage_name)
+                output_path = os.path.join(stage_path, "output")
+                equil_file = os.path.join(
+                    output_path, "check_equil_multiwindow_paired_t.txt"
+                )
+
+                # Read the fractional equilibration time from the file
+                fractional_equil_time = None
+                with open(equil_file, "r") as f:
+                    for line in f:
+                        if "Fractional equilibration time:" in line:
+                            fractional_equil_time = float(line.split(":")[1].strip())
+                            break
+
+                # Verify all lambda windows
+                for leg in calc.legs:
+                    if leg_name == os.path.basename(leg.base_dir):
+                        for stage in leg.stages:
+                            if stage_name == os.path.basename(stage.base_dir):
+                                for lam_win in stage.lam_windows:
+                                    assert lam_win.equil_time is not None
+                                    expected_time = (
+                                        fractional_equil_time
+                                        * lam_win.get_tot_simtime(run_nos=[1])
+                                    )
+                                    assert (
+                                        abs(lam_win.equil_time - expected_time) < 1e-6
+                                    )
 
         # Run analysis with error handling
         try:
