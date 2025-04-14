@@ -39,3 +39,6 @@ dependencies:
   #- pip:
   #  - codecov
 
+    # Development tools
+  - pre-commit
+

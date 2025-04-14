@@ -16,12 +16,9 @@ import BioSimSpace.Sandpit.Exscientia as _BSS
 
 from ..read._process_bss_systems import rename_lig as _rename_lig
 from ._utils import check_has_wat_and_box as _check_has_wat_and_box
-from ..configuration.enums import LegType as _LegType
-from ..configuration.enums import PreparationStage as _PreparationStage
-from ..configuration.enums import EngineType as _EngineType
-
-
-from ..configuration.system_prep_config import SomdSystemPreparationConfig as _SomdSystemPreparationConfig
+from ..configuration import LegType as _LegType
+from ..configuration import PreparationStage as _PreparationStage
+from ..configuration import EngineType as _EngineType
 
 
 def parameterise_input(
@@ -51,7 +48,7 @@ def parameterise_input(
     parameterised_system : _BSS._SireWrappers._system.System
         Parameterised system.
     """
-    cfg = _SomdSystemPreparationConfig.load(input_dir, leg_type)
+    cfg = engine_type.system_prep_config.load(input_dir, leg_type)
 
     print("Parameterising input...")
     # Parameterise the ligand
@@ -148,7 +145,7 @@ def solvate_input(
     solvated_system : _BSS._SireWrappers._system.System
         Solvated system.
     """
-    cfg = _SomdSystemPreparationConfig.load(input_dir, leg_type)
+    cfg = engine_type.system_prep_config.load(input_dir, leg_type)
 
     # Load the parameterised system
     print("Loading parameterised system...")
@@ -247,7 +244,7 @@ def minimise_input(
     minimised_system : _BSS._SireWrappers._system.System
         Minimised system.
     """
-    cfg = _SomdSystemPreparationConfig.load(input_dir, leg_type)
+    cfg = engine_type.system_prep_config.load(input_dir, leg_type)
 
     # Load the solvated system
     print("Loading solvated system...")
@@ -304,7 +301,7 @@ def heat_and_preequil_input(
     preequilibrated_system : _BSS._SireWrappers._system.System
         Pre-Equilibrated system.
     """
-    cfg = _SomdSystemPreparationConfig.load(input_dir, leg_type)
+    cfg = engine_type.system_prep_config.load(input_dir, leg_type)
 
     # Load the minimised system
     print("Loading minimised system...")
@@ -407,7 +404,7 @@ def run_ensemble_equilibration(
     -------
     None
     """
-    cfg = _SomdSystemPreparationConfig.load(input_dir, leg_type)
+    cfg = engine_type.system_prep_config.load(input_dir, leg_type)
 
     # Load the pre-equilibrated system
     print("Loading pre-equilibrated system...")
