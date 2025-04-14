@@ -36,7 +36,7 @@ The integration tests will:
 3. Verify output files and results
 4. Test analysis functionality and job management features
 
-These tests use example data from a3fe/data/example_calc_set/t4l as input.
+These tests use example data from a3fe/data/t4l_input as input.
 
 ## Notes
 1. These tests require an available SLURM environment

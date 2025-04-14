@@ -43,7 +43,7 @@ def _create_example_input_dir(engine_type):
             [
                 "cp",
                 "-r",
-                "a3fe/data/example_calc_set/t4l/input",
+                "a3fe/data/t4l_input",
                 f"{temp_dir}/input",
             ]
         )
