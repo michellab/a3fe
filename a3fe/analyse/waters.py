@@ -232,7 +232,6 @@ def get_av_waters_stage(
                     run_nos,
                     index2,
                     length2,
-                    run_nos,
                     print_fn,
                 )
                 for lam_window in lam_windows
