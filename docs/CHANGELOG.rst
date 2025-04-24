@@ -2,6 +2,10 @@
 Change Log
 ===============
 
+0.3.3
+====================
+- Fixed bug in water analysis ``get_water_stage()`` which caused repeats ``runs_nos`` and an error related to incorrect numbers of positional arguments.
+
 0.3.2
 ====================
 - Fix bug which caused somd.rst7 files in the ensemble equilibration directories to be incorrectly numbered in some cases.
