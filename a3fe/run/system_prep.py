@@ -64,6 +64,8 @@ class SystemPreparationConfig(_BaseModel):
         , the restraints generated for the first repeat are used. This allows meaningful
         comparison between repeats for the bound leg. If False, the unique restraints are
         generated for each repeat.
+    membrane_protein: bool
+        If True, the protein is a membrane protein requiring special NPT settings.
     """
 
     slurm: bool = _Field(True)
@@ -175,6 +177,10 @@ class SystemPreparationConfig(_BaseModel):
             ],
         },
     }
+    membrane_protein: bool = _Field(
+        False,
+        description="Whether the protein is a membrane protein requiring special configuration settings.",
+    )
 
     class Config:
         """
@@ -183,6 +189,29 @@ class SystemPreparationConfig(_BaseModel):
 
         extra = "forbid"
         validate_assignment = True
+
+    def get_membrane_equilibration_config(self) -> dict:
+        """Get the membrane configuration for equilibration runs."""
+        if self.membrane_protein:
+            return {
+            "pcoupltype": "semiisotropic",
+            "pcoupl": "C-rescale",           
+            "tau-p": "5.0",                  
+            "nstpcouple": "100",             
+            "compressibility": "4.5e-5 4.5e-5",
+            "ref-p": "1.0 1.0",
+            
+            "rcoulomb": "1.2",
+            "rvdw": "1.2",
+            "rlist": "1.2", 
+            "rvdw-switch": "1.0",
+            "vdw-modifier": "Force-switch",
+            
+            "nstcomm": "100",
+            "comm-mode": "linear",
+            "nstxout-compressed": "5000",
+            }
+        return {}
 
     def get_tot_simtime(self, n_runs: int, leg_type: _LegType) -> int:
         """
@@ -578,13 +607,21 @@ def heat_and_preequil_input(
     print(
         f"NPT equilibration for {cfg.runtime_npt} ps while restraining non-solvent heavy atoms"
     )
-    protocol = _BSS.Protocol.Equilibration(
-        runtime=cfg.runtime_npt * _BSS.Units.Time.picosecond,
-        pressure=1 * _BSS.Units.Pressure.atm,
-        temperature=cfg.end_temp * _BSS.Units.Temperature.kelvin,
-        restraint="heavy",
+    if not cfg.membrane_protein:
+        protocol = _BSS.Protocol.Equilibration(
+            runtime=cfg.runtime_npt * _BSS.Units.Time.picosecond,
+            pressure=1 * _BSS.Units.Pressure.atm,
+            temperature=cfg.end_temp * _BSS.Units.Temperature.kelvin,
+            restraint="heavy",
     )
-    equil4 = run_process(equil3, protocol)
+    #membrane protein does not need heavy atom restraints.
+    else:
+        protocol = _BSS.Protocol.Equilibration(
+            runtime=cfg.runtime_npt * _BSS.Units.Time.picosecond,
+            pressure=1 * _BSS.Units.Pressure.atm,
+            temperature=cfg.end_temp * _BSS.Units.Temperature.kelvin,
+        )
+    equil4 = run_process(equil3, protocol, extra_options=cfg.get_membrane_equilibration_config())
 
     print(f"NPT equilibration for {cfg.runtime_npt_unrestrained} ps without restraints")
     protocol = _BSS.Protocol.Equilibration(
@@ -592,7 +629,7 @@ def heat_and_preequil_input(
         pressure=1 * _BSS.Units.Pressure.atm,
         temperature=cfg.end_temp * _BSS.Units.Temperature.kelvin,
     )
-    preequilibrated_system = run_process(equil4, protocol)
+    preequilibrated_system = run_process(equil4, protocol, extra_options=cfg.get_membrane_equilibration_config())
 
     # Save, renaming the velocity property to foo so avoid saving velocities. Saving the
     # velocities sometimes causes issues with the size of the floats overflowing the RST7
@@ -681,7 +718,7 @@ def run_ensemble_equilibration(
         work_dir = output_dir
     else:
         work_dir = None
-    final_system = run_process(pre_equilibrated_system, protocol, work_dir=work_dir)
+    final_system = run_process(pre_equilibrated_system, protocol, work_dir=work_dir, extra_options=cfg.get_membrane_equilibration_config())
 
     # Save the coordinates only, renaming the velocity property to foo so avoid saving velocities. Saving the
     # velocities sometimes causes issues with the size of the floats overflowing the RST7
@@ -699,6 +736,7 @@ def run_process(
     system: _BSS._SireWrappers._system.System,
     protocol: _BSS.Protocol._protocol.Protocol,
     work_dir: _Optional[str] = None,
+    extra_options: _Optional[dict] = None,
 ) -> _BSS._SireWrappers._system.System:
     """
     Run a process with GROMACS, raising informative
@@ -713,13 +751,18 @@ def run_process(
     work_dir : str, optional
         The working directory to run the process in. If none,
         a temporary directory will be created.
+    extra_options : dict, optional
+        Extra options to pass to the GROMACS process, such as
+        membrane-specific configuration. If None, no extra options are passed.
 
     Returns
     -------
     system : _BSS._SireWrappers._system.System
         System after the process has been run.
     """
-    process = _BSS.Process.Gromacs(system, protocol, work_dir=work_dir)
+    if extra_options is None:
+        extra_options = {}
+    process = _BSS.Process.Gromacs(system, protocol, work_dir=work_dir, extra_options=extra_options)
     process.start()
     process.wait()
     import time
