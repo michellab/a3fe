@@ -277,3 +277,28 @@ Since A3FE 0.2.0, ABFE calculations with charged ligands are supported using a c
     cutoff distance = 10 * angstrom
 
 The default `template_config.cfg` uses reaction field instead of PME. This is faster (around twice as fast for some of our systems) and has been shown to give equivalent results for neutral ligands in RBFE calculations - see https://pubs.acs.org/doi/full/10.1021/acs.jcim.0c01424 .
+
+ABFE with Membrane Proteins
+***************************
+
+Since A3FE 0.3.4, ABFE calculations with membrane proteins are supported via gromacs for minimization, NVT, NPT, and ensemble equilibration. The only change in the input required is that the use of barostat_membrane, rather than barostat, should be specified in ``template_config.cfg`` as e.g.:
+
+.. code-block:: bash
+
+    ### Barostat ###
+    barostat = False
+    barostat_membrane = True
+
+By modifying the ``SystemPreparationConfig`` object as described above, we can now try running membrane protein abfe calculation. 
+Note that this is expected to change the template_config.cfg file in the same time.
+
+.. code-block:: python
+
+    import a3fe as a3
+    cfg = a3.SystemPreparationConfig(membrane_protein=True)
+    calc = a3.Calculation()
+    calc.setup(bound_leg_sysprep_config = cfg, free_leg_sysprep_config = cfg)
+
+However, users must provide the ``bound_solv`` and ``free_solv`` files externally, as automated parameterization and solvation are not yet supported. 
+Additionally, the configuration files (gromacs.mdp) for these preparation steps specified in ``get_membrane_equilibration_config`` function of ``system_prep.py`` file in which is general and not highly specialized; 
+Thus, it is recommended that users perform these pre-equilibration steps externally. Future updates will address these limitations.
