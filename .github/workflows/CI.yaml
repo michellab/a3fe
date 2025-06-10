@@ -39,11 +39,7 @@ jobs:
 
       - name: Setup environment for Python ${{ matrix.python-version }}
         run: |
-          export PACKAGE_NAME=a3fe
-          mamba create -y --name $PACKAGE_NAME python=${{ matrix.python-version }}
-          mamba env update --name $PACKAGE_NAME --file devtools/conda-envs/test_env.yaml
-          mamba run -n $PACKAGE_NAME pip install --no-deps -e .
-          mamba run -n $PACKAGE_NAME pre-commit install || true
+          make env PYTHON_VERSION=${{ matrix.python-version }}
 
       - name: Run linting and tests
         run: |
