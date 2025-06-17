@@ -1,6 +1,9 @@
 ===============
 Change Log
 ===============
+0.3.4
+====================
+- Added ability to run membrane proteins. This is done by setting the ``membrane_protein`` option to ``True`` in the ``SystemPreparationConfig`` object.
 
 0.3.3
 ====================
