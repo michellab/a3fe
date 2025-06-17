@@ -190,8 +190,20 @@ class SystemPreparationConfig(_BaseModel):
         extra = "forbid"
         validate_assignment = True
 
-    def get_membrane_equilibration_config(self) -> dict:
-        """Get the membrane configuration for equilibration runs."""
+    def get_membrane_nvt_config(self) -> dict:
+        """Get the temperature coupling configuration for membraneNVT equilibration runs."""
+        if self.membrane_protein:
+            return {
+                "tcoupl": "v-rescale",
+                "tc-grps": "Protein non-Protein",
+                "tau-t": "1.0 1.0",
+                "ref-t": "303.15 303.15",
+                "annealing": "no no",
+            }
+        return {}
+
+    def get_membrane_npt_config(self) -> dict:
+        """Get the pressure coupling configuration for membrane equilibration runs."""
         if self.membrane_protein:
             return {
                 "pcoupltype": "semiisotropic",
@@ -206,6 +218,15 @@ class SystemPreparationConfig(_BaseModel):
                 "nstcomm": "100",
                 "comm-mode": "linear",
                 "nstxout-compressed": "5000",
+            }
+        return {}
+
+    def get_membrane_bound_equil_config(self) -> dict:
+        """Get the temperature and pressure coupling configuration for membrane equilibration runs."""
+        if self.membrane_protein:
+            return {
+                **self.get_membrane_nvt_config(),
+                **self.get_membrane_npt_config(),
             }
         return {}
 
@@ -576,7 +597,11 @@ def heat_and_preequil_input(
         temperature_end=cfg.end_temp * _BSS.Units.Temperature.kelvin,
         restraint="all",
     )
-    equil1 = run_process(minimised_system, protocol)
+    # Only use membrane NVT config for bound leg (which has protein)
+    membrane_nvt_config = (
+        cfg.get_membrane_nvt_config() if leg_type == _LegType.BOUND else {}
+    )
+    equil1 = run_process(minimised_system, protocol, extra_options=membrane_nvt_config)
 
     # If this is the bound leg, carry out step with backbone restraints
     if leg_type == _LegType.BOUND:
@@ -588,7 +613,7 @@ def heat_and_preequil_input(
             temperature=cfg.end_temp * _BSS.Units.Temperature.kelvin,
             restraint="backbone",
         )
-        equil2 = run_process(equil1, protocol)
+        equil2 = run_process(equil1, protocol, extra_options=membrane_nvt_config)
 
     else:  # Free leg - skip the backbone restraint step
         equil2 = equil1
@@ -598,7 +623,7 @@ def heat_and_preequil_input(
         runtime=cfg.runtime_nvt * _BSS.Units.Time.picosecond,
         temperature=cfg.end_temp * _BSS.Units.Temperature.kelvin,
     )
-    equil3 = run_process(equil2, protocol)
+    equil3 = run_process(equil2, protocol, extra_options=membrane_nvt_config)
 
     print(
         f"NPT equilibration for {cfg.runtime_npt} ps while restraining non-solvent heavy atoms"
@@ -615,9 +640,13 @@ def heat_and_preequil_input(
         protocol_args["restraint"] = "heavy"
     protocol = _BSS.Protocol.Equilibration(**protocol_args)
 
-    equil4 = run_process(
-        equil3, protocol, extra_options=cfg.get_membrane_equilibration_config()
-    )
+    # NPT configuration: bound leg needs full config, free leg only needs pressure coupling
+    if leg_type == _LegType.BOUND:
+        membrane_npt_config = cfg.get_membrane_bound_equil_config()
+    else:
+        membrane_npt_config = cfg.get_membrane_npt_config()
+
+    equil4 = run_process(equil3, protocol, extra_options=membrane_npt_config)
 
     print(f"NPT equilibration for {cfg.runtime_npt_unrestrained} ps without restraints")
     protocol = _BSS.Protocol.Equilibration(
@@ -626,7 +655,7 @@ def heat_and_preequil_input(
         temperature=cfg.end_temp * _BSS.Units.Temperature.kelvin,
     )
     preequilibrated_system = run_process(
-        equil4, protocol, extra_options=cfg.get_membrane_equilibration_config()
+        equil4, protocol, extra_options=membrane_npt_config
     )
 
     # Save, renaming the velocity property to foo so avoid saving velocities. Saving the
@@ -714,13 +743,16 @@ def run_ensemble_equilibration(
     )
     if leg_type == _LegType.BOUND:
         work_dir = output_dir
+        membrane_equil_config = cfg.get_membrane_bound_equil_config()
     else:
         work_dir = None
+        membrane_equil_config = cfg.get_membrane_npt_config()
+
     final_system = run_process(
         pre_equilibrated_system,
         protocol,
         work_dir=work_dir,
-        extra_options=cfg.get_membrane_equilibration_config(),
+        extra_options=membrane_equil_config,
     )
 
     # Save the coordinates only, renaming the velocity property to foo so avoid saving velocities. Saving the
