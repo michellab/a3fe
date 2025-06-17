@@ -300,5 +300,5 @@ Note that this is expected to change the template_config.cfg file in the same ti
     calc.setup(bound_leg_sysprep_config = cfg, free_leg_sysprep_config = cfg)
 
 However, users must provide the ``bound_solv`` and ``free_solv`` files externally, as automated parameterization and solvation are not yet supported. 
-Additionally, the configuration files (gromacs.mdp) for these preparation steps specified in ``get_membrane_equilibration_config`` function of ``system_prep.py`` file in which is general and not highly specialized; 
+Additionally, the configuration files (gromacs.mdp) for these preparation steps specified in ``get_membrane_nvt_config`` and ``get_membrane_npt_config`` functions of ``system_prep.py`` file in which is general and not highly specialized; 
 Thus, it is recommended that users perform these pre-equilibration steps externally. Future updates will address these limitations.
