@@ -120,9 +120,6 @@ class Calculation(_SimulationRunner):
             self.relative_simulation_cost = relative_simulation_cost
             self.setup_complete: bool = False
 
-            # Validate the input
-            self._validate_input()
-
             # Save the state and update log
             self._update_log()
             self._dump()
@@ -136,12 +133,15 @@ class Calculation(_SimulationRunner):
         self._logger.info("Modifying/ creating legs")
         self._sub_sim_runners = value
 
-    def _validate_input(self) -> None:
+    def _validate_input(
+        self,
+        sysprep_config: _BaseSystemPreparationConfig,
+    ) -> None:
         """Check that the required input files are present in the input directory."""
         # Check backwards, as we care about the most advanced preparation stage
         for prep_stage in reversed(_PreparationStage):
             files_absent = False
-            for leg_type in [_LegType.FREE, _LegType.BOUND]:
+            for leg_type in sysprep_config.required_legs:
                 for file in _Leg.required_input_files[leg_type][prep_stage]:
                     if not _os.path.isfile(f"{self.input_dir}/{file}"):
                         files_absent = True
@@ -156,8 +156,8 @@ class Calculation(_SimulationRunner):
         # We didn't find all required files for any of the prep stages
         raise ValueError(
             f"Could not find all required input files for "
-            f"any preparation stage. Required files are: {_Leg.required_input_files[_LegType.BOUND]}"
-            f"and {_Leg.required_input_files[_LegType.FREE]}"
+            f"any preparation stage. Required files are: "
+            f"{[_Leg.required_input_files[leg] for leg in sysprep_config.required_legs]}"
         )
 
     @property
@@ -192,6 +192,9 @@ class Calculation(_SimulationRunner):
         if self.setup_complete:
             self._logger.info("Setup already complete. Skipping...")
             return
+
+        # Validate the input
+        self._validate_input(sysprep_config)
 
         self._logger.info("Starting calculation setup...")
         setup_start = _time.time()
