@@ -17,6 +17,8 @@ If you need to load old pickle files, please revert to version 0.3.x.
 In previous versions, users needed to configure run_somd.sh and template_config.cfg files to run calculations. 
 However, with version 0.4.0, these files are no longer needed. Instead, configuration objects (SlurmConfig, SomdConfig, and SomdSystemPreparationConfig) are passed directly to the Calculation object.
 
+For examples and detailed usage of these configuration objects, see the `Customising Calculations <guides.html#customising-calculations>`_ section in the documentation.
+
 0.3.0
 ====================
 

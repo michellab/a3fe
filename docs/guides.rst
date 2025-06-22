@@ -140,9 +140,12 @@ For example, to change the timestep, create a ``SomdConfig`` object and pass it 
     # Works if the calculation has already been setup
     calc.update_engine_config_option(timestep=2.0) # fs
 
+.. warning::
+   After calling ``calc.setup()``, do not modify engine_config directly. 
+   Use ``calc.update_engine_config_option()`` instead.
 
-To see a complete list of available configuration options, run ``somd-freenrg --help-config``.
-or inspect the ``a3.SomdConfig`` class in the code.
+To see a complete list of available configuration options, run ``somd-freenrg --help-config``
+or inspect the :class:`a3.SomdConfig` API reference.
 
 System Preparation Configuration
 -----------------

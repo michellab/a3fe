@@ -8,8 +8,14 @@ To run integration tests, use the following command:
 
    ```bash
    cd your/path/a3fe
+   make test-integration
+   ```
+
+Or you can run the pytest command directly:
+   ```bash
    RUN_SLURM_TESTS=1 pytest a3fe/tests --run-integration -v
    ```
+
 Or to run a specific integration test:
    ```bash
    RUN_SLURM_TESTS=1 pytest a3fe/tests/test_run_integration.py::TestSlurmIntegration::test_slurm_calculation_setup --run-integration -v
@@ -19,13 +25,14 @@ Or to run a specific integration test:
 
 Integration tests are skipped by default. There are several ways to control which tests run:
 
-   To skip all integration tests (default behavior):
+   To skip all integration tests:
+   ```bash
+   make test
+   ```
+   
+   Or using pytest directly:
    ```bash
    pytest a3fe/tests
-   ```
-   Or to explicitly skip integration tests (same as deafult):
-   ```bash
-   RUN_SLUEM_TESTS=0 pytest a3fe/tests --run-integration -v
    ```
 
 ## Test Description
