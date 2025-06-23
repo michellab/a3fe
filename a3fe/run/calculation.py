@@ -10,15 +10,12 @@ from typing import List as _List
 from typing import Optional as _Optional
 
 from ._simulation_runner import SimulationRunner as _SimulationRunner
-from ..configuration.enums import LegType as _LegType
 from ..configuration.enums import PreparationStage as _PreparationStage
 from .leg import Leg as _Leg
-from ..configuration import (
-    _BaseSystemPreparationConfig,
-    SlurmConfig as _SlurmConfig,
-    SomdConfig as _SomdConfig,
-)
-from ..configuration.enums import EngineType as _EngineType
+from ..configuration import _BaseSystemPreparationConfig
+from ..configuration import SlurmConfig as _SlurmConfig
+from ..configuration import _EngineConfig
+from ..configuration import EngineType as _EngineType
 
 
 class Calculation(_SimulationRunner):
@@ -32,8 +29,6 @@ class Calculation(_SimulationRunner):
         "ligand.sdf",
     ]  # Waters.pdb is optional
 
-    required_legs = [_LegType.FREE, _LegType.BOUND]
-
     def __init__(
         self,
         equil_detection: str = "multiwindow",
@@ -45,7 +40,7 @@ class Calculation(_SimulationRunner):
         stream_log_level: int = _logging.INFO,
         slurm_config: _Optional[_SlurmConfig] = None,
         analysis_slurm_config: _Optional[_SlurmConfig] = None,
-        engine_config: _Optional[_SomdConfig] = None,
+        engine_config: _Optional[_EngineConfig] = None,
         engine_type: _EngineType = _EngineType.SOMD,
         update_paths: bool = True,
     ) -> None:
@@ -92,8 +87,8 @@ class Calculation(_SimulationRunner):
             Configuration for the SLURM job scheduler for the analysis.
             This is helpful e.g. if you want to submit analysis to the CPU
             partition, but the main simulation to the GPU partition. If None,
-        engine_config: SomdConfig, default: None
-            Configuration for the SOMD engine. If None, the default configuration is used.
+        engine_config: EngineConfig, default: None
+            Configuration for the engine. If None, the default configuration is used.
         engine_type: EngineType, default: EngineType.SOMD
             The type of engine to use for the production simulations.
         update_paths: bool, Optional, default: True
@@ -124,9 +119,6 @@ class Calculation(_SimulationRunner):
             self.relative_simulation_cost = relative_simulation_cost
             self.setup_complete: bool = False
 
-            # Validate the input
-            self._validate_input()
-
             # Save the state and update log
             self._update_log()
             self._dump()
@@ -140,12 +132,15 @@ class Calculation(_SimulationRunner):
         self._logger.info("Modifying/ creating legs")
         self._sub_sim_runners = value
 
-    def _validate_input(self) -> None:
+    def _validate_input(
+        self,
+        sysprep_config: _BaseSystemPreparationConfig,
+    ) -> None:
         """Check that the required input files are present in the input directory."""
         # Check backwards, as we care about the most advanced preparation stage
         for prep_stage in reversed(_PreparationStage):
             files_absent = False
-            for leg_type in Calculation.required_legs:
+            for leg_type in sysprep_config.required_legs:
                 for file in _Leg.required_input_files[leg_type][prep_stage]:
                     if not _os.path.isfile(f"{self.input_dir}/{file}"):
                         files_absent = True
@@ -160,8 +155,8 @@ class Calculation(_SimulationRunner):
         # We didn't find all required files for any of the prep stages
         raise ValueError(
             f"Could not find all required input files for "
-            f"any preparation stage. Required files are: {_Leg.required_input_files[_LegType.BOUND]}"
-            f"and {_Leg.required_input_files[_LegType.FREE]}"
+            f"any preparation stage. Required files are: "
+            f"{[_Leg.required_input_files[leg] for leg in sysprep_config.required_legs]}"
         )
 
     @property
@@ -178,8 +173,7 @@ class Calculation(_SimulationRunner):
 
     def setup(
         self,
-        bound_leg_sysprep_config: _Optional[_BaseSystemPreparationConfig] = None,
-        free_leg_sysprep_config: _Optional[_BaseSystemPreparationConfig] = None,
+        sysprep_config: _Optional[_BaseSystemPreparationConfig] = None,
     ) -> None:
         """
         Set up the calculation. This involves parametrising, equilibrating, and
@@ -188,11 +182,9 @@ class Calculation(_SimulationRunner):
 
         Parameters
         ----------
-        bound_leg_sysprep_config: BaseSystemPreparationConfig, opttional, default = None
-            The system preparation configuration to use for the bound leg. If None, the default
-            configuration is used.
-        free_leg_sysprep_config: BaseSystemPreparationConfig, opttional, default = None
-            The system preparation configuration to use for the free leg. If None, the default
+        sysprep_config: BaseSystemPreparationConfig, optional, default = None
+            The system preparation configuration to use for all legs. The required legs
+            and stages will be determined from this configuration. If None, the default
             configuration is used.
         """
 
@@ -200,17 +192,18 @@ class Calculation(_SimulationRunner):
             self._logger.info("Setup already complete. Skipping...")
             return
 
-        configs = {
-            _LegType.BOUND: bound_leg_sysprep_config,
-            _LegType.FREE: free_leg_sysprep_config,
-        }
+        # Validate the input
+        if sysprep_config is None:
+            sysprep_config = self.engine_type.system_prep_config()
+
+        self._validate_input(sysprep_config)
 
         self._logger.info("Starting calculation setup...")
         setup_start = _time.time()
 
         # Set up the legs
         self.legs = []
-        for leg_type in reversed(Calculation.required_legs):
+        for leg_type in reversed(sysprep_config.required_legs):
             self._logger.info(f"Setting up {leg_type.name.lower()} leg...")
             leg_start = _time.time()
 
@@ -229,7 +222,7 @@ class Calculation(_SimulationRunner):
                 engine_type=self.engine_type,
             )
             self.legs.append(leg)
-            leg.setup(configs[leg_type])
+            leg.setup(sysprep_config)
 
             self._logger.debug(
                 f"Completed {leg_type.name.lower()} leg setup in {_time.time() - leg_start:.2f}s"

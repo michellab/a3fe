@@ -19,7 +19,6 @@ from typing import Optional as _Optional
 from typing import Tuple as _Tuple
 from typing import Union as _Union
 
-from ..configuration.enums import EngineType as _EngineType
 import numpy as _np
 import pandas as _pd
 import scipy.stats as _stats
@@ -51,10 +50,11 @@ from ..analyse.plot import plot_sq_sem_convergence as _plot_sq_sem_convergence
 from ..analyse.process_grads import GradientData as _GradientData
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._virtual_queue import VirtualQueue as _VirtualQueue
-from ..configuration.enums import StageType as _StageType
+from ..configuration import StageType as _StageType
 from .lambda_window import LamWindow as _LamWindow
-from ..configuration.slurm_config import SlurmConfig as _SlurmConfig
-from ..configuration.engine_config import SomdConfig as _SomdConfig
+from ..configuration import SlurmConfig as _SlurmConfig
+from ..configuration import _EngineConfig
+from ..configuration import EngineType as _EngineType
 
 
 class Stage(_SimulationRunner):
@@ -89,7 +89,7 @@ class Stage(_SimulationRunner):
         stream_log_level: int = _logging.INFO,
         slurm_config: _Optional[_SlurmConfig] = None,
         analysis_slurm_config: _Optional[_SlurmConfig] = None,
-        engine_config: _Optional[_SomdConfig] = None,
+        engine_config: _Optional[_EngineConfig] = None,
         engine_type: _EngineType = _EngineType.SOMD,
         update_paths: bool = True,
     ) -> None:
@@ -136,8 +136,8 @@ class Stage(_SimulationRunner):
             Configuration for the SLURM job scheduler for the analysis.
             This is helpful e.g. if you want to submit analysis to the CPU
             partition, but the main simulation to the GPU partition. If None,
-        engine_config: SomdConfig, default: None
-            Configuration for the SOMD engine. If None, the default configuration is used.
+        engine_config: EngineConfig, default: None
+            Configuration for the engine. If None, the default configuration is used.
         engine_type: EngineType, default: EngineType.SOMD
             The type of engine to use for the production simulations.
         update_paths: bool, Optional, default: True
@@ -167,11 +167,6 @@ class Stage(_SimulationRunner):
         )
 
         if not self.loaded_from_pickle:
-            if self.engine_config.lambda_values is None:
-                self.engine_config.lambda_values = self.get_lambda_values
-            else:
-                self.engine_config.lambda_values = self.engine_config.lambda_values # type: ignore
-
             self.equil_detection = equil_detection
             self.runtime_constant = runtime_constant
             self.relative_simulation_cost = relative_simulation_cost
@@ -186,7 +181,7 @@ class Stage(_SimulationRunner):
             )
             # Creating lambda window objects sets up required input directories
             lam_val_weights = self.lam_val_weights
-            for i, lam_val in enumerate(self.engine_config.lambda_values):
+            for i, lam_val in enumerate(self.lam_vals):
                 lam_base_dir = _os.path.join(self.output_dir, f"lambda_{lam_val:.3f}")
                 self.lam_windows.append(
                     _LamWindow(
@@ -218,6 +213,15 @@ class Stage(_SimulationRunner):
         return f"Stage (type = {self.stage_type.name.lower()})"
 
     @property
+    def lam_vals(self) -> _List[float]:
+        return self.engine_config.lambda_values
+
+    @lam_vals.setter
+    def lam_vals(self, value) -> None:
+        self._logger.info("Modifying/ creating lambda values")
+        self.engine_config.lambda_values = value
+
+    @property
     def lam_windows(self) -> _List[_LamWindow]:
         return self._sub_sim_runners
 
@@ -227,24 +231,19 @@ class Stage(_SimulationRunner):
         self._sub_sim_runners = value
 
     @property
-    def get_lambda_values(self) -> _List[float]:
-        """Return list of lambda values from the engine configuration."""
-        return _SomdConfig._from_config_file(_os.path.join(self.input_dir, "somd.cfg")).lambda_values
-
-    @property
     def lam_val_weights(self) -> _List[float]:
         """Return the weights for each lambda window. These are calculated
         according to how each windows contributes to the overall free energy
         estimate, as given by TI and the trapezoidal rule."""
         lam_val_weights = []
-        for i, lam_val in enumerate(self.engine_config.lambda_values):
+        for i, lam_val in enumerate(self.lam_vals):
             if i == 0:
-                lam_val_weights.append(0.5 * (self.engine_config.lambda_values[i + 1] - lam_val))
-            elif i == len(self.engine_config.lambda_values) - 1:
-                lam_val_weights.append(0.5 * (lam_val - self.engine_config.lambda_values[i - 1]))
+                lam_val_weights.append(0.5 * (self.lam_vals[i + 1] - lam_val))
+            elif i == len(self.lam_vals) - 1:
+                lam_val_weights.append(0.5 * (lam_val - self.lam_vals[i - 1]))
             else:
                 lam_val_weights.append(
-                    0.5 * (self.engine_config.lambda_values[i + 1] - self.engine_config.lambda_values[i - 1])
+                    0.5 * (self.lam_vals[i + 1] - self.lam_vals[i - 1])
                 )
         return lam_val_weights
 
@@ -1204,7 +1203,7 @@ class Stage(_SimulationRunner):
         self._logger.info("Deleting old lambda windows and creating new ones...")
         self._sub_sim_runners = []
         lam_val_weights = self.lam_val_weights
-        for i, lam_val in enumerate(self.engine_config.lambda_values):
+        for i, lam_val in enumerate(self.lam_vals):
             lam_base_dir = _os.path.join(self.output_dir, f"lambda_{lam_val:.3f}")
             new_lam_win = _LamWindow(
                 lam=lam_val,

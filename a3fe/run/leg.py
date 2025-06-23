@@ -28,18 +28,14 @@ from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._utils import get_single_mol as _get_single_mol
 from ._virtual_queue import Job as _Job
 from ._virtual_queue import VirtualQueue as _VirtualQueue
-from ..configuration.enums import LegType as _LegType
-from ..configuration.enums import PreparationStage as _PreparationStage
-from ..configuration.enums import StageType as _StageType
+from ..configuration import LegType as _LegType
+from ..configuration import PreparationStage as _PreparationStage
+from ..configuration import StageType as _StageType
+from ..configuration import EngineType as _EngineType
+from ..configuration import _EngineConfig
+from ..configuration import SlurmConfig as _SlurmConfig
 from .stage import Stage as _Stage
-from ..configuration import (
-    _BaseSystemPreparationConfig,
-    SlurmConfig as _SlurmConfig,
-    SomdConfig as _SomdConfig,
-    SomdSystemPreparationConfig as _SomdSystemPreparationConfig,
-)
-
-from ..configuration.enums import EngineType as _EngineType
+from ..configuration import _BaseSystemPreparationConfig
 
 
 class Leg(_SimulationRunner):
@@ -68,7 +64,7 @@ class Leg(_SimulationRunner):
         stream_log_level: int = _logging.INFO,
         slurm_config: _Optional[_SlurmConfig] = None,
         analysis_slurm_config: _Optional[_SlurmConfig] = None,
-        engine_config: _Optional[_SomdConfig] = None,
+        engine_config: _Optional[_EngineConfig] = None,
         engine_type: _EngineType = _EngineType.SOMD,
         update_paths: bool = True,
     ) -> None:
@@ -112,8 +108,8 @@ class Leg(_SimulationRunner):
             Configuration for the SLURM job scheduler for the analysis.
             This is helpful e.g. if you want to submit analysis to the CPU
             partition, but the main simulation to the GPU partition. If None,
-        engine_config: SomdConfig, default: None
-            Configuration for the SOMD engine. If None, the default configuration is used.
+        engine_config: EngineConfig, default: None
+            Configuration for the engine. If None, the default configuration is used.
         engine_type: EngineType, default: EngineType.SOMD
             The type of engine to use for the production simulations.
         update_paths: bool, optional, default: True
@@ -151,9 +147,6 @@ class Leg(_SimulationRunner):
             # if this is the bound leg
             if self.leg_type == _LegType.BOUND:
                 self.dg_multiplier = -1
-
-            # Validate the input
-            self._validate_input()
 
             # Create a virtual queue for the prep jobs
             self.virtual_queue = _VirtualQueue(
@@ -226,12 +219,15 @@ class Leg(_SimulationRunner):
         """
         self._logger.info("Setting up leg...")
 
+        # Validate the input
+        self._validate_input()
+
         # First, we need to save the config to the input directory so that this can be reloaded
         # by the slurm jobs.
         cfg = (
             sysprep_config
             if sysprep_config is not None
-            else _SomdSystemPreparationConfig()
+            else self.engine_type.system_prep_config()
         )
         cfg.dump(self.input_dir, self.leg_type)
 
@@ -257,7 +253,7 @@ class Leg(_SimulationRunner):
 
         # Store restraints used. Currenly (and unlike previous versions) we only allow
         # the same restraint to be used for all.
-        if self.leg_type == _LegType.BOUND: 
+        if self.leg_type == _LegType.BOUND:
             first_restr = self.restraints[0]
             self.restraints = [first_restr for _ in range(self.ensemble_size)]
 
@@ -390,7 +386,9 @@ class Leg(_SimulationRunner):
         # Save state
         self._dump()
 
-    def create_stage_input_dirs(self, sysprep_config: _BaseSystemPreparationConfig) -> _Dict[_StageType, str]:
+    def create_stage_input_dirs(
+        self, sysprep_config: _BaseSystemPreparationConfig
+    ) -> _Dict[_StageType, str]:
         """
         Create the input directories for each stage.
 
@@ -506,7 +504,7 @@ class Leg(_SimulationRunner):
             ]:
                 _subprocess.run(["cp", "-r", input_file, outdir], check=True)
 
-            # Also write a pickle of the config to the output directory
+            # Also write a yaml file of the config to the output directory
             sysprep_config.dump(outdir, self.leg_type)
 
         fn = _system_prep.run_ensemble_equilibration
@@ -614,7 +612,7 @@ class Leg(_SimulationRunner):
         self,
         pre_equilibrated_system: _BSS._SireWrappers._system.System,  # type: ignore
         sys_prep_config: _BaseSystemPreparationConfig,
-    ) -> _Dict[_StageType, _SomdConfig]:
+    ) -> _Dict[_StageType, _EngineConfig]:
         """
         Set up the engine configurations for each stage of the leg.
 
@@ -673,9 +671,13 @@ class Leg(_SimulationRunner):
             )  # We will run outside of BSS
 
             # Copy input written by BSS to the stage input directory, excluding only somd.cfg
-            for file in _glob.glob(f"{stage_input_dir}/lambda_0.0000/*"):
-                if _os.path.basename(file) != "somd.cfg": 
-                    _shutil.copy(file, stage_input_dir)
+            files = [
+                file
+                for file in _glob.glob(f"{stage_input_dir}/lambda_0.0000/*")
+                if not file.endswith(".cfg")
+            ]
+            for file in files:
+                _shutil.copy(file, stage_input_dir)
             for file in _glob.glob(f"{stage_input_dir}/lambda_*"):
                 _subprocess.run(["rm", "-rf", file], check=True)
 
@@ -715,7 +717,9 @@ class Leg(_SimulationRunner):
             stage_config.ligand_charge = (
                 -lig_charge
             )  # Use co-alchemical ion approach when there is a charge difference
-            stage_config.lambda_values = sys_prep_config.lambda_values[self.leg_type][stage_type]
+            stage_config.lambda_values = sys_prep_config.lambda_values[self.leg_type][
+                stage_type
+            ]
 
             stage_configs[stage_type] = stage_config
 

@@ -4,7 +4,7 @@ from enum import Enum as _Enum
 from typing import List as _List
 import yaml as _yaml
 
-from .engine_config import _EngineConfig , SomdConfig as _SomdConfig
+from .engine_config import _EngineConfig, SomdConfig as _SomdConfig
 
 from typing import Any as _Any
 
@@ -14,7 +14,7 @@ __all__ = [
     "LegType",
     "PreparationStage",
     "EngineType",
-]   
+]
 
 
 class _YamlSerialisableEnum(_Enum):
@@ -94,7 +94,6 @@ class LegType(_YamlSerialisableEnum):
 
 
 class EngineType(_YamlSerialisableEnum):
-
     SOMD = 1
 
     @property
@@ -104,7 +103,18 @@ class EngineType(_YamlSerialisableEnum):
             EngineType.SOMD: _SomdConfig,
         }
         return engine_configs[self]
-    
+
+    @property
+    def system_prep_config(self):
+        from .system_prep_config import (
+            SomdSystemPreparationConfig as _SomdSystemPreparationConfig,
+        )
+
+        """Return the system preparation configuration class."""
+        system_prep_configs = {
+            EngineType.SOMD: _SomdSystemPreparationConfig,
+        }
+        return system_prep_configs[self]
 
 
 class PreparationStage(_YamlSerialisableEnum):

@@ -1,4 +1,4 @@
-name: test
+name: a3fe
 channels:
 
   - conda-forge
@@ -35,7 +35,6 @@ dependencies:
   - sphinx_rtd_theme
   - numpydoc
 
-    # Pip-only installs
-  #- pip:
-  #  - codecov
+    # Development tools
+  - pre-commit
 

@@ -1,25 +1,23 @@
-"""Unit and regression tests for the SomdConfig class."""
+"""Unit and regression tests for the engine configuration class."""
 
 from tempfile import TemporaryDirectory
 import os
 import pytest
 
-from a3fe import SomdConfig
 
-
-def test_config_yaml_save_and_load():
+def test_config_yaml_save_and_load(engine_config):
     """Test that the config can be saved to and loaded from YAML."""
     with TemporaryDirectory() as dirname:
-        config = SomdConfig(runtime=1)
+        config = engine_config(runtime=1)
         config.dump(dirname)
-        config2 = SomdConfig.load(dirname)
+        config2 = engine_config.load(dirname)
         assert config.runtime == config2.runtime
 
 
-def test_write_config():
-    """Test that the SOMD configuration file is generated correctly."""
+def test_write_config_somd(engine_config):
+    """Test that the somd configuration file is generated correctly."""
     with TemporaryDirectory() as dirname:
-        config = SomdConfig(
+        config = engine_config(
             integrator="langevinmiddle",
             timestep=4.0,
             runtime=1,  # Integer runtime
@@ -55,15 +53,17 @@ def test_write_config():
         ("leapfrogverlet", False, False),
     ],
 )
-def test_integrator_thermostat_validation(integrator, thermostat, should_pass):
+def test_integrator_thermostat_validation_somd(
+    engine_config, integrator, thermostat, should_pass
+):
     """Test integrator and thermostat combination validation."""
     if should_pass:
-        config = SomdConfig(integrator=integrator, thermostat=thermostat, runtime=1)
+        config = engine_config(integrator=integrator, thermostat=thermostat, runtime=1)
         assert config.integrator == integrator
         assert config.thermostat == thermostat
     else:
         with pytest.raises(ValueError):
-            SomdConfig(integrator=integrator, thermostat=thermostat, runtime=1)
+            engine_config(integrator=integrator, thermostat=thermostat, runtime=1)
 
 
 @pytest.mark.parametrize(
@@ -77,44 +77,44 @@ def test_integrator_thermostat_validation(integrator, thermostat, should_pass):
         (-1, "cutoffperiodic", False),
     ],
 )
-def test_charge_cutoff_validation(charge, cutoff, should_pass):
+def test_charge_cutoff_validation(engine_config, charge, cutoff, should_pass):
     """
     Test ligand charge & cutoff type combination validation:
     if ligand_charge!=0 => must use PME.
     """
     if should_pass:
-        config = SomdConfig(ligand_charge=charge, cutoff_type=cutoff, runtime=1)
+        config = engine_config(ligand_charge=charge, cutoff_type=cutoff, runtime=1)
         assert config.ligand_charge == charge
         assert config.cutoff_type == cutoff
     else:
         with pytest.raises(ValueError):
-            SomdConfig(ligand_charge=charge, cutoff_type=cutoff, runtime=1)
+            engine_config(ligand_charge=charge, cutoff_type=cutoff, runtime=1)
 
 
-def test_ligand_charge_validation():
+def test_ligand_charge_validation(engine_config):
     """Test that ligand charge validation works correctly."""
 
     # test ligand_charge=0, any cutoff_type
-    valid_config_cutoff = SomdConfig(
+    valid_config_cutoff = engine_config(
         ligand_charge=0, cutoff_type="cutoffperiodic", runtime=1
     )
     assert valid_config_cutoff.ligand_charge == 0
     assert valid_config_cutoff.cutoff_type == "cutoffperiodic"
 
-    valid_config_charge = SomdConfig(ligand_charge=1, cutoff_type="PME", runtime=1)
+    valid_config_charge = engine_config(ligand_charge=1, cutoff_type="PME", runtime=1)
     assert valid_config_charge.ligand_charge == 1
     assert valid_config_charge.cutoff_type == "PME"
 
     with pytest.raises(ValueError):
-        SomdConfig(ligand_charge=1, cutoff_type="cutoffperiodic", runtime=1)
+        engine_config(ligand_charge=1, cutoff_type="cutoffperiodic", runtime=1)
 
 
-def test_get_somd_config_with_extra_options():
+def test_get_somd_config_with_extra_options(somd_engine_config):
     """
     Test SOMD config generation with some extra_options.
     """
     with TemporaryDirectory() as dirname:
-        config = SomdConfig(
+        config = somd_engine_config(
             integrator="langevinmiddle",
             runtime=1,
             cutoff_type="PME",
@@ -136,7 +136,7 @@ def test_get_somd_config_with_extra_options():
         assert "custom_option = value" in content
 
 
-def test_compare_with_reference_config():
+def test_compare_with_reference_config(somd_engine_config):
     """Test that we can generate a config file that matches a reference config."""
     reference_lines = [
         "timestep = 4.0 * femtosecond",
@@ -161,7 +161,7 @@ def test_compare_with_reference_config():
         "lambda array = 0.0, 0.125, 0.25, 0.375, 0.5, 1.0",
     ]
     with TemporaryDirectory() as dirname:
-        config = SomdConfig(
+        config = somd_engine_config(
             runtime=1,
             constraint="hbonds",
             hydrogen_mass_factor=3.0,
@@ -198,12 +198,22 @@ def test_compare_with_reference_config():
             assert line in cfg_content, f"Expected '{line}' in generated config."
 
 
-def test_copy_from_existing_config():
+def test_copy_from_existing_config(somd_engine_config):
     """Test that we can copy from an existing somd.cfg file."""
-    reference_config = "/home/roy/software/deve/a3fe/a3fe/data/example_run_dir/bound/discharge/output/lambda_0.000/run_01/somd.cfg"
+    reference_config = os.path.join(
+        "a3fe",
+        "data",
+        "example_run_dir",
+        "bound",
+        "discharge",
+        "output",
+        "lambda_0.000",
+        "run_01",
+        "somd.cfg",
+    )
     if not os.path.isfile(reference_config):
         pytest.skip("Reference config not found, skipping test.")
-    c = SomdConfig._from_config_file(reference_config)
+    c = somd_engine_config._from_config_file(reference_config)
 
     assert c.use_boresch_restraints is True
     assert c.turn_on_receptor_ligand_restraints is False

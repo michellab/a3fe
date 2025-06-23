@@ -16,20 +16,24 @@ from ._version import __version__
 from .run import (
     CalcSet,
     Calculation,
-    JobStatus,
     LamWindow,
     Leg,
-    LegType,
-    PreparationStage,
     Simulation,
     Stage,
-    StageType,
-    EngineType,
 )
 
-from .configuration import SomdSystemPreparationConfig, SlurmConfig, SomdConfig, enums
-
-_sys.modules["EnsEquil"] = _sys.modules["a3fe"]
+from .configuration import (
+    SlurmConfig,
+    _EngineConfig,
+    SomdConfig,
+    EngineType,
+    JobStatus,
+    LegType,
+    PreparationStage,
+    StageType,
+    enums,
+    SomdSystemPreparationConfig,
+)
 
 # A3FE can open many files due to the use of multiprocessing and
 # threading with MBAR. This can cause a "Too many open files" error.

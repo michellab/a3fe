@@ -36,13 +36,33 @@ class _BaseSystemPreparationConfig(_ABC, _BaseModel):
     )
     water_model: str = _Field("tip3p", description="Water model to use.")
     ion_conc: float = _Field(0.15, ge=0, lt=1, description="Ion concentration in M.")
-    steps: int = _Field(1000, gt=0, lt=100_000, description="Number of steps for the minimisation.")
-    runtime_short_nvt: int = _Field(5, gt=0, lt=500, description="Runtime for the short NVT equilibration in ps.")
-    runtime_nvt: int = _Field(50, gt=0, lt=5_000, description="Runtime for the NVT equilibration in ps.")
-    end_temp: float = _Field(298.15, gt=0, lt=350, description="End temperature for the NVT equilibration in K.")
-    runtime_npt: int = _Field(400, gt=0, lt=40_000, description="Runtime for the NPT equilibration in ps.")
-    runtime_npt_unrestrained: int = _Field(1000, gt=0, lt=100_000, description="Runtime for the unrestrained NPT equilibration in ps.")
-    ensemble_equilibration_time: int = _Field(5000, gt=0, lt=50_000, description="Ensemble equilibration time in ps.")
+    steps: int = _Field(
+        1000, gt=0, lt=100_000, description="Number of steps for the minimisation."
+    )
+    runtime_short_nvt: int = _Field(
+        5, gt=0, lt=500, description="Runtime for the short NVT equilibration in ps."
+    )
+    runtime_nvt: int = _Field(
+        50, gt=0, lt=5_000, description="Runtime for the NVT equilibration in ps."
+    )
+    end_temp: float = _Field(
+        298.15,
+        gt=0,
+        lt=350,
+        description="End temperature for the NVT equilibration in K.",
+    )
+    runtime_npt: int = _Field(
+        400, gt=0, lt=40_000, description="Runtime for the NPT equilibration in ps."
+    )
+    runtime_npt_unrestrained: int = _Field(
+        1000,
+        gt=0,
+        lt=100_000,
+        description="Runtime for the unrestrained NPT equilibration in ps.",
+    )
+    ensemble_equilibration_time: int = _Field(
+        5000, gt=0, lt=50_000, description="Ensemble equilibration time in ps."
+    )
     append_to_ligand_selection: str = _Field(
         "",
         description="If this is a bound leg, this appends the supplied string to the default atom selection which chooses the atoms in the ligand to consider as potential anchor points. The default atom selection is f'resname {ligand_resname} and not name H*'. Uses the mdanalysis atom selection language. For example, 'not name O*' will result in an atom selection of f'resname {ligand_resname} and not name H* and not name O*'.",
@@ -119,6 +139,17 @@ class _BaseSystemPreparationConfig(_ABC, _BaseModel):
             for leg_type in self.lambda_values.keys()
         }
 
+    @property
+    def required_legs(self) -> _List[_LegType]:
+        """
+        Get the required legs for the calculation.
+
+        Returns
+        -------
+        List[LegType]
+            Required legs for the calculation, determined from lambda_values.
+        """
+        return list(self.lambda_values.keys())
 
     model_config = _ConfigDict(extra="forbid", validate_assignment=True)
 

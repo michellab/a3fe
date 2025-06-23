@@ -19,13 +19,19 @@ For details of the algorithms and testing, please see the assocated paper:
 
 a3fe depends on SLURM for scheduling jobs, and on GROMACS for running initial equilibration simulations. Please ensure that your have sourced your GMXRC or loaded your GROMACS module before proceeding with the installation. While we recommend installing with [mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html), you can substitute `mamba` with `conda` in the following commands.
 
-Now, download and install a3fe:
+Now, download and install a3fe. Choose the appropriate environment for your use case:
+
+**Regular users:**
 ```bash
 git clone https://github.com/michellab/a3fe.git
 cd a3fe
-mamba env create -f environment.yaml
+make env
 mamba activate a3fe
-python -m pip install --no-deps .
+```
+
+**Developers with local GROMACS:**
+```bash
+make env-dev
 ```
 
 ### Quick Start

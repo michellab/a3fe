@@ -2,7 +2,7 @@ Getting Started
 ===============
 a3fe is a package for running alchemical absolute binding free energy calculations with SOMD (Sire / OpenMM Molecular Dynamics) through SLURM. 
 It is based on Sire(https://sire.openbiosim.org/) and also uses BioSimSpace(https://biosimspace.openbiosim.org/) during the set-up stages. For a
-discussion of the algorithms used, please see [the preprint](https://doi.org/10.26434/chemrxiv-2024-3ft7f).
+discussion of the algorithms used, please see (https://pubs.acs.org/doi/10.1021/acs.jctc.4c00806).
 
 Installation
 ************
@@ -18,11 +18,7 @@ Quick Start
 .. code-block:: python
 
     import a3fe as a3 
-    calc = a3.Calculation(
-        ensemble_size=5, # Use 5 (independently equilibrated) replicate runs
-        slurm_config=a3.SlurmConfig(partition="<desired partition>"),  # Set your desired partition!
-        engine_config=a3.SomdConfig(),
-    )
+    calc = a3.Calculation(ensemble_size=5) # Run with 5 independent replicates and default engine is SOMD
     calc.setup()
     calc.get_optimal_lam_vals()
     calc.run(adaptive=False, runtime = 5) # Run non-adaptively for 5 ns per replicate

@@ -13,16 +13,18 @@ Windows testing if you only plan to deploy on specific platforms. These are just
 
 ### Conda Environment:
 
-This directory contains the files to setup the Conda environment for testing purposes
+This directory contains the files to setup the Conda environment for different use cases
 
 * `conda-envs`: directory containing the YAML file(s) which fully describe Conda Environments, their dependencies, and those dependency provenance's
-  * `test_env.yaml`: Simple test environment file with base dependencies. Channels are not specified here and therefore respect global Conda configuration
-  
-### Additional Scripts:
+  * `base_env.yaml`: Regular user environment
+  * `dev_env.yaml`: Development environment with testing and documentation tools (no GROMACS)
+  * `ci_env.yaml`: Full CI environment including GROMACS and all testing tools
 
-This directory contains OS agnostic helper scripts which don't fall in any of the previous categories
-* `scripts`
-  * `create_conda_env.py`: Helper program for spinning up new conda environments based on a starter file with Python Version and Env. Name command-line options
+**Environment Setup:**
+Choose the appropriate environment for your use case:
+- **Regular users**: `make env` 
+- **Developers with local GROMACS**: `make env-dev` 
+- **CI and developers without GROMACS**: `make env-ci` 
 
 
 ## How to contribute changes

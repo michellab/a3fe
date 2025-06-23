@@ -1,0 +1,28 @@
+# .pre-commit-config.yaml
+repos:
+# Basic file cleanup hooks
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v3.2.0
+    hooks:
+    -   id: trailing-whitespace  # delete trailing whitespace
+    -   id: end-of-file-fixer    # ensure file ends with a blank line
+    -   id: check-yaml           # check yaml syntax
+    -   id: check-added-large-files  # prevent large files from being added
+    -   id: check-merge-conflict    # check for unresolved merge conflicts
+
+# Use local commands to format and check code
+-   repo: local
+    hooks:
+    # code format hook
+    -   id: ruff
+        name: Autoformat python code
+        language: system
+        entry: bash
+        args: [-c, "make format"]
+        
+    # code check hook
+    -   id: ruff
+        name: Lint python code
+        language: system
+        entry: bash
+        args: [-c, "make lint"]
