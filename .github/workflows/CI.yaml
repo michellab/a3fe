@@ -39,12 +39,13 @@ jobs:
 
       - name: Setup environment for Python ${{ matrix.python-version }}
         run: |
-          make env PYTHON_VERSION=${{ matrix.python-version }}
+          make env-ci PYTHON_VERSION=${{ matrix.python-version }}
 
       - name: Run linting and tests
         run: |
           make lint
           make test
+          make clean
           make docs
 
       - name: Upload coverage reports to Codecov

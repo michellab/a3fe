@@ -2,6 +2,17 @@
 
 This directory contains integration tests for A3FE, which are designed to run in a local SLURM environment rather than in a CI environment, as they may require longer run times and SLURM resources.
 
+## Prerequisites
+
+**For developers**: Integration tests require GROMACS and testing tools. Set up your development environment first:
+
+```bash
+cd your/path/a3fe
+make env-dev  # install development environment using your local GROMACS
+```
+
+**Note**: These tests will use your locally installed GROMACS. Make sure your GROMACS is available.
+
 ## Running Integration Tests
 
 To run integration tests, use the following command:

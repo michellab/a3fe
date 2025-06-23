@@ -12,6 +12,7 @@ If you need to load old pickle files, please revert to version 0.3.x.
 - Decoupled SOMD engine from a3fe calculation and removed run_somd.sh and template_config.cfg, replacing them with a3fe.configuration.slurm_config.SlurmConfig and a3fe.configuration.engine_config.SomdConfig. 
 - SystemPreparationConfigs saved as readable yaml file, rather than as a pickle. 
 - Separated system preparation configuration from system preparation and configured SOMD with a3fe.configuration.system_prep_config.SomdSystemPreparationConfig.
+- Streamlined the installation process with a Makefile.
 
 **Migration Guide**:
 In previous versions, users needed to configure run_somd.sh and template_config.cfg files to run calculations. 

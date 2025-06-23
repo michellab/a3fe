@@ -6,15 +6,28 @@ CONDA_ENV_RUN = conda run --no-capture-output --name $(PACKAGE_NAME)
 
 TEST_ARGS := -v --cov=$(PACKAGE_NAME) --cov-report=term --cov-report=xml --junitxml=unit.xml --color=yes
 
-.PHONY: env lint format test test-integration docs-build docs clean
+.PHONY: env env-dev env-ci lint format test test-integration docs-build docs clean
 
-# create and configure development environment
+# Regular users:
 env:
 	mamba create -y --name $(PACKAGE_NAME) $(if $(PYTHON_VERSION),python=$(PYTHON_VERSION))
-	mamba env update --name $(PACKAGE_NAME) --file devtools/conda-envs/test_env.yaml
+	mamba env update --name $(PACKAGE_NAME) --file devtools/conda-envs/base_env.yaml
+	$(CONDA_ENV_RUN) pip install --no-deps -e .
+
+# Developers with local GROMACS
+env-dev:
+	mamba create -y --name $(PACKAGE_NAME) $(if $(PYTHON_VERSION),python=$(PYTHON_VERSION))
+	mamba env update --name $(PACKAGE_NAME) --file devtools/conda-envs/dev_env.yaml
 	$(CONDA_ENV_RUN) pip install --no-deps -e .
 	$(CONDA_ENV_RUN) pre-commit install || true
 
+# CI and developers without GROMACS
+env-ci:
+	mamba create -y --name $(PACKAGE_NAME) $(if $(PYTHON_VERSION),python=$(PYTHON_VERSION))
+	mamba env update --name $(PACKAGE_NAME) --file devtools/conda-envs/ci_env.yaml
+	$(CONDA_ENV_RUN) pip install --no-deps -e .
+	$(CONDA_ENV_RUN) pre-commit install || true
+	
 # code check
 lint:
 	$(CONDA_ENV_RUN) ruff check $(PACKAGE_DIR)
