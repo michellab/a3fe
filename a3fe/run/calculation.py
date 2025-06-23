@@ -194,6 +194,9 @@ class Calculation(_SimulationRunner):
             return
 
         # Validate the input
+        if sysprep_config is None:
+            sysprep_config = self.engine_type.system_prep_config()
+
         self._validate_input(sysprep_config)
 
         self._logger.info("Starting calculation setup...")

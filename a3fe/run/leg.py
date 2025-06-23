@@ -148,9 +148,6 @@ class Leg(_SimulationRunner):
             if self.leg_type == _LegType.BOUND:
                 self.dg_multiplier = -1
 
-            # Validate the input
-            self._validate_input()
-
             # Create a virtual queue for the prep jobs
             self.virtual_queue = _VirtualQueue(
                 log_dir=self.base_dir, stream_log_level=self.stream_log_level
@@ -221,6 +218,9 @@ class Leg(_SimulationRunner):
             is used.
         """
         self._logger.info("Setting up leg...")
+
+        # Validate the input
+        self._validate_input()
 
         # First, we need to save the config to the input directory so that this can be reloaded
         # by the slurm jobs.
