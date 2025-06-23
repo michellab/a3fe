@@ -10,7 +10,6 @@ from typing import List as _List
 from typing import Optional as _Optional
 
 from ._simulation_runner import SimulationRunner as _SimulationRunner
-from ..configuration.enums import LegType as _LegType
 from ..configuration.enums import PreparationStage as _PreparationStage
 from .leg import Leg as _Leg
 from ..configuration import _BaseSystemPreparationConfig
