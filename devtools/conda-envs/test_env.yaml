@@ -24,6 +24,7 @@ dependencies:
   - pydantic
   - ruff
   - mkl>=2022.1.0
+  - loguru
 
     # Testing
   - pytest
