@@ -2,6 +2,10 @@
 Change Log
 ===============
 
+0.3.4
+====================
+- Added loguru to make dependency explicit in the environment.yaml and conda-envs/test_env.yaml files.
+
 0.3.3
 ====================
 - Fixed bug in water analysis ``get_water_stage()`` which caused repeats ``runs_nos`` and an error related to incorrect numbers of positional arguments.
