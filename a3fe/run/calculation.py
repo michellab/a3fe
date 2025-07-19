@@ -16,19 +16,26 @@ from .enums import PreparationStage as _PreparationStage
 from .leg import Leg as _Leg
 from .system_prep import SystemPreparationConfig as _SystemPreparationConfig
 
+# Notes from the paper - by JJ-2025-05-06 
+# The simulations with the ligand in solvent collectively make up the free leg, while those with the receptor–ligand 
+# complex make up the bound leg. Sets of calculations where interactions of a given type are introduced or removed 
+# are termed stages: receptor–ligand restraints were introduced, charges were scaled, and Lennard-Jones (LJ) terms 
+# were scaled in the restrain, discharge, and vanish stages, respectively
 
 class Calculation(_SimulationRunner):
     """
     Class to set up and run an entire ABFE calculation, consisting of two legs
     (bound and unbound) and multiple stages.
-    """
 
-    required_input_files = [
-        "run_somd.sh",
-        "protein.pdb",
-        "ligand.sdf",
-        "template_config.cfg",
-    ]  # Waters.pdb is optional
+
+    """
+    # commented out by JJ 2025-05-03
+    # required_input_files = [
+    #     "run_somd.sh",
+    #     "protein.pdb",
+    #     "ligand.sdf",
+    #     "template_config.cfg",
+    # ]  # Waters.pdb is optional
 
     required_legs = [_LegType.FREE, _LegType.BOUND]
 
@@ -168,6 +175,7 @@ class Calculation(_SimulationRunner):
         self,
         bound_leg_sysprep_config: _Optional[_SystemPreparationConfig] = None,
         free_leg_sysprep_config: _Optional[_SystemPreparationConfig] = None,
+        skip_preparation: bool = False, 
     ) -> None:
         """
         Set up the calculation. This involves parametrising, equilibrating, and
@@ -208,7 +216,7 @@ class Calculation(_SimulationRunner):
                 stream_log_level=self.stream_log_level,
             )
             self.legs.append(leg)
-            leg.setup(configs[leg_type])
+            leg.setup(configs[leg_type], skip_preparation=skip_preparation)
 
         # Save the state
         self.setup_complete = True

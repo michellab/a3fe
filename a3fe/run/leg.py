@@ -190,6 +190,7 @@ class Leg(_SimulationRunner):
     def setup(
         self,
         sysprep_config: _Optional[_SystemPreparationConfig] = None,
+        skip_preparation: bool = False, 
     ) -> None:
         """
         Set up the leg. This involves:
@@ -215,29 +216,45 @@ class Leg(_SimulationRunner):
         cfg = (
             sysprep_config if sysprep_config is not None else _SystemPreparationConfig()
         )
-        cfg.save_pickle(self.input_dir, self.leg_type)
+        cfg.save_pickle(self.input_dir, self.leg_type)   # This is where we save pickle files JJH-2025-05-17
 
         # Create input directories, parameterise, solvate, minimise, heat and preequil, all
         # depending on the input files present.
 
         # First, create the input directories
         self.create_stage_input_dirs()
-
-        # Then prepare as required according to the preparation stage
-        if self.prep_stage == _PreparationStage.STRUCTURES_ONLY:
-            self.parameterise_input(slurm=cfg.slurm)
-        if self.prep_stage == _PreparationStage.PARAMETERISED:
-            self.solvate_input(slurm=cfg.slurm)  # This also adds ions
-        if self.prep_stage == _PreparationStage.SOLVATED:
-            system = self.minimise_input(slurm=cfg.slurm)
-        if self.prep_stage == _PreparationStage.MINIMISED:
-            system = self.heat_and_preequil_input(slurm=cfg.slurm)
-        if self.prep_stage == _PreparationStage.PREEQUILIBRATED:
-            # Run separate equilibration simulations for each of the repeats and
-            # extract the final structures to give a diverse ensemble of starting
-            # conformations. For the bound leg, this also extracts the restraints.
-            system = self.run_ensemble_equilibration(sysprep_config=cfg)
-
+        
+        if not skip_preparation:
+            # Then prepare as required according to the preparation stage
+            if self.prep_stage == _PreparationStage.STRUCTURES_ONLY:
+                self.parameterise_input(slurm=cfg.slurm)
+            if self.prep_stage == _PreparationStage.PARAMETERISED:
+                self.solvate_input(slurm=cfg.slurm)  # This also adds ions
+            if self.prep_stage == _PreparationStage.SOLVATED:
+                system = self.minimise_input(slurm=cfg.slurm)
+            if self.prep_stage == _PreparationStage.MINIMISED:
+                system = self.heat_and_preequil_input(slurm=cfg.slurm)
+            if self.prep_stage == _PreparationStage.PREEQUILIBRATED:
+                # Run separate equilibration simulations for each of the repeats and
+                # extract the final structures to give a diverse ensemble of starting
+                # conformations. For the bound leg, this also extracts the restraints.
+                system = self.run_ensemble_equilibration(sysprep_config=cfg)
+        else:
+            # Skip preparation and load the pre-equilibrated system directly
+            self._logger.info("Skipping preparation steps - loading pre-equilibrated system...")
+            system = _BSS.IO.readMolecules(
+                [
+                    f"{self.input_dir}/{file}"
+                    for file in _PreparationStage.PREEQUILIBRATED.get_simulation_input_files(
+                        self.leg_type
+                    )
+                ]
+            )
+            # Mark the ligand to be decoupled
+            # need to do the same decouple thing as run_ensemble_equilibration()
+            lig = _BSS.Align.decouple(system[0], intramol=True)
+            system.updateMolecule(0, lig)
+        
         # Write input files
         self.write_input_files(system, config=cfg)
 
@@ -587,17 +604,19 @@ class Leg(_SimulationRunner):
         )
 
         for outdir in outdirs_to_run:
+            # This copies e.g., bound_preequil.rst7 and bound_preequil.prm7 to 
+            # ensemble_equilibration_1, ensemble_equilibration_2, etc.
             _subprocess.run(["mkdir", "-p", outdir], check=True)
-            for input_file in [
+            for input_file in [   # input_files are "bound_preequil.prm7" and "bound_preequil.rst7" 
                 f"{self.input_dir}/{ifile}"
                 for ifile in _PreparationStage.PREEQUILIBRATED.get_simulation_input_files(
                     self.leg_type
-                )
+                )  
             ]:
                 _subprocess.run(["cp", "-r", input_file, outdir], check=True)
 
             # Also write a pickle of the config to the output directory
-            sysprep_config.save_pickle(outdir, self.leg_type)
+            sysprep_config.save_pickle(outdir, self.leg_type)  # this is where we save the config pickle file
 
         if sysprep_config.slurm:
             if self.leg_type == _LegType.BOUND:
@@ -620,12 +639,15 @@ class Leg(_SimulationRunner):
             self.virtual_queue.wait()  # Wait for all jobs to finish
 
             # Check that the required input files have been produced, since slurm can fail silently
+            # NOTE: do I have to check this? is there a better way to check if the job is done? by JJH-2025-05-23
             for i, outdir in enumerate(outdirs_to_run):
+                # check few files (two inputs and one output: somd.rst7) to see if the job is done properly 
                 for file in (
-                    _PreparationStage.PREEQUILIBRATED.get_simulation_input_files(
+                    # NOTE bound_preequil.prm7 and bound_preequil.rst7 in the folder JJH-2025-05-17
+                    _PreparationStage.PREEQUILIBRATED.get_simulation_input_files(  
                         self.leg_type
                     )
-                    + ["somd.rst7"]
+                    + ["somd.rst7"]  # NOTE okay this is the original output file by JJH-2025-05-17
                 ):
                     if not _os.path.isfile(f"{outdir}/{file}"):
                         raise RuntimeError(
@@ -648,11 +670,13 @@ class Leg(_SimulationRunner):
         equil_numbers = [int(outdir.split("_")[-1]) for outdir in outdirs_to_run]
         for equil_number, outdir in zip(equil_numbers, outdirs_to_run):
             _subprocess.run(
+                # NOTE we rename the somd.rst7 file to somd_<equil_number>.rst7 here by JJH-2025-05-17
                 ["mv", f"{outdir}/somd.rst7", f"{outdir}/somd_{equil_number}.rst7"],
                 check=True,
             )
 
         # Load the system and mark the ligand to be decoupled
+        # Interestinly, we're loading preequil files, bound_preequil.prm7 and bound_preequil.rst7?
         self._logger.info("Loading pre-equilibrated system...")
         pre_equilibrated_system = _BSS.IO.readMolecules(
             [
@@ -664,6 +688,7 @@ class Leg(_SimulationRunner):
         )
 
         # Mark the ligand to be decoupled so the restraints searching algorithm works
+        # NOTE so why ligand is the first molecule in the system? by JJH-2025-05-17
         lig = _BSS.Align.decouple(pre_equilibrated_system[0], intramol=True)
         pre_equilibrated_system.updateMolecule(0, lig)
 
@@ -672,6 +697,7 @@ class Leg(_SimulationRunner):
             # For each run, load the trajectory and extract the restraints
             for i, outdir in enumerate(outdirs):
                 self._logger.info(f"Loading trajectory for run {i + 1}...")
+                # NOTE: again the first file is the top_file? easy to break by JJH-2025-05-17
                 top_file = f"{self.input_dir}/{_PreparationStage.PREEQUILIBRATED.get_simulation_input_files(self.leg_type)[0]}"
                 traj = _BSS.Trajectory.Trajectory(
                     topology=top_file,
@@ -694,6 +720,7 @@ class Leg(_SimulationRunner):
 
                 # Save the restraints to a text file and store within the Leg object
                 with open(f"{outdir}/restraint_{i + 1}.txt", "w") as f:
+                    # NOTE we can use "gromacs" as the engine here by JJH-2025-05-17
                     f.write(restraint.toString(engine="SOMD"))  # type: ignore
                 self.restraints.append(restraint)
 
@@ -709,6 +736,10 @@ class Leg(_SimulationRunner):
     ) -> None:
         """
         Write the required input files to all of the stage input directories.
+        NOTE: this writes to 
+        e.g., /Users/jingjinghuang/Documents/fep_workflow/test_run/bound/discharge/input
+
+        It seems we move lots of files from ensemble_equilibration_1 to the stage input directory
 
         Parameters
         ----------
@@ -832,6 +863,7 @@ class Leg(_SimulationRunner):
                 )
 
             # Now overwrite the SOMD generated config file with the updated template
+            # NOTE: here we rename template_config.cfg to somd.cfg
             _subprocess.run(
                 [
                     "mv",
@@ -882,7 +914,6 @@ class Leg(_SimulationRunner):
                     header_lines.append(line)
                 else:
                     break
-
         # Add module loading and environment setup
         header_lines.extend([
            "\n# Load required modules\n",
