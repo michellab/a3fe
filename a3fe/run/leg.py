@@ -883,9 +883,21 @@ class Leg(_SimulationRunner):
                 else:
                     break
 
+        # Add module loading and environment setup
+        header_lines.extend([
+           "\n# Load required modules\n",
+           "module load StdEnv/2023\n",
+           "module load gcc/12.3\n",
+           "module load openmpi/4.1.5\n",
+           "module load cuda/12.2\n",
+           "module load gromacs/2024.4\n",
+           "\n# Set Python executable\n",
+           "export A3FE_PYTHON=/home/jjhuang/miniconda3/envs/a3fe/bin/python\n",
+           "\n# Run the Python function\n"
+        ])
         # Add lines to run the python function and write out
         header_lines.append(
-            f"\npython -c 'from a3fe.run.system_prep import {sys_prep_fn.__name__}; {sys_prep_fn.__name__}()'"
+            f"${{A3FE_PYTHON:-python}} -c 'from a3fe.run.system_prep import {sys_prep_fn.__name__}; {sys_prep_fn.__name__}()'\n"
         )
         slurm_file = f"{run_dir}/{job_name}.sh"
         with open(slurm_file, "w") as file:
