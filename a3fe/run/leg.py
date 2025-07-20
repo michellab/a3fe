@@ -258,6 +258,13 @@ class Leg(_SimulationRunner):
             self._load_restraints_helper(pre_equilibrated_system=system, sysprep_config=cfg)
 
         
+        # Add this debug line just before write_input_files
+        if self.leg_type == _LegType.BOUND and hasattr(self, 'restraints') and self.restraints:
+            print(f"DEBUG: restraint type before write_input_files: {type(self.restraints[0])}")
+            print(f"DEBUG: restraint has toString: {hasattr(self.restraints[0], 'toString')}")
+            print(f"DEBUG: restraint has _restraint: {hasattr(self.restraints[0], '_restraint')}")
+
+
         # Write input files
         self.write_input_files(system, config=cfg)
 
@@ -330,6 +337,7 @@ class Leg(_SimulationRunner):
                 if restraint is None:
                     raise ValueError(f"No restraints found for run {i + 1}.")
 
+                self._logger.info(f"Obtained restraint for run {i + 1}: {restraint}")
                 # Save the restraints to a text file and store within the Leg object
                 with open(f"{outdir}/restraint_{i + 1}.txt", "w") as f:
                     # NOTE we can use "gromacs" as the engine here by JJH-2025-05-17
