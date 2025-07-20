@@ -255,7 +255,7 @@ class Leg(_SimulationRunner):
             lig = _BSS.Align.decouple(system[0], intramol=True)
             system.updateMolecule(0, lig)
             # now we need to load the restraints
-            self._load_restraints_helper(sysprep_config=cfg)
+            self._load_restraints_helper(pre_equilibrated_system=system, sysprep_config=cfg)
 
         
         # Write input files
@@ -292,7 +292,7 @@ class Leg(_SimulationRunner):
         # Save state
         self._dump()
 
-    def _load_restraints_helper(self, sysprep_config: _SystemPreparationConfig) -> None:
+    def _load_restraints_helper(self, pre_equilibrated_system: _BSS._SireWrappers._system.System, sysprep_config: _SystemPreparationConfig) -> None:
         """
         Temporary function to load pre-computed restraints in the bound leg.
         
@@ -303,16 +303,6 @@ class Leg(_SimulationRunner):
             f"{self.base_dir}/ensemble_equilibration_{i + 1}"
             for i in range(self.ensemble_size)
         ]
-
-        self._logger.info("Loading pre-equilibrated system...")
-        pre_equilibrated_system = _BSS.IO.readMolecules(
-            [
-                f"{self.input_dir}/{file}"
-                for file in _PreparationStage.PREEQUILIBRATED.get_simulation_input_files(
-                    self.leg_type
-                )
-            ]
-        )
 
         # If this is the bound leg, search for restraints
         if self.leg_type == _LegType.BOUND:
