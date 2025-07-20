@@ -255,7 +255,7 @@ class Leg(_SimulationRunner):
             lig = _BSS.Align.decouple(system[0], intramol=True)
             system.updateMolecule(0, lig)
             # now we need to load the restraints
-            self._load_restraints_helper(sysprep_config=sysprep_config)
+            self._load_restraints_helper(sysprep_config=cfg)
 
         
         # Write input files
