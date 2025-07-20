@@ -971,7 +971,7 @@ class Leg(_SimulationRunner):
            "module load cuda/12.2\n",
            "module load gromacs/2024.4\n",
            "\n# Set Python executable\n",
-           "export A3FE_PYTHON=/home/jjhuang/miniconda3/envs/a3fe/bin/python\n",
+           "export A3FE_PYTHON=/home/jjhuang/miniconda3/envs/a3fe_jh/bin/python\n",
            "\n# Run the Python function\n"
         ])
         # Add lines to run the python function and write out
