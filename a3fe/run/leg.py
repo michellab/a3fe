@@ -254,6 +254,9 @@ class Leg(_SimulationRunner):
             # need to do the same decouple thing as run_ensemble_equilibration()
             lig = _BSS.Align.decouple(system[0], intramol=True)
             system.updateMolecule(0, lig)
+            # now we need to load the restraints
+            self._load_restraints_helper(sysprep_config=sysprep_config)
+
         
         # Write input files
         self.write_input_files(system, config=cfg)
@@ -288,6 +291,61 @@ class Leg(_SimulationRunner):
         self._logger.info("Setup complete.")
         # Save state
         self._dump()
+
+    def _load_restraints_helper(self, sysprep_config: _SystemPreparationConfig) -> None:
+        """
+        Temporary function to load pre-computed restraints in the bound leg.
+        
+        used when skip_preparation is True, to search for restraints. 
+        the ensemble_equilibration step must be completed - by JJH 2025-07-19
+        """
+        outdirs = [
+            f"{self.base_dir}/ensemble_equilibration_{i + 1}"
+            for i in range(self.ensemble_size)
+        ]
+
+        self._logger.info("Loading pre-equilibrated system...")
+        pre_equilibrated_system = _BSS.IO.readMolecules(
+            [
+                f"{self.input_dir}/{file}"
+                for file in _PreparationStage.PREEQUILIBRATED.get_simulation_input_files(
+                    self.leg_type
+                )
+            ]
+        )
+
+        # If this is the bound leg, search for restraints
+        if self.leg_type == _LegType.BOUND:
+            # For each run, load the trajectory and extract the restraints
+            for i, outdir in enumerate(outdirs):
+                self._logger.info(f"Loading trajectory for run {i + 1}...")
+                # NOTE: again the first file is the top_file? easy to break by JJH-2025-05-17
+                top_file = f"{self.input_dir}/{_PreparationStage.PREEQUILIBRATED.get_simulation_input_files(self.leg_type)[0]}"
+                traj = _BSS.Trajectory.Trajectory(
+                    topology=top_file,
+                    trajectory=f"{outdir}/gromacs.xtc",
+                    system=pre_equilibrated_system,
+                )
+                self._logger.info(f"Selecting restraints for run {i + 1}...")
+                restraint = _BSS.FreeEnergy.RestraintSearch.analyse(
+                    method="BSS",
+                    system=pre_equilibrated_system,
+                    traj=traj,
+                    work_dir=outdir,
+                    temperature=298.15 * _BSS.Units.Temperature.kelvin,
+                    append_to_ligand_selection=sysprep_config.append_to_ligand_selection,
+                )
+
+                # Check that we actually generated a restraint
+                if restraint is None:
+                    raise ValueError(f"No restraints found for run {i + 1}.")
+
+                # Save the restraints to a text file and store within the Leg object
+                with open(f"{outdir}/restraint_{i + 1}.txt", "w") as f:
+                    # NOTE we can use "gromacs" as the engine here by JJH-2025-05-17
+                    f.write(restraint.toString(engine="SOMD"))  # type: ignore
+                self.restraints.append(restraint)
+
 
     def get_optimal_lam_vals(
         self,

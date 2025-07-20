@@ -1,4 +1,13 @@
-"""Functionality to process the gradient data."""
+"""Aknowledgement: "process_grads.py" is copied almost exactly from
+"process_grads.py" here:
+https://github.com/michellab/a3fe/blob/main/a3fe/analyse/process_grads.py
+The license and original authorship are preserved below:
+
+Copyright (c) 2023, Finlay Clark
+
+LICENSE
+xxx
+"""
 
 from __future__ import annotations
 
@@ -587,6 +596,7 @@ def get_time_series_multiwindow(
         for i, run_no in enumerate(run_nos):  # type: ignore
             sim = lam_win.sims[run_no - 1]
             times, grads = sim.read_gradients()
+
             dgs = [grad * lam_win.lam_val_weight for grad in grads]
             # Truncate here if necessary
             start_idx = 0 if start_frac is None else round(start_frac * len(dgs))
@@ -713,7 +723,7 @@ def get_time_series_multiwindow_mbar(
     start_and_end_fracs = [
         (round(x[0], 5), round(x[1], 5)) for x in start_and_end_fracs
     ]
-
+    print('start_and_end_fracs------', start_and_end_fracs)
     # Check whether we should use slurm or not.
     use_slurms = [
         getattr(lam_win, "slurm_equil_detection", True) for lam_win in lambda_windows
@@ -828,6 +838,6 @@ def _compute_dg(
         percentage_end=end_frac * 100,
         percentage_start=start_frac * 100,
         subsampling=False,
-        delete_outfiles=True,
+        delete_outfiles=False,
     )
     return free_energies[0]

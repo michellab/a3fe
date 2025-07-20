@@ -28,7 +28,7 @@ from .process_grads import (
     get_time_series_multiwindow_mbar as _get_time_series_multiwindow_mbar,
 )
 
-
+# not being used at the repo - by JJH 
 def check_equil_block_gradient(
     lam_win: "LamWindow",  # type: ignore # noqa: F821
     run_nos: _Optional[_List[int]],
@@ -78,6 +78,11 @@ def check_equil_block_gradient(
         d_dh_dl = _np.full(len(dh_dl), _np.nan)
         # Compute rolling average with the block size
         rolling_av_dh_dl = lam_win._get_rolling_average(dh_dl, idx_block_size)
+
+        # print(f"\n=== Rolling Average ===")
+        # print(f"Calculated rolling average with window size {idx_block_size}")
+        # print(f"First few rolling averages: {rolling_av_dh_dl}")
+
         for i in range(len(dh_dl)):
             if i < 2 * idx_block_size:
                 continue
@@ -87,11 +92,18 @@ def check_equil_block_gradient(
                 ) / lam_win.block_size  # Gradient of dh/dl in kcal mol-1 ns-1
         d_dh_dls.append(d_dh_dl)
 
+    import pickle
+
+    results = {'gradients': dh_dls[0], 'times': times}
+    with open(f"/Users/jingjinghuang/Documents/fep_workflow/binding_affinity_predicting/dh_dhl.pkl", "wb") as ofile:
+        pickle.dump(results, ofile)
+
     # Calculate the mean gradient
     mean_d_dh_dl = _np.mean(d_dh_dls, axis=0)
 
     # Check if the mean gradient has been below the threshold at any point, making
     # sure to exclude the initial nans
+    
     last_grad = mean_d_dh_dl[2 * idx_block_size]
     for i, grad in enumerate(mean_d_dh_dl[2 * idx_block_size :]):
         if gradient_threshold:
@@ -151,7 +163,7 @@ def check_equil_block_gradient(
 
     return equilibrated, equil_time
 
-
+# not being used at the repo - by JJH 
 def check_equil_chodera(
     lam_win: "LamWindow",  # type: ignore # noqa: F821
     run_nos: _Optional[_List[int]] = None,
@@ -248,7 +260,7 @@ def check_equil_chodera(
 # windows, which reduces the noise which can cause issues with single window equilibration
 # detection.
 
-
+# not being used at the repo - by JJH
 def check_equil_multiwindow(
     lambda_windows: _List["LamWindow"],  # noqa: F821
     output_dir: str,
@@ -362,7 +374,7 @@ def check_equil_multiwindow(
 
     return equilibrated, fractional_equil_time
 
-
+# not being used at the repo - by JJH
 def check_equil_multiwindow_kpss(
     lambda_windows: _List["LamWindow"],  # noqa: F821
     output_dir: str,
@@ -456,7 +468,7 @@ def check_equil_multiwindow_kpss(
 
     return equilibrated, fractional_equil_time
 
-
+# not being used at the repo - by JJH
 def check_equil_multiwindow_modified_geweke(
     lambda_windows: _List["LamWindow"],  # noqa: F821
     output_dir: str,
@@ -685,9 +697,11 @@ def check_equil_multiwindow_paired_t(
     equilibrated = False
     fractional_equil_time = None
     equil_time = None
-
+    import pickle
     # Calculate the p value for each interval
     start_fracs = _np.linspace(0, 1 - last_frac, num=intervals)
+    overall_dgs_list = []
+    overall_times_list = []
     for start_frac in start_fracs:
         # Generate the data
         overall_dgs, overall_times = _get_time_series_multiwindow_mbar(
@@ -696,6 +710,8 @@ def check_equil_multiwindow_paired_t(
             start_frac=start_frac,
             output_dir=output_dir,
         )
+        overall_dgs_list.append(overall_dgs)
+        overall_times_list.append(overall_times)
         # Get the indices of the end of the first slice and the start of the last slice
         first_slice_end_idx = round(first_frac * len(overall_dgs[0]))
         last_slice_start_idx = round((1 - last_frac) * len(overall_dgs[0]))
@@ -730,6 +746,12 @@ def check_equil_multiwindow_paired_t(
                 equilibrated = True
                 fractional_equil_time = start_frac
                 equil_time = overall_times[0][0]
+    
+        # import pickle
+    results = {'overall_dgs': overall_dgs_list, 'overall_times': overall_times_list}
+
+    with open('/Users/jingjinghuang/Documents/fep_workflow/binding_affinity_predicting/tests/test_files/data_for_detect_equil2.pkl', 'wb') as f:
+        pickle.dump(results, f)
 
     # Directly set the _equilibrated and _equil_time attributes of the lambda windows
     if equilibrated:
