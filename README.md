@@ -28,6 +28,45 @@ mamba activate a3fe
 python -m pip install --no-deps .
 ```
 
+### How to run on different cluster (DRAC | Compute Canada)
+- on Graham, we should use the following environment.yaml file: 
+    ```
+    name: a3fe_gra
+    channels:
+    - conda-forge
+    - openbiosim
+
+    dependencies:
+        # Base depends
+    - arviz
+    - pandas
+    - python>=3.9
+    - pip
+    - openmm<8.3.0
+    - numpy
+    - matplotlib
+    - scipy
+    - ipython
+    - pymbar<4
+    - ambertools
+    - biosimspace<=2024.4.1
+    - pydantic
+    - loguru
+    ```
+  we should add these modules/headers into sbatch script for Graham:
+    ```
+    module --force purge
+    module load StdEnv/2020  gcc/9.3.0  cuda/11.4  openmpi/4.0.3
+    module load gromacs/2023
+
+    # initialize and activate conda
+    . ~/miniconda3/etc/profile.d/conda.sh
+    conda activate a3fe_gra
+
+    export PATH="$CONDA_PREFIX/bin:$PATH"
+    hash -r
+    ```
+   
 ### Quick Start
 
 - Activate your a3fe conda environment 
