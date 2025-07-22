@@ -28,7 +28,7 @@ mamba activate a3fe
 python -m pip install --no-deps .
 ```
 
-### How to run on different cluster (DRAC | Compute Canada)
+### How to run on different clusters with GPU (DRAC | Compute Canada)
 - on Graham, we should use the following environment.yaml file: 
     ```
     name: a3fe_gra

@@ -937,7 +937,9 @@ class Leg(_SimulationRunner):
             )
 
         # We no longer need to store the large BSS restraint classes.
-        self._lighten_restraints()
+        # NOTE: comment out this to avoid computing constraints all the time
+            # since there is no such feature to load restraints from text files
+        # self._lighten_restraints()
 
     def _run_slurm(
         self, sys_prep_fn: _Callable, wait: bool, run_dir: str, job_name: str
