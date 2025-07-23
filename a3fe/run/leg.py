@@ -190,7 +190,7 @@ class Leg(_SimulationRunner):
     def setup(
         self,
         sysprep_config: _Optional[_SystemPreparationConfig] = None,
-        skip_preparation: bool = False, 
+        skip_preparation: bool = False,   # only used for debugging purposes by JH
     ) -> None:
         """
         Set up the leg. This involves:
@@ -256,15 +256,7 @@ class Leg(_SimulationRunner):
             system.updateMolecule(0, lig)
             # now we need to load the restraints
             self._load_restraints_helper(pre_equilibrated_system=system, sysprep_config=cfg)
-
-        
-        # Add this debug line just before write_input_files
-        if self.leg_type == _LegType.BOUND and hasattr(self, 'restraints') and self.restraints:
-            print(f"DEBUG: restraint type before write_input_files: {type(self.restraints[0])}")
-            print(f"DEBUG: restraint has toString: {hasattr(self.restraints[0], 'toString')}")
-            print(f"DEBUG: restraint has _restraint: {hasattr(self.restraints[0], '_restraint')}")
-
-
+            
         # Write input files
         self.write_input_files(system, config=cfg)
 

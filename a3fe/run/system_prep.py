@@ -90,6 +90,10 @@ class SystemPreparationConfig(_BaseModel):
         description="Whether to use the same restraints for all repeats of the bound leg. Note "
         "that this should be used if you plan to run adaptively.",
     )
+    # Added by JJ-2025-05-05
+    mdrun_options: _Optional[str] = _Field(
+        None, description="Extra flags for 'gmx mdrun' (e.g., '-ntmpi 1 -ntomp 8')."
+    )
     lambda_values: dict = {
         _LegType.BOUND: {
             _StageType.RESTRAIN: [0.000, 0.125, 0.250, 0.375, 0.500, 1.000],
