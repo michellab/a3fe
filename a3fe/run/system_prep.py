@@ -497,7 +497,7 @@ def minimise_input(
     # Minimise
     print(f"Minimising input structure with {cfg.steps} steps...")
     protocol = _BSS.Protocol.Minimisation(steps=cfg.steps)
-    minimised_system = run_process(solvated_system, protocol)
+    minimised_system = run_process(system=solvated_system, protocol=protocol, leg_type=leg_type)
 
     # Save, renaming the velocity property to foo so avoid saving velocities. Saving the
     # velocities sometimes causes issues with the size of the floats overflowing the RST7
@@ -555,7 +555,7 @@ def heat_and_preequil_input(
         temperature_end=cfg.end_temp * _BSS.Units.Temperature.kelvin,
         restraint="all",
     )
-    equil1 = run_process(minimised_system, protocol)
+    equil1 = run_process(system=minimised_system, protocol=protocol, leg_type=leg_type)
 
     # If this is the bound leg, carry out step with backbone restraints
     if leg_type == _LegType.BOUND:
@@ -567,7 +567,7 @@ def heat_and_preequil_input(
             temperature=cfg.end_temp * _BSS.Units.Temperature.kelvin,
             restraint="backbone",
         )
-        equil2 = run_process(equil1, protocol)
+        equil2 = run_process(system=equil1, protocol=protocol, leg_type=leg_type)
 
     else:  # Free leg - skip the backbone restraint step
         equil2 = equil1
@@ -577,7 +577,7 @@ def heat_and_preequil_input(
         runtime=cfg.runtime_nvt * _BSS.Units.Time.picosecond,
         temperature=cfg.end_temp * _BSS.Units.Temperature.kelvin,
     )
-    equil3 = run_process(equil2, protocol)
+    equil3 = run_process(system=equil2, protocol=protocol, leg_type=leg_type)
 
     print(
         f"NPT equilibration for {cfg.runtime_npt} ps while restraining non-solvent heavy atoms"
@@ -588,7 +588,7 @@ def heat_and_preequil_input(
         temperature=cfg.end_temp * _BSS.Units.Temperature.kelvin,
         restraint="heavy",
     )
-    equil4 = run_process(equil3, protocol)
+    equil4 = run_process(system=equil3, protocol=protocol, leg_type=leg_type)
 
     print(f"NPT equilibration for {cfg.runtime_npt_unrestrained} ps without restraints")
     protocol = _BSS.Protocol.Equilibration(
@@ -596,7 +596,7 @@ def heat_and_preequil_input(
         pressure=1 * _BSS.Units.Pressure.atm,
         temperature=cfg.end_temp * _BSS.Units.Temperature.kelvin,
     )
-    preequilibrated_system = run_process(equil4, protocol)
+    preequilibrated_system = run_process(system=equil4, protocol=protocol, leg_type=leg_type)
 
     # Save, renaming the velocity property to foo so avoid saving velocities. Saving the
     # velocities sometimes causes issues with the size of the floats overflowing the RST7
@@ -685,7 +685,8 @@ def run_ensemble_equilibration(
         work_dir = output_dir
     else:
         work_dir = None
-    final_system = run_process(pre_equilibrated_system, protocol, work_dir=work_dir)
+    final_system = run_process(system=pre_equilibrated_system, protocol=protocol, leg_type=leg_type,
+                               work_dir=work_dir)
 
     # Save the coordinates only, renaming the velocity property to foo so avoid saving velocities. Saving the
     # velocities sometimes causes issues with the size of the floats overflowing the RST7
@@ -702,6 +703,7 @@ def run_ensemble_equilibration(
 def run_process(
     system: _BSS._SireWrappers._system.System,
     protocol: _BSS.Protocol._protocol.Protocol,
+    leg_type: _LegType,
     work_dir: _Optional[str] = None,
 ) -> _BSS._SireWrappers._system.System:
     """
@@ -724,6 +726,13 @@ def run_process(
         System after the process has been run.
     """
     process = _BSS.Process.Gromacs(system, protocol, work_dir=work_dir)
+
+    # Added by JJ-2025-05-05 for local run on Mac
+    cfg = SystemPreparationConfig.from_pickle(work_dir or "./input", leg_type)
+    mdrun_extra_args = cfg.mdrun_options.split()
+    for flag, value in zip(mdrun_extra_args[::2], mdrun_extra_args[1::2]):
+        process.setArg(flag, value)
+    
     process.start()
     process.wait()
     import time
