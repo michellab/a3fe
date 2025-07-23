@@ -56,15 +56,14 @@ python -m pip install --no-deps .
   we should add these modules/headers into sbatch script for Graham:
     ```
     module --force purge
-    module load StdEnv/2020  gcc/9.3.0  cuda/11.4  openmpi/4.0.3
+    module load StdEnv/2020  gcc/9.3.0  cuda/11.8.0  openmpi/4.0.3
     module load gromacs/2023
 
-    # initialize and activate conda
     . ~/miniconda3/etc/profile.d/conda.sh
     conda activate a3fe_gra
 
-    export PATH="$CONDA_PREFIX/bin:$PATH"
-    hash -r
+    unset LD_LIBRARY_PATH
+    export LD_LIBRARY_PATH="$CUDA_HOME/lib64"
     ```
    
 ### Quick Start
