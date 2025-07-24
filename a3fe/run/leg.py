@@ -14,6 +14,7 @@ from typing import Dict as _Dict
 from typing import List as _List
 from typing import Optional as _Optional
 from typing import Tuple as _Tuple
+import pickle as _pkl
 
 import BioSimSpace.Sandpit.Exscientia as _BSS
 import numpy as _np
@@ -209,6 +210,7 @@ class Leg(_SimulationRunner):
             Configuration object for the setup of the leg. If None, the default configuration
             is used.
         """
+        print('hello hello hello')
         self._logger.info("Setting up leg...")
 
         # First, we need to save the config to the input directory so that this can be reloaded
@@ -241,7 +243,7 @@ class Leg(_SimulationRunner):
                 system = self.run_ensemble_equilibration(sysprep_config=cfg)
         else:
             # Skip preparation and load the pre-equilibrated system directly
-            self._logger.info("Skipping preparation steps - loading pre-equilibrated system...")
+            self._logger.info("SKIPPING PREPARATION STEPS - Loading pre-equilibrated system...")
             system = _BSS.IO.readMolecules(
                 [
                     f"{self.input_dir}/{file}"
@@ -254,8 +256,9 @@ class Leg(_SimulationRunner):
             # need to do the same decouple thing as run_ensemble_equilibration()
             lig = _BSS.Align.decouple(system[0], intramol=True)
             system.updateMolecule(0, lig)
-            # now we need to load the restraints
-            self._load_restraints_helper(pre_equilibrated_system=system, sysprep_config=cfg)
+            self._logger.info("SKIPPING PREPARATION STEPS - Loading restraints...")
+            # now we need to load the restraints from pickle if they exist
+            self._load_restraints_from_pickle()
             
         # Write input files
         self.write_input_files(system, config=cfg)
@@ -291,50 +294,40 @@ class Leg(_SimulationRunner):
         # Save state
         self._dump()
 
-    def _load_restraints_helper(self, pre_equilibrated_system: _BSS._SireWrappers._system.System, sysprep_config: _SystemPreparationConfig) -> None:
-        """
-        Temporary function to load pre-computed restraints in the bound leg.
-        
-        used when skip_preparation is True, to search for restraints. 
-        the ensemble_equilibration step must be completed - by JJH 2025-07-19
-        """
-        outdirs = [
-            f"{self.base_dir}/ensemble_equilibration_{i + 1}"
-            for i in range(self.ensemble_size)
-        ]
+    def _dump_restraints_to_pickle(self) -> None:
+        self._logger.info(f"Dumping {len(self.restraints)} restraints to pickle...")
+        if self.leg_type == _LegType.BOUND and hasattr(self, 'restraints') and self.restraints:
+            restraints_pickle_path = f"{self.base_dir}/restraints.pkl"
+            try:
+                with open(restraints_pickle_path, 'wb') as f:
+                    _pkl.dump(self.restraints, f)
+                self._logger.info(f"Dumped {len(self.restraints)} restraints to {restraints_pickle_path}")
+            except Exception as e:
+                self._logger.error(f"Failed to dump restraints to pickle: {e}")
 
-        # If this is the bound leg, search for restraints
+    def _load_restraints_from_pickle(self) -> bool:
+        """
+        Returns
+        -------
+        bool
+            True if restraints were successfully loaded, False otherwise.
+        """
+        self._logger.info("Loading restraints from pickle if available...")
         if self.leg_type == _LegType.BOUND:
-            # For each run, load the trajectory and extract the restraints
-            for i, outdir in enumerate(outdirs):
-                self._logger.info(f"Loading trajectory for run {i + 1}...")
-                # NOTE: again the first file is the top_file? easy to break by JJH-2025-05-17
-                top_file = f"{self.input_dir}/{_PreparationStage.PREEQUILIBRATED.get_simulation_input_files(self.leg_type)[0]}"
-                traj = _BSS.Trajectory.Trajectory(
-                    topology=top_file,
-                    trajectory=f"{outdir}/gromacs.xtc",
-                    system=pre_equilibrated_system,
-                )
-                self._logger.info(f"Selecting restraints for run {i + 1}...")
-                restraint = _BSS.FreeEnergy.RestraintSearch.analyse(
-                    method="BSS",
-                    system=pre_equilibrated_system,
-                    traj=traj,
-                    work_dir=outdir,
-                    temperature=298.15 * _BSS.Units.Temperature.kelvin,
-                    append_to_ligand_selection=sysprep_config.append_to_ligand_selection,
-                )
-
-                # Check that we actually generated a restraint
-                if restraint is None:
-                    raise ValueError(f"No restraints found for run {i + 1}.")
-
-                self._logger.info(f"Obtained restraint for run {i + 1}: {restraint}")
-                # Save the restraints to a text file and store within the Leg object
-                with open(f"{outdir}/restraint_{i + 1}.txt", "w") as f:
-                    # NOTE we can use "gromacs" as the engine here by JJH-2025-05-17
-                    f.write(restraint.toString(engine="SOMD"))  # type: ignore
-                self.restraints.append(restraint)
+            restraints_pickle_path = f"{self.base_dir}/restraints.pkl"
+            if _os.path.isfile(restraints_pickle_path):
+                try:
+                    with open(restraints_pickle_path, 'rb') as f:
+                        self.restraints = _pkl.load(f)
+                    self._logger.info(f"Loaded {len(self.restraints)} restraints from {restraints_pickle_path}")
+                    return True
+                except Exception as e:
+                    self._logger.warning(f"Failed to load restraints from pickle: {e}")
+                    return False
+            else:
+                self._logger.warning(f"No restraints pickle found at {restraints_pickle_path}")
+                return False
+        return False
 
 
     def get_optimal_lam_vals(
@@ -743,6 +736,7 @@ class Leg(_SimulationRunner):
         # If this is the bound leg, search for restraints
         if self.leg_type == _LegType.BOUND:
             # For each run, load the trajectory and extract the restraints
+            self._logger.info(f"now we proceed to search for restraints for run {i + 1}...")
             for i, outdir in enumerate(outdirs):
                 self._logger.info(f"Loading trajectory for run {i + 1}...")
                 # NOTE: again the first file is the top_file? easy to break by JJH-2025-05-17
@@ -771,6 +765,9 @@ class Leg(_SimulationRunner):
                     # NOTE we can use "gromacs" as the engine here by JJH-2025-05-17
                     f.write(restraint.toString(engine="SOMD"))  # type: ignore
                 self.restraints.append(restraint)
+
+            # dump the restraints to a pickle file for later use    
+            self._dump_restraints_to_pickle()
 
             return pre_equilibrated_system
 

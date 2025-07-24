@@ -726,13 +726,14 @@ def run_process(
         System after the process has been run.
     """
     process = _BSS.Process.Gromacs(system, protocol, work_dir=work_dir)
-
+    # TODO: Adding the following lines will lead to the following error: - by JH-2025-07-23
+    #   FileNotFoundError: [Errno 2] No such file or directory: 
+    #   './input/system_preparation_config_free.pkl' for free leg
     # Added by JJ-2025-05-05 for local run on Mac
-    cfg = SystemPreparationConfig.from_pickle(work_dir or "./input", leg_type)
-    mdrun_extra_args = cfg.mdrun_options.split()
-    for flag, value in zip(mdrun_extra_args[::2], mdrun_extra_args[1::2]):
-        process.setArg(flag, value)
-    
+    # cfg = SystemPreparationConfig.from_pickle(work_dir or "./input", leg_type)
+    # mdrun_extra_args = cfg.mdrun_options.split() if cfg.mdrun_options else []
+    # for flag, value in zip(mdrun_extra_args[::2], mdrun_extra_args[1::2]):
+    #     process.setArg(flag, value)
     process.start()
     process.wait()
     import time
