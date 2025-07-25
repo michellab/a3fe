@@ -88,6 +88,11 @@ calc.save()
 
 - Check the results in the ``output`` directories (separate output directories are created for the Calculation, Legs, and Stages)
 
+### Some notes for solving runtime issues
+- if `ensemble_equilibration_*` runs faild, we can simply remove the entire folder and re-run the calculation
+- reloading molecules via `_BSS.IO.readMolecules()` leads to different molecule number (MolNum) so it's tricky to dump restraints and load them back. This reloading operation results in `ValueError` from this check `atom._sire_object.molecule().number()!= decoupled_mol._sire_object.number()` (Restraint.system() setter)
+   - With this being said, it is tricky to save restraints and load them back
+- 
 ### Copyright
 
 Copyright (c) 2023, Finlay Clark

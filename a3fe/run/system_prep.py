@@ -636,7 +636,7 @@ def run_ensemble_equilibration(
     cfg = SystemPreparationConfig.from_pickle(input_dir, leg_type)
 
     # Load the pre-equilibrated system
-    print("Loading pre-equilibrated system...")
+    # print("Loading pre-equilibrated system...")
     pre_equilibrated_system = _BSS.IO.readMolecules(
         [
             f"{input_dir}/{file}"

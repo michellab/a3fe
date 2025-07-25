@@ -191,7 +191,6 @@ class Calculation(_SimulationRunner):
             The system preparation configuration to use for the free leg. If None, the default
             configuration is used.
         """
-
         if self.setup_complete:
             self._logger.info("Setup already complete. Skipping...")
             return
