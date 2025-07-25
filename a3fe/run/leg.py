@@ -38,7 +38,7 @@ from .enums import StageType as _StageType
 from .stage import Stage as _Stage
 from .system_prep import SystemPreparationConfig as _SystemPreparationConfig
 from BioSimSpace.Sandpit.Exscientia.FreeEnergy import Restraint as _BoreschRestraint
-from .slurm_script_generator import A3feSlurmGenerator, A3feSlurmParameters
+from .slurm_script_generator import A3feSlurmGenerator
 from .slurm_config_manager import SimulationSlurmConfigs, default_slurm_configs
 
 

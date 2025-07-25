@@ -42,6 +42,16 @@ class A3feSlurmParameters(BaseModel):
     
     # Environment variables
     setup_cuda_env: bool = Field(default=True, description="Whether to set up CUDA environment")
+
+    # pre/post command sequences
+    pre_commands: list[str] = Field(
+        default_factory=list,
+        description="Commands to run before main execution"
+    )
+    post_commands: list[str] = Field(
+        default_factory=list,
+        description="Commands to run after main execution"
+    )
     
     # Additional SLURM directives
     custom_directives: dict[str, str] = Field(
@@ -73,8 +83,6 @@ class A3feSlurmGenerator:
         job_name: str,
         python_command: str,
         custom_overrides: Optional[dict[str, Any]] = None,
-        pre_commands: Optional[list[str]] = None,
-        post_commands: Optional[list[str]] = None,
     ) -> str:
         """
         Generate SLURM script for A3FE preparation jobs.
@@ -116,16 +124,12 @@ class A3feSlurmGenerator:
         return self._format_prep_script(
             params=params,
             python_command=python_command,
-            pre_commands=pre_commands,
-            post_commands=post_commands,
         )
     
     def generate_somd_script(
         self,
         job_name: str,
         custom_overrides: Optional[dict[str, Any]] = None,
-        pre_commands: Optional[list[str]] = None,
-        post_commands: Optional[list[str]] = None,
     ) -> str:
         """
         Generate SLURM script for SOMD simulations.
@@ -166,16 +170,12 @@ class A3feSlurmGenerator:
         
         return self._format_somd_script(
             params=params,
-            pre_commands=pre_commands,
-            post_commands=post_commands,
         )
     
     def _format_prep_script(
         self,
         params: A3feSlurmParameters,
         python_command: str,
-        pre_commands: Optional[list[str]] = None,
-        post_commands: Optional[list[str]] = None,
     ) -> str:
         """Format parameters into preparation script content."""
         lines = [
@@ -237,10 +237,10 @@ class A3feSlurmGenerator:
             ])
         
         # Pre-commands
-        if pre_commands:
+        if params.pre_commands:
             lines.extend([
                 "# Pre-execution commands",
-                *pre_commands,
+                *params.pre_commands,
                 "",
             ])
         
@@ -252,10 +252,10 @@ class A3feSlurmGenerator:
         ])
         
         # Post-commands
-        if post_commands:
+        if params.post_commands:
             lines.extend([
                 "# Post-execution commands",
-                *post_commands,
+                *params.post_commands,
                 "",
             ])
         
@@ -265,8 +265,8 @@ class A3feSlurmGenerator:
     def _format_somd_script(
         self,
         params: A3feSlurmParameters,
-        pre_commands: Optional[list[str]] = None,
-        post_commands: Optional[list[str]] = None,
+        # pre_commands: Optional[list[str]] = None,
+        # post_commands: Optional[list[str]] = None,
     ) -> str:
         """Format parameters into SOMD script content."""
         lines = [
@@ -325,10 +325,10 @@ class A3feSlurmGenerator:
         ])
         
         # Pre-commands
-        if pre_commands:
+        if params.pre_commands:
             lines.extend([
                 "# Pre-execution commands",
-                *pre_commands,
+                *params.pre_commands,
                 "",
             ])
         
@@ -341,10 +341,10 @@ class A3feSlurmGenerator:
         ])
         
         # Post-commands
-        if post_commands:
+        if params.post_commands:
             lines.extend([
                 "# Post-execution commands",
-                *post_commands,
+                *params.post_commands,
                 "",
             ])
         
