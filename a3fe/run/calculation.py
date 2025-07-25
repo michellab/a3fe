@@ -368,3 +368,9 @@ class Calculation(_SimulationRunner):
                 for lambda_window in stage.lam_windows:
                     for simulation in lambda_window.sims:
                         _shutil.copy(master_run_somd, simulation.input_dir)
+
+
+    def update_leg_slurm_config(self, step_type: str, **kwargs):
+        """Update SLURM configuration for bound leg."""
+        for leg in self.legs:
+            leg.update_slurm_config(step_type, **kwargs)

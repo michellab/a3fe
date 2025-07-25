@@ -1419,7 +1419,8 @@ class Leg(_SimulationRunner):
     @classmethod
     def update_default_slurm_config(cls, step_type: str, **kwargs) -> None:
         """
-        Update default SLURM configuration for a specific step type.
+        Update global default SLURM configuration for a specific step type.
+        This affects all new Leg instances that don't specify custom configs.
         
         Parameters
         ----------
@@ -1428,12 +1429,35 @@ class Leg(_SimulationRunner):
         **kwargs
             Parameters to update in the configuration
         """
-        if step_type not in cls.PREP_STEP_SLURM_CONFIGS:
-            raise ValueError(f"Unknown step type: {step_type}")
+        # Import here to avoid circular imports
+        from .slurm_script_manager import default_slurm_configs
+        default_slurm_configs.update_config(step_type, **kwargs)
+
+    @classmethod
+    def setup_site_configs(cls, account: str, **kwargs) -> None:
+        """
+        Set up site-specific SLURM configurations globally.
+        This affects all new Leg instances.
         
-        config = cls.PREP_STEP_SLURM_CONFIGS[step_type]
-        for key, value in kwargs.items():
-            if hasattr(config, key):
-                setattr(config, key, value)
-            else:
-                config.custom_directives[key] = str(value)
+        Parameters
+        ----------
+        account : str
+            SLURM account to use
+        **kwargs
+            Additional site-specific settings (modules, conda_env, base_gres, etc.)
+        """
+        from .slurm_script_manager import default_slurm_configs  
+        default_slurm_configs.create_site_specific_configs(account, **kwargs)
+
+    def update_slurm_config(self, step_type: str, **kwargs) -> None:
+        """
+        Update SLURM configuration for a specific step type for this leg instance.
+        
+        Parameters
+        ----------
+        step_type : str
+            The preparation step type to update
+        **kwargs
+            Parameters to update in the configuration
+        """
+        self.slurm_configs.update_config(step_type, **kwargs)
