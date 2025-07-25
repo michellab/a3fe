@@ -6,8 +6,8 @@ for A3FE preparation jobs and SOMD simulations.
 """
 
 from pathlib import Path
-from typing import Optional, Union, List, Dict, Any
-from pydantic import BaseModel, Field, field_validator
+from typing import Optional, Union, Any
+from pydantic import BaseModel, Field
 
 
 
@@ -28,7 +28,7 @@ class A3feSlurmParameters(BaseModel):
     
     # Module system
     purge_modules: bool = Field(default=True, description="Whether to purge modules first")
-    modules_to_load: List[str] = Field(
+    modules_to_load: list[str] = Field(
         default=["StdEnv/2020", "gcc/9.3.0", "cuda/11.8.0", "openmpi/4.0.3", "gromacs/2023"],
         description="Modules to load"
     )
@@ -44,7 +44,7 @@ class A3feSlurmParameters(BaseModel):
     setup_cuda_env: bool = Field(default=True, description="Whether to set up CUDA environment")
     
     # Additional SLURM directives
-    custom_directives: Dict[str, str] = Field(
+    custom_directives: dict[str, str] = Field(
         default_factory=dict, 
         description="Additional SLURM directives"
     )
@@ -72,9 +72,9 @@ class A3feSlurmGenerator:
         self,
         job_name: str,
         python_command: str,
-        custom_overrides: Optional[Dict[str, Any]] = None,
-        pre_commands: Optional[List[str]] = None,
-        post_commands: Optional[List[str]] = None,
+        custom_overrides: Optional[dict[str, Any]] = None,
+        pre_commands: Optional[list[str]] = None,
+        post_commands: Optional[list[str]] = None,
     ) -> str:
         """
         Generate SLURM script for A3FE preparation jobs.
@@ -123,9 +123,9 @@ class A3feSlurmGenerator:
     def generate_somd_script(
         self,
         job_name: str,
-        custom_overrides: Optional[Dict[str, Any]] = None,
-        pre_commands: Optional[List[str]] = None,
-        post_commands: Optional[List[str]] = None,
+        custom_overrides: Optional[dict[str, Any]] = None,
+        pre_commands: Optional[list[str]] = None,
+        post_commands: Optional[list[str]] = None,
     ) -> str:
         """
         Generate SLURM script for SOMD simulations.
@@ -174,8 +174,8 @@ class A3feSlurmGenerator:
         self,
         params: A3feSlurmParameters,
         python_command: str,
-        pre_commands: Optional[List[str]] = None,
-        post_commands: Optional[List[str]] = None,
+        pre_commands: Optional[list[str]] = None,
+        post_commands: Optional[list[str]] = None,
     ) -> str:
         """Format parameters into preparation script content."""
         lines = [
@@ -265,8 +265,8 @@ class A3feSlurmGenerator:
     def _format_somd_script(
         self,
         params: A3feSlurmParameters,
-        pre_commands: Optional[List[str]] = None,
-        post_commands: Optional[List[str]] = None,
+        pre_commands: Optional[list[str]] = None,
+        post_commands: Optional[list[str]] = None,
     ) -> str:
         """Format parameters into SOMD script content."""
         lines = [

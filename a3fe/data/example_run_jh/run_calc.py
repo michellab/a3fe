@@ -18,14 +18,29 @@ from a3fe.run.system_prep import SystemPreparationConfig
 a3.Calculation.required_legs = [_LegType.BOUND]
 
 print('step-1...')
+# initialize the calculation
 calc = a3.Calculation(
     ensemble_size=3,
     base_dir="/home/jjhuang/project/jjhuang/fep_workflows/test_run_full/",
     input_dir="/home/jjhuang/project/jjhuang/fep_workflows/test_run_full/input",
 )
-print("step-2: setup (GROMACS prep will run locally)")
-calc.setup(skip_preparation=True)
+
+# we can update slurm config for different steps
+calc.bound_leg.update_slurm_config(
+    "parameterise", 
+    time="00:12:12",     
+    mem="1G",           
+    cpus_per_task=1       
+)
+calc.bound_leg.update_slurm_config(
+    "solvate",
+    mem="8G",             
+    time="00:11:11"       
+)
+print("step-2...")
+calc.setup()
 print('step-3...')
+# get optimal lambda spacing
 calc.get_optimal_lam_vals()
 print('step-4...')
 calc.run(

@@ -39,7 +39,7 @@ from .stage import Stage as _Stage
 from .system_prep import SystemPreparationConfig as _SystemPreparationConfig
 from BioSimSpace.Sandpit.Exscientia.FreeEnergy import Restraint as _BoreschRestraint
 from .slurm_script_generator import A3feSlurmGenerator, A3feSlurmParameters
-from .slurm_script_manager import SlurmPreparationConfigs, default_slurm_configs
+from .slurm_config_manager import SimulationSlurmConfigs, default_slurm_configs
 
 
 class Leg(_SimulationRunner):
@@ -71,9 +71,9 @@ class Leg(_SimulationRunner):
         ensemble_size: int = 5,
         base_dir: _Optional[str] = None,
         input_dir: _Optional[str] = None,
-        slurm_configs: _Optional[SlurmPreparationConfigs] = None,
         stream_log_level: int = _logging.INFO,
         update_paths: bool = True,
+        slurm_configs: _Optional[SimulationSlurmConfigs] = None,
     ) -> None:
         """
         Instantiate a calculation based on files in the input dir. If leg.pkl exists in the
@@ -1430,7 +1430,8 @@ class Leg(_SimulationRunner):
             Parameters to update in the configuration
         """
         # Import here to avoid circular imports
-        from .slurm_script_manager import default_slurm_configs
+        from .slurm_config_manager import default_slurm_configs
+        cls._logger.info(f"Updating default SLURM config for step type: {step_type} with {kwargs}")
         default_slurm_configs.update_config(step_type, **kwargs)
 
     @classmethod
@@ -1446,7 +1447,11 @@ class Leg(_SimulationRunner):
         **kwargs
             Additional site-specific settings (modules, conda_env, base_gres, etc.)
         """
-        from .slurm_script_manager import default_slurm_configs  
+        from .slurm_config_manager import default_slurm_configs
+        cls._logger.info(
+            f"Setting up site-specific SLURM configurations for account: {account} with {kwargs}"
+        )
+        # Import here to avoid circular imports
         default_slurm_configs.create_site_specific_configs(account, **kwargs)
 
     def update_slurm_config(self, step_type: str, **kwargs) -> None:
@@ -1460,4 +1465,83 @@ class Leg(_SimulationRunner):
         **kwargs
             Parameters to update in the configuration
         """
+        self._logger.info(f"Updating SLURM config for step type: {step_type} with {kwargs}")
         self.slurm_configs.update_config(step_type, **kwargs)
+        updated_config = self.slurm_configs.get_config(step_type)
+
+        if self.leg_type.name.lower() in ["bound", "free"]:
+            updated_config.job_name = f"{updated_config.job_name}_{self.leg_type.name.lower()}"
+
+        step_function_map = {
+            "parameterise": f"parameterise_input",
+            "solvate": f"solvate_input",
+            "minimise": f"minimise_input",
+            "heat_preequil": f"heat_and_preequil_input",
+            "ensemble_equil": f"run_ensemble_equilibration",
+        }
+
+        # Define directories where scripts might exist based on step type
+        script_directories = []
+        if step_type in ["parameterise", "solvate", "minimise", "heat_preequil"]:
+            # These scripts are in the input directory
+            script_directories.append(self.input_dir)
+        elif step_type == "ensemble_equil":
+            # These scripts are in ensemble equilibration directories
+            for i in range(self.ensemble_size):
+                equil_dir = f"{self.base_dir}/ensemble_equilibration_{i + 1}"
+                if _os.path.isdir(equil_dir):
+                    script_directories.append(equil_dir)
+        elif step_type == "somd_production":
+            # These scripts are in stage directories and lambda window directories
+            if hasattr(self, 'stages'):
+                for stage in self.stages:
+                    for lam_window in stage.lam_windows:
+                        for sim in lam_window.sims:
+                            if _os.path.isdir(sim.base_dir):
+                                script_directories.append(sim.base_dir)
+
+        # self._logger.info(f"Script directories for {step_type}: {script_directories}")
+        # Generate and write updated scripts
+        scripts_updated = 0
+        for script_dir in script_directories:
+            script_filename = f"{updated_config.job_name}.sh"
+            script_path = _os.path.join(script_dir, script_filename)
+            
+            # Check if script already exists
+            if _os.path.isfile(script_path):
+                self._logger.info(f"Updating existing SLURM script: {script_path}")
+                
+                # Generate updated script content
+                if step_type == "somd_production":
+                    # For SOMD production runs, use the special SOMD script format
+                    script_content = self.slurm_generator.generate_somd_script(
+                        job_name=updated_config.job_name,
+                        custom_overrides=updated_config.dict()
+                    )
+                else:
+                    # For preparation steps, use the prep script format
+                    function_name = step_function_map.get(step_type)
+                    if function_name:
+                        python_command = f"python -c 'from a3fe.run.system_prep import {function_name}; {function_name}()'"
+                        script_content = self.slurm_generator.generate_prep_script(
+                            job_name=updated_config.job_name,
+                            python_command=python_command,
+                            custom_overrides=updated_config.dict()
+                        )
+                    else:
+                        self._logger.warning(f"Unknown step type for script generation: {step_type}")
+                        continue
+                
+                # Write the updated script
+                self.slurm_generator.write_script(script_path, script_content)
+                scripts_updated += 1
+            else:
+                self._logger.warning(f"No existing SLURM script found to update: {script_path}")
+        
+        if scripts_updated > 0:
+            self._logger.info(f"Updated {scripts_updated} SLURM scripts for step type: {step_type}")
+        else:
+            self._logger.info(f"No existing SLURM scripts found to update for step type: {step_type}")
+        
+        # Save the updated state
+        self._dump()

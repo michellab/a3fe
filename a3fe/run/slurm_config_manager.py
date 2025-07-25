@@ -66,9 +66,9 @@ DEFAULT_PREP_STEP_CONFIGS = {
 }
 
 
-class SlurmPreparationConfigs:
+class SimulationSlurmConfigs:
     """
-    Manager class for SLURM preparation step configurations.
+    Manager class for SLURM configurations.
     
     This class provides a centralized way to manage and customize SLURM configurations
     for different preparation steps, with support for site-specific customizations.
@@ -204,7 +204,7 @@ class SlurmPreparationConfigs:
 
 
 # Global instance for easy access (can be customized)
-default_slurm_configs = SlurmPreparationConfigs()
+default_slurm_configs = SimulationSlurmConfigs()
 
 
 # Convenience functions for backward compatibility and ease of use
