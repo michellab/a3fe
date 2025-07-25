@@ -53,7 +53,7 @@ class Leg(_SimulationRunner):
         required_input_files[leg_type] = {}
         for prep_stage in _PreparationStage:
             required_input_files[leg_type][prep_stage] = [
-                "run_somd.sh",
+                # "run_somd.sh",  # we can retire this with the new slurm script manager
                 "template_config.cfg",
             ] + prep_stage.get_simulation_input_files(leg_type)
 
