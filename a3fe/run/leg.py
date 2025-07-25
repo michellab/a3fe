@@ -126,6 +126,7 @@ class Leg(_SimulationRunner):
         )
 
         if not self.loaded_from_pickle:
+            # so if we see Leg.pkl in the folder, we will by default load it
             self.stage_types = Leg.required_stages[leg_type]
             self.equil_detection = equil_detection
             self.runtime_constant = runtime_constant
@@ -149,10 +150,12 @@ class Leg(_SimulationRunner):
             # If this is a bound leg, we want to store restraints
             if self.leg_type == _LegType.BOUND:
                 self.restraints = []
-
+            
+            self.pre_equilibrated_system = None  # This will be set after the pre-equilibration stage
             # Save the state and update log
             self._update_log()
             self._dump()
+
 
     def __str__(self) -> str:
         return f"Leg (type = {self.leg_type.name})"
@@ -245,22 +248,10 @@ class Leg(_SimulationRunner):
             # TODO: this part is USELESS because we cannot dump and load the restraints (see README.md)
             # Skip preparation and load the pre-equilibrated system directly
             self._logger.info("SKIPPING PREPARATION STEPS - Loading pre-equilibrated system...")
-            system = _BSS.IO.readMolecules(
-                [
-                    f"{self.input_dir}/{file}"
-                    for file in _PreparationStage.PREEQUILIBRATED.get_simulation_input_files(
-                        self.leg_type
-                    )
-                ]
-            )
-            # Mark the ligand to be decoupled
-            # need to do the same decouple thing as run_ensemble_equilibration()
-            lig = _BSS.Align.decouple(system[0], intramol=True)
-            system.updateMolecule(0, lig)
-            self._logger.info("SKIPPING PREPARATION STEPS - Loading restraints...")
+            system = self.pre_equilibrated_system
             # now we need to load the restraints from pickle if they exist
-            self._logger.info("Loading restraints from pickle...")
-            self._load_restraints_from_pickle(system=system)
+            # self._load_restraints_helper(pre_equilibrated_system=system, sysprep_config=cfg)
+            self._load_restraints_from_pickle()
 
         # Write input files
         self.write_input_files(system, config=cfg)
@@ -296,12 +287,65 @@ class Leg(_SimulationRunner):
         # Save state
         self._dump()
 
+    def _load_restraints_helper(self, pre_equilibrated_system: _BSS._SireWrappers._system.System, 
+                                sysprep_config: _SystemPreparationConfig) -> None:
+        """
+        #NOTE DEPRECATED FUNCTION
+        Temporary function to load pre-computed restraints in the bound leg.
+        
+        used when skip_preparation is True, to search for restraints. 
+        the ensemble_equilibration step must be completed - by JJH 2025-07-19
+        """
+        outdirs = [
+            f"{self.base_dir}/ensemble_equilibration_{i + 1}"
+            for i in range(self.ensemble_size)
+        ]
+
+        # If this is the bound leg, search for restraints
+        if self.leg_type == _LegType.BOUND:
+            # For each run, load the trajectory and extract the restraints
+            for i, outdir in enumerate(outdirs):
+                self._logger.info(f"Loading trajectory for run {i + 1}...")
+                # NOTE: again the first file is the top_file? easy to break by JJH-2025-05-17
+                top_file = f"{self.input_dir}/{_PreparationStage.PREEQUILIBRATED.get_simulation_input_files(self.leg_type)[0]}"
+                traj = _BSS.Trajectory.Trajectory(
+                    topology=top_file,
+                    trajectory=f"{outdir}/gromacs.xtc",
+                    system=pre_equilibrated_system,
+                )
+                self._logger.info(f"Selecting restraints for run {i + 1}...")
+                restraint = _BSS.FreeEnergy.RestraintSearch.analyse(
+                    method="BSS",
+                    system=pre_equilibrated_system,
+                    traj=traj,
+                    work_dir=outdir,
+                    temperature=298.15 * _BSS.Units.Temperature.kelvin,
+                    append_to_ligand_selection=sysprep_config.append_to_ligand_selection,
+                )
+
+                # Check that we actually generated a restraint
+                if restraint is None:
+                    raise ValueError(f"No restraints found for run {i + 1}.")
+
+                self._logger.info(f"Obtained restraint for run {i + 1}: {restraint}")
+                # Save the restraints to a text file and store within the Leg object
+                with open(f"{outdir}/restraint_{i + 1}.txt", "w") as f:
+                    # NOTE we can use "gromacs" as the engine here by JJH-2025-05-17
+                    f.write(restraint.toString(engine="SOMD"))  # type: ignore
+                self.restraints.append(restraint)
+
+
     def _dump_restraints_to_pickle(self) -> None:
         """
         Dump the restraints to a pickle file in the base directory.
         """
         if self.leg_type == _LegType.BOUND and hasattr(self, 'restraints') and self.restraints:
             restraints_pickle_path = f"{self.base_dir}/restraints.pkl"
+
+            if _os.path.isfile(restraints_pickle_path):
+                self._logger.info(f"Restraints pickle already exists at {restraints_pickle_path}, skipping dump.")
+                return
+        
             restraint_dicts = [restraint._restraint_dict for restraint in self.restraints]
             try:
                 with open(restraints_pickle_path, 'wb') as f:
@@ -310,7 +354,7 @@ class Leg(_SimulationRunner):
             except Exception as e:
                 self._logger.error(f"Failed to dump restraints to pickle: {e}")
 
-    def _load_restraints_from_pickle(self, system: _BSS._SireWrappers._system.System) -> bool:
+    def _load_restraints_from_pickle(self) -> bool:
         """
         Returns
         -------
@@ -320,20 +364,23 @@ class Leg(_SimulationRunner):
         if self.leg_type != _LegType.BOUND:
             return False
     
-        decoupled = system.getDecoupledMolecules()
-        if not decoupled:
-            lig = _BSS.Align.decouple(system[0], intramol=True)
-            system.updateMolecule(0, lig)
-
+        if self.pre_equilibrated_system is None:
+            self._logger.warning("No pre-equilibrated system found. Cannot load restraints...")
+            return False
+        else:
+            self._logger.info("Pre-equilibrated system found. Attempting to load restraints...")
+        
         restraints_pickle_path = f"{self.base_dir}/restraints.pkl"
         if _os.path.isfile(restraints_pickle_path):
+            self._logger.info(f"Loading restraints from pickle file {restraints_pickle_path}...")
             try:
                 with open(restraints_pickle_path,"rb") as f:
                     restraint_dicts = _pkl.load(f)
 
                 self.restraints = [
                     _BoreschRestraint(
-                        system=system,
+                        # we store the pre_equilibrated_system in the Leg object in the first run
+                        system=self.pre_equilibrated_system,  
                         restraint_dict=rd,
                         temperature=298.15 * _BSS.Units.Temperature.kelvin,
                         restraint_type="Boresch"
@@ -348,7 +395,6 @@ class Leg(_SimulationRunner):
             self._logger.warning(f"No restraints pickle found at {restraints_pickle_path}")
             return False
   
-
 
     def get_optimal_lam_vals(
         self,
@@ -747,11 +793,13 @@ class Leg(_SimulationRunner):
                 )
             ]
         )
-
         # Mark the ligand to be decoupled so the restraints searching algorithm works
         # NOTE so why ligand is the first molecule in the system? by JJH-2025-05-17
         lig = _BSS.Align.decouple(pre_equilibrated_system[0], intramol=True)
         pre_equilibrated_system.updateMolecule(0, lig)
+
+        # NOTE: store pre_equilibrated_system in leg only for loading back the restraints
+        self.pre_equilibrated_system = pre_equilibrated_system
 
         # If this is the bound leg, search for restraints
         if self.leg_type == _LegType.BOUND:
@@ -787,7 +835,6 @@ class Leg(_SimulationRunner):
                 self.restraints.append(restraint)
 
             # dump the restraints to a pickle file for later use
-            self._logger.info("Dumping restraints to pickle...")  
             self._dump_restraints_to_pickle()
 
             return pre_equilibrated_system

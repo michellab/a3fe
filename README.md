@@ -90,9 +90,9 @@ calc.save()
 
 ### Some notes for solving runtime issues
 - if `ensemble_equilibration_*` runs faild, we can simply remove the entire folder and re-run the calculation
-- reloading molecules via `_BSS.IO.readMolecules()` leads to different molecule number (MolNum) so it's tricky to dump restraints and load them back. This reloading operation results in `ValueError` from this check `atom._sire_object.molecule().number()!= decoupled_mol._sire_object.number()` (Restraint.system() setter)
-   - With this being said, it is tricky to save restraints and load them back
-- 
+- reloading molecules via `_BSS.IO.readMolecules()` leads to different molecule number (MolNum).
+  - so it's better to store everything related to the `_BSS._SireWrappers._system.System` object in one run, e.g., (Restraints)
+- pay attention to calculation.pkl (leg.pkl or stage.pkl) files when re-running a previously stopped calculation because the calculation will load these pickle file by default. These pickle files are use to load the previously saved `Calculation`, `Leg` and `Stage` objects.
 ### Copyright
 
 Copyright (c) 2023, Finlay Clark
