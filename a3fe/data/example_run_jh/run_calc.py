@@ -24,21 +24,25 @@ calc = a3.Calculation(
     base_dir="/home/jjhuang/project/jjhuang/fep_workflows/test_run_full/",
     input_dir="/home/jjhuang/project/jjhuang/fep_workflows/test_run_full/input",
 )
-
-# we can update slurm config for different steps
-calc.bound_leg.update_slurm_config(
+print("step-2...")
+calc.setup()
+# we can update the slurm script for steps here
+calc.bound_leg.update_slurm_script(
     "parameterise", 
     time="00:12:12",     
     mem="1G",           
     cpus_per_task=1       
 )
-calc.bound_leg.update_slurm_config(
+calc.bound_leg.update_slurm_script(
     "solvate",
     mem="8G",             
     time="00:11:11"       
 )
-print("step-2...")
-calc.setup()
+calc.bound_leg.update_slurm_script(
+    "somd_production",
+    mem="2G",             
+    time="00:13:13"       
+)
 print('step-3...')
 # get optimal lambda spacing
 calc.get_optimal_lam_vals()

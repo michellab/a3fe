@@ -1487,16 +1487,13 @@ class Leg(_SimulationRunner):
         # Define directories where scripts might exist based on step type
         script_directories = []
         if step_type in ["parameterise", "solvate", "minimise", "heat_preequil"]:
-            # These scripts are in the input directory
             script_directories.append(self.input_dir)
         elif step_type == "ensemble_equil":
-            # These scripts are in ensemble equilibration directories
             for i in range(self.ensemble_size):
                 equil_dir = f"{self.base_dir}/ensemble_equilibration_{i + 1}"
                 if _os.path.isdir(equil_dir):
                     script_directories.append(equil_dir)
         elif step_type == "somd_production":
-            # These scripts are in stage directories and lambda window directories
             if hasattr(self, 'stages'):
                 for stage in self.stages:
                     for lam_window in stage.lam_windows:
@@ -1504,11 +1501,15 @@ class Leg(_SimulationRunner):
                             if _os.path.isdir(sim.base_dir):
                                 script_directories.append(sim.base_dir)
 
-        # self._logger.info(f"Script directories for {step_type}: {script_directories}")
         # Generate and write updated scripts
         scripts_updated = 0
         for script_dir in script_directories:
-            script_filename = f"{updated_config.job_name}.sh"
+            # For SOMD production, always use run_somd.sh
+            if step_type == "somd_production":
+                script_filename = "run_somd.sh"
+            else:
+                script_filename = f"{updated_config.job_name}.sh"
+            
             script_path = _os.path.join(script_dir, script_filename)
             
             # Check if script already exists
@@ -1536,7 +1537,6 @@ class Leg(_SimulationRunner):
                         self._logger.warning(f"Unknown step type for script generation: {step_type}")
                         continue
                 
-                # Write the updated script
                 self.slurm_generator.write_script(script_path, script_content)
                 scripts_updated += 1
             else:

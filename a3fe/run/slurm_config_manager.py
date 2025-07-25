@@ -55,7 +55,7 @@ DEFAULT_PREP_STEP_CONFIGS = {
         setup_cuda_env=True
     ),
     "somd_production": A3feSlurmParameters(
-        job_name="somd",
+        job_name="run_somd",
         cpus_per_task=4,
         gres="gpu:v100:1",  # GPU for SOMD production runs
         time="24:00:00", 
