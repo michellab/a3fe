@@ -90,8 +90,8 @@ calc.save()
 
 ### Some notes for solving runtime issues
 - if `ensemble_equilibration_*` runs faild, we can simply remove the entire folder and re-run the calculation
-- reloading molecules via `_BSS.IO.readMolecules()` leads to different molecule number (MolNum).
-  - so it's better to store everything related to the `_BSS._SireWrappers._system.System` object in one run, e.g., (Restraints)
+- reloading molecules via `_BSS.IO.readMolecules()` leads to different molecule number (MolNum). This may cause issues when we resume a previously-stopped run
+  - as a result, when using `skip_preparation=True` in Leg.setup(), we have to ensure that restraints are generated in the same run as pre-equilibrated system is loaded. In other words, `restraints.pkl` and `Leg.pkl` must be created in the same run
 - pay attention to calculation.pkl (leg.pkl or stage.pkl) files when re-running a previously stopped calculation because the calculation will load these pickle file by default. These pickle files are use to load the previously saved `Calculation`, `Leg` and `Stage` objects.
 ### Copyright
 
