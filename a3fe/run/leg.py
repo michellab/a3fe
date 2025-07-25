@@ -214,6 +214,10 @@ class Leg(_SimulationRunner):
             - Running pre-equilibration simulations (and extracting the
               restraints for the bound leg)
             - Creating the Stage objects
+        
+        VERY IMPORTANT NOTE: `skip_preparation` must be used with caution. When set to True, it loads Restraints from 
+          a pickle file generated in the previous run. the restraints-storing pickle and the Leg.pkl file must be 
+          generated in the same run, otherwise the restraints will not be loaded correctly.
 
         Parameters
         ----------
@@ -1454,7 +1458,7 @@ class Leg(_SimulationRunner):
         # Import here to avoid circular imports
         default_slurm_configs.create_site_specific_configs(account, **kwargs)
 
-    def update_slurm_config(self, step_type: str, **kwargs) -> None:
+    def update_slurm_script(self, step_type: str, **kwargs) -> None:
         """
         Update SLURM configuration for a specific step type for this leg instance.
         

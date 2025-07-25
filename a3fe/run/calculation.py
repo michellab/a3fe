@@ -376,7 +376,7 @@ class Calculation(_SimulationRunner):
     def update_leg_slurm_config(self, step_type: str, **kwargs):
         """Update SLURM configuration for both legs"""
         for leg in self.legs:
-            leg.update_slurm_config(step_type, **kwargs)
+            leg.update_slurm_script(step_type, **kwargs)
 
     @property
     def bound_leg(self) -> _Optional[_Leg]:
