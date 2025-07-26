@@ -278,8 +278,9 @@ class A3feSlurmGenerator:
             f"#SBATCH --cpus-per-task={params.cpus_per_task}",
         ]
         
-        # SOMD always needs GPU, so always include gres
-        lines.append(f"#SBATCH --gres={params.gres}")
+        # Only add gres directive if it's not empty
+        if params.gres.strip():
+            lines.append(f"#SBATCH --gres={params.gres}")
         
         lines.extend([
             f"#SBATCH --time={params.time}",

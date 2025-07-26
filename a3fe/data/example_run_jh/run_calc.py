@@ -41,7 +41,8 @@ calc.setup()
 calc.bound_leg.update_slurm_script(
     "somd_production",
     mem="2G",             
-    time="00:20:20"       
+    time="00:20:20",
+    gres="", # switch to CPU-only        
 )
 print('step-3: Get optimal lambda values...')
 calc.get_optimal_lam_vals()
