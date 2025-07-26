@@ -384,6 +384,10 @@ class Calculation(_SimulationRunner):
         for leg in self.legs:
             if leg.leg_type == _LegType.BOUND:
                 return leg
+
+        self._logger.warning(
+            "No bound leg found. This is unexpected, as the bound leg is required for calculations."
+        )
         return None
 
     @property
@@ -392,4 +396,7 @@ class Calculation(_SimulationRunner):
         for leg in self.legs:
             if leg.leg_type == _LegType.FREE:
                 return leg
+        self._logger.warning(
+            "No free leg found. This is unexpected, as the free leg is required for calculations."
+        )
         return None
