@@ -4,7 +4,7 @@ import a3fe as a3
 import os
 from a3fe.run.system_prep import SystemPreparationConfig
 from a3fe.run._virtual_queue import VirtualQueue
-
+from a3fe.run.enums import LegType as _LegType
 
 print("mdrun_options" in SystemPreparationConfig.model_fields)
 
@@ -67,6 +67,15 @@ if shutil.which("squeue") is None:
     VirtualQueue._submit_job = _submit_locally
 
 
+# Set global defaults before creating any Leg instances
+for step in ["parameterise", "solvate", "minimise", "heat_preequil", "ensemble_equil"]:
+    a3.Leg.update_default_slurm_config(
+        step_type=step,
+        pre_commands=['export PATH="$CONDA_PREFIX/bin:$PATH"']
+    )
+
+a3.Calculation.required_legs = [_LegType.BOUND]
+                                
 sysprep_cfg = SystemPreparationConfig(slurm=False,
                                       mdrun_options="-ntmpi 1 -ntomp 1",
                                       runtime_short_nvt=5,
@@ -80,11 +89,19 @@ calc = a3.Calculation(ensemble_size=1,
                       base_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again2",
                       input_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again2/input")
 print("step-2:...")
+
 calc.setup(
     bound_leg_sysprep_config=sysprep_cfg,
     free_leg_sysprep_config=sysprep_cfg,
     # skip_preparation=True,  # skip system preparation
 )
+
+calc.bound_leg.update_slurm_script(
+    "somd_production",
+    mem="2G",             
+    time="00:13:13"       
+)
+
 print('step-3...')
 # calc.get_optimal_lam_vals()
 print('step-4...')
