@@ -127,7 +127,10 @@ class Leg(_SimulationRunner):
             update_paths=update_paths,
             dump=False,
         )
-
+        # add slurm generator and configs
+        self.slurm_generator = A3feSlurmGenerator()
+        self.slurm_configs = slurm_configs or default_slurm_configs
+    
         if not self.loaded_from_pickle:
             # so if we see Leg.pkl in the folder, we will by default load it
             self.stage_types = Leg.required_stages[leg_type]
@@ -156,9 +159,6 @@ class Leg(_SimulationRunner):
             
             self.pre_equilibrated_system = None  # This will be set after the pre-equilibration stage
 
-            # add slurm generator and configs
-            self.slurm_generator = A3feSlurmGenerator()
-            self.slurm_configs = slurm_configs or default_slurm_configs
             # Save the state and update log
             self._update_log()
             self._dump()
@@ -1435,7 +1435,7 @@ class Leg(_SimulationRunner):
         """
         # Import here to avoid circular imports
         from .slurm_config_manager import default_slurm_configs
-        cls._logger.info(f"Updating default SLURM config for step type: {step_type} with {kwargs}")
+        print(f"Updating default SLURM config for step type: {step_type} with {kwargs}")
         default_slurm_configs.update_config(step_type, **kwargs)
 
     @classmethod
@@ -1452,7 +1452,7 @@ class Leg(_SimulationRunner):
             Additional site-specific settings (modules, conda_env, base_gres, etc.)
         """
         from .slurm_config_manager import default_slurm_configs
-        cls._logger.info(
+        print(
             f"Setting up site-specific SLURM configurations for account: {account} with {kwargs}"
         )
         # Import here to avoid circular imports

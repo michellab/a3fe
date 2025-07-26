@@ -27,17 +27,16 @@ calc = a3.Calculation(
 print("step-2...")
 calc.setup()
 # we can update the slurm script for steps here
-calc.bound_leg.update_slurm_script(
-    "parameterise", 
-    time="00:12:12",     
-    mem="1G",           
-    cpus_per_task=1       
-)
-calc.bound_leg.update_slurm_script(
-    "solvate",
-    mem="8G",             
-    time="00:11:11"       
-)
+for step in ["parameterise", "solvate", "minimise", "heat_preequil", "ensemble_equil"]:
+    calc.bound_leg.update_slurm_script(
+        "parameterise", 
+        pre_commands=['export PATH="$CONDA_PREFIX/bin:$PATH"']
+    )
+    calc.free_leg.update_slurm_script(
+        "parameterise", 
+        pre_commands=['export PATH="$CONDA_PREFIX/bin:$PATH"']
+    )
+    
 calc.bound_leg.update_slurm_script(
     "somd_production",
     mem="2G",             
