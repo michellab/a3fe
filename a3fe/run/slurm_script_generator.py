@@ -215,7 +215,7 @@ class A3feSlurmGenerator:
         if params.modules_to_load:
             # Filter out CUDA module if not using CUDA
             modules = params.modules_to_load.copy()
-            if not params.setup_cuda_env and params.somd_platform.upper() == "CPU":
+            if not params.setup_cuda_env or params.somd_platform.upper() == "CPU":
                 # Remove CUDA-related modules
                 modules = [mod for mod in modules if "cuda" not in mod.lower()]
             
@@ -311,8 +311,15 @@ class A3feSlurmGenerator:
             lines.append("module --force purge")
         
         if params.modules_to_load:
-            module_line = "module load " + "  ".join(params.modules_to_load)
-            lines.append(module_line)
+            # Filter out CUDA module if not using CUDA
+            modules = params.modules_to_load.copy()
+            if not params.setup_cuda_env or params.somd_platform.upper() == "CPU":
+                # Remove CUDA-related modules
+                modules = [mod for mod in modules if "cuda" not in mod.lower()]
+            
+            if modules:  # Only add if there are modules to load
+                module_line = "module load " + "  ".join(modules)
+                lines.append(module_line)
         
         lines.extend(["", ""])
         
@@ -349,7 +356,7 @@ class A3feSlurmGenerator:
             f"srun somd-freenrg -C somd.cfg -l $lam -p {params.somd_platform.upper()}",
             ""
         ])
-        
+
         # Post-commands
         if params.post_commands:
             lines.extend([
