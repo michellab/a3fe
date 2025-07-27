@@ -92,8 +92,8 @@ for step in ["parameterise", "solvate", "minimise", "heat_preequil", "ensemble_e
 
 calc = a3.Calculation(
     ensemble_size=3,
-    base_dir="~/home/jjhuang/project/jjhuang/fep_workflows/test_run_full/",
-    input_dir="~/home/jjhuang/project/jjhuang/fep_workflows/test_run_full/input",
+    base_dir="~/test_run_full/",
+    input_dir="~/test_run_full/input",
 )
 calc.setup()
 
