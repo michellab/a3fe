@@ -15,6 +15,7 @@ from .enums import LegType as _LegType
 from .enums import PreparationStage as _PreparationStage
 from .leg import Leg as _Leg
 from .system_prep import SystemPreparationConfig as _SystemPreparationConfig
+from .slurm_config_manager import SimulationSlurmConfigs
 
 # Notes from the paper - by JJ-2025-05-06 
 # The simulations with the ligand in solvent collectively make up the free leg, while those with the receptor–ligand 
@@ -49,6 +50,7 @@ class Calculation(_SimulationRunner):
         base_dir: _Optional[str] = None,
         stream_log_level: int = _logging.INFO,
         update_paths: bool = True,
+        slurm_configs: _Optional[SimulationSlurmConfigs] = None,
     ) -> None:
         """
         Instantiate a calculation based on files in the input dir. If calculation.pkl exists in the
@@ -109,7 +111,7 @@ class Calculation(_SimulationRunner):
             self.runtime_constant = runtime_constant
             self.relative_simulation_cost = relative_simulation_cost
             self.setup_complete: bool = False
-
+            self.slurm_configs = slurm_configs
             # Validate the input
             self._validate_input()
 
@@ -213,6 +215,7 @@ class Calculation(_SimulationRunner):
                 input_dir=self.input_dir,
                 base_dir=_os.path.join(self.base_dir, leg_type.name.lower()),
                 stream_log_level=self.stream_log_level,
+                slurm_configs=self.slurm_configs,
             )
             self.legs.append(leg)
             leg.setup(configs[leg_type], skip_preparation=skip_preparation)
@@ -368,3 +371,32 @@ class Calculation(_SimulationRunner):
                 for lambda_window in stage.lam_windows:
                     for simulation in lambda_window.sims:
                         _shutil.copy(master_run_somd, simulation.input_dir)
+
+
+    def update_leg_slurm_config(self, step_type: str, **kwargs):
+        """Update SLURM configuration for both legs"""
+        for leg in self.legs:
+            leg.update_slurm_script(step_type, **kwargs)
+
+    @property
+    def bound_leg(self) -> _Optional[_Leg]:
+        """Get the bound leg if it exists."""
+        for leg in self.legs:
+            if leg.leg_type == _LegType.BOUND:
+                return leg
+
+        self._logger.warning(
+            "No bound leg found. This is unexpected, as the bound leg is required for calculations."
+        )
+        return None
+
+    @property
+    def free_leg(self) -> _Optional[_Leg]:
+        """Get the free leg if it exists."""
+        for leg in self.legs:
+            if leg.leg_type == _LegType.FREE:
+                return leg
+        self._logger.warning(
+            "No free leg found. This is unexpected, as the free leg is required for calculations."
+        )
+        return None

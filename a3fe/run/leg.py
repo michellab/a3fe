@@ -38,6 +38,8 @@ from .enums import StageType as _StageType
 from .stage import Stage as _Stage
 from .system_prep import SystemPreparationConfig as _SystemPreparationConfig
 from BioSimSpace.Sandpit.Exscientia.FreeEnergy import Restraint as _BoreschRestraint
+from .slurm_script_generator import A3feSlurmGenerator
+from .slurm_config_manager import SimulationSlurmConfigs, default_slurm_configs
 
 
 class Leg(_SimulationRunner):
@@ -51,7 +53,7 @@ class Leg(_SimulationRunner):
         required_input_files[leg_type] = {}
         for prep_stage in _PreparationStage:
             required_input_files[leg_type][prep_stage] = [
-                "run_somd.sh",
+                # "run_somd.sh",  # we can retire this with the new slurm script manager
                 "template_config.cfg",
             ] + prep_stage.get_simulation_input_files(leg_type)
 
@@ -71,6 +73,7 @@ class Leg(_SimulationRunner):
         input_dir: _Optional[str] = None,
         stream_log_level: int = _logging.INFO,
         update_paths: bool = True,
+        slurm_configs: _Optional[SimulationSlurmConfigs] = None,
     ) -> None:
         """
         Instantiate a calculation based on files in the input dir. If leg.pkl exists in the
@@ -124,7 +127,10 @@ class Leg(_SimulationRunner):
             update_paths=update_paths,
             dump=False,
         )
-
+        # add slurm generator and configs
+        self.slurm_generator = A3feSlurmGenerator()
+        self.slurm_configs = slurm_configs or default_slurm_configs
+    
         if not self.loaded_from_pickle:
             # so if we see Leg.pkl in the folder, we will by default load it
             self.stage_types = Leg.required_stages[leg_type]
@@ -152,6 +158,7 @@ class Leg(_SimulationRunner):
                 self.restraints = []
             
             self.pre_equilibrated_system = None  # This will be set after the pre-equilibration stage
+
             # Save the state and update log
             self._update_log()
             self._dump()
@@ -207,6 +214,10 @@ class Leg(_SimulationRunner):
             - Running pre-equilibration simulations (and extracting the
               restraints for the bound leg)
             - Creating the Stage objects
+        
+        VERY IMPORTANT NOTE: `skip_preparation` must be used with caution. When set to True, it loads Restraints from 
+          a pickle file generated in the previous run. the restraints-storing pickle and the Leg.pkl file must be 
+          generated in the same run, otherwise the restraints will not be loaded correctly.
 
         Parameters
         ----------
@@ -544,7 +555,7 @@ class Leg(_SimulationRunner):
                 fn = _system_prep.slurm_parameterise_free
             else:
                 raise ValueError("Invalid leg type.")
-            self._run_slurm(fn, wait=True, run_dir=self.input_dir, job_name=job_name)
+            self._run_slurm(fn, wait=True, run_dir=self.input_dir, step_type="parameterise")
 
             # Check that the required input files have been produced, since slurm can fail silently
             for file in _PreparationStage.PARAMETERISED.get_simulation_input_files(
@@ -587,7 +598,7 @@ class Leg(_SimulationRunner):
                 fn = _system_prep.slurm_solvate_free
             else:
                 raise ValueError("Invalid leg type.")
-            self._run_slurm(fn, wait=True, run_dir=self.input_dir, job_name=job_name)
+            self._run_slurm(fn, wait=True, run_dir=self.input_dir, step_type="solvate")
 
             # Check that the required input files have been produced, since slurm can fail silently
             for file in _PreparationStage.SOLVATED.get_simulation_input_files(
@@ -624,7 +635,7 @@ class Leg(_SimulationRunner):
                 fn = _system_prep.slurm_minimise_free
             else:
                 raise ValueError("Invalid leg type.")
-            self._run_slurm(fn, wait=True, run_dir=self.input_dir, job_name=job_name)
+            self._run_slurm(fn, wait=True, run_dir=self.input_dir, step_type="minimise")
 
             # Check that the required input files have been produced, since slurm can fail silently
             for file in _PreparationStage.MINIMISED.get_simulation_input_files(
@@ -661,7 +672,7 @@ class Leg(_SimulationRunner):
                 fn = _system_prep.slurm_heat_and_preequil_free
             else:
                 raise ValueError("Invalid leg type.")
-            self._run_slurm(fn, wait=True, run_dir=self.input_dir, job_name=job_name)
+            self._run_slurm(fn, wait=True, run_dir=self.input_dir, step_type="heat_preequil")
 
             # Check that the required input files have been produced, since slurm can fail silently
             for file in _PreparationStage.PREEQUILIBRATED.get_simulation_input_files(
@@ -684,6 +695,7 @@ class Leg(_SimulationRunner):
     def run_ensemble_equilibration(
         self,
         sysprep_config: _SystemPreparationConfig,
+        custom_slurm_overrides: _Optional[_Dict] = None,
     ) -> _BSS._SireWrappers._system.System:
         """
         Run 5 ns simulations with SOMD for each of the ensemble_size runs and extract the final structures
@@ -741,7 +753,9 @@ class Leg(_SimulationRunner):
                 self._logger.info(
                     f"Running ensemble equilibration {i + 1} of {len(outdirs_to_run)}. Submitting through SLURM..."
                 )
-                self._run_slurm(fn, wait=False, run_dir=outdir, job_name=job_name)
+                overrides = custom_slurm_overrides or {}
+
+                self._run_slurm(fn, wait=False, run_dir=outdir, step_type="ensemble_equil", custom_overrides=overrides)
 
             self.virtual_queue.wait()  # Wait for all jobs to finish
 
@@ -999,7 +1013,7 @@ class Leg(_SimulationRunner):
         # self._lighten_restraints()
 
     def _run_slurm(
-        self, sys_prep_fn: _Callable, wait: bool, run_dir: str, job_name: str
+        self, sys_prep_fn: _Callable, wait: bool, run_dir: str, step_type: str, custom_overrides: _Optional[_Dict] = None,
     ) -> None:
         """
         Run the supplied function through a slurm job. The function must be in
@@ -1020,45 +1034,55 @@ class Leg(_SimulationRunner):
         -------
         None
         """
-        # Write the slurm script
-        # Get the header from run_somd.sh
-        header_lines = []
-        with open(f"{self.input_dir}/run_somd.sh", "r") as file:
-            for line in file.readlines():
-                if line.startswith("#SBATCH") or line.startswith("#!/bin/bash"):
-                    header_lines.append(line)
+        try:
+            base_config = self.slurm_configs.get_config(step_type)
+        except ValueError:
+            raise ValueError(f"Unknown step type: {step_type}. Available: {self.slurm_configs.list_steps()}")
+        
+        
+        if self.leg_type.name.lower() in ["bound", "free"]:
+            base_config.job_name = f"{base_config.job_name}_{self.leg_type.name.lower()}"
+        
+        if custom_overrides:
+            for key, value in custom_overrides.items():
+                if hasattr(base_config, key):
+                    setattr(base_config, key, value)
                 else:
-                    break
-        # Add module loading and environment setup
-        header_lines.extend([
-           "\n# Load required modules\n",
-           "module load StdEnv/2023\n",
-           "module load gcc/12.3\n",
-           "module load openmpi/4.1.5\n",
-           "module load cuda/12.2\n",
-           "module load gromacs/2024.4\n",
-           "\n# Set Python executable\n",
-           "export A3FE_PYTHON=/home/jjhuang/miniconda3/envs/a3fe_gra/bin/python\n",
-           "\n# Run the Python function\n"
-        ])
-        # Add lines to run the python function and write out
-        header_lines.append(
-            f"${{A3FE_PYTHON:-python}} -c 'from a3fe.run.system_prep import {sys_prep_fn.__name__}; {sys_prep_fn.__name__}()'\n"
-        )
-        slurm_file = f"{run_dir}/{job_name}.sh"
-        with open(slurm_file, "w") as file:
-            file.writelines(header_lines)
+                    base_config.custom_directives[key] = str(value)
+
+        python_command = f"python -c 'from a3fe.run.system_prep import {sys_prep_fn.__name__}; {sys_prep_fn.__name__}()'"
+        # Generate script content based on step type
+        if step_type == "somd_production":
+            # For SOMD production runs, use the special SOMD script format
+            script_content = self.slurm_generator.generate_somd_script(
+                job_name=base_config.job_name,
+                custom_overrides=base_config.dict()
+            )
+        else:
+            # For preparation steps, use the prep script format
+            script_content = self.slurm_generator.generate_prep_script(
+                job_name=base_config.job_name,
+                python_command=python_command,
+                custom_overrides=base_config.dict()
+            )
+        
+        script_filename = f"{base_config.job_name}.sh"
+        script_path = _os.path.join(run_dir, script_filename)
+        
+        self.slurm_generator.write_script(script_path, script_content)
 
         # Submit to the virtual queue
         cmd_list = [
             "--chdir",
-            f"{run_dir}",
-            f"{run_dir}/{job_name}.sh",
+            run_dir,
+            script_path,
         ]  # The virtual queue adds sbatch
-        slurm_file_base = _get_slurm_file_base(slurm_file)
+
+        slurm_file_base = _get_slurm_file_base(script_path)
         job = self.virtual_queue.submit(cmd_list, slurm_file_base=slurm_file_base)
-        self._logger.info(f"Submitted job {job}")
+        self._logger.info(f"Submitted {step_type} job {job} using configuration: {base_config.job_name}")
         self.jobs.append(job)
+
         # Update the virtual queue to submit the job
         self.virtual_queue.update()
 
@@ -1395,3 +1419,133 @@ class Leg(_SimulationRunner):
                 _A3feRestraint(restraint) for restraint in self.restraints
             ]
             self.restraints = light_restraints
+
+    @classmethod
+    def update_default_slurm_config(cls, step_type: str, **kwargs) -> None:
+        """
+        Update global default SLURM configuration for a specific step type.
+        This affects all new Leg instances that don't specify custom configs.
+        
+        Parameters
+        ----------
+        step_type : str
+            The preparation step type to update
+        **kwargs
+            Parameters to update in the configuration
+        """
+        # Import here to avoid circular imports
+        from .slurm_config_manager import default_slurm_configs
+        print(f"Updating default SLURM config for step type: {step_type} with {kwargs}")
+        default_slurm_configs.update_config(step_type, **kwargs)
+
+    @classmethod
+    def setup_site_configs(cls, account: str, **kwargs) -> None:
+        """
+        Set up site-specific SLURM configurations globally.
+        This affects all new Leg instances.
+        
+        Parameters
+        ----------
+        account : str
+            SLURM account to use
+        **kwargs
+            Additional site-specific settings (modules, conda_env, base_gres, etc.)
+        """
+        from .slurm_config_manager import default_slurm_configs
+        print(
+            f"Setting up site-specific SLURM configurations for account: {account} with {kwargs}"
+        )
+        # Import here to avoid circular imports
+        default_slurm_configs.create_site_specific_configs(account, **kwargs)
+
+    def update_slurm_script(self, step_type: str, **kwargs) -> None:
+        """
+        Update SLURM configuration for a specific step type for this leg instance.
+        
+        Parameters
+        ----------
+        step_type : str
+            The preparation step type to update
+        **kwargs
+            Parameters to update in the configuration
+        """
+        self._logger.info(f"Updating SLURM config for step type: {step_type} with {kwargs}")
+        self.slurm_configs.update_config(step_type, **kwargs)
+        updated_config = self.slurm_configs.get_config(step_type)
+
+        if self.leg_type.name.lower() in ["bound", "free"]:
+            updated_config.job_name = f"{updated_config.job_name}_{self.leg_type.name.lower()}"
+
+        step_function_map = {
+            "parameterise": f"parameterise_input",
+            "solvate": f"solvate_input",
+            "minimise": f"minimise_input",
+            "heat_preequil": f"heat_and_preequil_input",
+            "ensemble_equil": f"run_ensemble_equilibration",
+        }
+
+        # Define directories where scripts might exist based on step type
+        script_directories = []
+        if step_type in ["parameterise", "solvate", "minimise", "heat_preequil"]:
+            script_directories.append(self.input_dir)
+        elif step_type == "ensemble_equil":
+            for i in range(self.ensemble_size):
+                equil_dir = f"{self.base_dir}/ensemble_equilibration_{i + 1}"
+                if _os.path.isdir(equil_dir):
+                    script_directories.append(equil_dir)
+        elif step_type == "somd_production":
+            if hasattr(self, 'stages'):
+                for stage in self.stages:
+                    for lam_window in stage.lam_windows:
+                        for sim in lam_window.sims:
+                            if _os.path.isdir(sim.base_dir):
+                                script_directories.append(sim.base_dir)
+
+        # Generate and write updated scripts
+        scripts_updated = 0
+        for script_dir in script_directories:
+            # For SOMD production, always use run_somd.sh
+            if step_type == "somd_production":
+                script_filename = "run_somd.sh"
+            else:
+                script_filename = f"{updated_config.job_name}.sh"
+            
+            script_path = _os.path.join(script_dir, script_filename)
+            
+            # Check if script already exists
+            if _os.path.isfile(script_path):
+                self._logger.info(f"Updating existing SLURM script: {script_path}")
+                
+                # Generate updated script content
+                if step_type == "somd_production":
+                    # For SOMD production runs, use the special SOMD script format
+                    script_content = self.slurm_generator.generate_somd_script(
+                        job_name=updated_config.job_name,
+                        custom_overrides=updated_config.dict()
+                    )
+                else:
+                    # For preparation steps, use the prep script format
+                    function_name = step_function_map.get(step_type)
+                    if function_name:
+                        python_command = f"python -c 'from a3fe.run.system_prep import {function_name}; {function_name}()'"
+                        script_content = self.slurm_generator.generate_prep_script(
+                            job_name=updated_config.job_name,
+                            python_command=python_command,
+                            custom_overrides=updated_config.dict()
+                        )
+                    else:
+                        self._logger.warning(f"Unknown step type for script generation: {step_type}")
+                        continue
+                
+                self.slurm_generator.write_script(script_path, script_content)
+                scripts_updated += 1
+            else:
+                self._logger.warning(f"No existing SLURM script found to update: {script_path}")
+        
+        if scripts_updated > 0:
+            self._logger.info(f"Updated {scripts_updated} SLURM scripts for step type: {step_type}")
+        else:
+            self._logger.info(f"No existing SLURM scripts found to update for step type: {step_type}")
+        
+        # Save the updated state
+        self._dump()

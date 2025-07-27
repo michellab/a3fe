@@ -12,6 +12,7 @@ from time import sleep as _sleep
 from typing import Dict as _Dict
 from typing import List as _List
 from typing import Tuple as _Tuple
+from typing import Optional as _Optional
 
 import numpy as _np
 
@@ -23,6 +24,7 @@ from ..read._process_somd_files import (
 )
 from ..run._virtual_queue import Job as _Job
 from ..run._virtual_queue import VirtualQueue as _VirtualQueue
+from ..run.slurm_script_generator import A3feSlurmGenerator, A3feSlurmParameters
 
 
 def run_mbar(
@@ -134,6 +136,8 @@ def submit_mbar_slurm(
     subsampling: bool = False,
     equilibrated: bool = True,
     wait: bool = False,
+    slurm_generator: _Optional[A3feSlurmGenerator] = None,
+    custom_slurm_overrides: _Optional[_Dict] = None,
 ) -> _Tuple[_List[_Job], _List[str], _List[str]]:
     """
     Submit slurm jobs to run MBAR on SOMD output files.
@@ -187,15 +191,29 @@ def submit_mbar_slurm(
         equilibrated=equilibrated,
     )
 
-    # Read the slurm header
-    # Get the header from run_somd.sh
-    header_lines = []
-    with open(f"{run_somd_dir}/run_somd.sh", "r") as file:
-        for line in file.readlines():
-            if line.startswith("#SBATCH") or line.startswith("#!/bin/bash"):
-                header_lines.append(line)
+    # Initialize SLURM generator if not provided
+    if slurm_generator is None:
+        slurm_generator = A3feSlurmGenerator()
+
+    # Set up MBAR-specific SLURM parameters
+    mbar_slurm_params = A3feSlurmParameters(
+        job_name="mbar_analysis",
+        cpus_per_task=1,
+        gres="",  # CPU-only for MBAR analysis
+        time="02:00:00",
+        mem="4G",
+        modules_to_load=["StdEnv/2020", "gcc/9.3.0", "openmpi/4.0.3"],
+        setup_cuda_env=False
+    )
+
+    # Apply custom overrides if provided
+    if custom_slurm_overrides:
+        for key, value in custom_slurm_overrides.items():
+            if hasattr(mbar_slurm_params, key):
+                setattr(mbar_slurm_params, key, value)
             else:
-                break
+                mbar_slurm_params.custom_directives[key] = str(value)
+
 
     # Add MBAR command and run for each run.
     mbar_out_files = []
@@ -218,12 +236,38 @@ def submit_mbar_slurm(
         ]
         if subsampling:
             cmd_list.append("--subsampling")
-        slurm_cmd = " ".join(cmd_list)
-        slurm_lines = header_lines + [slurm_cmd]
+
+        mbar_command = " ".join(cmd_list)
+
+        # Generate job name for this specific run
+        job_name = f"mbar_run_{str(run_no).zfill(2)}_{round(percentage_end, 3)}_end_{round(percentage_start, 3)}_start"
+     
+        # Generate SLURM script using the generator
+        try:
+            script_content = slurm_generator.generate_prep_script(
+                job_name=job_name,
+                python_command="",  # We'll override this with the direct command
+                custom_overrides=mbar_slurm_params.dict()
+            )
+            
+            # Replace the Python command placeholder with the MBAR command
+            script_content = script_content.replace(
+                "# Main execution\n",
+                f"# Main execution\n{mbar_command}\n"
+            )
+            
+        except Exception as e:
+            # Fallback to legacy method if generator fails
+            print(f"Warning: SLURM generator failed ({e}), falling back to legacy method")
+            script_content = _generate_legacy_mbar_script(run_somd_dir, mbar_command)
+
         # Write the slurm file
         slurm_file = f"{output_dir}/freenrg-MBAR-run_{str(run_no).zfill(2)}_{round(percentage_end, 3)}_end_{round(percentage_start, 3)}_start.sh"
         with open(slurm_file, "w") as file:
-            file.writelines(slurm_lines)
+            file.write(script_content)
+
+        # Make script executable
+        _os.chmod(slurm_file, 0o755)
 
         # Submit to the virtual queue
         cmd_list = [
@@ -245,6 +289,48 @@ def submit_mbar_slurm(
                 virtual_queue.update()
 
     return jobs, mbar_out_files, tmp_simfiles
+
+def _generate_legacy_mbar_script(run_somd_dir: str, mbar_command: str) -> str:
+    """
+    Legacy method for generating MBAR SLURM scripts by copying headers from run_somd.sh.
+    Used as fallback if the SLURM generator fails.
+    
+    Parameters
+    ----------
+    run_somd_dir : str
+        Directory containing run_somd.sh file
+    mbar_command : str
+        The MBAR command to execute
+        
+    Returns
+    -------
+    str
+        SLURM script content
+    """
+    # Get the header from run_somd.sh
+    header_lines = []
+    try:
+        with open(f"{run_somd_dir}/run_somd.sh", "r") as file:
+            for line in file.readlines():
+                if line.startswith("#SBATCH") or line.startswith("#!/bin/bash"):
+                    header_lines.append(line)
+                else:
+                    break
+    except FileNotFoundError:
+        # Minimal fallback header
+        header_lines = [
+            "#!/bin/bash\n",
+            "#SBATCH --job-name=mbar_analysis\n",
+            "#SBATCH --time=02:00:00\n",
+            "#SBATCH --cpus-per-task=1\n",
+            "#SBATCH --mem=4G\n",
+            "\n"
+        ]
+    
+    # Add the MBAR command
+    header_lines.append(f"{mbar_command}\n")
+    
+    return "".join(header_lines)
 
 
 def collect_mbar_slurm(

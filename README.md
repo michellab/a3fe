@@ -29,7 +29,8 @@ python -m pip install --no-deps .
 ```
 
 ### How to run on different clusters with GPU (DRAC | Compute Canada)
-- on Graham, we should use the following environment.yaml file: 
+- According to [creating and using a virtual environment](https://docs.alliancecan.ca/wiki/Python#Creating_and_using_a_virtual_environment), it's strongly recommended against using Conda or Anaconda in DRAC HPC. This will cause issues with setting CUDA because Conda or Anaconda will pull in its own compilers, CUDA runtimes, and library paths, and mess up with Modules in DRAC HPC cluster. This is also why we need to use `export LD_LIBRARY_PATH="$CUDA_HOME/lib64"` on Graham to get around this issue. However, this quick fix is not recommended, so better to use `mamba env create -f environment.yaml`!
+- On Graham, we should use the following environment.yaml file: 
     ```
     name: a3fe_gra
     channels:
@@ -85,13 +86,15 @@ calc.set_equilibration_time(1) # Discard the first ns of simulation time
 calc.analyse()
 calc.save()
 ```
+- a up-to-date run script can be found here: `a3fe_jh/a3fe/data/example_run_jh/run_calc.py`
+    - in the same folder, we can use `protein.pdb` and `ligand.sdf` as the input to quickly test the run
 
 - Check the results in the ``output`` directories (separate output directories are created for the Calculation, Legs, and Stages)
 
-### Some notes for solving runtime issues
+### Some notes for solving runtime errors
 - if `ensemble_equilibration_*` runs faild, we can simply remove the entire folder and re-run the calculation
-- reloading molecules via `_BSS.IO.readMolecules()` leads to different molecule number (MolNum).
-  - so it's better to store everything related to the `_BSS._SireWrappers._system.System` object in one run, e.g., (Restraints)
+- reloading molecules via `_BSS.IO.readMolecules()` leads to different molecule number (MolNum). This may cause issues when we resume a previously-stopped run
+  - as a result, when using `skip_preparation=True` in Leg.setup(), we have to ensure that restraints are generated in the same run as pre-equilibrated system is loaded. In other words, `restraints.pkl` and `Leg.pkl` must be created in the same run
 - pay attention to calculation.pkl (leg.pkl or stage.pkl) files when re-running a previously stopped calculation because the calculation will load these pickle file by default. These pickle files are use to load the previously saved `Calculation`, `Leg` and `Stage` objects.
 ### Copyright
 
