@@ -74,11 +74,39 @@ python -m pip install --no-deps .
 - Move your input files into the the input directory. For example, if you have parameterised AMBER-format input files, name these bound_param.rst7, bound_param.prm7, free_param.rst7, and free_param.prm7. For more details see the documentation. Alternatively, copy the example input files from a3fe/a3fe/data/example_run_dir to your input directory.
 - Copy run somd.sh and template_config.sh from a3fe/a3fe/data/example_run_dir to your `input` directory, making sure to the SLURM options in run_somd.sh so that the jobs will run on your cluster
 - In the calculation base directory, run the following python code, either through ipython or as a python script (you will likely want to run the script with `nohup`or use ipython through tmux to ensure that the calculation is not killed when you lose connection)
+- a up-to-date run script can be found here: `a3fe_jh/a3fe/data/example_run_jh/run_calc.py`
+    - in the same folder, we can use `protein.pdb` and `ligand.sdf` as the input to quickly test the run
+- Check the results in the ``output`` directories (separate output directories are created for the Calculation, Legs, and Stages)
 
 ```python
-import a3fe as a3 
-calc = a3.Calculation(ensemble_size=5)
+import a3fe as a3
+
+# we can change slurm script setting here for preparation steps
+for step in ["parameterise", "solvate", "minimise", "heat_preequil", "ensemble_equil"]:
+    a3.Leg.update_default_slurm_config(
+        step_type=step,
+        time="12:00:00",
+        gres="",  # switch to CPU-only 
+        pre_commands=['export PATH="$CONDA_PREFIX/bin:$PATH"']
+    )
+
+calc = a3.Calculation(
+    ensemble_size=3,
+    base_dir="~/home/jjhuang/project/jjhuang/fep_workflows/test_run_full/",
+    input_dir="~/home/jjhuang/project/jjhuang/fep_workflows/test_run_full/input",
+)
 calc.setup()
+
+# we could also update somd slurm script here
+calc.bound_leg.update_slurm_script(
+    "somd_production",
+    mem="2G",             
+    time="00:12:12",
+    gres="", # switch to CPU-only
+    setup_cuda_env=False,       # Disable CUDA environment setup
+    somd_platform="CPU"         # Use CPU instead of CUDA 
+)
+
 calc.get_optimal_lam_vals()
 calc.run(adaptive=False, runtime = 5) # Run non-adaptively for 5 ns per replicate
 calc.wait()
@@ -86,16 +114,13 @@ calc.set_equilibration_time(1) # Discard the first ns of simulation time
 calc.analyse()
 calc.save()
 ```
-- a up-to-date run script can be found here: `a3fe_jh/a3fe/data/example_run_jh/run_calc.py`
-    - in the same folder, we can use `protein.pdb` and `ligand.sdf` as the input to quickly test the run
-
-- Check the results in the ``output`` directories (separate output directories are created for the Calculation, Legs, and Stages)
 
 ### Some notes for solving runtime errors
 - if `ensemble_equilibration_*` runs faild, we can simply remove the entire folder and re-run the calculation
 - reloading molecules via `_BSS.IO.readMolecules()` leads to different molecule number (MolNum). This may cause issues when we resume a previously-stopped run
-  - as a result, when using `skip_preparation=True` in Leg.setup(), we have to ensure that restraints are generated in the same run as pre-equilibrated system is loaded. In other words, `restraints.pkl` and `Leg.pkl` must be created in the same run
+  - as a result, when using `skip_preparation=True` in Leg.setup(), we have to ensure that restraints are generated in the same run as  pre-equilibrated system is loaded. In other words, `restraints.pkl` and `Leg.pkl` must be created in the same run
 - pay attention to calculation.pkl (leg.pkl or stage.pkl) files when re-running a previously stopped calculation because the calculation will load these pickle file by default. These pickle files are use to load the previously saved `Calculation`, `Leg` and `Stage` objects.
+
 ### Copyright
 
 Copyright (c) 2023, Finlay Clark
