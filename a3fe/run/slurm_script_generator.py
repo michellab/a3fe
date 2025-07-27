@@ -42,6 +42,7 @@ class A3feSlurmParameters(BaseModel):
     
     # Environment variables
     setup_cuda_env: bool = Field(default=True, description="Whether to set up CUDA environment")
+    somd_platform: str = Field(default="CUDA", description="SOMD platform (CUDA or CPU)")
 
     # pre/post command sequences
     pre_commands: list[str] = Field(
@@ -158,7 +159,7 @@ class A3feSlurmGenerator:
         params.output_file = f"{job_name}-%A.%a.out"
         params.error_file = f"{job_name}-%A.%a.err"
         params.time = "24:00:00"  # Longer time for simulations
-        params.mem = "8G"  # More memory for simulations
+        params.mem = "4G"  # More memory for simulations
         
         # Apply custom overrides
         if custom_overrides:
@@ -212,8 +213,15 @@ class A3feSlurmGenerator:
             lines.append("module --force purge")
         
         if params.modules_to_load:
-            module_line = "module load " + "  ".join(params.modules_to_load)
-            lines.append(module_line)
+            # Filter out CUDA module if not using CUDA
+            modules = params.modules_to_load.copy()
+            if not params.setup_cuda_env and params.somd_platform.upper() == "CPU":
+                # Remove CUDA-related modules
+                modules = [mod for mod in modules if "cuda" not in mod.lower()]
+            
+            if modules:  # Only add if there are modules to load
+                module_line = "module load " + "  ".join(modules)
+                lines.append(module_line)
         
         lines.extend(["", ""])
         
@@ -318,12 +326,13 @@ class A3feSlurmGenerator:
         ])
         
         # Environment setup (SOMD always needs CUDA)
-        lines.extend([
-            "unset LD_LIBRARY_PATH",
-            'export LD_LIBRARY_PATH="$CUDA_HOME/lib64"',
-            "",
-            ""
-        ])
+        if params.setup_cuda_env and params.somd_platform.upper() == "CUDA":
+            lines.extend([
+                "unset LD_LIBRARY_PATH",
+                'export LD_LIBRARY_PATH="$CUDA_HOME/lib64"',
+                "",
+                ""
+            ])
         
         # Pre-commands
         if params.pre_commands:
@@ -337,7 +346,7 @@ class A3feSlurmGenerator:
         lines.extend([
             "lam=$1",
             'echo "lambda is: $lam"',
-            "srun somd-freenrg -C somd.cfg -l $lam -p CUDA",
+            f"srun somd-freenrg -C somd.cfg -l $lam -p {params.somd_platform.upper()}",
             ""
         ])
         
