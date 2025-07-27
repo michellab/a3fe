@@ -42,7 +42,9 @@ calc.bound_leg.update_slurm_script(
     "somd_production",
     mem="2G",             
     time="00:20:20",
-    gres="", # switch to CPU-only        
+    gres="", # switch to CPU-only    
+    setup_cuda_env=False,       # Disable CUDA environment setup
+    somd_platform="CPU"         # Use CPU instead of CUDA    
 )
 print('step-3: Get optimal lambda values...')
 calc.get_optimal_lam_vals()
