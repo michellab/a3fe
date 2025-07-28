@@ -7,7 +7,6 @@ from a3fe.run.enums import LegType as _LegType
 from a3fe.run.system_prep import SystemPreparationConfig
 
 
-# Configuration options
 FORCE_LOCAL_EXECUTION = True  # Set to False for normal SLURM execution
 FORCE_CPU_PLATFORM = False   # Set to True to force CPU even on GPU systems
 
@@ -228,10 +227,13 @@ if __name__ == "__main__":
                       base_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again",
                       input_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again/input")
 
+    # To use "skip_preparation=True", run calc.setup() skip_preparation=False first and ensure the restraints.pkl and Leg.pkl
+    # files are produced successfully. then we can use the skip_preparation flag to skip the preparation step for
+    # subsequent runs.
     calc.setup(
         bound_leg_sysprep_config=sysprep_cfg,
         free_leg_sysprep_config=sysprep_cfg,
-        # skip_preparation=True,  # skip system preparation
+        # skip_preparation=True,  
     )
 
     # calc.bound_leg.update_slurm_script(
