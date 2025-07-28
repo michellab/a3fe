@@ -201,7 +201,7 @@ def patch_virtual_queue_for_local_execution():
 if __name__ == "__main__":
     # Configure via environment variables
     FORCE_LOCAL_EXECUTION = True
-    FORCE_CPU_PLATFORM = False 
+    FORCE_CPU_PLATFORM = False  # Set to True to force CPU even on GPU systems
     
     patch_virtual_queue_for_local_execution()
     
