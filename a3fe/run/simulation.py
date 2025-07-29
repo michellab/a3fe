@@ -566,12 +566,28 @@ class Simulation(_SimulationRunner):
                     temp = float(temp) + 273.15  # Convert to K
                 else:
                     temp = float(temp)
-            # Get the gradients
+
+        # If temperature not found in header, get it from somd.cfg
+        # Somehow some simfile.dat files do not contain headers which could result in this erro
+        # "TypeError: unsupported operand type(s) for *: 'NoneType' and 'float'" 
+        # therefore we add this fallback solution - by JH 2025-07-29
+        if temp is None:
+            try:
+                temp_str = _read_simfile_option(self.simfile_path, "temperature")
+                temp = float(temp_str.split()[0])  # Remove any units
+            except:
+                # Default to 298.15 K if we can't find temperature anywhere
+                temp = 298.15
+                self._logger.warning(f"Could not find temperature in simfile header or somd.cfg. Using default {temp} K")
+
+        # Extract gradient data (rest of method unchanged)
+        for line in lines:
+            vals = line.split()
             if not line.startswith("#"):
                 step = int(vals[0].strip())
-                if not endstate:  #  Return the infinitesimal gradients
+                if not endstate:
                     grad = float(vals[2].strip())
-                else:  # Return the difference in energy between the end state Hamiltonians
+                else:
                     energy_start = float(vals[5].strip())
                     energy_end = float(vals[-1].strip())
                     grad = energy_end - energy_start
