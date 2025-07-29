@@ -255,17 +255,19 @@ class Leg(_SimulationRunner):
                 # extract the final structures to give a diverse ensemble of starting
                 # conformations. For the bound leg, this also extracts the restraints.
                 system = self.run_ensemble_equilibration(sysprep_config=cfg)
+                # note that in run_ensemble_equilibration(), we also save the pre_equilibrated_system
         else:
             # TODO: this part is USELESS because we cannot dump and load the restraints (see README.md)
             # Skip preparation and load the pre-equilibrated system directly
             self._logger.info("SKIPPING PREPARATION STEPS - Loading pre-equilibrated system...")
+            # When running this branch, the pre_equilibrated_system is already saved in the Leg object/pickle 
             system = self.pre_equilibrated_system
             # now we need to load the restraints from pickle if they exist
             # self._load_restraints_helper(pre_equilibrated_system=system, sysprep_config=cfg)
             self._load_restraints_from_pickle()
 
         # Write input files
-        self.write_input_files(system, config=cfg)
+        self.write_input_files(pre_equilibrated_system=system, config=cfg)
 
         # Make sure the stored restraints reflect the restraints used. TODO:
         # make this more robust my using the SOMD functionality to extract

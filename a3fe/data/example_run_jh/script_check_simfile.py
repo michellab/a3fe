@@ -54,83 +54,134 @@ def check_simfile_temperature(simfile_path):
     except Exception as e:
         return False, None, f"Error reading file: {str(e)}"
 
-def find_all_simfiles(root_directory):
+
+def check_somd_cfg_file(cfg_path):
+    try:
+        file_size = os.path.getsize(cfg_path)
+        
+        if file_size == 0:
+            return False, 0, "File is empty"
+        
+        return True, file_size, None
+        
+    except FileNotFoundError:
+        return False, 0, "File not found"
+    except Exception as e:
+        return False, 0, f"Error accessing file: {str(e)}"
+    
+    
+def find_simulation_directories(root_directory):
     """
-    Find all simfile.dat files in the directory structure.
+    Find all directories containing either simfile.dat or somd.cfg files.
     
     Args:
         root_directory (str): Root directory to search
         
     Returns:
-        list: List of paths to simfile.dat files
+        dict: Dictionary with directory paths as keys and dict of found files as values
     """
-    simfile_paths = []
     root_path = Path(root_directory)
+    simulation_dirs = {}
     
-    # Recursively find all simfile.dat files
+    # Find all simfile.dat files
     for simfile in root_path.rglob("simfile.dat"):
-        simfile_paths.append(str(simfile))
+        dir_path = str(simfile.parent)
+        if dir_path not in simulation_dirs:
+            simulation_dirs[dir_path] = {'simfile': None, 'somd_cfg': None}
+        simulation_dirs[dir_path]['simfile'] = str(simfile)
     
-    return sorted(simfile_paths)
+    # Find all somd.cfg files
+    for cfg_file in root_path.rglob("somd.cfg"):
+        dir_path = str(cfg_file.parent)
+        if dir_path not in simulation_dirs:
+            simulation_dirs[dir_path] = {'simfile': None, 'somd_cfg': None}
+        simulation_dirs[dir_path]['somd_cfg'] = str(cfg_file)
+    
+    return simulation_dirs
 
+
+def format_file_size(size_bytes):
+    """Convert bytes to human readable format."""
+    if size_bytes == 0:
+        return "0 B"
+    elif size_bytes < 1024:
+        return f"{size_bytes} B"
+    elif size_bytes < 1024 * 1024:
+        return f"{size_bytes/1024:.1f} KB"
+    else:
+        return f"{size_bytes/(1024*1024):.1f} MB"
+    
 def main(root_directory="."):
     """Main function to check all simfile.dat files."""
     
     if len(sys.argv) > 1:
         root_directory = sys.argv[1]
     
-    print(f"Checking simfile.dat files in: {os.path.abspath(root_directory)}")
-    print("=" * 60)
+    print(f"Checking simulation files in: {os.path.abspath(root_directory)}")
+    print("=" * 80)
     
     # Find all simfile.dat files
-    simfile_paths = find_all_simfiles(root_directory)
+    simulation_dirs = find_simulation_directories(root_directory)
     
-    if not simfile_paths:
-        print("No simfile.dat files found!")
+    if not simulation_dirs:
+        print("No simulation files (simfile.dat or somd.cfg) found!")
         return
     
-    print(f"Found {len(simfile_paths)} simfile.dat files")
-    print("-" * 60)
+    print(f"Found {len(simulation_dirs)} directories with simulation files")
+    print("-" * 80)
     
-    # Check each file
-    valid_files = []
-    invalid_files = []
+    # Track results
+    valid_simfiles = []
+    invalid_simfiles = []
+    valid_cfg_files = []
+    invalid_cfg_files = []
+    missing_files = []
     
-    for simfile_path in simfile_paths:
-        is_valid, temperature, error_msg = check_simfile_temperature(simfile_path)
+    # Check each directory
+    for dir_path in sorted(simulation_dirs.keys()):
+        files = simulation_dirs[dir_path]
+        rel_dir = os.path.relpath(dir_path, root_directory)
         
-        # Get relative path for cleaner output
-        rel_path = os.path.relpath(simfile_path, root_directory)
+        print(f"\nDirectory: {rel_dir}")
+        print("  " + "-" * 60)
         
-        if is_valid:
-            valid_files.append((rel_path, temperature))
-            print(f"✓ {rel_path:<60} | T = {temperature:.2f} K")
+        # Check simfile.dat
+        if files['simfile']:
+            is_valid, temperature, error_msg = check_simfile_temperature(files['simfile'])
+            if is_valid:
+                valid_simfiles.append((rel_dir, temperature))
+                print(f"  ✓ simfile.dat    | T = {temperature:.2f} K")
+            else:
+                invalid_simfiles.append((rel_dir, error_msg))
+                print(f"  ✗ simfile.dat    | ERROR: {error_msg}")
         else:
-            invalid_files.append((rel_path, error_msg))
-            print(f"✗ {rel_path:<60} | ERROR: {error_msg}")
+            missing_files.append((rel_dir, "simfile.dat"))
+            print(f"  ⚠ simfile.dat    | MISSING")
+        
+        # Check somd.cfg
+        if files['somd_cfg']:
+            is_valid, file_size, error_msg = check_somd_cfg_file(files['somd_cfg'])
+            if is_valid:
+                valid_cfg_files.append((rel_dir, file_size))
+                size_str = format_file_size(file_size)
+                print(f"  ✓ somd.cfg       | Size: {size_str}")
+            else:
+                invalid_cfg_files.append((rel_dir, error_msg))
+                print(f"  ✗ somd.cfg       | ERROR: {error_msg}")
+        else:
+            missing_files.append((rel_dir, "somd.cfg"))
+            print(f"  ⚠ somd.cfg       | MISSING")
     
     # Summary
-    print("=" * 60)
-    print(f"SUMMARY:")
-    print(f"Total files checked: {len(simfile_paths)}")
-    print(f"Valid files: {len(valid_files)}")
-    print(f"Invalid files: {len(invalid_files)}")
+    print("\n" + "=" * 80)
+    print("SUMMARY:")
+    print(f"Total directories checked: {len(simulation_dirs)}")
+    print(f"Valid simfile.dat files: {len(valid_simfiles)}")
+    print(f"Invalid simfile.dat files: {len(invalid_simfiles)}")
+    print(f"Valid somd.cfg files: {len(valid_cfg_files)}")
+    print(f"Invalid somd.cfg files: {len(invalid_cfg_files)}")
+    print(f"Missing files: {len(missing_files)}")
     
-    if invalid_files:
-        print("\nINVALID FILES:")
-        for file_path, error in invalid_files:
-            print(f"  - {file_path}: {error}")
-        sys.exit(1)  # Exit with error code if any files are invalid
-    else:
-        print("\n🎉 All simfile.dat files have valid temperatures!")
-        
-        # Optional: Show temperature statistics
-        if valid_files:
-            temperatures = [temp for _, temp in valid_files]
-            print(f"\nTemperature Statistics:")
-            print(f"  Min: {min(temperatures):.2f} K")
-            print(f"  Max: {max(temperatures):.2f} K")
-            print(f"  Avg: {sum(temperatures)/len(temperatures):.2f} K")
 
 if __name__ == "__main__":
     main(root_directory=".")

@@ -641,7 +641,7 @@ class Simulation(_SimulationRunner):
         if self.slurm_file_base:
             self.slurm_file_base = self.slurm_file_base.replace(
                 old_sub_path, new_sub_path
-            )
+            ) 
 
         # Now we can easily change the paths in the simfile
         input_paths = {
@@ -650,6 +650,7 @@ class Simulation(_SimulationRunner):
             "crdfile": "somd.rst7",
         }
         for option, name in input_paths.items():
+            #print(f'self.simfile_path {self.simfile_path}')
             _write_simfile_option(
                 self.simfile_path, option, _os.path.join(self.input_dir, name)
             )
