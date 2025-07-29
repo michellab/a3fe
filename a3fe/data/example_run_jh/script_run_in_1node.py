@@ -63,7 +63,8 @@ def patch_virtual_queue_for_local_execution():
     
     def _run_somd_locally(script_path, lam_arg, cwd):
         """Run SOMD simulation locally."""
-        print(f"[LOCAL SOMD] Running lambda={lam_arg} in {cwd or os.getcwd()}")
+        working_dir = cwd or os.getcwd()
+        print(f"[LOCAL SOMD] Running lambda={lam_arg} in {working_dir}")
         
         # Read the script to find the somd command
         somd_command = None
@@ -105,16 +106,17 @@ def patch_virtual_queue_for_local_execution():
         print(f"[LOCAL SOMD] Executing: {' '.join(parts)}")
         
         try:
-            subprocess.run(parts, cwd=cwd, check=True)
-            print(f"[LOCAL SOMD] Completed successfully for lambda={lam_arg}")
+            subprocess.run(parts, cwd=working_dir, check=True)
+            print(f"[LOCAL SOMD] Completed successfully for lambda={lam_arg} at {working_dir}")
             return 0  # Return fake job ID
         except subprocess.CalledProcessError as e:
-            print(f"[LOCAL SOMD] Failed with return code {e.returncode}")
+            print(f"[LOCAL SOMD] Failed with return code {e.returncode} for lambda={lam_arg} at {working_dir}")
             raise RuntimeError(f"SOMD simulation failed: {e}")
     
     def _run_prep_locally(script_path, cwd):
         """Run preparation step locally."""
-        print(f"[LOCAL PREP] Running preparation script in {cwd or os.getcwd()}")
+        working_dir = cwd or os.getcwd()
+        print(f"[LOCAL PREP] Running preparation script in {working_dir}")
         
         # Read the script to find the python command
         python_command = None
@@ -131,11 +133,11 @@ def patch_virtual_queue_for_local_execution():
         print(f"[LOCAL PREP] Executing: {python_command}")
         
         try:
-            subprocess.run(python_command, shell=True, cwd=cwd, check=True)
-            print(f"[LOCAL PREP] Completed successfully")
+            subprocess.run(python_command, shell=True, cwd=working_dir, check=True)
+            print(f"[LOCAL PREP] Completed successfully at {working_dir}")
             return 0  # Return fake job ID
         except subprocess.CalledProcessError as e:
-            print(f"[LOCAL PREP] Failed with return code {e.returncode}")
+            print(f"[LOCAL PREP] Failed with return code {e.returncode} for preparation step at {working_dir}")
             raise RuntimeError(f"Preparation step failed: {e}")
     
 
