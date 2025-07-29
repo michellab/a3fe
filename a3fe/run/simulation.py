@@ -568,7 +568,7 @@ class Simulation(_SimulationRunner):
                     temp = float(temp)
 
         # If temperature not found in header, get it from somd.cfg
-        # Somehow some simfile.dat files do not contain headers which could result in this erro
+        # Somehow some simfile.dat files do not contain headers which could result in this error
         # "TypeError: unsupported operand type(s) for *: 'NoneType' and 'float'" 
         # therefore we add this fallback solution - by JH 2025-07-29
         if temp is None:
