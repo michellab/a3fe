@@ -574,7 +574,26 @@ class Simulation(_SimulationRunner):
         if temp is None:
             try:
                 temp_str = _read_simfile_option(self.simfile_path, "temperature")
-                temp = float(temp_str.split()[0])  # Remove any units
+                # Parse temperature string like "'25 * celsius'" or "'298.15 * kelvin'"
+                # Remove quotes and split by '*'
+                temp_str = temp_str.strip("'\"")
+                parts = temp_str.split("*")
+                
+                if len(parts) >= 2:
+                    temp_value = float(parts[0].strip())
+                    unit = parts[1].strip().lower()
+                    
+                    if unit in ["celsius", "c"]:
+                        temp = temp_value + 273.15  # Convert to K
+                    elif unit in ["kelvin", "k"]:
+                        temp = temp_value  # Already in K
+                    else:
+                        # Unknown unit, assume Kelvin
+                        temp = temp_value
+                        self._logger.warning(f"Unknown temperature unit '{unit}', assuming Kelvin")
+                else:
+                    # No unit specified, assume the number is in Kelvin
+                    temp = float(temp_str)
             except:
                 # Default to 298.15 K if we can't find temperature anywhere
                 temp = 298.15
