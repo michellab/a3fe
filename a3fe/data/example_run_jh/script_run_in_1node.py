@@ -7,6 +7,7 @@ from a3fe.run.enums import LegType as _LegType
 from a3fe.run.system_prep import SystemPreparationConfig
 
 
+# Configuration options
 FORCE_LOCAL_EXECUTION = True  # Set to False for normal SLURM execution
 FORCE_CPU_PLATFORM = False   # Set to True to force CPU even on GPU systems
 
@@ -62,9 +63,21 @@ def patch_virtual_queue_for_local_execution():
             return _run_prep_locally(script_path, cwd)
     
     def _run_somd_locally(script_path, lam_arg, cwd):
-        """Run SOMD simulation locally."""
-        working_dir = cwd or os.getcwd()
-        print(f"[LOCAL SOMD] Running lambda={lam_arg} in {working_dir}")
+        """Run SOMD simulation locally.
+           note somd.cfg may be easily corrupated by the original a3fe code. 
+        """
+        real_cwd = cwd or os.path.dirname(script_path)
+        cfg_path = os.path.join(real_cwd, "somd.cfg")
+        bak_path = cfg_path + ".bak"
+
+        if not os.path.exists(cfg_path) or os.path.getsize(cfg_path) == 0:
+            print(f"[LOCAL SOMD] ❌ {cfg_path} is missing or empty in {real_cwd}; cannot run SOMD")
+            raise RuntimeError(f"somd.cfg is missing or empty in {real_cwd}; cannot run SOMD")
+
+        shutil.copy2(cfg_path, bak_path)
+        print(f"Backed up {cfg_path} → {bak_path}")
+
+        print(f"[LOCAL SOMD] Running lambda={lam_arg} in {cwd or os.getcwd()}")
         
         # Read the script to find the somd command
         somd_command = None
@@ -106,17 +119,23 @@ def patch_virtual_queue_for_local_execution():
         print(f"[LOCAL SOMD] Executing: {' '.join(parts)}")
         
         try:
-            subprocess.run(parts, cwd=working_dir, check=True)
-            print(f"[LOCAL SOMD] Completed successfully for lambda={lam_arg} at {working_dir}")
+            subprocess.run(parts, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            print(f"[LOCAL SOMD] Completed successfully for lambda={lam_arg}")
             return 0  # Return fake job ID
         except subprocess.CalledProcessError as e:
-            print(f"[LOCAL SOMD] Failed with return code {e.returncode} for lambda={lam_arg} at {working_dir}")
+            print(f"[LOCAL SOMD] ❌ Failed with return code {e.returncode}")
+            # Restore the original config file
+            if not os.path.exists(cfg_path) or os.path.getsize(cfg_path) == 0:
+                try:
+                    shutil.copy2(bak_path, cfg_path)
+                    print("Restored somd.cfg from backup")
+                except Exception as e:
+                    print("❌ Failed to restore somd.cfg: %s", e)
             raise RuntimeError(f"SOMD simulation failed: {e}")
     
     def _run_prep_locally(script_path, cwd):
         """Run preparation step locally."""
-        working_dir = cwd or os.getcwd()
-        print(f"[LOCAL PREP] Running preparation script in {working_dir}")
+        print(f"[LOCAL PREP] Running preparation script in {cwd or os.getcwd()}")
         
         # Read the script to find the python command
         python_command = None
@@ -133,11 +152,11 @@ def patch_virtual_queue_for_local_execution():
         print(f"[LOCAL PREP] Executing: {python_command}")
         
         try:
-            subprocess.run(python_command, shell=True, cwd=working_dir, check=True)
-            print(f"[LOCAL PREP] Completed successfully at {working_dir}")
+            subprocess.run(python_command, shell=True, cwd=cwd, check=True)
+            print(f"[LOCAL PREP] Completed successfully")
             return 0  # Return fake job ID
         except subprocess.CalledProcessError as e:
-            print(f"[LOCAL PREP] Failed with return code {e.returncode} for preparation step at {working_dir}")
+            print(f"[LOCAL PREP] ❌ Failed with return code {e.returncode}")
             raise RuntimeError(f"Preparation step failed: {e}")
     
 
@@ -203,7 +222,7 @@ def patch_virtual_queue_for_local_execution():
 if __name__ == "__main__":
     # Configure via environment variables
     FORCE_LOCAL_EXECUTION = True
-    FORCE_CPU_PLATFORM = False  # Set to True to force CPU even on GPU systems
+    FORCE_CPU_PLATFORM = True
     
     patch_virtual_queue_for_local_execution()
     
@@ -218,24 +237,21 @@ if __name__ == "__main__":
 
     a3.Calculation.required_legs = [_LegType.BOUND]
                                     
-    sysprep_cfg = SystemPreparationConfig(slurm=True,
-                                        runtime_short_nvt=5,
-                                        runtime_nvt=10,
-                                        runtime_npt=10,                   # added for local test run on mac; unit - ps
-                                        runtime_npt_unrestrained=10,      # added for local test run on mac; unit - ps
-                                        ensemble_equilibration_time=10,)  # added for local test run on mac; unit - ps
+    sysprep_cfg = SystemPreparationConfig(slurm=True)
+                                        #runtime_short_nvt=5,
+                                        #runtime_nvt=10,
+                                        #runtime_npt=10,                   # added for local test run on mac; unit - ps
+                                        #runtime_npt_unrestrained=10,      # added for local test run on mac; unit - ps
+                                        #ensemble_equilibration_time=10,)  # added for local test run on mac; unit - ps
 
-    calc = a3.Calculation(ensemble_size=1, 
-                      base_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again",
-                      input_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again/input")
+    calc = a3.Calculation(ensemble_size=3, 
+                      base_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again2",
+                      input_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again2/input")
 
-    # To use "skip_preparation=True", run calc.setup() skip_preparation=False first and ensure the restraints.pkl and Leg.pkl
-    # files are produced successfully. then we can use the skip_preparation flag to skip the preparation step for
-    # subsequent runs.
     calc.setup(
         bound_leg_sysprep_config=sysprep_cfg,
         free_leg_sysprep_config=sysprep_cfg,
-        # skip_preparation=True,  
+        skip_preparation=True,  # skip system preparation
     )
 
     # calc.bound_leg.update_slurm_script(
@@ -254,3 +270,4 @@ if __name__ == "__main__":
     calc.set_equilibration_time(1)        # Discard the first ns of simulation time
     calc.analyse()
     calc.save()
+

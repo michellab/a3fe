@@ -100,6 +100,25 @@ def find_simulation_directories(root_directory):
     return simulation_dirs
 
 
+def find_run01_directories(root_directory):
+    """
+    Find all directories named 'run_01' containing simfile.dat or somd.cfg.
+    """
+    root_path = Path(root_directory)
+    run01_dirs = {}
+    for run_dir in root_path.rglob("run_01"):
+        if run_dir.is_dir():
+            simfile = run_dir / "simfile.dat"
+            cfgfile = run_dir / "somd.cfg"
+            # Only include if at least one of the files exists
+            if simfile.exists() or cfgfile.exists():
+                run01_dirs[str(run_dir)] = {
+                    'simfile': str(simfile) if simfile.exists() else None,
+                    'somd_cfg': str(cfgfile) if cfgfile.exists() else None
+                }
+    return run01_dirs
+
+
 def format_file_size(size_bytes):
     """Convert bytes to human readable format."""
     if size_bytes == 0:
@@ -111,7 +130,7 @@ def format_file_size(size_bytes):
     else:
         return f"{size_bytes/(1024*1024):.1f} MB"
     
-def main(root_directory="."):
+def main(root_directory=".", run_01_only=True):
     """Main function to check all simfile.dat files."""
     
     if len(sys.argv) > 1:
@@ -121,7 +140,10 @@ def main(root_directory="."):
     print("=" * 80)
     
     # Find all simfile.dat files
-    simulation_dirs = find_simulation_directories(root_directory)
+    if run_01_only:
+        simulation_dirs = find_run01_directories(root_directory)
+    else:
+        simulation_dirs = find_simulation_directories(root_directory)
     
     if not simulation_dirs:
         print("No simulation files (simfile.dat or somd.cfg) found!")
@@ -142,35 +164,32 @@ def main(root_directory="."):
         files = simulation_dirs[dir_path]
         rel_dir = os.path.relpath(dir_path, root_directory)
         
-        print(f"\nDirectory: {rel_dir}")
-        print("  " + "-" * 60)
-        
         # Check simfile.dat
-        if files['simfile']:
-            is_valid, temperature, error_msg = check_simfile_temperature(files['simfile'])
-            if is_valid:
-                valid_simfiles.append((rel_dir, temperature))
-                print(f"  ✓ simfile.dat    | T = {temperature:.2f} K")
-            else:
-                invalid_simfiles.append((rel_dir, error_msg))
-                print(f"  ✗ simfile.dat    | ERROR: {error_msg}")
+        if 'simfile' in files:
+            sf_valid, sf_temp, sf_err = check_simfile_temperature(files['simfile'])
         else:
-            missing_files.append((rel_dir, "simfile.dat"))
-            print(f"  ⚠ simfile.dat    | MISSING")
-        
+            sf_valid, sf_temp, sf_err = False, None, "simfile.dat MISSING"
+
         # Check somd.cfg
-        if files['somd_cfg']:
-            is_valid, file_size, error_msg = check_somd_cfg_file(files['somd_cfg'])
-            if is_valid:
-                valid_cfg_files.append((rel_dir, file_size))
-                size_str = format_file_size(file_size)
-                print(f"  ✓ somd.cfg       | Size: {size_str}")
-            else:
-                invalid_cfg_files.append((rel_dir, error_msg))
-                print(f"  ✗ somd.cfg       | ERROR: {error_msg}")
+        if 'somd_cfg' in files:
+            cfg_valid, cfg_size, cfg_err = check_somd_cfg_file(files['somd_cfg'])
         else:
-            missing_files.append((rel_dir, "somd.cfg"))
-            print(f"  ⚠ somd.cfg       | MISSING")
+            cfg_valid, cfg_size, cfg_err = False, None, "somd.cfg MISSING"
+
+        # Skip if both are valid
+        if sf_valid and cfg_valid:
+            continue
+
+        # Otherwise print errors
+        print(f"\nDirectory with issues: {rel_dir}")
+        print("  " + "-" * 60)
+
+        if not sf_valid:
+            print(f"  ✗ simfile.dat    | {sf_err}")
+            invalid_simfiles.append((rel_dir, sf_err))
+        if not cfg_valid:
+            print(f"  ✗ somd.cfg       | {cfg_err}")
+            invalid_cfg_files.append((rel_dir, cfg_err))
     
     # Summary
     print("\n" + "=" * 80)
@@ -181,7 +200,7 @@ def main(root_directory="."):
     print(f"Valid somd.cfg files: {len(valid_cfg_files)}")
     print(f"Invalid somd.cfg files: {len(invalid_cfg_files)}")
     print(f"Missing files: {len(missing_files)}")
-    
+
 
 if __name__ == "__main__":
     main(root_directory=".")

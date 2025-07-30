@@ -2,7 +2,7 @@
 This script provides functions to update attributes of a leg object stored in a pickle file.
 
 It's messy, but I need to constantly move and run simulations on different machines (HPC and local) 
-due to compute restraints, so I need to update the paths in the object. 
+so I need to update the paths in the object. 
 
 We may also use the following code (not tested):
 
