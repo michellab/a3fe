@@ -43,15 +43,12 @@ def update_leg_object(pickle_path, output_path=None, **kwargs):
             base_dir="/new/base/directory"
         )
     """
-    
-    # Load the existing leg object
     print(f"Loading leg object from: {pickle_path}")
     with open(pickle_path, "rb") as f:
         leg = pickle.load(f)
     
     print(f"Original leg object loaded with {len(leg)} attributes")
     
-    # Track what we're updating
     updates_made = []
     
     # Update attributes if provided
@@ -77,7 +74,6 @@ def update_leg_object(pickle_path, output_path=None, **kwargs):
     # Create output directory if it doesn't exist
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
-    # Save the updated leg object
     with open(output_path, "wb") as f:
         pickle.dump(leg, f)
     
