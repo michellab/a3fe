@@ -10,6 +10,7 @@ from a3fe.run.system_prep import SystemPreparationConfig
 # Configuration options
 FORCE_LOCAL_EXECUTION = True  # Set to False for normal SLURM execution
 FORCE_CPU_PLATFORM = False   # Set to True to force CPU even on GPU systems
+FAST_UPDATE_INTERVAL = 3  # seconds between updates for local execution
 
 
 def patch_virtual_queue_for_local_execution():
@@ -193,7 +194,7 @@ def patch_virtual_queue_for_local_execution():
         # (since we raise exceptions for failures in _submit_locally)
         return False
 
-   # CRITICAL: Override the update method to handle fake job IDs
+    # CRITICAL: Override the update method to handle fake job IDs
     original_update = VirtualQueue.update
     def local_update(self):
         """Updated update method that handles local execution fake job IDs."""
@@ -213,7 +214,6 @@ def patch_virtual_queue_for_local_execution():
         # Call original update for any real SLURM jobs (if any)
         original_update(self)
 
-   
     # Apply the patches
     VirtualQueue.update = local_update
     VirtualQueue._submit_job = _submit_locally
@@ -223,11 +223,8 @@ def patch_virtual_queue_for_local_execution():
     Job.has_failed = local_has_failed
     
     # Reduce VirtualQueue logging verbosity by patching the submit method
-
-    
     # Store the original submit method
     original_submit = VirtualQueue.submit
-    
     def quiet_submit(self, command_list, slurm_file_base):
         """Submit method without the 'submitted' logging message."""
         virtual_job_id = self._available_virt_job_id
