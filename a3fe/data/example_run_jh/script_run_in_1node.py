@@ -69,8 +69,8 @@ def patch_virtual_queue_for_local_execution():
                 for line in reversed(tail):
                     if "status = JobStatus.FINISHED finished successfully" in line:
                         print(f"[LOCAL SOMD] ✅ Already finished in {real_cwd}; skipping")
-                        # FIXED: Return a fake job ID that will immediately be marked as finished
-                        return 999999  # Use a high number that won't conflict
+                        # Return a fake job ID that will immediately be marked as finished
+                        return 999999
                 
             return _run_somd_locally(script_path, lam_arg, cwd)
         else:
@@ -194,7 +194,7 @@ def patch_virtual_queue_for_local_execution():
         # (since we raise exceptions for failures in _submit_locally)
         return False
 
-    # CRITICAL: Override the update method to handle fake job IDs
+    # Override the update method to handle fake job IDs
     original_update = VirtualQueue.update
     def local_update(self):
         """Updated update method that handles local execution fake job IDs."""
@@ -286,7 +286,9 @@ if __name__ == "__main__":
     #     setup_cuda_env=False,       # Disable CUDA environment setup
     #     somd_platform="CPU"         # Use CPU instead of CUDA 
     # )
-    calc.get_optimal_lam_vals() # by default simtime=0.1 ns
+    # by default use simtime=0.1 ns
+    # we might need to reduce delta_er to get more lambda windows
+    calc.get_optimal_lam_vals(delta_er=0.5) 
     calc.run(adaptive=False, 
             runtime=25,              # run non-adaptively for 25 ns per replicate
             parallel=False)              # run things sequentially
