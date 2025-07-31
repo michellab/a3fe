@@ -34,14 +34,14 @@ def patch_virtual_queue_for_local_execution():
     # Replace job submission with local execution
     def _submit_locally(self, job_command_list):
         """Submit job locally instead of through SLURM."""
-        print(f'[LOCAL EXECUTION] Command: {job_command_list}')
-        
-        # Extract working directory
+        # print(f'[LOCAL EXECUTION] Command: {job_command_list}')
+        # Get the working directory from the command list
         cwd = None
         if "--chdir" in job_command_list:
-            i = job_command_list.index("--chdir")
-            cwd = job_command_list[i + 1]
-        
+            idx = job_command_list.index("--chdir")
+            cwd = job_command_list[idx + 1]
+        real_cwd = cwd or os.getcwd()
+
         # Find the script to execute
         script_idx = next(
             (j for j, tok in enumerate(job_command_list) if tok.endswith(".sh")),
@@ -57,6 +57,20 @@ def patch_virtual_queue_for_local_execution():
         # Check if this is a SOMD simulation (has lambda argument)
         if len(job_command_list) > script_idx + 1:
             lam_arg = job_command_list[-1]  # Lambda value
+
+            # ——— EARLY SKIP if Simulation.log shows FINISHED ———
+            sim_log = os.path.join(real_cwd, "Simulation.log")
+            if os.path.exists(sim_log):
+                # only read the last few KB for speed
+                with open(sim_log, "rb") as f:
+                    f.seek(max(0, os.path.getsize(sim_log) - 4096))
+                    tail = f.read().decode(errors="ignore").splitlines()
+                for line in reversed(tail):
+                    if "status = JobStatus.FINISHED finished successfully" in line:
+                        print(f"[LOCAL SOMD] ✅ Already finished in {real_cwd}; skipping")
+                        # FIXED: Return a fake job ID that will immediately be marked as finished
+                        return 999999  # Use a high number that won't conflict
+                
             return _run_somd_locally(script_path, lam_arg, cwd)
         else:
             # This is a preparation step
@@ -67,15 +81,13 @@ def patch_virtual_queue_for_local_execution():
            note somd.cfg may be easily corrupated by the original a3fe code. 
         """
         real_cwd = cwd or os.path.dirname(script_path)
+            
         cfg_path = os.path.join(real_cwd, "somd.cfg")
-        bak_path = cfg_path + ".bak"
 
         if not os.path.exists(cfg_path) or os.path.getsize(cfg_path) == 0:
             print(f"[LOCAL SOMD] ❌ {cfg_path} is missing or empty in {real_cwd}; cannot run SOMD")
             raise RuntimeError(f"somd.cfg is missing or empty in {real_cwd}; cannot run SOMD")
 
-        shutil.copy2(cfg_path, bak_path)
-        print(f"Backed up {cfg_path} → {bak_path}")
 
         print(f"[LOCAL SOMD] Running lambda={lam_arg} in {cwd or os.getcwd()}")
         
@@ -116,7 +128,7 @@ def patch_virtual_queue_for_local_execution():
         # Substitute lambda value
         parts = [tok.replace("$lam", lam_arg).replace("${lam}", lam_arg) for tok in parts]
         
-        print(f"[LOCAL SOMD] Executing: {' '.join(parts)}")
+        print(f"[LOCAL SOMD] Executing: {' '.join(parts)} at {real_cwd}")
         
         try:
             subprocess.run(parts, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
@@ -124,13 +136,6 @@ def patch_virtual_queue_for_local_execution():
             return 0  # Return fake job ID
         except subprocess.CalledProcessError as e:
             print(f"[LOCAL SOMD] ❌ Failed with return code {e.returncode}")
-            # Restore the original config file
-            if not os.path.exists(cfg_path) or os.path.getsize(cfg_path) == 0:
-                try:
-                    shutil.copy2(bak_path, cfg_path)
-                    print("Restored somd.cfg from backup")
-                except Exception as e:
-                    print("❌ Failed to restore somd.cfg: %s", e)
             raise RuntimeError(f"SOMD simulation failed: {e}")
     
     def _run_prep_locally(script_path, cwd):
@@ -149,7 +154,7 @@ def patch_virtual_queue_for_local_execution():
         if not python_command:
             raise RuntimeError(f"No A3FE preparation command found in {script_path}")
         
-        print(f"[LOCAL PREP] Executing: {python_command}")
+        print(f"[LOCAL PREP] Executing: {python_command} at {cwd or os.getcwd()}")
         
         try:
             subprocess.run(python_command, shell=True, cwd=cwd, check=True)
@@ -187,8 +192,30 @@ def patch_virtual_queue_for_local_execution():
         # For local execution, we assume if the job ID is set, it completed successfully
         # (since we raise exceptions for failures in _submit_locally)
         return False
-    
+
+   # CRITICAL: Override the update method to handle fake job IDs
+    original_update = VirtualQueue.update
+    def local_update(self):
+        """Updated update method that handles local execution fake job IDs."""
+        # Define fake job IDs used for already-completed or local jobs
+        fake_job_ids = [0, 999999]  # 0 from actual execution, 999999 from early skip
+        
+        # Mark any jobs with fake IDs as finished and remove from queue
+        jobs_to_remove = []
+        for job in self._slurm_queue:
+            if job.slurm_job_id in fake_job_ids:
+                job.status = _JobStatus.FINISHED
+                jobs_to_remove.append(job)
+                print(f"[LOCAL UPDATE] Marking local job {job.slurm_job_id} as finished")
+        # Remove the completed local jobs
+        for job in jobs_to_remove:
+            self._slurm_queue.remove(job)
+        # Call original update for any real SLURM jobs (if any)
+        original_update(self)
+
+   
     # Apply the patches
+    VirtualQueue.update = local_update
     VirtualQueue._submit_job = _submit_locally
 
     # Patch Job class for local execution
@@ -262,7 +289,7 @@ if __name__ == "__main__":
     #     setup_cuda_env=False,       # Disable CUDA environment setup
     #     somd_platform="CPU"         # Use CPU instead of CUDA 
     # )
-    calc.get_optimal_lam_vals()
+    calc.get_optimal_lam_vals() # by default simtime=0.1 ns
     calc.run(adaptive=False, 
             runtime=25,              # run non-adaptively for 25 ns per replicate
             parallel=False)              # run things sequentially
