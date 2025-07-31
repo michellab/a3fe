@@ -487,32 +487,50 @@ class Simulation(_SimulationRunner):
             for file in _pathlib.Path(self.output_dir).glob(del_file):
                 self._logger.info(f"Deleting {file}")
                 _subprocess.run(["rm", file])
+    
 
     def _set_n_cycles(self, n_cycles: int) -> None:
         """
-        Set the number of cycles in the SOMD config file.
+        Set the number of cycles in the SOMD config file atomically,
+        so that somd.cfg is never left empty on error.
 
-        Parameters
-        ----------
-        n_cycles : int
-            Number of cycles to set in the config file.
-
-        Returns
-        -------
-        None
+        note that the original implementation somehow always results in empty somd.cfg files
         """
-        # Find the line with n_cycles and replace
-        with open(_os.path.join(self.input_dir, "somd.cfg"), "r") as ifile:
-            lines = ifile.readlines()
-            for i, line in enumerate(lines):
-                if line.startswith("ncycles ="):
-                    lines[i] = "ncycles = " + str(n_cycles) + "\n"
-                    break
+        import os
+        import tempfile
 
-        # Now write the new file
-        with open(_os.path.join(self.input_dir, "somd.cfg"), "w+") as ofile:
-            for line in lines:
-                ofile.write(line)
+        config_path = os.path.join(self.input_dir, "somd.cfg")
+        if not os.path.exists(config_path):
+            raise FileNotFoundError(f"Config file not found: {config_path}")
+
+        # 1) Read the existing file
+        with open(config_path, "r") as ifile:
+            lines = ifile.readlines()
+
+        # 2) Update or append the ncycles line
+        for i, line in enumerate(lines):
+            if line.strip().startswith("ncycles"):
+                lines[i] = f"ncycles = {n_cycles}\n"
+                break
+        else:
+            # not found → append at end
+            lines.append(f"\nncycles = {n_cycles}\n")
+
+        # 3) Write to a temporary file in the same directory
+        dirpath = os.path.dirname(config_path)
+        fd, tmp_path = tempfile.mkstemp(dir=dirpath, prefix="somd.cfg.", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as tmpf:
+                tmpf.writelines(lines)
+                tmpf.flush()
+                os.fsync(tmpf.fileno())      # force write to disk
+            # 4) Atomically replace the old file
+            os.replace(tmp_path, config_path)
+        except Exception:
+            # cleanup and re-raise if anything went wrong
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            raise
 
     def read_gradients(
         self, equilibrated_only: bool = False, endstate: bool = False

@@ -358,8 +358,16 @@ class GradientData:
         # desired integrated standard error of the mean between lam vals
         if n_lam_vals is None:
             n_lam_vals: int = round(total_error / delta_er) + 1
+
         # Make sure that we have at least 2 windows
         n_lam_vals = max(n_lam_vals, 2)
+
+        # I don't think n_lam=2 is physically right? - by JH 2025-07-30
+        if n_lam_vals <= 2:
+            raise ValueError(
+                "The number of lambda values must be greater than 2. "
+                "Please provide a larger value for n_lam_vals or a smaller value for delta_er."
+            )
 
         # Convert the number of lambda values to an array of SEM values
         requested_sem_vals = _np.linspace(0, total_error, n_lam_vals)

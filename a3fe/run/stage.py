@@ -616,7 +616,7 @@ class Stage(_SimulationRunner):
         self,
         er_type: str = "root_var",
         delta_er: _Optional[float] = None,
-        n_lam_vals: _Optional[int] = None,
+        n_lam_vals: _Optional[int] = None,  # it's always None - by JH 2025-07-30
         run_nos: _List[int] = [1],
     ) -> _np.ndarray:
         """
@@ -659,11 +659,12 @@ class Stage(_SimulationRunner):
         unequilibrated_gradient_data = _GradientData(
             lam_winds=self.lam_windows, equilibrated=False, run_nos=run_nos
         )
+        
         for plot_type in [
             "mean",
             "stat_ineff",
-            "integrated_sem",
-            "integrated_var",
+            "integrated_sem",  # er_type="sem" sem_origin="inter", n_lam_vals = 10
+            "integrated_var",  # er_type="root_var", sem_origin="inter", n_lam_vals = 10
             "pred_best_simtime",
         ]:
             _plot_gradient_stats(
