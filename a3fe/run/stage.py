@@ -183,6 +183,7 @@ class Stage(_SimulationRunner):
                         base_dir=lam_base_dir,
                         input_dir=self.input_dir,
                         stream_log_level=self.stream_log_level,
+                        stage_type=self.stage_type.name.lower(),  # pass stage type for logging purposes
                     )
                 )
 
@@ -659,7 +660,7 @@ class Stage(_SimulationRunner):
         unequilibrated_gradient_data = _GradientData(
             lam_winds=self.lam_windows, equilibrated=False, run_nos=run_nos
         )
-        
+
         for plot_type in [
             "mean",
             "stat_ineff",
@@ -1221,6 +1222,7 @@ class Stage(_SimulationRunner):
                 base_dir=lam_base_dir,
                 input_dir=self.input_dir,
                 stream_log_level=self.stream_log_level,
+                stage_type=self.stage_type.name.lower(),   # Pass stage type
             )
             # Overwrite the default equilibration detection algorithm
             new_lam_win.check_equil = old_lam_vals_attrs["check_equil"]
