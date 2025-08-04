@@ -476,7 +476,7 @@ class Stage(_SimulationRunner):
                 normalised_sem_dg = smooth_dg_sems[i]
                 predicted_run_time_max_eff = (
                     1 / _np.sqrt(self.runtime_constant * self.relative_simulation_cost)  # type: ignore
-                ) * normalised_sem_dg
+                ) * normalised_sem_dg  # "normalised_sem_dg" is σ_current(ΔF) -> current uncertainty in the free energy change
                 actual_run_time = win.get_tot_simtime(run_nos=run_nos)
                 win._logger.info(
                     f"Predicted maximum efficiency run time for is {predicted_run_time_max_eff:.3f} ns"
@@ -1133,19 +1133,34 @@ class Stage(_SimulationRunner):
 
     def setup(self) -> None:
         raise NotImplementedError("Stages are set up when they are created")
-
-    def _mv_output(self, save_name: str) -> None:
+    
+    def _mv_output(self, save_name: str, backup: bool = False) -> None:
         """
         Move the output directory to a new location, without
         changing self.output_dir.
+
+        I've modified this by including a backup option - by JH 2025-07-30
 
         Parameters
         ----------
         save_name : str
             The new name of the old output directory.
         """
+        from datetime import datetime
         self._logger.info(f"Moving contents of output directory to {save_name}")
         base_dir = _pathlib.Path(self.output_dir).parent.resolve()
+        target = _os.path.join(base_dir, save_name)
+ 
+        if backup and _os.path.isdir(target) and any(_pathlib.Path(target).iterdir()):
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_name = f"{save_name}_{timestamp}"
+            backup_target = _os.path.join(base_dir, backup_name)
+            self._logger.warning(
+                f"Target '{target}' already exists; backing it up to '{backup_target}'"
+            )
+            _os.rename(target, backup_target)
+
+         # Move current output directory (will raise if target exists and backup=False)
         _os.rename(self.output_dir, _os.path.join(base_dir, save_name))
 
     def set_simfile_option(self, option: str, value: str) -> None:
