@@ -127,11 +127,9 @@ def patch_virtual_queue_for_local_execution():
     original_call = subprocess.call
     def quiet_call(*args, **kwargs):
         if args and isinstance(args[0], list) and len(args[0]) > 0:
-            # Silence ln commands specifically
             if args[0][0] == "ln":
                 kwargs.setdefault('stdout', subprocess.DEVNULL)
                 kwargs.setdefault('stderr', subprocess.DEVNULL)
-            # Also silence other common commands that might be noisy
             elif args[0][0] in ["mkdir", "cp", "mv", "rm"]:
                 kwargs.setdefault('stdout', subprocess.DEVNULL)
                 kwargs.setdefault('stderr', subprocess.DEVNULL)
@@ -272,7 +270,7 @@ def patch_virtual_queue_for_local_execution():
         try:
             subprocess.run(python_command, shell=True, cwd=cwd, check=True)
             print(f"[LOCAL PREP] Completed successfully")
-            return 0  # Return fake job ID
+            return 888888 # Return fake job ID
         except subprocess.CalledProcessError as e:
             print(f"[LOCAL PREP] ❌ Failed with return code {e.returncode}")
             raise RuntimeError(f"Preparation step failed: {e}")
@@ -325,7 +323,7 @@ def patch_virtual_queue_for_local_execution():
                 job.status = _JobStatus.FINISHED
                 job._already_marked_finished = True  # flag to prevent repeated downstream prints
                 jobs_to_remove.append(job)
-                print(f"[LOCAL UPDATE] ✅ Marking local job {job.slurm_job_id}, {job_sim_info} as finished")
+                print(f"[LOCAL UPDATE] ✅ Marking job slurm_job_id={job.slurm_job_id}, {job_sim_info} as finished")
         # Remove the completed local jobs
         for job in jobs_to_remove:
             self._slurm_queue.remove(job)
@@ -394,7 +392,7 @@ if __name__ == "__main__":
     calc.setup(
         bound_leg_sysprep_config=sysprep_cfg,
         free_leg_sysprep_config=sysprep_cfg,
-        # skip_preparation=True,  # skip system preparation
+        skip_preparation=True,  # skip system preparation
     )
 
     add_filter_recursively(calc)
