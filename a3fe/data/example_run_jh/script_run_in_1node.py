@@ -9,6 +9,9 @@ import re
 import logging
 import time
 from datetime import datetime
+from a3fe.run.simulation import Simulation
+from a3fe.run._virtual_queue import Job
+from a3fe.run.enums import JobStatus as _JobStatus
 
 # Configuration options
 FORCE_LOCAL_EXECUTION = True  # Set to False for normal SLURM execution
@@ -106,7 +109,6 @@ def _parse_sim_info_from_job(job) -> str:
             run_no = m_run.group(1)
 
     return f"stage={stage}, lam={lam}, run_no={run_no}"
-
 
 
 def patch_virtual_queue_for_local_execution(): 
@@ -303,12 +305,13 @@ def patch_virtual_queue_for_local_execution():
             raise RuntimeError(f"Preparation step failed: {e}")
     
 
-    # Patch get_tot_gpu_time to read from timing logs
-    from a3fe.run.simulation import Simulation
-    original_get_tot_gpu_time = Simulation.get_tot_gpu_time
-
     def timing_based_get_tot_gpu_time(self) -> float:
-        """Get GPU time from local timing logs."""
+        """need to get tot_gpu_time to set relative_simulation_cost which is 
+           a must for adaptive runtime mode
+
+           however, we set set_relative_sim_cost=False for get_optimal_lam_vals()
+              so this method will not be called in the first place.
+        """
         # First check for local timing log
         timing_log_path = os.path.join(self.base_dir, "local_execution.log")
         if os.path.exists(timing_log_path):
@@ -326,18 +329,12 @@ def patch_virtual_queue_for_local_execution():
         else:
             print(f"[ERROR] Timing log not found at {timing_log_path}")
 
-    # Apply the patches
-    Simulation.get_tot_gpu_time = timing_based_get_tot_gpu_time
 
-    from a3fe.run._virtual_queue import Job
-    from a3fe.run.enums import JobStatus as _JobStatus
-
-    # Store original methods
-    original_slurm_outfile = Job.slurm_outfile.fget if hasattr(Job.slurm_outfile, 'fget') else None
-    original_has_failed = Job.has_failed
-    
     def local_slurm_outfile(self):
         """Mock slurm outfile property for local execution."""
+        if hasattr(self, '_local_outfile'):
+            return self._local_outfile
+    
         cwd = None
         if "--chdir" in self.command_list:
             idx = self.command_list.index("--chdir")
@@ -393,17 +390,8 @@ def patch_virtual_queue_for_local_execution():
         # Call original update for any real SLURM jobs (if any)
         original_update(self)
 
-    # Apply the patches
-    VirtualQueue.update = local_update
-    VirtualQueue._submit_job = _submit_locally
-
-    # Patch Job class for local execution
-    Job.slurm_outfile = property(local_slurm_outfile)
-    Job.has_failed = local_has_failed
     
     # Reduce VirtualQueue logging verbosity by patching the submit method
-    # Store the original submit method
-    original_submit = VirtualQueue.submit
     def quiet_submit(self, command_list, slurm_file_base):
         """Submit method without the 'submitted' logging message."""
         virtual_job_id = self._available_virt_job_id
@@ -415,7 +403,16 @@ def patch_virtual_queue_for_local_execution():
         self.update()
         return job
     
-    # Patch the submit method
+
+    # APPLY THE PATCHES NOW
+    Simulation.get_tot_gpu_time = timing_based_get_tot_gpu_time
+
+    VirtualQueue.update = local_update
+    VirtualQueue._submit_job = _submit_locally
+
+    Job.slurm_outfile = property(local_slurm_outfile)
+    Job.has_failed = local_has_failed
+
     VirtualQueue.submit = quiet_submit
 
     print("VirtualQueue successfully patched for local execution!")
