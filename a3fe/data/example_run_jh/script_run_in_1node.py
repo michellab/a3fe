@@ -5,7 +5,8 @@ from a3fe.run._virtual_queue import VirtualQueue
 import a3fe as a3
 from a3fe.run.enums import LegType as _LegType
 from a3fe.run.system_prep import SystemPreparationConfig
-
+import re
+import logging
 
 # Configuration options
 FORCE_LOCAL_EXECUTION = True  # Set to False for normal SLURM execution
@@ -13,7 +14,100 @@ FORCE_CPU_PLATFORM = False   # Set to True to force CPU even on GPU systems
 FAST_UPDATE_INTERVAL = 3  # seconds between updates for local execution
 
 
-def patch_virtual_queue_for_local_execution():
+class DedupStatusFilter(logging.Filter):
+
+    """
+    we may want to de-duplicate massive logging info like:
+
+    INFO - 2025-08-02 22:28:36,711 - Simulation (stage=discharge, lam=0.0, run_no=1)_70 - Not running
+    INFO - 2025-08-02 22:28:36,719 - Simulation (stage=discharge, lam=0.0, run_no=1)_70 - Job 
+     (virtual_job_id = 1, slurm_job_id= 999999), status = JobStatus.FINISHED finished successfully
+    INFO - 2025-08-02 22:28:36,719 - Simulation (stage=discharge, lam=1.0, run_no=1)_74 - Not running
+    INFO - 2025-08-02 22:28:36,743 - Simulation (stage=discharge, lam=1.0, run_no=1)_74 - Job 
+     (virtual_job_id = 2, slurm_job_id= 999999), status = JobStatus.FINISHED finished successfully
+    """
+    JOBID_RE = re.compile(r"slurm_job_id=\s*(\d+)")
+    STATUS_RE = re.compile(r"status\s*=\s*([^,)+]+)")
+
+    def __init__(self):
+        super().__init__()
+        self._last_status_by_jobid: dict[str, str] = {}  # jobid -> last seen status
+        self._last_not_running_by_logger: dict[str, bool] = {}  # logger name -> saw "Not running"
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        msg = record.getMessage()
+        name = record.name
+
+        if "Not running" in msg:
+            if self._last_not_running_by_logger.get(name, False):
+                return False
+            self._last_not_running_by_logger[name] = True
+            return True
+
+        if "status =" in msg:
+            jobid_m = self.JOBID_RE.search(msg)
+            status_m = self.STATUS_RE.search(msg)
+            if jobid_m and status_m:
+                jobid = jobid_m.group(1)
+                status = status_m.group(1).strip()
+                prev = self._last_status_by_jobid.get(jobid)
+                if prev == status:
+                    return False
+                self._last_status_by_jobid[jobid] = status
+        return True
+    
+
+def add_filter_recursively(sim_runner):
+    if hasattr(sim_runner, "_logger"):
+        sim_runner._logger.addFilter(DedupStatusFilter())
+    if hasattr(sim_runner, "_sub_sim_runners"):
+        for sub in sim_runner._sub_sim_runners:
+            add_filter_recursively(sub)
+            
+
+def _parse_sim_info_from_job(job) -> str:
+    """
+    Job.command_list is like:
+      ['--chdir', '/Users/jingjinghuang/Documents/fep_workflow/
+        test_somd_run_again2_copy1/bound/vanish/output/lambda_0.000/run_01', 
+        '/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again2_copy1/
+        bound/vanish/output/lambda_0.000/run_01/run_somd.sh', '0.0']
+    """
+    stage = "?"
+    lam = "?"
+    run_no = "?"
+
+    # Lambda is last element if numeric
+    try:
+        potential_lam = job.command_list[-1]
+        float(potential_lam)
+        lam = potential_lam
+    except Exception:
+        pass
+
+    # Get cwd from --chdir
+    cwd = None
+    if "--chdir" in job.command_list:
+        idx = job.command_list.index("--chdir")
+        if idx + 1 < len(job.command_list):
+            cwd = job.command_list[idx + 1]
+
+    if isinstance(cwd, str):
+        # stage: e.g., .../bound/vanish/output/...
+        m_stage = re.search(r"/(?:bound|free)/([^/]+)/output/", cwd)
+        if m_stage:
+            stage = m_stage.group(1)
+
+        # run number: e.g., .../run_01
+        m_run = re.search(r"run_(\d+)", cwd)
+        if m_run:
+            run_no = m_run.group(1)
+
+    return f"stage={stage}, lam={lam}, run_no={run_no}"
+
+
+
+def patch_virtual_queue_for_local_execution(): 
     """
     Patch VirtualQueue to run jobs locally instead of through SLURM.
     Works on both local machines and HPC systems.
@@ -28,6 +122,23 @@ def patch_virtual_queue_for_local_execution():
     # Detect GPU availability
     print("Patching VirtualQueue for local execution...")
     print(f"Force CPU: {FORCE_CPU_PLATFORM}")
+
+    # Silence subprocess calls (for ln commands and other system calls)
+    original_call = subprocess.call
+    def quiet_call(*args, **kwargs):
+        if args and isinstance(args[0], list) and len(args[0]) > 0:
+            # Silence ln commands specifically
+            if args[0][0] == "ln":
+                kwargs.setdefault('stdout', subprocess.DEVNULL)
+                kwargs.setdefault('stderr', subprocess.DEVNULL)
+            # Also silence other common commands that might be noisy
+            elif args[0][0] in ["mkdir", "cp", "mv", "rm"]:
+                kwargs.setdefault('stdout', subprocess.DEVNULL)
+                kwargs.setdefault('stderr', subprocess.DEVNULL)
+        return original_call(*args, **kwargs)
+    
+    # Apply the subprocess patch
+    subprocess.call = quiet_call
     
     # Mock SLURM queue reading (always return empty queue)
     VirtualQueue._read_slurm_queue = lambda self: []
@@ -132,11 +243,12 @@ def patch_virtual_queue_for_local_execution():
         print(f"[LOCAL SOMD] Executing: {' '.join(parts)} at {real_cwd}")
         
         try:
-            subprocess.run(parts, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            subprocess.run(parts, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, text=True)
             print(f"[LOCAL SOMD] Completed successfully for lambda={lam_arg}")
-            return 0  # Return fake job ID
+            return 888888  # Return fake job ID
         except subprocess.CalledProcessError as e:
             print(f"[LOCAL SOMD] ❌ Failed with return code {e.returncode}")
+            print(f"[LOCAL SOMD] STDERR:\n{e.stderr}")
             raise RuntimeError(f"SOMD simulation failed: {e}")
     
     def _run_prep_locally(script_path, cwd):
@@ -199,15 +311,21 @@ def patch_virtual_queue_for_local_execution():
     def local_update(self):
         """Updated update method that handles local execution fake job IDs."""
         # Define fake job IDs used for already-completed or local jobs
-        fake_job_ids = [0, 999999]  # 0 from actual execution, 999999 from early skip
+        fake_job_ids = [888888, 999999]  # 888888 from actual execution, 999999 from early skip
         
         # Mark any jobs with fake IDs as finished and remove from queue
         jobs_to_remove = []
         for job in self._slurm_queue:
+            # grab more info like command list, etc.
+            job_sim_info = _parse_sim_info_from_job(job)
+
             if job.slurm_job_id in fake_job_ids:
+                if getattr(job, "_already_marked_finished", False):
+                    continue
                 job.status = _JobStatus.FINISHED
+                job._already_marked_finished = True  # flag to prevent repeated downstream prints
                 jobs_to_remove.append(job)
-                print(f"[LOCAL UPDATE] Marking local job {job.slurm_job_id} as finished")
+                print(f"[LOCAL UPDATE] ✅ Marking local job {job.slurm_job_id}, {job_sim_info} as finished")
         # Remove the completed local jobs
         for job in jobs_to_remove:
             self._slurm_queue.remove(job)
@@ -243,6 +361,7 @@ def patch_virtual_queue_for_local_execution():
 
 
 
+
 if __name__ == "__main__":
     # Configure via environment variables
     FORCE_LOCAL_EXECUTION = True
@@ -269,14 +388,16 @@ if __name__ == "__main__":
                                         #ensemble_equilibration_time=10,)  # added for local test run on mac; unit - ps
 
     calc = a3.Calculation(ensemble_size=3, 
-                      base_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again2",
-                      input_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again2/input")
+                      base_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again2_copy1",
+                      input_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again2_copy1/input")
 
     calc.setup(
         bound_leg_sysprep_config=sysprep_cfg,
         free_leg_sysprep_config=sysprep_cfg,
-        skip_preparation=True,  # skip system preparation
+        # skip_preparation=True,  # skip system preparation
     )
+
+    add_filter_recursively(calc)
 
     # calc.bound_leg.update_slurm_script(
     #     "somd_production",
@@ -288,7 +409,7 @@ if __name__ == "__main__":
     # )
     # by default use simtime=0.1 ns
     # we might need to reduce delta_er to get more lambda windows
-    calc.get_optimal_lam_vals(delta_er=0.5) 
+    calc.get_optimal_lam_vals() 
     calc.run(adaptive=False, 
             runtime=25,              # run non-adaptively for 25 ns per replicate
             parallel=False)              # run things sequentially
