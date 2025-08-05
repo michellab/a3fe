@@ -10,8 +10,11 @@ import logging
 import time
 from datetime import datetime
 from a3fe.run.simulation import Simulation
+from a3fe.run.stage import Stage
+from a3fe.run._simulation_runner import SimulationRunner
 from a3fe.run._virtual_queue import Job
 from a3fe.run.enums import JobStatus as _JobStatus
+from time import sleep
 
 # Configuration options
 FORCE_LOCAL_EXECUTION = True  # Set to False for normal SLURM execution
@@ -113,10 +116,12 @@ def _parse_sim_info_from_job(job) -> str:
     return f"stage={stage}, lam={lam}, run_no={run_no}"
 
 
-def patch_virtual_queue_for_local_execution(): 
+def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False): 
     """
     Patch VirtualQueue to run jobs locally instead of through SLURM.
     Works on both local machines and HPC systems.
+
+    turn on use_faster_wait to speed up local testing by reducing wait time
     """
     # Check if we should use local execution
     use_local = FORCE_LOCAL_EXECUTION or (shutil.which("squeue") is None)
@@ -177,12 +182,10 @@ def patch_virtual_queue_for_local_execution():
             sim_log = os.path.join(real_cwd, "Simulation.log")
             exe_log = os.path.join(real_cwd, "local_execution.log")
             if os.path.exists(sim_log) and os.path.exists(exe_log):
-                with open(sim_log, "rb") as f:
-                    # only read the last few KB for speed
-                    f.seek(max(0, os.path.getsize(sim_log) - 4096))
-                    sim_tail = f.read().decode(errors="ignore").splitlines()
-                sim_ok = any("status = JobStatus.FINISHED finished successfully" in L
-                             for L in sim_tail)
+                with open(sim_log, "r") as f:
+                    sim_lines = f.read().splitlines()
+                sim_ok = any("JobStatus.FINISHED finished successfully" in L
+                             for L in sim_lines)
 
                 with open(exe_log, "r") as f:
                     local_content = f.read()
@@ -423,6 +426,25 @@ def patch_virtual_queue_for_local_execution():
         self.update()
         return job
     
+    def _local_wait(self) -> None:
+        """Wait for all jobs to finish with faster polling for local execution."""
+        while len(self.queue) > 0:
+            self.update()
+            sleep(3) 
+    
+    def _local_stage_wait(self) -> None:
+        """Wait for the stage to finish with faster polling."""
+        sleep(3)  
+        self.virtual_queue.update()
+        while self.running:
+            sleep(3) 
+            self.virtual_queue.update()
+
+    def _local_sim_runner_wait(self) -> None:
+        """Wait for the simulation runner to finish with faster polling for local execution."""
+        sleep(3) 
+        while self.running:
+            sleep(3)
 
     # APPLY THE PATCHES NOW
     Simulation.get_tot_gpu_time = timing_based_get_tot_gpu_time
@@ -435,7 +457,14 @@ def patch_virtual_queue_for_local_execution():
 
     VirtualQueue.submit = quiet_submit
 
-    print("VirtualQueue successfully patched for local execution!")
+    if use_faster_wait:
+        # Patch the wait method to use faster polling for local execution
+        # This is useful for local testing to avoid long waits
+        VirtualQueue.wait = _local_wait
+        Stage.wait = _local_stage_wait
+        SimulationRunner.wait = _local_sim_runner_wait
+
+    print("A3FE was successfully patched for local execution!")
 
 
 
@@ -444,7 +473,7 @@ if __name__ == "__main__":
     FORCE_LOCAL_EXECUTION = True
     FORCE_CPU_PLATFORM = True
     
-    patch_virtual_queue_for_local_execution()
+    patch_virtual_queue_for_local_execution(use_faster_wait=True)
     
     # # Set global defaults before creating any Leg instances
     # for step in ["parameterise", "solvate", "minimise", "heat_preequil", "ensemble_equil"]:
