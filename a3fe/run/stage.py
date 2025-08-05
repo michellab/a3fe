@@ -1213,7 +1213,7 @@ class Stage(_SimulationRunner):
         if self.running:
             raise RuntimeError("Can't update while ensemble is running")
         if _os.path.isdir(self.output_dir):
-            self._mv_output(save_name=save_name, backup=False)
+            self._mv_output(save_name=save_name, backup=True)
         # Update the list of lambda windows in the simfile
         _write_simfile_option(
             simfile=f"{self.input_dir}/somd.cfg",
