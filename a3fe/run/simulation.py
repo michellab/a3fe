@@ -587,6 +587,7 @@ class Simulation(_SimulationRunner):
                     temp = float(temp) + 273.15  # Convert to K
                 else:
                     temp = float(temp)
+                break
 
         # If temperature not found in header, get it from somd.cfg
         # Somehow some simfile.dat files do not contain headers which could result in this error
