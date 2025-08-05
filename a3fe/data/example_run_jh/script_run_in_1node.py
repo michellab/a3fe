@@ -27,7 +27,6 @@ FAST_UPDATE_INTERVAL = 3  # seconds between updates for local execution
 
 
 class DedupStatusFilter(logging.Filter):
-
     """
     we may want to de-duplicate massive logging info like:
 
@@ -50,7 +49,6 @@ class DedupStatusFilter(logging.Filter):
         self.debug_mode = debug_mode
         self._last_not_running_by_logger: dict[str, bool] = {}
         self._last_status_by_job: dict[str, str] = {}
-
 
     def filter(self, record: logging.LogRecord) -> bool:
         msg = record.getMessage()
