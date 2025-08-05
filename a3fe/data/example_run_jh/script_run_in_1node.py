@@ -22,6 +22,10 @@ FORCE_CPU_PLATFORM = False   # Set to True to force CPU even on GPU systems
 FAST_UPDATE_INTERVAL = 3  # seconds between updates for local execution
 
 
+# _GLOBAL_LAST_STATUS_BY_JOB = {}  # unique_job_key -> last seen status
+# _GLOBAL_LAST_NOT_RUNNING_BY_LOGGER = {}  # logger name -> saw "Not running"
+
+
 class DedupStatusFilter(logging.Filter):
 
     """
@@ -37,43 +41,93 @@ class DedupStatusFilter(logging.Filter):
     so that we only log out info when the status changes.
     """
     JOBID_RE = re.compile(r"slurm_job_id=\s*(\d+)")
-    STATUS_RE = re.compile(r"status\s*=\s*([^,)+]+)")
+    NOTRUN_RE = re.compile(r"Not running")
+    STATUS_RE = re.compile(r"status\s*=\s*([^,)]+)")
+    SIM_DETAILS_RE = re.compile(r"Simulation \(stage=([^,]+), lam=([^,]+), run_no=([^)]+)\)")
 
-    def __init__(self):
+    def __init__(self, debug_mode: bool = False):
         super().__init__()
-        self._last_status_by_jobid: dict[str, str] = {}  # jobid -> last seen status
-        self._last_not_running_by_logger: dict[str, bool] = {}  # logger name -> saw "Not running"
+        self.debug_mode = debug_mode
+        self._last_not_running_by_logger: dict[str, bool] = {}
+        self._last_status_by_job: dict[str, str] = {}
+
 
     def filter(self, record: logging.LogRecord) -> bool:
         msg = record.getMessage()
         name = record.name
-
+        print(f"[DEBUG LOGGING]: Processing message from {name}: {msg}...")
+        # Handle "Not running" messages - suppress after first occurrence per logger
         if "Not running" in msg:
             if self._last_not_running_by_logger.get(name, False):
-                return False
-            self._last_not_running_by_logger[name] = True
+                if self.debug_mode:
+                    print(f"[DEBUG LOGGING]: Suppressing duplicate 'Not running' from {name}")
+                return False  # Suppress duplicate "Not running"
+            if self.debug_mode:
+                print(f"[DEBUG LOGGING]: First 'Not running' from {name}, allowing and marking")
+            self._last_status_by_job[name] = True
             return True
 
+        # Handle status messages - suppress if same status for same unique job
         if "status =" in msg:
             jobid_m = self.JOBID_RE.search(msg)
             status_m = self.STATUS_RE.search(msg)
+            
             if jobid_m and status_m:
                 jobid = jobid_m.group(1)
                 status = status_m.group(1).strip()
-                prev = self._last_status_by_jobid.get(jobid)
-                if prev == status:
-                    return False
-                self._last_status_by_jobid[jobid] = status
-        return True
-    
+                
+                # Create a unique key combining job ID + simulation details
+                unique_job_key = self._create_unique_job_key(jobid, msg, name)
+                prev_status = self._last_status_by_job.get(unique_job_key)
+                
+                if self.debug_mode:
+                    print(f"[DEBUG LOGGING]: Unique job key: '{unique_job_key}'")
+                    print(f"[DEBUG LOGGING]: Current status: '{status}', Previous status: '{prev_status}'")
+                
+                if prev_status == status:
+                    if self.debug_mode:
+                        print(f"[DEBUG LOGGING]: Suppressing duplicate status '{status}' for job '{unique_job_key}'")
+                    return False  # Suppress duplicate status
+                
+                if self.debug_mode:
+                    print(f"[DEBUG LOGGING]: New status '{status}' for job '{unique_job_key}', allowing and storing")
+                self._last_status_by_job[unique_job_key] = status
+        if self.debug_mode:
+            print(f"[DEBUG LOGGING]: Allowing message through")
+        return True  # Allow all other messages
 
-def add_filter_recursively(sim_runner):
+    def _create_unique_job_key(self, jobid: str, msg: str, logger_name: str) -> str:
+        """
+        Create a unique key for job tracking that combines:
+        - Job ID
+        - Stage, lambda, and run number (if available)
+        - Logger name as fallback
+        """
+        # Try to extract simulation details from the message or logger name
+        sim_details_m = self.SIM_DETAILS_RE.search(msg)
+        if not sim_details_m:
+            sim_details_m = self.SIM_DETAILS_RE.search(logger_name)
+        
+        if sim_details_m:
+            stage = sim_details_m.group(1)
+            lam = sim_details_m.group(2)
+            run_no = sim_details_m.group(3)
+            return f"{jobid}:{stage}:{lam}:{run_no}"
+        else:
+            # Fallback to logger name if we can't extract details
+            return f"{jobid}:{logger_name}"
+ 
+# Create ONE instance and reuse it
+shared_filter = DedupStatusFilter(debug_mode=False) # set to True for debugging
+
+
+def add_filter_recursively(sim_runner, filter_instance=shared_filter):
     if hasattr(sim_runner, "_logger"):
-        sim_runner._logger.addFilter(DedupStatusFilter())
+        sim_runner._logger.addFilter(filter_instance)  # Same instance!
     if hasattr(sim_runner, "_sub_sim_runners"):
         for sub in sim_runner._sub_sim_runners:
-            add_filter_recursively(sub)
-            
+            add_filter_recursively(sub, filter_instance)  # Same instance!
+
 
 def _parse_sim_info_from_job(job) -> str:
     """
@@ -500,7 +554,7 @@ if __name__ == "__main__":
     calc.setup(
         bound_leg_sysprep_config=sysprep_cfg,
         free_leg_sysprep_config=sysprep_cfg,
-        skip_preparation=True,  # skip system preparation
+        # skip_preparation=True,  # skip system preparation
     )
 
     add_filter_recursively(calc)
