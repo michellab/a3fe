@@ -183,6 +183,7 @@ class Stage(_SimulationRunner):
                         base_dir=lam_base_dir,
                         input_dir=self.input_dir,
                         stream_log_level=self.stream_log_level,
+                        stage_type=self.stage_type.name.lower(),  # pass stage type for logging purposes
                     )
                 )
 
@@ -475,7 +476,7 @@ class Stage(_SimulationRunner):
                 normalised_sem_dg = smooth_dg_sems[i]
                 predicted_run_time_max_eff = (
                     1 / _np.sqrt(self.runtime_constant * self.relative_simulation_cost)  # type: ignore
-                ) * normalised_sem_dg
+                ) * normalised_sem_dg  # "normalised_sem_dg" is σ_current(ΔF) -> current uncertainty in the free energy change
                 actual_run_time = win.get_tot_simtime(run_nos=run_nos)
                 win._logger.info(
                     f"Predicted maximum efficiency run time for is {predicted_run_time_max_eff:.3f} ns"
@@ -616,7 +617,7 @@ class Stage(_SimulationRunner):
         self,
         er_type: str = "root_var",
         delta_er: _Optional[float] = None,
-        n_lam_vals: _Optional[int] = None,
+        n_lam_vals: _Optional[int] = None,  # it's always None - by JH 2025-07-30
         run_nos: _List[int] = [1],
     ) -> _np.ndarray:
         """
@@ -659,11 +660,12 @@ class Stage(_SimulationRunner):
         unequilibrated_gradient_data = _GradientData(
             lam_winds=self.lam_windows, equilibrated=False, run_nos=run_nos
         )
+
         for plot_type in [
             "mean",
             "stat_ineff",
-            "integrated_sem",
-            "integrated_var",
+            "integrated_sem",  # er_type="sem" sem_origin="inter", n_lam_vals = 10
+            "integrated_var",  # er_type="root_var", sem_origin="inter", n_lam_vals = 10
             "pred_best_simtime",
         ]:
             _plot_gradient_stats(
@@ -1131,19 +1133,34 @@ class Stage(_SimulationRunner):
 
     def setup(self) -> None:
         raise NotImplementedError("Stages are set up when they are created")
-
-    def _mv_output(self, save_name: str) -> None:
+    
+    def _mv_output(self, save_name: str, backup: bool = False) -> None:
         """
         Move the output directory to a new location, without
         changing self.output_dir.
+
+        I've modified this by including a backup option - by JH 2025-07-30
 
         Parameters
         ----------
         save_name : str
             The new name of the old output directory.
         """
+        from datetime import datetime
         self._logger.info(f"Moving contents of output directory to {save_name}")
         base_dir = _pathlib.Path(self.output_dir).parent.resolve()
+        target = _os.path.join(base_dir, save_name)
+ 
+        if backup and _os.path.isdir(target) and any(_pathlib.Path(target).iterdir()):
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_name = f"{save_name}_{timestamp}"
+            backup_target = _os.path.join(base_dir, backup_name)
+            self._logger.warning(
+                f"Target '{target}' already exists; backing it up to '{backup_target}'"
+            )
+            _os.rename(target, backup_target)
+
+         # Move current output directory (will raise if target exists and backup=False)
         _os.rename(self.output_dir, _os.path.join(base_dir, save_name))
 
     def set_simfile_option(self, option: str, value: str) -> None:
@@ -1196,7 +1213,7 @@ class Stage(_SimulationRunner):
         if self.running:
             raise RuntimeError("Can't update while ensemble is running")
         if _os.path.isdir(self.output_dir):
-            self._mv_output(save_name)
+            self._mv_output(save_name=save_name, backup=True)
         # Update the list of lambda windows in the simfile
         _write_simfile_option(
             simfile=f"{self.input_dir}/somd.cfg",
@@ -1220,6 +1237,7 @@ class Stage(_SimulationRunner):
                 base_dir=lam_base_dir,
                 input_dir=self.input_dir,
                 stream_log_level=self.stream_log_level,
+                stage_type=self.stage_type.name.lower(),   # Pass stage type
             )
             # Overwrite the default equilibration detection algorithm
             new_lam_win.check_equil = old_lam_vals_attrs["check_equil"]

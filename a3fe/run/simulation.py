@@ -60,6 +60,7 @@ class Simulation(_SimulationRunner):
         output_dir: _Optional[str] = None,
         stream_log_level: int = _logging.INFO,
         update_paths: bool = True,
+        stage_type: _Optional[str] = None,  # Add this parameter for logging purposes
     ) -> None:
         """
         Initialise a Simulation object.
@@ -96,6 +97,7 @@ class Simulation(_SimulationRunner):
         # required for __str__, and therefore the super().__init__ call
         self.lam = lam
         self.run_no = run_no
+        self.stage_type = stage_type or "unknown"  # Default fallback
 
         super().__init__(
             base_dir=base_dir,
@@ -112,6 +114,7 @@ class Simulation(_SimulationRunner):
             self._validate_input()
             self.job: _Optional[_Job] = None
             self._running: bool = False
+            self._last_status_logged: _Optional[str] = None  # Track last logged status
             self.simfile_path = _os.path.join(self.base_dir, "somd.cfg")
             # Select the correct rst7 and, if supplied, restraints
             self._select_input_files()
@@ -128,7 +131,7 @@ class Simulation(_SimulationRunner):
             self._update_log()
 
     def __str__(self) -> str:
-        return f"Simulation (lam={self.lam}, run_no={self.run_no})"
+        return f"Simulation (stage={self.stage_type}, lam={self.lam}, run_no={self.run_no})"
 
     @property
     def running(self) -> bool:
@@ -487,32 +490,50 @@ class Simulation(_SimulationRunner):
             for file in _pathlib.Path(self.output_dir).glob(del_file):
                 self._logger.info(f"Deleting {file}")
                 _subprocess.run(["rm", file])
+    
 
     def _set_n_cycles(self, n_cycles: int) -> None:
         """
-        Set the number of cycles in the SOMD config file.
+        Set the number of cycles in the SOMD config file atomically,
+        so that somd.cfg is never left empty on error.
 
-        Parameters
-        ----------
-        n_cycles : int
-            Number of cycles to set in the config file.
-
-        Returns
-        -------
-        None
+        note that the original implementation somehow always results in empty somd.cfg files
         """
-        # Find the line with n_cycles and replace
-        with open(_os.path.join(self.input_dir, "somd.cfg"), "r") as ifile:
-            lines = ifile.readlines()
-            for i, line in enumerate(lines):
-                if line.startswith("ncycles ="):
-                    lines[i] = "ncycles = " + str(n_cycles) + "\n"
-                    break
+        import os
+        import tempfile
 
-        # Now write the new file
-        with open(_os.path.join(self.input_dir, "somd.cfg"), "w+") as ofile:
-            for line in lines:
-                ofile.write(line)
+        config_path = os.path.join(self.input_dir, "somd.cfg")
+        if not os.path.exists(config_path):
+            raise FileNotFoundError(f"Config file not found: {config_path}")
+
+        # 1) Read the existing file
+        with open(config_path, "r") as ifile:
+            lines = ifile.readlines()
+
+        # 2) Update or append the ncycles line
+        for i, line in enumerate(lines):
+            if line.strip().startswith("ncycles"):
+                lines[i] = f"ncycles = {n_cycles}\n"
+                break
+        else:
+            # not found → append at end
+            lines.append(f"\nncycles = {n_cycles}\n")
+
+        # 3) Write to a temporary file in the same directory
+        dirpath = os.path.dirname(config_path)
+        fd, tmp_path = tempfile.mkstemp(dir=dirpath, prefix="somd.cfg.", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as tmpf:
+                tmpf.writelines(lines)
+                tmpf.flush()
+                os.fsync(tmpf.fileno())      # force write to disk
+            # 4) Atomically replace the old file
+            os.replace(tmp_path, config_path)
+        except Exception:
+            # cleanup and re-raise if anything went wrong
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            raise
 
     def read_gradients(
         self, equilibrated_only: bool = False, endstate: bool = False
@@ -566,12 +587,48 @@ class Simulation(_SimulationRunner):
                     temp = float(temp) + 273.15  # Convert to K
                 else:
                     temp = float(temp)
-            # Get the gradients
+                break
+
+        # If temperature not found in header, get it from somd.cfg
+        # Somehow some simfile.dat files do not contain headers which could result in this error
+        # "TypeError: unsupported operand type(s) for *: 'NoneType' and 'float'" 
+        # therefore we add this fallback solution - by JH 2025-07-29
+        if temp is None:
+            try:
+                temp_str = _read_simfile_option(self.simfile_path, "temperature")
+                # Parse temperature string like "'25 * celsius'" or "'298.15 * kelvin'"
+                # Remove quotes and split by '*'
+                temp_str = temp_str.strip("'\"")
+                parts = temp_str.split("*")
+                
+                if len(parts) >= 2:
+                    temp_value = float(parts[0].strip())
+                    unit = parts[1].strip().lower()
+                    
+                    if unit in ["celsius", "c"]:
+                        temp = temp_value + 273.15  # Convert to K
+                    elif unit in ["kelvin", "k"]:
+                        temp = temp_value  # Already in K
+                    else:
+                        # Unknown unit, assume Kelvin
+                        temp = temp_value
+                        self._logger.warning(f"Unknown temperature unit '{unit}', assuming Kelvin")
+                else:
+                    # No unit specified, assume the number is in Kelvin
+                    temp = float(temp_str)
+            except:
+                # Default to 298.15 K if we can't find temperature anywhere
+                temp = 298.15
+                self._logger.warning(f"Could not find temperature in simfile header or somd.cfg. Using default {temp} K")
+
+        # Extract gradient data (rest of method unchanged)
+        for line in lines:
+            vals = line.split()
             if not line.startswith("#"):
                 step = int(vals[0].strip())
-                if not endstate:  #  Return the infinitesimal gradients
+                if not endstate:
                     grad = float(vals[2].strip())
-                else:  # Return the difference in energy between the end state Hamiltonians
+                else:
                     energy_start = float(vals[5].strip())
                     energy_end = float(vals[-1].strip())
                     grad = energy_end - energy_start
@@ -606,7 +663,7 @@ class Simulation(_SimulationRunner):
         if self.slurm_file_base:
             self.slurm_file_base = self.slurm_file_base.replace(
                 old_sub_path, new_sub_path
-            )
+            ) 
 
         # Now we can easily change the paths in the simfile
         input_paths = {
@@ -615,6 +672,7 @@ class Simulation(_SimulationRunner):
             "crdfile": "somd.rst7",
         }
         for option, name in input_paths.items():
+            #print(f'self.simfile_path {self.simfile_path}')
             _write_simfile_option(
                 self.simfile_path, option, _os.path.join(self.input_dir, name)
             )

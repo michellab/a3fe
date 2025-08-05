@@ -51,6 +51,7 @@ class LamWindow(_SimulationRunner):
         output_dir: _Optional[str] = None,
         stream_log_level: int = _logging.INFO,
         update_paths: bool = True,
+        stage_type: _Optional[str] = None,
     ) -> None:
         """
         Initialise a LamWindow object.
@@ -146,6 +147,8 @@ class LamWindow(_SimulationRunner):
             self.relative_simulation_cost = relative_simulation_cost
             self._running: bool = False
 
+            self.stage_type = stage_type  # Store stage type for logging
+
             # Create the required simulations for this lambda value
             for run_no in range(1, ensemble_size + 1):
                 # Copy the input files over to the simulation base directory,
@@ -176,6 +179,7 @@ class LamWindow(_SimulationRunner):
                         input_dir=sim_base_dir,
                         output_dir=sim_base_dir,
                         stream_log_level=stream_log_level,
+                        stage_type=stage_type,  
                     )
                 )
 
