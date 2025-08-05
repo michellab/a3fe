@@ -16,14 +16,11 @@ from a3fe.run._virtual_queue import Job
 from a3fe.run.enums import JobStatus as _JobStatus
 from time import sleep
 
+
 # Configuration options
 FORCE_LOCAL_EXECUTION = True  # Set to False for normal SLURM execution
 FORCE_CPU_PLATFORM = False   # Set to True to force CPU even on GPU systems
 FAST_UPDATE_INTERVAL = 3  # seconds between updates for local execution
-
-
-# _GLOBAL_LAST_STATUS_BY_JOB = {}  # unique_job_key -> last seen status
-# _GLOBAL_LAST_NOT_RUNNING_BY_LOGGER = {}  # logger name -> saw "Not running"
 
 
 class DedupStatusFilter(logging.Filter):
@@ -40,32 +37,40 @@ class DedupStatusFilter(logging.Filter):
     so that we only log out info when the status changes.
     """
     JOBID_RE = re.compile(r"slurm_job_id=\s*(\d+)")
-    NOTRUN_RE = re.compile(r"Not running")
     STATUS_RE = re.compile(r"status\s*=\s*([^,)]+)")
     SIM_DETAILS_RE = re.compile(r"Simulation \(stage=([^,]+), lam=([^,]+), run_no=([^)]+)\)")
 
     def __init__(self, debug_mode: bool = False):
         super().__init__()
         self.debug_mode = debug_mode
-        self._last_not_running_by_logger: dict[str, bool] = {}
-        self._last_status_by_job: dict[str, str] = {}
-
+        self._last_status_by_job: dict[str, str] = {}  # unique_job_key -> last seen status
+        self._not_running_jobs: set[str] = set()  # Track which jobs have logged "Not running"
+    
     def filter(self, record: logging.LogRecord) -> bool:
         msg = record.getMessage()
         name = record.name
-        print(f"[DEBUG LOGGING]: Processing message from {name}: {msg}...")
-        # Handle "Not running" messages - suppress after first occurrence per logger
+
+        if self.debug_mode:
+            print(f"DEBUG: Processing message from {name}: {msg[:100]}...")
+        
+        # For "Not running" messages, try to identify which job this is about
         if "Not running" in msg:
-            if self._last_not_running_by_logger.get(name, False):
+            job_key = self._get_job_key(msg, name)  # No jobid for "Not running"
+            
+            if job_key and job_key in self._not_running_jobs:
                 if self.debug_mode:
-                    print(f"[DEBUG LOGGING]: Suppressing duplicate 'Not running' from {name}")
-                return False  # Suppress duplicate "Not running"
-            if self.debug_mode:
-                print(f"[DEBUG LOGGING]: First 'Not running' from {name}, allowing and marking")
-            self._last_status_by_job[name] = True
+                    print(f"DEBUG: Suppressing duplicate 'Not running' for job {job_key}")
+                return False            
+            if job_key:
+                self._not_running_jobs.add(job_key)
+                if self.debug_mode:
+                    print(f"DEBUG: First 'Not running' for job {job_key}, allowing")
+            else:
+                if self.debug_mode:
+                    print(f"DEBUG: Allowing 'Not running' (couldn't identify job)")
             return True
 
-        # Handle status messages - suppress if same status for same unique job
+        # For status messages
         if "status =" in msg:
             jobid_m = self.JOBID_RE.search(msg)
             status_m = self.STATUS_RE.search(msg)
@@ -74,47 +79,47 @@ class DedupStatusFilter(logging.Filter):
                 jobid = jobid_m.group(1)
                 status = status_m.group(1).strip()
                 
-                # Create a unique key combining job ID + simulation details
-                unique_job_key = self._create_unique_job_key(jobid, msg, name)
+                unique_job_key = self._get_job_key(msg, name, jobid)
                 prev_status = self._last_status_by_job.get(unique_job_key)
-                
+
                 if self.debug_mode:
-                    print(f"[DEBUG LOGGING]: Unique job key: '{unique_job_key}'")
-                    print(f"[DEBUG LOGGING]: Current status: '{status}', Previous status: '{prev_status}'")
+                    print(f"DEBUG: Job key: '{unique_job_key}', Status: '{status}' (was: '{prev_status}')")
                 
                 if prev_status == status:
                     if self.debug_mode:
-                        print(f"[DEBUG LOGGING]: Suppressing duplicate status '{status}' for job '{unique_job_key}'")
-                    return False  # Suppress duplicate status
+                        print(f"DEBUG: Suppressing duplicate status for {unique_job_key}")
+                    return False
                 
-                if self.debug_mode:
-                    print(f"[DEBUG LOGGING]: New status '{status}' for job '{unique_job_key}', allowing and storing")
                 self._last_status_by_job[unique_job_key] = status
-        if self.debug_mode:
-            print(f"[DEBUG LOGGING]: Allowing message through")
-        return True  # Allow all other messages
+                # If this job is now running/finished, allow "Not running" to be logged again later
+                if status in ["JobStatus.FINISHED", "JobStatus.FAILED", "JobStatus.KILLED"]:
+                    self._not_running_jobs.discard(unique_job_key)
+                    if self.debug_mode:
+                        print(f"DEBUG: Job {unique_job_key} finished, allowing future 'Not running'")
 
-    def _create_unique_job_key(self, jobid: str, msg: str, logger_name: str) -> str:
-        """
-        Create a unique key for job tracking that combines:
-        - Job ID
-        - Stage, lambda, and run number (if available)
-        - Logger name as fallback
-        """
-        # Try to extract simulation details from the message or logger name
+        if self.debug_mode:
+            print(f"DEBUG: Allowing message through")
+        return True
+    
+    def _get_job_key(self, msg: str, logger_name: str, jobid: str = None) -> str | None:
         sim_details_m = self.SIM_DETAILS_RE.search(msg)
         if not sim_details_m:
             sim_details_m = self.SIM_DETAILS_RE.search(logger_name)
-        
         if sim_details_m:
             stage = sim_details_m.group(1)
             lam = sim_details_m.group(2)
-            run_no = sim_details_m.group(3)
-            return f"{jobid}:{stage}:{lam}:{run_no}"
+            run_no = sim_details_m.group(3)            
+            if jobid:
+                return f"{jobid}:{stage}:{lam}:{run_no}"
+            else:
+                return f"current:{stage}:{lam}:{run_no}"
         else:
-            # Fallback to logger name if we can't extract details
-            return f"{jobid}:{logger_name}"
- 
+            if jobid:
+                return f"{jobid}:{logger_name}"
+            else:
+                return None
+
+
 # Create ONE instance and reuse it
 shared_filter = DedupStatusFilter(debug_mode=False) # set to True for debugging
 
@@ -552,7 +557,7 @@ if __name__ == "__main__":
     calc.setup(
         bound_leg_sysprep_config=sysprep_cfg,
         free_leg_sysprep_config=sysprep_cfg,
-        # skip_preparation=True,  # skip system preparation
+        skip_preparation=True,  # skip system preparation
     )
 
     add_filter_recursively(calc)
