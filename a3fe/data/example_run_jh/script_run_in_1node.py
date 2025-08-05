@@ -30,6 +30,8 @@ class DedupStatusFilter(logging.Filter):
     INFO - 2025-08-02 22:28:36,719 - Simulation (stage=discharge, lam=1.0, run_no=1)_74 - Not running
     INFO - 2025-08-02 22:28:36,743 - Simulation (stage=discharge, lam=1.0, run_no=1)_74 - Job 
      (virtual_job_id = 2, slurm_job_id= 999999), status = JobStatus.FINISHED finished successfully
+
+    so that we only log out info when the status changes.
     """
     JOBID_RE = re.compile(r"slurm_job_id=\s*(\d+)")
     STATUS_RE = re.compile(r"status\s*=\s*([^,)+]+)")
@@ -148,7 +150,6 @@ def patch_virtual_queue_for_local_execution():
     # Replace job submission with local execution
     def _submit_locally(self, job_command_list):
         """Submit job locally instead of through SLURM."""
-        # print(f'[LOCAL EXECUTION] Command: {job_command_list}')
         # Get the working directory from the command list
         cwd = None
         if "--chdir" in job_command_list:
@@ -174,16 +175,26 @@ def patch_virtual_queue_for_local_execution():
 
             # ——— EARLY SKIP if Simulation.log shows FINISHED ———
             sim_log = os.path.join(real_cwd, "Simulation.log")
-            if os.path.exists(sim_log):
-                # only read the last few KB for speed
+            exe_log = os.path.join(real_cwd, "local_execution.log")
+            if os.path.exists(sim_log) and os.path.exists(exe_log):
                 with open(sim_log, "rb") as f:
+                    # only read the last few KB for speed
                     f.seek(max(0, os.path.getsize(sim_log) - 4096))
-                    tail = f.read().decode(errors="ignore").splitlines()
-                for line in reversed(tail):
-                    if "status = JobStatus.FINISHED finished successfully" in line:
-                        print(f"[LOCAL SOMD] Already finished in {real_cwd}; SKIPPING")
-                        # Return a fake job ID that will immediately be marked as finished
-                        return 999999
+                    sim_tail = f.read().decode(errors="ignore").splitlines()
+                sim_ok = any("status = JobStatus.FINISHED finished successfully" in L
+                             for L in sim_tail)
+
+                with open(exe_log, "r") as f:
+                    local_content = f.read()
+                exe_ok = "Job completed successfully" in local_content
+
+                if sim_ok and exe_ok:
+                    with open(exe_log, "a") as f:
+                        f.write(f"[LOCAL SOMD] SKIPPED lambda={lam_arg} at "
+                                f"{datetime.now():%Y-%m-%d %H:%M:%S}\n")
+                    print(f"[LOCAL SOMD] Already finished in {real_cwd}; SKIPPING")
+                    # Return a fake job ID that will immediately be marked as finished
+                    return 999999
                 
             return _run_somd_locally(script_path, lam_arg, cwd)
         else:
@@ -199,26 +210,35 @@ def patch_virtual_queue_for_local_execution():
 
         if not os.path.exists(cfg_path) or os.path.getsize(cfg_path) == 0:
             print(f"[LOCAL SOMD] ❌ {cfg_path} is missing or empty in {real_cwd}; cannot run SOMD")
+            with open(os.path.join(real_cwd, "local_execution.log"), "a") as flog:
+                flog.write(f"[LOCAL SOMD] ❌ JOB FAILED {cfg_path} is missing or empty in {real_cwd}; cannot run SOMD\n")
             raise RuntimeError(f"somd.cfg is missing or empty in {real_cwd}; cannot run SOMD")
 
-       # Record start time
+        # Record start time
         start_time = time.time()
         start_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"[LOCAL SOMD] {start_timestamp} Running lambda={lam_arg} in {cwd or os.getcwd()}")
         
         # Read the script to find the somd command
         somd_command = None
-        with open(script_path) as f:
-            for line in f:
-                line = line.strip()
-                if "somd-freenrg" in line:
-                    # Extract the somd command (remove srun prefix if present)
-                    if line.startswith("srun "):
-                        somd_command = line.split(None, 1)[1]
-                    else:
-                        somd_command = line
-                    break
-        
+        try:
+            with open(script_path) as f:
+                for line in f:
+                    line = line.strip()
+                    if "somd-freenrg" in line:
+                        # Extract the somd command (remove srun prefix if present)
+                        if line.startswith("srun "):
+                            somd_command = line.split(None, 1)[1]
+                        else:
+                            somd_command = line
+                        break
+        except FileNotFoundError:
+            log_path = os.path.join(real_cwd, "local_execution.log")
+            with open(log_path, "a") as flog:
+                flog.write(f"[LOCAL SOMD] ❌ JOB FAILED missing script {script_path}\n")
+            # now propagate up so you still surface the error
+            raise 
+
         if not somd_command:
             raise RuntimeError(f"No somd-freenrg command found in {script_path}")
         
@@ -252,7 +272,7 @@ def patch_virtual_queue_for_local_execution():
             end_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             duration_seconds = end_time - start_time
 
-            print(f"[LOCAL SOMD] {end_timestamp} Completed successfully for lambda={lam_arg}")
+            print(f"[LOCAL SOMD] ✅ {end_timestamp} Completed successfully for lambda={lam_arg}")
             print(f"[LOCAL SOMD] Simulation took {duration_seconds:.2f} seconds")
 
             # Create a local_execution.log file that mimics SLURM output
@@ -261,19 +281,19 @@ def patch_virtual_queue_for_local_execution():
                 f.write(f"[LOCAL SOMD] Starting lambda={lam_arg} at {start_timestamp}\n")
                 f.write(f"[LOCAL SOMD] Completed lambda={lam_arg} at {end_timestamp}\n")
                 f.write(f"Simulation took {duration_seconds:.2f} seconds\n")
-                f.write(f"Job completed successfully\n")
+                f.write(f"✅ Job completed successfully\n")
             return 888888  # Return fake job ID on success
         
         except subprocess.CalledProcessError as e:
             end_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print(f"[LOCAL SOMD] ❌ Failed with return code {e.returncode}")
-            print(f"[LOCAL SOMD] STDERR:\n{e.stderr}")
+            print(f"[LOCAL SOMD] ❌ JOB FAILED with return code {e.returncode}")
+            print(f"[LOCAL SOMD] ❌ STDERR:\n{e.stderr}")
 
             # --- write a “failed” marker into the same execution log ---
             local_execution_log_path = os.path.join(real_cwd, "local_execution.log")
             with open(local_execution_log_path, "a") as f:
-                f.write(f"[LOCAL SOMD] {end_timestamp} ❌ Job failed with return code {e.returncode}\n")
-                f.write(f"[LOCAL SOMD] STDERR: {e.stderr}\n")
+                f.write(f"[LOCAL SOMD] {end_timestamp} ❌ JOB FAILED with return code {e.returncode}\n")
+                f.write(f"[LOCAL SOMD] ❌ STDERR: {e.stderr}\n")
 
             raise RuntimeError(f"SOMD simulation failed: {e}")
     
@@ -298,7 +318,7 @@ def patch_virtual_queue_for_local_execution():
         
         try:
             subprocess.run(python_command, shell=True, cwd=cwd, check=True)
-            print(f"[LOCAL PREP] Completed successfully")
+            print(f"[LOCAL PREP] ✅ Completed successfully")
             return 888888 # Return fake job ID
         except subprocess.CalledProcessError as e:
             print(f"[LOCAL PREP] ❌ Failed with return code {e.returncode}")
@@ -312,7 +332,7 @@ def patch_virtual_queue_for_local_execution():
            however, we set set_relative_sim_cost=False for get_optimal_lam_vals()
               so this method will not be called in the first place.
         """
-        # First check for local timing log
+        # First check for local execution log
         timing_log_path = os.path.join(self.base_dir, "local_execution.log")
         if os.path.exists(timing_log_path):
             try:
@@ -325,9 +345,9 @@ def patch_virtual_queue_for_local_execution():
                         hours = seconds / 3600
                         return hours
             except Exception as e:
-                print(f"[ERROR] Failed to read timing log: {e}")
+                print(f"[ERROR] ❌ get tot_gpu_time - Failed to read local execution: {e}")
         else:
-            print(f"[ERROR] Timing log not found at {timing_log_path}")
+            print(f"[ERROR] ❌ get tot_gpu_time - Local execution log not found at {timing_log_path}")
 
 
     def local_slurm_outfile(self):
@@ -353,7 +373,7 @@ def patch_virtual_queue_for_local_execution():
         try:
             log_file = self.slurm_outfile   # points at local_execution.log
             with open(log_file, "r") as f:
-                return "Job failed" in f.read()
+                return "JOB FAILED" in f.read()
         except Exception:
             return False  # no log yet → not failed
 
@@ -445,8 +465,8 @@ if __name__ == "__main__":
                                         #ensemble_equilibration_time=10,)  # added for local test run on mac; unit - ps
 
     calc = a3.Calculation(ensemble_size=3, 
-                      base_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again2_copy1",
-                      input_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again2_copy1/input")
+                      base_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again5",
+                      input_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again5/input")
 
     calc.setup(
         bound_leg_sysprep_config=sysprep_cfg,
