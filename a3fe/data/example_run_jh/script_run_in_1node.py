@@ -17,6 +17,36 @@ from a3fe.run.enums import JobStatus as _JobStatus
 from time import sleep
 
 
+# --- set up colored logging ---
+class ColorFormatter(logging.Formatter):
+    ORANGE = "\033[33m"  # ANSI “yellow” as an orange stand‐in
+    GREEN  = "\033[32m"
+    RED    = "\033[31m"
+    RESET  = "\033[0m"
+
+    FORMATS = {
+        logging.DEBUG: ORANGE + "%(levelname)s: %(message)s" + RESET,
+        logging.INFO:  GREEN  + "%(levelname)s: %(message)s" + RESET,
+        logging.ERROR: RED    + "%(levelname)s: %(message)s" + RESET,
+        logging.WARNING: RED    + "%(levelname)s: %(message)s" + RESET,
+
+    }
+
+    def format(self, record):
+        fmt = self.FORMATS.get(record.levelno, "%(levelname)s: %(message)s")
+        return logging.Formatter(fmt).format(record)
+
+handler = logging.StreamHandler()
+handler.setFormatter(ColorFormatter())
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+root_logger.handlers.clear()
+root_logger.addHandler(handler)
+
+# now use `logger = logging.getLogger(__name__)` everywhere
+logger = logging.getLogger(__name__)
+
+
 # Configuration options
 FORCE_LOCAL_EXECUTION = True  # Set to False for normal SLURM execution
 FORCE_CPU_PLATFORM = False   # Set to True to force CPU even on GPU systems
@@ -52,7 +82,7 @@ class DedupStatusFilter(logging.Filter):
         name = record.name
 
         if self.debug_mode:
-            print(f"DEBUG: Processing message from {name}: {msg[:100]}...")
+            logger.debug(f"DEBUG: Processing message from {name}: {msg[:100]}...")
         
         # For "Not running" messages, try to identify which job this is about
         if "Not running" in msg:
@@ -60,15 +90,15 @@ class DedupStatusFilter(logging.Filter):
             
             if job_key and job_key in self._not_running_jobs:
                 if self.debug_mode:
-                    print(f"DEBUG: Suppressing duplicate 'Not running' for job {job_key}")
+                    logger.debug(f"DEBUG: Suppressing duplicate 'Not running' for job {job_key}")
                 return False            
             if job_key:
                 self._not_running_jobs.add(job_key)
                 if self.debug_mode:
-                    print(f"DEBUG: First 'Not running' for job {job_key}, allowing")
+                    logger.debug(f"DEBUG: First 'Not running' for job {job_key}, allowing")
             else:
                 if self.debug_mode:
-                    print(f"DEBUG: Allowing 'Not running' (couldn't identify job)")
+                    logger.debug(f"DEBUG: Allowing 'Not running' (couldn't identify job)")
             return True
 
         # For status messages
@@ -84,11 +114,11 @@ class DedupStatusFilter(logging.Filter):
                 prev_status = self._last_status_by_job.get(unique_job_key)
 
                 if self.debug_mode:
-                    print(f"DEBUG: Job key: '{unique_job_key}', Status: '{status}' (was: '{prev_status}')")
+                    logger.debug(f"DEBUG: Job key: '{unique_job_key}', Status: '{status}' (was: '{prev_status}')")
                 
                 if prev_status == status:
                     if self.debug_mode:
-                        print(f"DEBUG: Suppressing duplicate status for {unique_job_key}")
+                        logger.debug(f"DEBUG: Suppressing duplicate status for {unique_job_key}")
                     return False
                 
                 self._last_status_by_job[unique_job_key] = status
@@ -96,10 +126,10 @@ class DedupStatusFilter(logging.Filter):
                 if status in ["JobStatus.FINISHED", "JobStatus.FAILED", "JobStatus.KILLED"]:
                     self._not_running_jobs.discard(unique_job_key)
                     if self.debug_mode:
-                        print(f"DEBUG: Job {unique_job_key} finished, allowing future 'Not running'")
+                        logger.debug(f"DEBUG: Job {unique_job_key} finished, allowing future 'Not running'")
 
         if self.debug_mode:
-            print(f"DEBUG: Allowing message through")
+            logger.debug(f"DEBUG: Allowing message through")
         return True
     
     def _get_job_key(self, msg: str, logger_name: str, jobid: str = None) -> str | None:
@@ -185,12 +215,12 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
     use_local = FORCE_LOCAL_EXECUTION or (shutil.which("squeue") is None)
     
     if not use_local:
-        print("SLURM detected and local execution not forced. Using normal SLURM submission.")
+        logger.info("SLURM detected and local execution not forced. Using normal SLURM submission.")
         return
     
     # Detect GPU availability
-    print("Patching VirtualQueue for local execution...")
-    print(f"Force CPU: {FORCE_CPU_PLATFORM}")
+    logger.info("Patching VirtualQueue for local execution...")
+    logger.info(f"Force CPU: {FORCE_CPU_PLATFORM}")
 
     # Silence subprocess calls (for ln commands and other system calls)
     original_call = subprocess.call
@@ -253,7 +283,7 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
                     with open(exe_log, "a") as f:
                         f.write(f"[LOCAL SOMD] SKIPPED lambda={lam_arg} at "
                                 f"{datetime.now():%Y-%m-%d %H:%M:%S}\n")
-                    print(f"[LOCAL SOMD] Already finished in {real_cwd}; SKIPPING")
+                    logger.info(f"[LOCAL SOMD] Already finished in {real_cwd}; SKIPPING")
                     # Return a fake job ID that will immediately be marked as finished
                     return 999999
                 
@@ -270,7 +300,7 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
         cfg_path = os.path.join(real_cwd, "somd.cfg")
 
         if not os.path.exists(cfg_path) or os.path.getsize(cfg_path) == 0:
-            print(f"[LOCAL SOMD] ❌ {cfg_path} is missing or empty in {real_cwd}; cannot run SOMD")
+            logger.error(f"[LOCAL SOMD] ❌ {cfg_path} is missing or empty in {real_cwd}; cannot run SOMD")
             with open(os.path.join(real_cwd, "local_execution.log"), "a") as flog:
                 flog.write(f"[LOCAL SOMD] ❌ JOB FAILED {cfg_path} is missing or empty in {real_cwd}; cannot run SOMD\n")
             raise RuntimeError(f"somd.cfg is missing or empty in {real_cwd}; cannot run SOMD")
@@ -278,7 +308,7 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
         # Record start time
         start_time = time.time()
         start_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"[LOCAL SOMD] {start_timestamp} Running lambda={lam_arg} in {cwd or os.getcwd()}")
+        logger.info(f"[LOCAL SOMD] {start_timestamp} Running lambda={lam_arg} in {cwd or os.getcwd()}")
         
         # Read the script to find the somd command
         somd_command = None
@@ -316,15 +346,15 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
                     # Force CPU regardless of hardware
                     if current_platform != "CPU":
                         parts[p_idx + 1] = "CPU"
-                        print("[LOCAL SOMD] Forced platform to CPU")
+                        logger.warning("[LOCAL SOMD] Forced platform to CPU")
                 else:
                     # Keep whatever platform was specified
-                    print(f"[LOCAL SOMD] Using {current_platform} platform")
+                    logger.info(f"[LOCAL SOMD] Using {current_platform} platform")
         
         # Substitute lambda value
         parts = [tok.replace("$lam", lam_arg).replace("${lam}", lam_arg) for tok in parts]
         
-        print(f"[LOCAL SOMD] Executing: {' '.join(parts)} at {real_cwd}")
+        logger.info(f"[LOCAL SOMD] Executing: {' '.join(parts)} at {real_cwd}")
         
         try:
             subprocess.run(parts, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, text=True)
@@ -333,8 +363,8 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
             end_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             duration_seconds = end_time - start_time
 
-            print(f"[LOCAL SOMD] ✅ {end_timestamp} Completed successfully for lambda={lam_arg}")
-            print(f"[LOCAL SOMD] Simulation took {duration_seconds:.2f} seconds")
+            logger.info(f"[LOCAL SOMD] ✅ {end_timestamp} Completed successfully for lambda={lam_arg}")
+            logger.infot(f"[LOCAL SOMD] Simulation took {duration_seconds:.2f} seconds")
 
             # Create a local_execution.log file that mimics SLURM output
             local_execution_log_path = os.path.join(real_cwd, "local_execution.log")
@@ -347,8 +377,8 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
         
         except subprocess.CalledProcessError as e:
             end_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print(f"[LOCAL SOMD] ❌ JOB FAILED with return code {e.returncode}")
-            print(f"[LOCAL SOMD] ❌ STDERR:\n{e.stderr}")
+            logger.error(f"[LOCAL SOMD] ❌ JOB FAILED with return code {e.returncode}")
+            logger.error(f"[LOCAL SOMD] ❌ STDERR:\n{e.stderr}")
 
             # --- write a “failed” marker into the same execution log ---
             local_execution_log_path = os.path.join(real_cwd, "local_execution.log")
@@ -361,7 +391,7 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
 
     def _run_prep_locally(script_path, cwd) -> int:
         """Run preparation step locally."""
-        print(f"[LOCAL PREP] Running preparation script in {cwd or os.getcwd()}")
+        logger.info(f"[LOCAL PREP] Running preparation script in {cwd or os.getcwd()}")
         
         # Read the script to find the python command
         python_command = None
@@ -375,14 +405,14 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
         if not python_command:
             raise RuntimeError(f"No A3FE preparation command found in {script_path}")
         
-        print(f"[LOCAL PREP] Executing: {python_command} at {cwd or os.getcwd()}")
+        logger.info(f"[LOCAL PREP] Executing: {python_command} at {cwd or os.getcwd()}")
         
         try:
             subprocess.run(python_command, shell=True, cwd=cwd, check=True)
-            print(f"[LOCAL PREP] ✅ Completed successfully")
+            logger.info(f"[LOCAL PREP] ✅ Completed successfully")
             return 888888 # Return fake job ID
         except subprocess.CalledProcessError as e:
-            print(f"[LOCAL PREP] ❌ Failed with return code {e.returncode}")
+            logger.error(f"[LOCAL PREP] ❌ Failed with return code {e.returncode}")
             raise RuntimeError(f"Preparation step failed: {e}")
     
 
@@ -406,9 +436,9 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
                         hours = seconds / 3600
                         return hours
             except Exception as e:
-                print(f"[ERROR] ❌ get tot_gpu_time - Failed to read local execution: {e}")
+                logger.error(f"[ERROR] ❌ get tot_gpu_time - Failed to read local execution: {e}")
         else:
-            print(f"[ERROR] ❌ get tot_gpu_time - Local execution log not found at {timing_log_path}")
+            logger.error(f"[ERROR] ❌ get tot_gpu_time - Local execution log not found at {timing_log_path}")
 
 
     def local_slurm_outfile(self):
@@ -456,9 +486,9 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
                 if getattr(job, "_already_marked_finished", False):
                     continue
                 job.status = _JobStatus.FINISHED
-                job._already_marked_finished = True  # flag to prevent repeated downstream prints
+                job._already_marked_finished = True  # flag to prevent repeated downstream logging
                 jobs_to_remove.append(job)
-                print(f"[LOCAL UPDATE] ✅ Marking job slurm_job_id={job.slurm_job_id}, {job_sim_info} as finished")
+                logger.info(f"[LOCAL UPDATE] ✅ Marking job slurm_job_id={job.slurm_job_id}, {job_sim_info} as finished")
             elif job.slurm_job_id in fake_fail_ids:
                 # leave it in the queue so downstream sees it as FAILED
                 # (local_has_failed will now return True)
@@ -522,7 +552,7 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
         Stage.wait = _local_stage_wait
         SimulationRunner.wait = _local_sim_runner_wait
 
-    print("A3FE was successfully patched for local execution!")
+    logger.info("A3FE was successfully patched for local execution!")
 
 
 
@@ -573,9 +603,9 @@ if __name__ == "__main__":
     # )
     # by default use simtime=0.1 ns
     # we might need to reduce delta_er to get more lambda windows
-    calc.get_optimal_lam_vals() 
-    calc.run(adaptive=False, 
-             runtime=25,                  # run non-adaptively for 25 ns per replicate
+    # calc.get_optimal_lam_vals() 
+    calc.run(adaptive=True, 
+             # runtime=25,                  # run non-adaptively for 25 ns per replicate
              parallel=False)              # run things sequentially
     calc.wait()
     calc.set_equilibration_time(1)        # Discard the first ns of simulation time
