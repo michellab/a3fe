@@ -37,7 +37,8 @@ class DedupStatusFilter(logging.Filter):
     so that we only log out info when the status changes.
     """
     JOBID_RE = re.compile(r"slurm_job_id=\s*(\d+)")
-    STATUS_RE = re.compile(r"status\s*=\s*([^,)]+)")
+    # STATUS_RE = re.compile(r"status\s*=\s*([^,)]+)")
+    STATUS_RE = re.compile(r"status\s*=\s*(JobStatus\.\w+)")
     SIM_DETAILS_RE = re.compile(r"Simulation \(stage=([^,]+), lam=([^,]+), run_no=([^)]+)\)")
 
     def __init__(self, debug_mode: bool = False):
