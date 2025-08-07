@@ -250,6 +250,26 @@ def _parse_sim_info_from_job(job) -> str:
     return f"stage={stage}, lam={lam}, run_no={run_no}"
 
 
+def _format_sim_info(cwd: str, lam_arg: str = None) -> str:
+    """
+    Given a working directory (the --chdir path), an optional lambda string,
+    and an optional restraint type, returns:
+       "stage=<stage>, lam=<lam>, run_no=<run_no>[, restraint=<type>]"
+    """
+    # parse lam from argument or from cwd
+    if lam_arg is None:
+        m_lam = re.search(r"/lambda_([0-9.]+)/", cwd)
+        lam_arg = m_lam.group(1) if m_lam else "?"
+    # parse stage
+    m_stage = re.search(r"/(?:bound|free)/([^/]+)/output/", cwd)
+    stage = m_stage.group(1) if m_stage else "?"
+    # parse run number
+    m_run = re.search(r"/run_(\d+)", cwd)
+    run_no = m_run.group(1) if m_run else "?"
+    parts = [f"stage={stage}", f"lam={lam_arg}", f"run_no={run_no}"]
+    return ", ".join(parts)
+
+
 def _is_mbar_script(script_path) -> bool:
     """Check if a script is an MBAR analysis script."""
     try:
@@ -438,7 +458,8 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
         # Record start time
         start_time = time.time()
         start_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        logger.info(f"[LOCAL SOMD] {start_timestamp} Running lambda={lam_arg} in {cwd or os.getcwd()}")
+        sim_info = _format_sim_info(real_cwd, lam_arg)
+        logger.info(f"[LOCAL SOMD] {start_timestamp} Running {sim_info} in {cwd or os.getcwd()}")
         
         # Read the script to find the somd command
         somd_command = None
@@ -493,14 +514,14 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
             end_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             duration_seconds = end_time - start_time
 
-            logger.info(f"[LOCAL SOMD] ✅ {end_timestamp} Completed successfully for lambda={lam_arg}")
+            logger.info(f"[LOCAL SOMD] ✅ {end_timestamp} Completed successfully for {sim_info}")
             logger.info(f"[LOCAL SOMD] Simulation took {duration_seconds:.2f} seconds")
 
             # Create a local_execution.log file that mimics SLURM output
             local_execution_log_path = os.path.join(real_cwd, "local_execution.log")
             with open(local_execution_log_path, 'a') as f:
-                f.write(f"[LOCAL SOMD] Starting lambda={lam_arg} at {start_timestamp}\n")
-                f.write(f"[LOCAL SOMD] Completed lambda={lam_arg} at {end_timestamp}\n")
+                f.write(f"[LOCAL SOMD] Starting {sim_info} at {start_timestamp}\n")
+                f.write(f"[LOCAL SOMD] Completed {sim_info} at {end_timestamp}\n")
                 f.write(f"Simulation took {duration_seconds:.2f} seconds\n")
                 f.write(f"✅ Job completed successfully\n")
             return 888888  # Return fake job ID on success
