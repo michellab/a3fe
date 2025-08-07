@@ -17,6 +17,12 @@ from a3fe.run.enums import JobStatus as _JobStatus
 from time import sleep
 
 
+# Configuration options
+FORCE_LOCAL_EXECUTION = True  # Set to False for normal SLURM execution
+FORCE_CPU_PLATFORM = False   # Set to True to force CPU even on GPU systems
+FAST_UPDATE_INTERVAL = 3  # seconds between updates for local execution
+
+
 # --- set up colored logging ---
 class ColorFormatter(logging.Formatter):
     ORANGE = "\033[33m"  # ANSI “yellow” as an orange stand‐in
@@ -35,22 +41,6 @@ class ColorFormatter(logging.Formatter):
     def format(self, record):
         fmt = self.FORMATS.get(record.levelno, "%(levelname)s: %(message)s")
         return logging.Formatter(fmt).format(record)
-
-handler = logging.StreamHandler()
-handler.setFormatter(ColorFormatter())
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.INFO)
-root_logger.handlers.clear()
-root_logger.addHandler(handler)
-
-# now use `logger = logging.getLogger(__name__)` everywhere
-logger = logging.getLogger(__name__)
-
-
-# Configuration options
-FORCE_LOCAL_EXECUTION = True  # Set to False for normal SLURM execution
-FORCE_CPU_PLATFORM = False   # Set to True to force CPU even on GPU systems
-FAST_UPDATE_INTERVAL = 3  # seconds between updates for local execution
 
 
 class DedupStatusFilter(logging.Filter):
@@ -82,7 +72,7 @@ class DedupStatusFilter(logging.Filter):
         name = record.name
 
         if self.debug_mode:
-            logger.debug(f"DEBUG: Processing message from {name}: {msg[:100]}...")
+            print(f"DEBUG: Processing message from {name}: {msg[:100]}...")
         
         # For "Not running" messages, try to identify which job this is about
         if "Not running" in msg:
@@ -90,15 +80,15 @@ class DedupStatusFilter(logging.Filter):
             
             if job_key and job_key in self._not_running_jobs:
                 if self.debug_mode:
-                    logger.debug(f"DEBUG: Suppressing duplicate 'Not running' for job {job_key}")
+                    print(f"DEBUG: Suppressing duplicate 'Not running' for job {job_key}")
                 return False            
             if job_key:
                 self._not_running_jobs.add(job_key)
                 if self.debug_mode:
-                    logger.debug(f"DEBUG: First 'Not running' for job {job_key}, allowing")
+                    print(f"DEBUG: First 'Not running' for job {job_key}, allowing")
             else:
                 if self.debug_mode:
-                    logger.debug(f"DEBUG: Allowing 'Not running' (couldn't identify job)")
+                    print(f"DEBUG: Allowing 'Not running' (couldn't identify job)")
             return True
 
         # For status messages
@@ -114,11 +104,11 @@ class DedupStatusFilter(logging.Filter):
                 prev_status = self._last_status_by_job.get(unique_job_key)
 
                 if self.debug_mode:
-                    logger.debug(f"DEBUG: Job key: '{unique_job_key}', Status: '{status}' (was: '{prev_status}')")
+                    print(f"DEBUG: Job key: '{unique_job_key}', Status: '{status}' (was: '{prev_status}')")
                 
                 if prev_status == status:
                     if self.debug_mode:
-                        logger.debug(f"DEBUG: Suppressing duplicate status for {unique_job_key}")
+                        print(f"DEBUG: Suppressing duplicate status for {unique_job_key}")
                     return False
                 
                 self._last_status_by_job[unique_job_key] = status
@@ -126,10 +116,10 @@ class DedupStatusFilter(logging.Filter):
                 if status in ["JobStatus.FINISHED", "JobStatus.FAILED", "JobStatus.KILLED"]:
                     self._not_running_jobs.discard(unique_job_key)
                     if self.debug_mode:
-                        logger.debug(f"DEBUG: Job {unique_job_key} finished, allowing future 'Not running'")
+                        print(f"DEBUG: Job {unique_job_key} finished, allowing future 'Not running'")
 
         if self.debug_mode:
-            logger.debug(f"DEBUG: Allowing message through")
+            print(f"DEBUG: Allowing message through")
         return True
     
     def _get_job_key(self, msg: str, logger_name: str, jobid: str = None) -> str | None:
@@ -155,14 +145,70 @@ class DedupStatusFilter(logging.Filter):
 shared_filter = DedupStatusFilter(debug_mode=False) # set to True for debugging
 
 
-def add_filter_recursively(sim_runner, filter_instance=shared_filter):
-    if hasattr(sim_runner, "_logger"):
-        sim_runner._logger.addFilter(filter_instance)  # Same instance!
-    if hasattr(sim_runner, "_sub_sim_runners"):
-        for sub in sim_runner._sub_sim_runners:
-            add_filter_recursively(sub, filter_instance)  # Same instance!
+def setup_global_logging():
+    """Set up global logging configuration with deduplication filter."""
+    # Configure root logger
+    root_logger = logging.getLogger()
+    root_logger.handlers.clear()
+    root_logger.setLevel(logging.INFO)
+    
+    # Create handler with color formatting
+    handler = logging.StreamHandler()
+    handler.setFormatter(ColorFormatter())
+    handler.addFilter(shared_filter)
+    
+    root_logger.addHandler(handler)
+    
+    # Patch SimulationRunner._set_up_logging
+    if hasattr(SimulationRunner, '_set_up_logging'):
+        original_sr_setup = SimulationRunner._set_up_logging
+        def patched_sr_setup(self, null: bool = False):
+            original_sr_setup(self, null)
+            if hasattr(self, '_logger'):
+                self._logger.addFilter(shared_filter)
+                for handler in self._logger.handlers:
+                    handler.addFilter(shared_filter)
+        SimulationRunner._set_up_logging = patched_sr_setup
+    
+    # Patch VirtualQueue._set_up_logging
+    if hasattr(VirtualQueue, '_set_up_logging'):
+        original_vq_setup = VirtualQueue._set_up_logging
+        def patched_vq_setup(self):
+            original_vq_setup(self)
+            if hasattr(self, '_logger'):
+                self._logger.addFilter(shared_filter)
+                for handler in self._logger.handlers:
+                    handler.addFilter(shared_filter)
+        VirtualQueue._set_up_logging = patched_vq_setup
 
 
+def add_filter_recursively(obj, filter_instance=shared_filter):
+    """Recursively add filter to all loggers in an object hierarchy."""
+    if hasattr(obj, "_logger"):
+        obj._logger.addFilter(filter_instance)
+        for handler in obj._logger.handlers:
+            handler.addFilter(filter_instance)
+    
+    # Handle different types of sub-objects
+    sub_objects = []
+    if hasattr(obj, "_sub_sim_runners") and obj._sub_sim_runners:
+        sub_objects.extend(obj._sub_sim_runners)
+    if hasattr(obj, "stages") and obj.stages:
+        sub_objects.extend(obj.stages)
+    if hasattr(obj, "lam_windows") and obj.lam_windows:
+        sub_objects.extend(obj.lam_windows)
+    if hasattr(obj, "sims") and obj.sims:
+        sub_objects.extend(obj.sims)
+    if hasattr(obj, "legs") and obj.legs:
+        sub_objects.extend(obj.legs)
+    if hasattr(obj, "virtual_queue"):
+        sub_objects.append(obj.virtual_queue)
+    
+    # Recursively apply to sub-objects
+    for sub_obj in sub_objects:
+        add_filter_recursively(sub_obj, filter_instance)
+
+    
 def _parse_sim_info_from_job(job) -> str:
     """
     Job.command_list is like:
@@ -280,6 +326,17 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
     """
     # Check if we should use local execution
     use_local = FORCE_LOCAL_EXECUTION or (shutil.which("squeue") is None)
+
+    # Set up colored logger for this function
+    logger = logging.getLogger(__name__ + ".LOCAL_SOMD")
+    logger.handlers.clear()  # Clear any existing handlers
+    logger.setLevel(logging.INFO)
+    logger.propagate = False  # Don't propagate to avoid duplicate messages    
+    handler = logging.StreamHandler()
+    handler.setFormatter(ColorFormatter())
+    handler.addFilter(shared_filter)
+    logger.addHandler(handler)
+
     
     if not use_local:
         logger.info("SLURM detected and local execution not forced. Using normal SLURM submission.")
@@ -516,13 +573,11 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
         logger.info(f"[LOCAL MBAR] Executing MBAR command: {mbar_command}")
         
         try:
-            result = subprocess.run(mbar_command, shell=True, cwd=cwd, check=True,
+            subprocess.run(mbar_command, shell=True, cwd=cwd, check=True,
                                   capture_output=True, text=True)
             
             logger.info(f"[LOCAL MBAR] ✅ MBAR analysis completed successfully")
-            if result.stdout:
-                logger.info(f"[LOCAL MBAR] STDOUT: {result.stdout[:200]}...")
-            return 888888  # Return fake job ID
+            return 666666  # Return fake job ID
             
         except subprocess.CalledProcessError as e:
             logger.error(f"[LOCAL MBAR] ❌ MBAR analysis failed with return code {e.returncode}")
@@ -539,7 +594,7 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
                 _create_dummy_mbar_output(dummy_path, cwd)
                 logger.warning(f"[LOCAL MBAR] Created dummy MBAR output file: {dummy_path}")
             
-            return 888888  # Return success to continue execution
+            return 666666  # Return success to continue execution
         
     def timing_based_get_tot_gpu_time(self) -> float:
         """need to get tot_gpu_time to set relative_simulation_cost which is 
@@ -564,7 +619,6 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
                 logger.error(f"[ERROR] ❌ get tot_gpu_time - Failed to read local execution: {e}")
         else:
             logger.error(f"[ERROR] ❌ get tot_gpu_time - Local execution log not found at {timing_log_path}")
-
 
     def local_slurm_outfile(self):
         """Mock slurm outfile property for local execution."""
@@ -598,7 +652,8 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
     def local_update(self) -> None:
         """Updated update method that handles local execution fake job IDs."""
         # Define fake job IDs used for already-completed or local jobs
-        fake_job_ids = [888888, 999999]  # 888888 from actual execution, 999999 from early skip
+        # 888888 from actual execution, 999999 from early skip, 666666 from mbar output
+        fake_job_ids = [666666, 888888, 999999]  
         fake_fail_ids = [777777]
         
         # Mark any jobs with fake IDs as finished and remove from queue
@@ -682,11 +737,14 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
 
 
 if __name__ == "__main__":
+    # Set up global logging first
+    setup_global_logging()
+
     # Configure via environment variables
     FORCE_LOCAL_EXECUTION = True
     FORCE_CPU_PLATFORM = True
     
-    patch_virtual_queue_for_local_execution(use_faster_wait=True)
+    patch_virtual_queue_for_local_execution(use_faster_wait=False)
     
     # # Set global defaults before creating any Leg instances
     # for step in ["parameterise", "solvate", "minimise", "heat_preequil", "ensemble_equil"]:
@@ -728,7 +786,7 @@ if __name__ == "__main__":
     # )
     # by default use simtime=0.1 ns
     # we might need to reduce delta_er to get more lambda windows
-    # calc.get_optimal_lam_vals() 
+    calc.get_optimal_lam_vals() 
     calc.run(adaptive=True, 
              # runtime=25,                  # run non-adaptively for 25 ns per replicate
              parallel=False)              # run things sequentially
