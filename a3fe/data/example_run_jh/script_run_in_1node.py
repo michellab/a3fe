@@ -15,6 +15,8 @@ from a3fe.run._simulation_runner import SimulationRunner
 from a3fe.run._virtual_queue import Job
 from a3fe.run.enums import JobStatus as _JobStatus
 from time import sleep
+from functools import lru_cache
+
 
 
 # Configuration options
@@ -57,7 +59,6 @@ class DedupStatusFilter(logging.Filter):
     so that we only log out info when the status changes.
     """
     JOBID_RE = re.compile(r"slurm_job_id=\s*(\d+)")
-    # STATUS_RE = re.compile(r"status\s*=\s*([^,)]+)")
     STATUS_RE = re.compile(r"status\s*=\s*(JobStatus\.\w+)")
     SIM_DETAILS_RE = re.compile(r"Simulation \(stage=([^,]+), lam=([^,]+), run_no=([^)]+)\)")
 
@@ -122,6 +123,7 @@ class DedupStatusFilter(logging.Filter):
             print(f"DEBUG: Allowing message through")
         return True
     
+    @lru_cache(maxsize=1000) 
     def _get_job_key(self, msg: str, logger_name: str, jobid: str = None) -> str | None:
         sim_details_m = self.SIM_DETAILS_RE.search(msg)
         if not sim_details_m:
@@ -792,7 +794,7 @@ if __name__ == "__main__":
     calc.setup(
         bound_leg_sysprep_config=sysprep_cfg,
         free_leg_sysprep_config=sysprep_cfg,
-        skip_preparation=True,  # skip system preparation
+        # skip_preparation=True,  # skip system preparation
     )
 
     add_filter_recursively(calc)

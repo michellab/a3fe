@@ -747,11 +747,6 @@ def check_equil_multiwindow_paired_t(
                 fractional_equil_time = start_frac
                 equil_time = overall_times[0][0]
     
-        # import pickle
-    results = {'overall_dgs': overall_dgs_list, 'overall_times': overall_times_list}
-
-    with open('/Users/jingjinghuang/Documents/fep_workflow/binding_affinity_predicting/tests/test_files/data_for_detect_equil2.pkl', 'wb') as f:
-        pickle.dump(results, f)
 
     # Directly set the _equilibrated and _equil_time attributes of the lambda windows
     if equilibrated:
