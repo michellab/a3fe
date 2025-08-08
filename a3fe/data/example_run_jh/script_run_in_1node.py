@@ -1135,10 +1135,11 @@ if __name__ == "__main__":
     # Configure via environment variables
     FORCE_LOCAL_EXECUTION = True
     FORCE_CPU_PLATFORM = True
-    SKIP_ADAPTIVE_EFFICIENCY=True
+    SKIP_ADAPTIVE_EFFICIENCY=True  # NOTE set this to False or remove this completely in production runs
     
     patch_virtual_queue_for_local_execution(use_faster_wait=False)
 
+    # NOTE we should comment out this in production run
     patch_stage_skip_adaptive_efficiency()
     
     # # Set global defaults before creating any Leg instances
