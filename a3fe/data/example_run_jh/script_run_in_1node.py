@@ -1,4 +1,11 @@
 import os
+os.environ["MPLBACKEND"] = "Agg"  # prevents macOS GUI backend from opening windows
+try:
+    import matplotlib as _mpl
+    _mpl.use("Agg", force=True)
+except Exception:
+    pass
+
 import shutil
 import subprocess
 from a3fe.run._virtual_queue import VirtualQueue
@@ -16,7 +23,11 @@ from a3fe.run._virtual_queue import Job
 from a3fe.run.enums import JobStatus as _JobStatus
 from time import sleep
 from functools import lru_cache
-
+import concurrent.futures
+import itertools
+import subprocess
+from tqdm import tqdm
+import sys
 
 
 # Configuration options
@@ -65,6 +76,10 @@ class DedupStatusFilter(logging.Filter):
     def __init__(self, debug_mode: bool = False):
         super().__init__()
         self.debug_mode = debug_mode
+        self.suppress_mbar_noise: bool = False
+        self._mbar_noise = re.compile(
+            r"(?:Submitted MBAR job \d+:|\[LOCAL UPDATE\].*MBAR job \d+.*|MBAR job \d+ (?:running|completed successfully|failed))"
+        )
         self._last_status_by_job: dict[str, str] = {}  # unique_job_key -> last seen status
         self._not_running_jobs: set[str] = set()  # Track which jobs have logged "Not running"
     
@@ -118,6 +133,9 @@ class DedupStatusFilter(logging.Filter):
                     self._not_running_jobs.discard(unique_job_key)
                     if self.debug_mode:
                         print(f"DEBUG: Job {unique_job_key} finished, allowing future 'Not running'")
+
+        if self.suppress_mbar_noise and self._mbar_noise.search(msg):
+            return False
 
         if self.debug_mode:
             print(f"DEBUG: Allowing message through")
@@ -272,6 +290,23 @@ def _format_sim_info(cwd: str, lam_arg: str = None) -> str:
     return ", ".join(parts)
 
 
+def _mbar_worker(cwd: str, mbar_command: str) -> tuple[int, str, str]:
+    """
+    Run MBAR command in a separate process.
+    Returns (returncode, stdout, stderr). Never raises.
+    """
+    env = os.environ.copy()
+    # prevent BLAS oversubscription when using multiprocessing
+    env.setdefault("OMP_NUM_THREADS", "1")
+    env.setdefault("MKL_NUM_THREADS", "1")
+    env.setdefault("OPENBLAS_NUM_THREADS", "1")
+    proc = subprocess.run(
+        mbar_command, shell=True, cwd=cwd, check=False,
+        capture_output=True, text=True, env=env
+    )
+    return proc.returncode, proc.stdout, proc.stderr
+
+
 def _is_mbar_script(script_path) -> bool:
     """Check if a script is an MBAR analysis script."""
     try:
@@ -337,8 +372,213 @@ def _extract_mbar_output_file(command: str) -> str:
     except:
         pass
     return ""
+
+
+# ==================================================
+# Global MBAR Manager for Parallel Execution
+# ==================================================
+class GlobalMBARManager:
+    """Global manager for parallel MBAR execution with proper synchronization."""
     
+    def __init__(self, max_workers: int = None, use_progress: bool = True):
+        self.use_progress = use_progress
+        if max_workers is None:
+            # Use half the available cores to avoid oversubscription
+            max_workers = max(1, (os.cpu_count() or 4) // 2)
+        
+        self.max_workers = max_workers
+        self.executor = concurrent.futures.ProcessPoolExecutor(max_workers=max_workers)
+        self.futures = {}  # job_id -> Future
+        self.job_metadata = {}  # job_id -> {"cwd": str, "cmd": str, "script": str}
+        self.job_counter = itertools.count(600000)
+        self.expected_outputs = set() 
+        self.logger = logging.getLogger(__name__ + ".MBAR_MANAGER")
+        
+    def submit_mbar_job(self, script_path: str, cwd: str) -> int:
+        """Submit an MBAR job for parallel execution."""
+        if hasattr(shared_filter, "suppress_mbar_noise"):
+            shared_filter.suppress_mbar_noise = True
+        # Parse the MBAR command from script
+        try:
+            with open(script_path) as f:
+                script_content = f.read()
+        except FileNotFoundError:
+            raise RuntimeError(f"MBAR script not found: {script_path}")
+
+        mbar_command = None
+        for line in script_content.splitlines():
+            line = line.strip()
+            if (("analyse_freenrg" in line) and 
+                not line.startswith("#") and
+                not line.startswith("export")):
+                mbar_command = line
+                break
+
+        if not mbar_command:
+            self.logger.warning(f"No explicit MBAR command found, running script directly")
+            mbar_command = f"bash {script_path}"
+
+        ofile = _extract_mbar_output_file(mbar_command)
+        if ofile:
+            self.expected_outputs.add(os.path.join(cwd, ofile))
+
+        # Submit to executor
+        job_id = next(self.job_counter)
+        future = self.executor.submit(_mbar_worker, cwd, mbar_command)
+        
+        self.futures[job_id] = future
+        self.job_metadata[job_id] = {
+            "cwd": cwd, 
+            "cmd": mbar_command, 
+            "script": script_path
+        }
+        
+        self.logger.info(f"Submitted MBAR job {job_id}: {mbar_command}")
+        return job_id
     
+    def wait_for_completion(self):
+        """Wait for all submitted MBAR jobs to complete (robust)."""
+        if not self.futures:
+            self.logger.info("No MBAR jobs to wait for")
+            return
+
+        self.logger.info(f"Waiting for {len(self.futures)} MBAR jobs to complete...")
+
+        total = len(self.futures)
+        future_to_id = {fut: jid for jid, fut in self.futures.items()}
+        # Use a TTY-aware progress bar if available
+        use_pb = self.use_progress and (tqdm is not None) and sys.stderr.isatty()
+        ok = 0
+        fail = 0
+
+
+        if use_pb:
+            bar = tqdm(total=total, desc="MBAR analyses", unit="job", leave=True, smoothing=0.1)
+            # (optional) hide noisy “running/submitted” logs while bar is active
+            if hasattr(shared_filter, "suppress_mbar_noise"):
+                shared_filter.suppress_mbar_noise = True
+        else:
+            self.logger.info(f"Waiting for {total} MBAR jobs to complete...")
+
+        
+        for future in concurrent.futures.as_completed(self.futures.values()):
+            job_id = future_to_id.get(future)
+            if job_id is None:
+                continue
+
+            meta = self.job_metadata.get(job_id, {})
+            cwd = meta.get("cwd", "")
+            cmd = meta.get("cmd", "")
+            script = meta.get("script", "")
+
+            try:
+                rc, stdout, stderr = future.result()
+            except Exception as e:
+                rc, stdout, stderr = -1, "", str(e)
+
+            # NOTE: Success must also produce a .dat file
+            ofile = _extract_mbar_output_file(cmd)
+            ofile_path = os.path.join(cwd, ofile) if ofile else None
+            if not os.path.exists(ofile_path) or os.path.getsize(ofile_path) == 0:
+                rc = -1
+
+            if rc == 0:
+                ok += 1
+                if not use_pb:
+                    self.logger.info(f"MBAR job {job_id} completed successfully")
+            else:
+                fail += 1
+                if not use_pb:
+                    self.logger.warning(f"MBAR job {job_id} failed")
+                    self.logger.warning(f"MBAR job {job_id} failed with STDERR {stderr}")
+            if use_pb:
+                bar.update(1)
+                bar.set_postfix_str(f"ok={ok} fail={fail}")
+
+
+        if use_pb:
+            bar.close()
+            if hasattr(shared_filter, "suppress_mbar_noise"):
+                shared_filter.suppress_mbar_noise = False
+
+        self.futures.clear()
+        self.job_metadata.clear()
+        self.logger.info(f"All MBAR jobs completed (ok={ok}, fail={fail})")
+       
+    
+    def has_pending_jobs(self) -> bool:
+        """Check if there are any pending MBAR jobs."""
+        return bool(self.futures)
+    
+    def get_job_status(self, job_id: int) -> str:
+        """Get the status of a specific job."""
+        if job_id not in self.futures:
+            return "UNKNOWN"
+        
+        future = self.futures[job_id]
+        if future.done():
+            try:
+                result = future.result()
+                return "FINISHED"
+            except:
+                return "FAILED"
+        else:
+            return "RUNNING"
+
+# Global instance
+_GLOBAL_MBAR_MANAGER = None
+
+def _install_mbar_barrier_wrapper(logger):
+    import a3fe.analyse.mbar as mbar
+    import a3fe.analyse.process_grads as process_grads
+    import a3fe.analyse.detect_equil as detect_equil
+
+    if not hasattr(mbar, "_original_collect_mbar_slurm"):
+        mbar._original_collect_mbar_slurm = mbar.collect_mbar_slurm
+
+    mbar_sync_in_progress = False
+    def _collect_mbar_wrapper(*args, **kwargs):
+        nonlocal mbar_sync_in_progress
+        # Only say anything if there are outstanding MBAR futures
+        has_pending = _GLOBAL_MBAR_MANAGER and _GLOBAL_MBAR_MANAGER.has_pending_jobs()
+        if has_pending and not mbar_sync_in_progress:
+            logger.info("[MBAR SYNC] collect_mbar_slurm called - waiting for all MBAR jobs to complete")
+            mbar_sync_in_progress = True
+
+        if has_pending:
+            _GLOBAL_MBAR_MANAGER.wait_for_completion()
+
+        # Safety net: ensure all expected outputs exist (create dummies if not)
+        if _GLOBAL_MBAR_MANAGER:
+            missing = []
+            for ofile in list(_GLOBAL_MBAR_MANAGER.expected_outputs):
+                if not os.path.exists(ofile):
+                    # raise FileNotFoundError(f"Expected MBAR output missing: {ofile}")
+                    missing.append(ofile)
+                    _create_dummy_mbar_output(ofile, os.path.dirname(ofile))
+                    logger.warning(f"[MBAR SYNC] Missing MBAR output; created dummy: {ofile}")
+
+            if missing:
+                logger.warning(f"[MBAR SYNC] {len(missing)} MBAR outputs were missing and replaced with dummies.")
+
+        # Only print the completion line once per wave
+        if has_pending and mbar_sync_in_progress:
+            logger.info("[MBAR SYNC] All MBAR jobs completed - proceeding to collect results")
+            mbar_sync_in_progress = False
+
+        kwargs_modified = kwargs.copy()
+        kwargs_modified['delete_outfiles'] = False
+        return mbar._original_collect_mbar_slurm(*args, **kwargs_modified)
+
+    # Replace on module
+    mbar.collect_mbar_slurm = _collect_mbar_wrapper
+    # Rebind any cached aliases
+    if hasattr(process_grads, "_collect_mbar_slurm"):
+        process_grads._collect_mbar_slurm = _collect_mbar_wrapper
+    if hasattr(detect_equil, "_collect_mbar_slurm"):
+        detect_equil._collect_mbar_slurm = _collect_mbar_wrapper
+
+
 def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False): 
     """
     Patch VirtualQueue to run jobs locally instead of through SLURM.
@@ -346,6 +586,8 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
 
     turn on use_faster_wait to speed up local testing by reducing wait time
     """
+    global _GLOBAL_MBAR_MANAGER
+
     # Check if we should use local execution
     use_local = FORCE_LOCAL_EXECUTION or (shutil.which("squeue") is None)
 
@@ -359,7 +601,6 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
     handler.addFilter(shared_filter)
     logger.addHandler(handler)
 
-    
     if not use_local:
         logger.info("SLURM detected and local execution not forced. Using normal SLURM submission.")
         return
@@ -367,6 +608,12 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
     # Detect GPU availability
     logger.info("Patching VirtualQueue for local execution...")
     logger.info(f"Force CPU: {FORCE_CPU_PLATFORM}")
+
+    # Initialize global MBAR manager
+    _GLOBAL_MBAR_MANAGER = GlobalMBARManager()
+    # APPLY THE MBAR PATCHES HERE
+    _install_mbar_barrier_wrapper(logger)
+    logger.info(f"MBAR parallel workers: {_GLOBAL_MBAR_MANAGER.max_workers}")
 
     # Silence subprocess calls (for ln commands and other system calls)
     original_call = subprocess.call
@@ -439,7 +686,7 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
         else:
             # Check if this is an MBAR analysis script
             if _is_mbar_script(script_path):
-                return _run_mbar_locally(script_path, cwd)
+                return _submit_mbar_parallel(script_path, cwd)
             else:
                 # This is a preparation step
                 return _run_prep_locally(script_path, cwd)
@@ -569,9 +816,9 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
             raise RuntimeError(f"Preparation step failed: {e}")
     
 
-    def _run_mbar_locally(script_path, cwd) -> int: 
-        """Run MBAR analysis locally."""
-        logger.info(f"[LOCAL MBAR] Running MBAR analysis in {cwd or os.getcwd()}")
+    def _run_mbar_locally(self, script_path, cwd) -> int: 
+        """Submit MBAR to the process pool and return a fake job id immediately."""
+        logger.info(f"[LOCAL MBAR] Queuing MBAR analysis in {cwd or os.getcwd()}")
 
         try:
             with open(script_path) as f:
@@ -593,6 +840,7 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
             logger.warning(f"[LOCAL MBAR] No MBAR command found, trying to run script directly")
             mbar_command = f"bash {script_path}"
         
+
         logger.info(f"[LOCAL MBAR] Executing MBAR command: {mbar_command}")
         
         try:
@@ -619,6 +867,12 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
             
             return 666666  # Return success to continue execution
         
+
+    def _submit_mbar_parallel(script_path, cwd) -> int:
+        """Submit MBAR job to global manager for parallel execution."""
+        return _GLOBAL_MBAR_MANAGER.submit_mbar_job(script_path, cwd)
+
+
     def timing_based_get_tot_gpu_time(self) -> float:
         """need to get tot_gpu_time to set relative_simulation_cost which is 
            a must for adaptive runtime mode
@@ -676,7 +930,7 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
         """Updated update method that handles local execution fake job IDs."""
         # Define fake job IDs used for already-completed or local jobs
         # 888888 from actual execution, 999999 from early skip, 666666 from mbar output
-        fake_job_ids = [666666, 888888, 999999]  
+        fake_job_ids = [888888, 999999]  
         fake_fail_ids = [777777]
         
         # Mark any jobs with fake IDs as finished and remove from queue
@@ -685,6 +939,29 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
             # grab more info like command list, etc.
             job_sim_info = _parse_sim_info_from_job(job)
 
+            # Handle MBAR jobs - check status in global manager
+            if job.slurm_job_id >= 600000:  # MBAR job IDs start at 600000
+                status = _GLOBAL_MBAR_MANAGER.get_job_status(job.slurm_job_id)
+                
+                if status == "FINISHED":
+                    if not getattr(job, "_already_marked_finished", False):
+                        job.status = _JobStatus.FINISHED
+                        job._already_marked_finished = True
+                        jobs_to_remove.append(job)
+                        logger.info(f"[LOCAL UPDATE] ✅ MBAR job {job.slurm_job_id} finished, {job_sim_info}")
+                elif status == "FAILED":
+                    if not getattr(job, "_already_marked_finished", False):
+                        job.status = _JobStatus.FINISHED  # Still mark as finished to continue pipeline
+                        job._already_marked_finished = True
+                        jobs_to_remove.append(job)
+                        logger.warning(f"[LOCAL UPDATE] ⚠️ MBAR job {job.slurm_job_id} failed but continuing, {job_sim_info}")
+                elif status == "RUNNING":
+                    # Keep job in queue, mark as running if not already done
+                    if not hasattr(job, '_logged_running'):
+                        logger.info(f"[LOCAL UPDATE] 🟡 MBAR job {job.slurm_job_id} running, {job_sim_info}")
+                        job._logged_running = True
+                continue
+            
             if job.slurm_job_id in fake_job_ids:
                 if getattr(job, "_already_marked_finished", False):
                     continue
@@ -697,6 +974,7 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
                 # (local_has_failed will now return True)
                 job.status = _JobStatus.FAILED
                 continue
+
 
         # Remove the completed local jobs
         for job in jobs_to_remove:
@@ -737,6 +1015,7 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
         while self.running:
             sleep(3)
 
+
     # APPLY THE PATCHES NOW
     Simulation.get_tot_gpu_time = timing_based_get_tot_gpu_time
 
@@ -755,7 +1034,93 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
         Stage.wait = _local_stage_wait
         SimulationRunner.wait = _local_sim_runner_wait
 
-    logger.info("A3FE was successfully patched for local execution!")
+    logger.info("A3FE._virtual_queue was successfully patched for local execution")
+
+
+
+# NOTE: THIS PATCH IS FOR TESTING AND DEBUGGING PURPOSES ONLY
+def patch_stage_skip_adaptive_efficiency():
+    """
+    Patch Stage._run_without_threading to optionally skip the adaptive efficiency loop.
+    This is useful for testing or when need to skip the resource-intensive optimization phase.
+    """
+    # Set up colored logger for this function
+    logger = logging.getLogger(__name__ + ".STAGE_PATCH")
+    logger.handlers.clear()  # Clear any existing handlers
+    logger.setLevel(logging.INFO)
+    logger.propagate = False  # Don't propagate to avoid duplicate messages    
+    handler = logging.StreamHandler()
+    handler.setFormatter(ColorFormatter())
+    handler.addFilter(shared_filter)
+    logger.addHandler(handler)
+    
+    def patched_run_without_threading(
+        self,
+        run_nos,
+        adaptive=True,
+        runtime=None,
+        max_runtime=60,
+    ):
+        """Modified _run_without_threading that can skip the adaptive efficiency loop"""
+        try:
+            self.kill_thread = False
+            if not adaptive and runtime is None:
+                raise ValueError(
+                    "If adaptive equilibration detection is disabled, a runtime must be supplied."
+                )
+            if adaptive and runtime is not None:
+                raise ValueError(
+                    "If adaptive equilibration detection is enabled, a runtime cannot be supplied."
+                )
+            if not adaptive:
+                self._logger.info(
+                    f"Starting {self}. Adaptive equilibration = {adaptive}..."
+                )
+            elif adaptive:
+                self._logger.info(
+                    f"Starting {self}. Adaptive equilibration = {adaptive}..."
+                )
+                if runtime is None:
+                    runtime = 0.2  # ns
+
+            # Run initial SOMD simulations
+            if SKIP_ADAPTIVE_EFFICIENCY:
+                self._logger.info("SKIP_ADAPTIVE_EFFICIENCY=True: Skipping initial SOMD simulations (dry run mode)")
+                self.running_wins = []
+            else:
+                for win in self.lam_windows:
+                    win.run(run_nos=run_nos, runtime=runtime)
+                    win._update_log()
+                    self._dump()
+
+            if not SKIP_ADAPTIVE_EFFICIENCY:
+                self.running_wins = self.lam_windows.copy()
+            self._dump()
+
+            if adaptive:
+                # NEW: Check if we should skip adaptive efficiency
+                if SKIP_ADAPTIVE_EFFICIENCY:
+                    self._logger.info("SKIP_ADAPTIVE_EFFICIENCY=True: Skipping adaptive efficiency optimization loop")
+                    self._maximally_efficient = True
+                else:
+                    self._logger.info("Running adaptive efficiency optimization loop")
+                    self._run_loop_adaptive_efficiency(
+                        run_nos=run_nos, max_runtime=max_runtime
+                    )                
+                self._run_loop_adaptive_equilibration_multiwindow(
+                    run_nos=run_nos, max_runtime=max_runtime
+                )
+            else:
+                self._run_loop_non_adaptive()
+            self._logger.info(f"All simulations in {self} have finished.")
+
+        except Exception as e:
+            self._logger.exception("")
+            raise e
+    
+    # APPLY THE PATCH
+    Stage._run_without_threading = patched_run_without_threading
+    logger.info(f"Stage._run_without_threading patched to {'skip' if SKIP_ADAPTIVE_EFFICIENCY else 'include'} adaptive efficiency loop")
 
 
 
@@ -763,11 +1128,18 @@ if __name__ == "__main__":
     # Set up global logging first
     setup_global_logging()
 
+    os.environ.setdefault("OMP_NUM_THREADS", "1")
+    os.environ.setdefault("MKL_NUM_THREADS", "1") 
+    os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+    
     # Configure via environment variables
     FORCE_LOCAL_EXECUTION = True
     FORCE_CPU_PLATFORM = True
+    SKIP_ADAPTIVE_EFFICIENCY=True
     
     patch_virtual_queue_for_local_execution(use_faster_wait=False)
+
+    patch_stage_skip_adaptive_efficiency()
     
     # # Set global defaults before creating any Leg instances
     # for step in ["parameterise", "solvate", "minimise", "heat_preequil", "ensemble_equil"]:
@@ -791,11 +1163,11 @@ if __name__ == "__main__":
                       base_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again5",
                       input_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again5/input")
 
-    calc.setup(
-        bound_leg_sysprep_config=sysprep_cfg,
-        free_leg_sysprep_config=sysprep_cfg,
-        # skip_preparation=True,  # skip system preparation
-    )
+    # calc.setup(
+    #     bound_leg_sysprep_config=sysprep_cfg,
+    #     free_leg_sysprep_config=sysprep_cfg,
+    #     # skip_preparation=True,  # skip system preparation
+    # )
 
     add_filter_recursively(calc)
 
@@ -809,7 +1181,7 @@ if __name__ == "__main__":
     # )
     # by default use simtime=0.1 ns
     # we might need to reduce delta_er to get more lambda windows
-    calc.get_optimal_lam_vals() 
+    # calc.get_optimal_lam_vals() 
     calc.run(adaptive=True, 
              # runtime=25,                  # run non-adaptively for 25 ns per replicate
              parallel=False)              # run things sequentially
