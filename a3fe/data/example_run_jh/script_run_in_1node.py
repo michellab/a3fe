@@ -579,6 +579,9 @@ def _install_mbar_barrier_wrapper(logger):
         process_grads._collect_mbar_slurm = _collect_mbar_wrapper
     if hasattr(detect_equil, "_collect_mbar_slurm"):
         detect_equil._collect_mbar_slurm = _collect_mbar_wrapper
+    if hasattr(stage, "_collect_mbar_slurm"):
+        stage._collect_mbar_slurm = _collect_mbar_wrapper
+
 
 
 def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False): 
