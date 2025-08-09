@@ -532,7 +532,8 @@ _GLOBAL_MBAR_MANAGER = None
 def _install_mbar_barrier_wrapper(logger):
     import a3fe.analyse.mbar as mbar
     import a3fe.analyse.process_grads as process_grads
-    import a3fe.analyse.detect_equil as detect_equil
+    import a3fe.analyse.detect_equil as detect_equil  # need this for equil analysis
+    import a3fe.run.stage as stage # need this for calc.analyse()
 
     if not hasattr(mbar, "_original_collect_mbar_slurm"):
         mbar._original_collect_mbar_slurm = mbar.collect_mbar_slurm
