@@ -34,6 +34,7 @@ import sys
 FORCE_LOCAL_EXECUTION = True  # Set to False for normal SLURM execution
 FORCE_CPU_PLATFORM = False   # Set to True to force CPU even on GPU systems
 FAST_UPDATE_INTERVAL = 3  # seconds between updates for local execution
+SKIP_ADAPTIVE_EFFICIENCY = False  # Set to True to skip adaptive efficiency checks
 
 
 # --- set up colored logging ---
@@ -387,7 +388,7 @@ class GlobalMBARManager:
             max_workers = max(1, (os.cpu_count() or 4) // 2)
         
         self.max_workers = max_workers
-        self.executor = concurrent.futures.ProcessPoolExecutor(max_workers=max_workers)
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
         self.futures = {}  # job_id -> Future
         self.job_metadata = {}  # job_id -> {"cwd": str, "cmd": str, "script": str}
         self.job_counter = itertools.count(600000)
@@ -939,6 +940,11 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
             # grab more info like command list, etc.
             job_sim_info = _parse_sim_info_from_job(job)
 
+            sid = getattr(job, "slurm_job_id", None)
+            if not isinstance(sid, int):
+                # not yet assigned, skip this cycle
+                continue
+
             # Handle MBAR jobs - check status in global manager
             if job.slurm_job_id >= 600000:  # MBAR job IDs start at 600000
                 status = _GLOBAL_MBAR_MANAGER.get_job_status(job.slurm_job_id)
@@ -974,7 +980,6 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
                 # (local_has_failed will now return True)
                 job.status = _JobStatus.FAILED
                 continue
-
 
         # Remove the completed local jobs
         for job in jobs_to_remove:
@@ -1135,12 +1140,12 @@ if __name__ == "__main__":
     # Configure via environment variables
     FORCE_LOCAL_EXECUTION = True
     FORCE_CPU_PLATFORM = True
-    SKIP_ADAPTIVE_EFFICIENCY=True  # NOTE set this to False or remove this completely in production runs
+    # SKIP_ADAPTIVE_EFFICIENCY=True  # NOTE set this to False or remove this completely in production runs
     
     patch_virtual_queue_for_local_execution(use_faster_wait=False)
 
     # NOTE we should comment out this in production run
-    patch_stage_skip_adaptive_efficiency()
+    # patch_stage_skip_adaptive_efficiency()
     
     # # Set global defaults before creating any Leg instances
     # for step in ["parameterise", "solvate", "minimise", "heat_preequil", "ensemble_equil"]:
