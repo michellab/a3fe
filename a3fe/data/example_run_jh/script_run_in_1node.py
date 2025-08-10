@@ -1048,10 +1048,10 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
 
 
 # NOTE: THIS PATCH IS FOR TESTING AND DEBUGGING PURPOSES ONLY
-def patch_stage_skip_adaptive_efficiency():
+def _debug_patch_stage_skip_adaptive_efficiency():
     """
     Patch Stage._run_without_threading to optionally skip the adaptive efficiency loop.
-    This is useful for testing or when need to skip the resource-intensive optimization phase.
+    This is useful for debugging and testing or when need to skip the resource-intensive optimization phase.
     """
     # Set up colored logger for this function
     logger = logging.getLogger(__name__ + ".STAGE_PATCH")
@@ -1133,6 +1133,72 @@ def patch_stage_skip_adaptive_efficiency():
 
 
 
+def _debug_simulation_times(calc):
+    """Debug simulation times to identify inconsistencies
+    
+    sometimes we get the following error:
+
+    │ /Users/jingjinghuang/Documents/fep_workflow/a3fe_jh/a3fe/analyse/process_grads.py:638 in         │
+    │ get_time_series_multiwindow                                                                      │
+    │                                                                                                  │
+    │   635 │   │   │   │   for i in range(n_runs)                                                     │
+    │   636 │   │   │   ]                                                                              │
+    │   637 │   │   ):                                                                                 │
+    │ ❱ 638 │   │   │   raise ValueError(                                                              │
+    │   639 │   │   │   │   "Total simulation times are not the same for all runs. Please ensure tha   │
+    │   640 │   │   │   │   "the total simulation times are the same for all runs."                    │
+    │   641 │   │   │   )                                                                              │
+    ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+    ValueError: Total simulation times are not the same for all runs. Please ensure that the total simulation times are the same for all runs.
+    """
+    print("=== DEBUGGING SIMULATION TIMES ===")
+    
+    issues_found = []
+    
+    for leg in calc.legs:
+        print(f"\n=== {leg.leg_type.name} LEG ===")
+        for stage in leg.stages:
+            print(f"\n--- {stage.stage_type.name} STAGE ---")
+            
+            stage_issues = []
+            for win in stage.lam_windows:
+                print(f"\nLambda {win.lam:.3f}:")
+                simtimes = []
+                
+                for i, sim in enumerate(win.sims, 1):
+                    simtime = sim.get_tot_simtime()
+                    simtimes.append(simtime)
+                    print(f"  Run {i}: {simtime:.6f} ns")
+                    
+                    # Check if simulation output files exist
+                    simfile_path = f"{sim.output_dir}/simfile.dat"
+                    if not os.path.exists(simfile_path):
+                        issue = f"Missing simfile.dat for {stage.stage_type.name} lambda {win.lam:.3f} run {i}"
+                        print(f"    ERROR: {issue}")
+                        issues_found.append(issue)
+                    elif os.path.getsize(simfile_path) == 0:
+                        issue = f"Empty simfile.dat for {stage.stage_type.name} lambda {win.lam:.3f} run {i}"
+                        print(f"    ERROR: {issue}")
+                        issues_found.append(issue)
+                
+                # Check consistency within this lambda window
+                if len(set(f"{t:.6f}" for t in simtimes)) > 1:
+                    issue = f"Inconsistent times in {stage.stage_type.name} lambda {win.lam:.3f}: {simtimes}"
+                    print(f"    ERROR: {issue}")
+                    stage_issues.append((win.lam, simtimes))
+                    issues_found.append(issue)
+                else:
+                    print(f"    ✓ All runs consistent: {simtimes[0]:.6f} ns")
+            
+            # Check consistency across lambda windows in this stage
+            if stage_issues:
+                print(f"\n  STAGE {stage.stage_type.name} HAS TIMING ISSUES:")
+                for lam, times in stage_issues:
+                    print(f"    Lambda {lam:.3f}: {times}")
+    
+    return issues_found
+
+
 if __name__ == "__main__":
     # Set up global logging first
     setup_global_logging()
@@ -1149,7 +1215,7 @@ if __name__ == "__main__":
     patch_virtual_queue_for_local_execution(use_faster_wait=False)
 
     # NOTE we should comment out this in production run
-    # patch_stage_skip_adaptive_efficiency()
+    # _debug_patch_stage_skip_adaptive_efficiency()
     
     # # Set global defaults before creating any Leg instances
     # for step in ["parameterise", "solvate", "minimise", "heat_preequil", "ensemble_equil"]:
@@ -1170,13 +1236,16 @@ if __name__ == "__main__":
                                         #ensemble_equilibration_time=10,)  # added for local test run on mac; unit - ps
 
     calc = a3.Calculation(ensemble_size=3, 
-                      base_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again5",
-                      input_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again5/input")
+                      base_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again6",
+                      input_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again6/input")
+    
+
+    _debug_simulation_times(calc)
 
     # calc.setup(
     #     bound_leg_sysprep_config=sysprep_cfg,
     #     free_leg_sysprep_config=sysprep_cfg,
-    #     # skip_preparation=True,  # skip system preparation
+    #     skip_preparation=True,  # skip system preparation
     # )
 
     add_filter_recursively(calc)
@@ -1192,10 +1261,10 @@ if __name__ == "__main__":
     # by default use simtime=0.1 ns
     # we might need to reduce delta_er to get more lambda windows
     # calc.get_optimal_lam_vals() 
-    calc.run(adaptive=True, 
-             # runtime=25,                  # run non-adaptively for 25 ns per replicate
-             parallel=False)              # run things sequentially
-    calc.wait()
+    # calc.run(adaptive=True, 
+    #          # runtime=25,                  # run non-adaptively for 25 ns per replicate
+    #          parallel=False)              # run things sequentially
+    # calc.wait()
     calc.set_equilibration_time(1)        # Discard the first ns of simulation time
     calc.analyse()
     calc.save()

@@ -255,7 +255,7 @@ if __name__ == "__main__":
     # }
     updated_leg = update_all_paths_leg(
         pickle_path="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again2_copy1/bound/Leg.pkl",
-        old_base="/project/6097686/jjhuang/fep_workflows/run_in_one_node1",
+        old_base="/home/jjhuang/projects/jjhuang/fep_workflows/new_run_1",
         new_base="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again2_copy1",
     )
 
