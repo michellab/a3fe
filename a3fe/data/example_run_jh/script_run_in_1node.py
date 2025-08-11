@@ -1210,62 +1210,34 @@ if __name__ == "__main__":
     # Configure via environment variables
     FORCE_LOCAL_EXECUTION = True
     FORCE_CPU_PLATFORM = True
-    # SKIP_ADAPTIVE_EFFICIENCY=True  # NOTE set this to False or remove this completely in production runs
+    # comment out this debugging variable in production
+    # SKIP_ADAPTIVE_EFFICIENCY = True 
     
     patch_virtual_queue_for_local_execution(use_faster_wait=False)
 
-    # NOTE we should comment out this in production run
+    # comment out this debugging function in production
     # _debug_patch_stage_skip_adaptive_efficiency()
-    
-    # # Set global defaults before creating any Leg instances
-    # for step in ["parameterise", "solvate", "minimise", "heat_preequil", "ensemble_equil"]:
-    #     a3.Leg.update_default_slurm_config(
-    #         step_type=step,
-    #         time="12:00:00",
-    #         gres="",  # switch to CPU-only
-    #         pre_commands=['export PATH="$CONDA_PREFIX/bin:$PATH"']
-    #     )
-
-    a3.Calculation.required_legs = [_LegType.BOUND]
                                     
     sysprep_cfg = SystemPreparationConfig(slurm=True)
-                                        #runtime_short_nvt=5,
-                                        #runtime_nvt=10,
-                                        #runtime_npt=10,                   # added for local test run on mac; unit - ps
-                                        #runtime_npt_unrestrained=10,      # added for local test run on mac; unit - ps
-                                        #ensemble_equilibration_time=10,)  # added for local test run on mac; unit - ps
 
-    calc = a3.Calculation(ensemble_size=3, 
-                      base_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again6",
-                      input_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again6/input")
+    calc = a3.Calculation(base_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again6",
+                          input_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again6/input")
     
+    # comment this debugging function out in production
+    # _debug_simulation_times(calc)
 
-    _debug_simulation_times(calc)
-
-    # calc.setup(
-    #     bound_leg_sysprep_config=sysprep_cfg,
-    #     free_leg_sysprep_config=sysprep_cfg,
-    #     skip_preparation=True,  # skip system preparation
-    # )
+    calc.setup(
+        bound_leg_sysprep_config=sysprep_cfg,
+        free_leg_sysprep_config=sysprep_cfg,
+    )
 
     add_filter_recursively(calc)
 
-    # calc.bound_leg.update_slurm_script(
-    #     "somd_production",
-    #     mem="2G",             
-    #     time="00:13:13",
-    #     gres="", # switch to CPU-only
-    #     setup_cuda_env=False,       # Disable CUDA environment setup
-    #     somd_platform="CPU"         # Use CPU instead of CUDA 
-    # )
-    # by default use simtime=0.1 ns
-    # we might need to reduce delta_er to get more lambda windows
-    # calc.get_optimal_lam_vals() 
-    # calc.run(adaptive=True, 
-    #          # runtime=25,                  # run non-adaptively for 25 ns per replicate
-    #          parallel=False)              # run things sequentially
-    # calc.wait()
-    calc.set_equilibration_time(1)        # Discard the first ns of simulation time
+    calc.get_optimal_lam_vals() 
+    calc.run(adaptive=True, 
+             parallel=True)                 # run things in parallel 
+    calc.wait()
+    # calc.set_equilibration_time(1)        # we should comment this out in adaptive mode
     calc.analyse()
     calc.save()
 

@@ -124,6 +124,7 @@ calc.save()
 - 
 ### Running a3fe in one node
 - It is recommended to use script `a3fe_jh/a3fe/data/example_run_jh/script_run_in_1node.py` to run a3fe calculation in one node
+  - for running in adaptive mode, make sure to remove this step `calc.set_equilibration_time()`
  
 
 ### Copyright
