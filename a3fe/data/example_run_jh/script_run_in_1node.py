@@ -1151,25 +1151,20 @@ def _debug_simulation_times(calc):
     ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
     ValueError: Total simulation times are not the same for all runs. Please ensure that the total simulation times are the same for all runs.
     """
-    print("=== DEBUGGING SIMULATION TIMES ===")
-    
+    print("=== DEBUGGING SIMULATION TIMES ===") 
     issues_found = []
-    
     for leg in calc.legs:
         print(f"\n=== {leg.leg_type.name} LEG ===")
         for stage in leg.stages:
-            print(f"\n--- {stage.stage_type.name} STAGE ---")
-            
+            print(f"\n--- {stage.stage_type.name} STAGE ---")  
             stage_issues = []
             for win in stage.lam_windows:
                 print(f"\nLambda {win.lam:.3f}:")
-                simtimes = []
-                
+                simtimes = []       
                 for i, sim in enumerate(win.sims, 1):
                     simtime = sim.get_tot_simtime()
                     simtimes.append(simtime)
-                    print(f"  Run {i}: {simtime:.6f} ns")
-                    
+                    print(f"  Run {i}: {simtime:.6f} ns") 
                     # Check if simulation output files exist
                     simfile_path = f"{sim.output_dir}/simfile.dat"
                     if not os.path.exists(simfile_path):
@@ -1180,7 +1175,6 @@ def _debug_simulation_times(calc):
                         issue = f"Empty simfile.dat for {stage.stage_type.name} lambda {win.lam:.3f} run {i}"
                         print(f"    ERROR: {issue}")
                         issues_found.append(issue)
-                
                 # Check consistency within this lambda window
                 if len(set(f"{t:.6f}" for t in simtimes)) > 1:
                     issue = f"Inconsistent times in {stage.stage_type.name} lambda {win.lam:.3f}: {simtimes}"
@@ -1189,7 +1183,6 @@ def _debug_simulation_times(calc):
                     issues_found.append(issue)
                 else:
                     print(f"    ✓ All runs consistent: {simtimes[0]:.6f} ns")
-            
             # Check consistency across lambda windows in this stage
             if stage_issues:
                 print(f"\n  STAGE {stage.stage_type.name} HAS TIMING ISSUES:")
