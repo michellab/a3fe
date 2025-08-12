@@ -132,6 +132,10 @@ class GradientData:
             )  # This isn't really a meaningful quantity
             sem_intra = _np.sqrt(squared_sem_intra)
             sem_inter = _np.sqrt(squared_sem_inter)
+            # add this code for debugging
+            lens = [None if g is None else getattr(g, "shape", None) or (len(g) if hasattr(g, "__len__") else None)
+            for g in gradients_wind]
+            print("DEBUG gradients_wind shapes:", lens)
             gradients_all_winds.append(_np.array(gradients_wind))
             gradients_subsampled_all_winds.append(gradients_subsampled_wind)
             means_all_winds.append(mean_overall)
@@ -715,7 +719,7 @@ def get_time_series_multiwindow_mbar(
     # Do this so that the total simulation time for each window is spread evenly over the total
     # simulation time for the whole calculation
     n_runs = len(run_nos)
-    n_points = 100
+    n_points = 100  # DEBUG - BY JH 2025-07-30
     overall_dgs = _np.zeros(
         [
             n_runs,
@@ -731,7 +735,6 @@ def get_time_series_multiwindow_mbar(
     start_and_end_fracs = [
         (round(x[0], 5), round(x[1], 5)) for x in start_and_end_fracs
     ]
-    print('start_and_end_fracs------', start_and_end_fracs)
     # Check whether we should use slurm or not.
     use_slurms = [
         getattr(lam_win, "slurm_equil_detection", True) for lam_win in lambda_windows
@@ -787,7 +790,7 @@ def get_time_series_multiwindow_mbar(
                     mbar_out_files=mbar_outfiles,
                     virtual_queue=lambda_windows[0].virtual_queue,
                     tmp_simfiles=tmp_simfiles,
-                    delete_outfiles=True,
+                    delete_outfiles=True,  # This may be problematic by JH 2025-08-08
                 )
             )
 

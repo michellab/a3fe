@@ -122,6 +122,10 @@ calc.save()
 - pay attention to calculation.pkl (leg.pkl or stage.pkl) files when re-running a previously stopped calculation because the calculation will load these pickle file by default. These pickle files are use to load the previously saved `Calculation`, `Leg` and `Stage` objects.
 - some `simfile.dat` files generated from SOMD simulations may miss headers.
 - 
+### Running a3fe in one node
+- It is recommended to use script `a3fe_jh/a3fe/data/example_run_jh/script_run_in_1node.py` to run a3fe calculation in one node
+  - for running in adaptive mode, make sure to remove this step `calc.set_equilibration_time()`
+ 
 
 ### Copyright
 

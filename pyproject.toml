@@ -32,6 +32,7 @@ dependencies = [
      "ipython",
      "pymbar<4",
      "pydantic",
+     "tqdm",
 ]
 
 # Update the urls once the hosting is set up.
