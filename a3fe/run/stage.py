@@ -766,6 +766,7 @@ class Stage(_SimulationRunner):
         # Check that all simulations have equilibrated
         for win in self.lam_windows:
             if not win.equilibrated:
+                self._logger.error(f"stage {self.__str__()} Window {win.__str__()} has not equilibrated")
                 raise RuntimeError(
                     "Not all lambda windows have equilibrated. Analysis cannot be performed."
                 )

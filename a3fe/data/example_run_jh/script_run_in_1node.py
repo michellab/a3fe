@@ -371,8 +371,7 @@ def _extract_mbar_output_file(command: str) -> str:
             if "freenrg-MBAR" in part and part.endswith(".dat"):
                 return os.path.basename(part)
     except:
-        pass
-    return ""
+        raise ValueError("Failed to extract output file from command")
 
 
 # ==================================================
@@ -1151,20 +1150,25 @@ def _debug_simulation_times(calc):
     ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
     ValueError: Total simulation times are not the same for all runs. Please ensure that the total simulation times are the same for all runs.
     """
-    print("=== DEBUGGING SIMULATION TIMES ===") 
+    print("=== DEBUGGING SIMULATION TIMES ===")
+    
     issues_found = []
+    
     for leg in calc.legs:
         print(f"\n=== {leg.leg_type.name} LEG ===")
         for stage in leg.stages:
-            print(f"\n--- {stage.stage_type.name} STAGE ---")  
+            print(f"\n--- {stage.stage_type.name} STAGE ---")
+            
             stage_issues = []
             for win in stage.lam_windows:
                 print(f"\nLambda {win.lam:.3f}:")
-                simtimes = []       
+                simtimes = []
+                
                 for i, sim in enumerate(win.sims, 1):
                     simtime = sim.get_tot_simtime()
                     simtimes.append(simtime)
-                    print(f"  Run {i}: {simtime:.6f} ns") 
+                    print(f"  Run {i}: {simtime:.6f} ns")
+                    
                     # Check if simulation output files exist
                     simfile_path = f"{sim.output_dir}/simfile.dat"
                     if not os.path.exists(simfile_path):
@@ -1175,6 +1179,7 @@ def _debug_simulation_times(calc):
                         issue = f"Empty simfile.dat for {stage.stage_type.name} lambda {win.lam:.3f} run {i}"
                         print(f"    ERROR: {issue}")
                         issues_found.append(issue)
+                
                 # Check consistency within this lambda window
                 if len(set(f"{t:.6f}" for t in simtimes)) > 1:
                     issue = f"Inconsistent times in {stage.stage_type.name} lambda {win.lam:.3f}: {simtimes}"
@@ -1183,6 +1188,7 @@ def _debug_simulation_times(calc):
                     issues_found.append(issue)
                 else:
                     print(f"    ✓ All runs consistent: {simtimes[0]:.6f} ns")
+            
             # Check consistency across lambda windows in this stage
             if stage_issues:
                 print(f"\n  STAGE {stage.stage_type.name} HAS TIMING ISSUES:")
@@ -1196,41 +1202,39 @@ if __name__ == "__main__":
     # Set up global logging first
     setup_global_logging()
 
-    os.environ.setdefault("OMP_NUM_THREADS", "1")
-    os.environ.setdefault("MKL_NUM_THREADS", "1") 
-    os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
-    
     # Configure via environment variables
     FORCE_LOCAL_EXECUTION = True
-    FORCE_CPU_PLATFORM = True
-    # comment out this debugging variable in production
-    # SKIP_ADAPTIVE_EFFICIENCY = True 
+    FORCE_CPU_PLATFORM = False
+    SKIP_ADAPTIVE_EFFICIENCY = True  # skip the adaptive efficiency optimization loop
+   
+
+    patch_virtual_queue_for_local_execution()
+
+    _debug_patch_stage_skip_adaptive_efficiency()
     
-    patch_virtual_queue_for_local_execution(use_faster_wait=False)
+    sysprep_cfg = SystemPreparationConfig(slurm=True) # use default settings
 
-    # comment out this debugging function in production
-    # _debug_patch_stage_skip_adaptive_efficiency()
-                                    
-    sysprep_cfg = SystemPreparationConfig(slurm=True)
+    calc = a3.Calculation(base_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again7",
+                          input_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again7/input")
 
-    calc = a3.Calculation(base_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again6",
-                          input_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again6/input")
+    # calc.setup(
+    #     bound_leg_sysprep_config=sysprep_cfg,
+    #     free_leg_sysprep_config=sysprep_cfg,
+    # )
+
+    # add_filter_recursively(calc)
+
+    # calc.get_optimal_lam_vals(delta_er=0.5)
+    # calc.run(adaptive=True, 
+    #          parallel=True,
+    #          runtime_constant=0.0005)              
     
-    # comment this debugging function out in production
-    # _debug_simulation_times(calc)
+    # calc.wait()
+    for leg in calc.legs:
+        for stage in leg.stages:
+            equilibrated = stage.is_equilibrated()
+            print(f"{leg.leg_type.name} {stage.stage_type.name}: equilibrated = {equilibrated}")
 
-    calc.setup(
-        bound_leg_sysprep_config=sysprep_cfg,
-        free_leg_sysprep_config=sysprep_cfg,
-    )
 
-    add_filter_recursively(calc)
-
-    calc.get_optimal_lam_vals() 
-    calc.run(adaptive=True, 
-             parallel=True)                 # run things in parallel 
-    calc.wait()
-    # calc.set_equilibration_time(1)        # we should comment this out in adaptive mode
     calc.analyse()
     calc.save()
-

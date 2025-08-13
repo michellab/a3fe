@@ -254,17 +254,17 @@ if __name__ == "__main__":
     # StageType.VANISH: '/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again2/bound/vanish/input'
     # }
     updated_leg = update_all_paths_leg(
-        pickle_path="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again2_copy1/bound/Leg.pkl",
-        old_base="/home/jjhuang/projects/jjhuang/fep_workflows/new_run_1",
-        new_base="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again2_copy1",
+        pickle_path="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again7/bound/Leg.pkl",
+        old_base="/System/Volumes/Data/home/jjhuang/project/jjhuang/fep_workflows/new_run_final_2",
+        new_base="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again7",
     )
 
     for stage_name in ['restrain', 'discharge', 'vanish']:
-        stage_path = f"/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again2_copy1/bound/{stage_name}/Stage.pkl"
+        stage_path = f"/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again7/bound/{stage_name}/Stage.pkl"
         updated_stage = update_all_paths_stage(
             stage_path,
-            old_base="/project/6097686/jjhuang/fep_workflows/run_in_one_node1",
-            new_base="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again2_copy1"
+            old_base="/System/Volumes/Data/home/jjhuang/project/jjhuang/fep_workflows/new_run_final_2",
+            new_base="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again7",
         )
 
     print("Leg updater functions loaded. Use the functions above to update your leg objects.")
