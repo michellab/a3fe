@@ -28,6 +28,7 @@ import itertools
 import subprocess
 from tqdm import tqdm
 import sys
+import shlex
 
 
 # Configuration options
@@ -291,21 +292,26 @@ def _format_sim_info(cwd: str, lam_arg: str = None) -> str:
     return ", ".join(parts)
 
 
-def _mbar_worker(cwd: str, mbar_command: str) -> tuple[int, str, str]:
+def _mbar_worker(cwd: str, mbar_command: str) -> tuple[int, str, str, float]:
     """
-    Run MBAR command in a separate process.
-    Returns (returncode, stdout, stderr). Never raises.
+    Run MBAR command in a separate process with timing.
+    Returns (returncode, stdout, stderr, duration). Never raises.
     """
+    start_time = time.time()
+    
     env = os.environ.copy()
     # prevent BLAS oversubscription when using multiprocessing
     env.setdefault("OMP_NUM_THREADS", "1")
     env.setdefault("MKL_NUM_THREADS", "1")
     env.setdefault("OPENBLAS_NUM_THREADS", "1")
+    
     proc = subprocess.run(
         mbar_command, shell=True, cwd=cwd, check=False,
         capture_output=True, text=True, env=env
     )
-    return proc.returncode, proc.stdout, proc.stderr
+    
+    duration = time.time() - start_time
+    return proc.returncode, proc.stdout, proc.stderr, duration
 
 
 def _is_mbar_script(script_path) -> bool:
@@ -357,21 +363,31 @@ def _create_dummy_mbar_output(output_path: str, cwd: str) -> None:
         f.write(dummy_content)
 
 
-def _extract_mbar_output_file(command: str) -> str:
-    """Extract the output file name from an MBAR command."""
+_FALLBACK_RE = re.compile(r"(freenrg-MBAR[^\s/]*?\.dat)\b")
+def _extract_mbar_output_file(command: str) -> str | None:
+    """
+    Extract the MBAR output file basename from a CLI command string.
+    """
     try:
+        parts = shlex.split(command)  # safer than .split()
+    except Exception:
         parts = command.split()
-        for i, part in enumerate(parts):
-            if part == "--output" and i + 1 < len(parts):
-                return os.path.basename(parts[i + 1])
-            elif part.startswith("--output="):
-                return os.path.basename(part.split("=", 1)[1])
-        # If no explicit output specified, try to guess from command structure
-        for part in parts:
-            if "freenrg-MBAR" in part and part.endswith(".dat"):
-                return os.path.basename(part)
-    except:
-        raise ValueError("Failed to extract output file from command")
+
+    output_value = None
+    for i, tok in enumerate(parts):
+        if tok in ("--output", "-o"):
+            if i + 1 < len(parts) and not parts[i + 1].startswith("-"):
+                output_value = parts[i + 1]
+        elif tok.startswith("--output="):
+            output_value = tok.split("=", 1)[1]
+
+    # Fallback: regex search in the whole command
+    if not output_value:
+        m = _FALLBACK_RE.search(command)
+        if m:
+            output_value = m.group(1)
+
+    return os.path.basename(output_value) if output_value else None
 
 
 # ==================================================
@@ -432,10 +448,54 @@ class GlobalMBARManager:
             "cmd": mbar_command, 
             "script": script_path
         }
+        self._log_mbar_start(cwd, mbar_command, job_id)
         
         self.logger.info(f"Submitted MBAR job {job_id}: {mbar_command}")
         return job_id
     
+    def _log_mbar_start(self, cwd: str, command: str, job_id: int):
+        """Log MBAR job start to local_execution.log"""
+        try:
+            start_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            mbar_info = self._format_mbar_info(cwd, command)
+            
+            log_path = os.path.join(cwd, "local_execution.log")
+            os.makedirs(cwd, exist_ok=True)  # Ensure directory exists
+            
+            with open(log_path, "a") as f:
+                f.write(f"[LOCAL MBAR] {start_timestamp} Starting MBAR job {job_id}: {mbar_info}\n")
+                f.write(f"[LOCAL MBAR] Command: {command}\n")
+        except Exception as e:
+            self.logger.warning(f"Failed to log MBAR start: {e}")
+
+    def _log_mbar_completion(self, cwd: str, job_id: int, success: bool, duration: float, error_msg: str = None):
+        """Log MBAR job completion to local_execution.log"""
+        try:
+            end_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            status = "✅ SUCCESS" if success else "❌ FAILED"
+            
+            log_path = os.path.join(cwd, "local_execution.log")
+            with open(log_path, "a") as f:
+                f.write(f"[LOCAL MBAR] {end_timestamp} MBAR job {job_id} completed: {status}\n")
+                f.write(f"[LOCAL MBAR] Duration: {duration:.2f} seconds\n")
+                if not success and error_msg:
+                    f.write(f"[LOCAL MBAR] Error: {error_msg}\n")
+                else:
+                    f.write(f"[LOCAL MBAR] ❌ MBAR analysis failed (dummy output created)\n")
+        except Exception as e:
+            self.logger.warning(f"Failed to log MBAR completion: {e}")
+
+    def _format_mbar_info(self, cwd: str, command: str) -> str:
+        """Format MBAR job info for logging"""
+        # Extract stage info from path
+        stage_match = re.search(r"/(?:bound|free)/([^/]+)/output/", cwd)
+        stage = stage_match.group(1) if stage_match else "unknown"
+        
+        # Extract output file
+        output_file = _extract_mbar_output_file(command)
+        
+        return f"stage={stage}, output={output_file or 'unknown'}"
+
     def wait_for_completion(self):
         """Wait for all submitted MBAR jobs to complete (robust)."""
         if not self.futures:
@@ -450,7 +510,6 @@ class GlobalMBARManager:
         use_pb = self.use_progress and (tqdm is not None) and sys.stderr.isatty()
         ok = 0
         fail = 0
-
 
         if use_pb:
             bar = tqdm(total=total, desc="MBAR analyses", unit="job", leave=True, smoothing=0.1)
@@ -469,28 +528,34 @@ class GlobalMBARManager:
             meta = self.job_metadata.get(job_id, {})
             cwd = meta.get("cwd", "")
             cmd = meta.get("cmd", "")
-            script = meta.get("script", "")
+            # script = meta.get("script", "")
 
             try:
-                rc, stdout, stderr = future.result()
+                rc, stdout, stderr, duration = future.result()
             except Exception as e:
-                rc, stdout, stderr = -1, "", str(e)
+                rc, stdout, stderr, duration = -1, "", str(e)
 
             # NOTE: Success must also produce a .dat file
             ofile = _extract_mbar_output_file(cmd)
-            ofile_path = os.path.join(cwd, ofile) if ofile else None
-            if not os.path.exists(ofile_path) or os.path.getsize(ofile_path) == 0:
-                rc = -1
-
-            if rc == 0:
-                ok += 1
-                if not use_pb:
-                    self.logger.info(f"MBAR job {job_id} completed successfully")
+            success = False
+            if ofile is None:
+                self.logger.error(f"MBAR job {job_id} did not produce an output file")
+                rc = -1 
             else:
-                fail += 1
-                if not use_pb:
-                    self.logger.warning(f"MBAR job {job_id} failed")
-                    self.logger.warning(f"MBAR job {job_id} failed with STDERR {stderr}")
+                ofile_path = os.path.join(cwd, ofile)
+                if rc == 0 and os.path.exists(ofile_path) and os.path.getsize(ofile_path) > 0:
+                    success = True
+                    ok += 1
+                    if not use_pb:
+                        self.logger.info(f"MBAR job {job_id} completed successfully")
+                else:
+                    fail += 1
+                    error_msg = stderr if stderr else "Output file missing or empty"
+                    if not use_pb:
+                        self.logger.warning(f"MBAR job {job_id} failed: {error_msg}")
+            
+
+            self._log_mbar_completion(cwd, job_id, success, duration, stderr if not success else None)
             if use_pb:
                 bar.update(1)
                 bar.set_postfix_str(f"ok={ok} fail={fail}")
@@ -1225,16 +1290,15 @@ if __name__ == "__main__":
     # add_filter_recursively(calc)
 
     # calc.get_optimal_lam_vals(delta_er=0.5)
-    # calc.run(adaptive=True, 
-    #          parallel=True,
-    #          runtime_constant=0.0005)              
+    calc.run(adaptive=True, 
+             parallel=False,
+             runtime_constant=0.0005)              
     
-    # calc.wait()
+    calc.wait()
     for leg in calc.legs:
         for stage in leg.stages:
             equilibrated = stage.is_equilibrated()
             print(f"{leg.leg_type.name} {stage.stage_type.name}: equilibrated = {equilibrated}")
-
 
     calc.analyse()
     calc.save()
