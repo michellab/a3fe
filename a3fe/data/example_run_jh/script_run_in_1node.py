@@ -469,27 +469,24 @@ class GlobalMBARManager:
             f.write(f"[LOCAL MBAR] {start_timestamp} Starting MBAR job {job_id}: {mbar_info}\n")
             f.write(f"[LOCAL MBAR] Command: {command}\n")
 
-    def _log_mbar_completion(self, cwd: str, job_id: int, success: bool, duration: float, error_msg: str = None):
+    def _log_mbar_completion(self, cwd: str, job_id: int, success: bool, duration: float, error_msg: str = None, outputfile_path: str = None):
         """Log MBAR job completion to local_execution.log"""
         end_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         log_path = os.path.join(cwd, "local_execution.log")
         with open(log_path, "a") as f:
             if success:
-                f.write(f"[LOCAL MBAR] {end_timestamp} ✅ MBAR job {job_id} completed in {duration:.2f} seconds\n")
+                f.write(f"[LOCAL MBAR] {end_timestamp} ✅ MBAR job {job_id} completed in {duration:.2f} seconds; output -> {outputfile_path}\n")
             else:
                 f.write(f"[LOCAL MBAR] {end_timestamp} ❌ MBAR job {job_id} failed (dummy output created)\n")
                 f.write(f"[LOCAL MBAR] Error: {error_msg}\n")
 
-
     def _format_mbar_info(self, cwd: str, command: str) -> str:
         """Format MBAR job info for logging"""
         # Extract stage info from path
-        stage_match = re.search(r"/(?:bound|free)/([^/]+)/output/", cwd)
+        stage_match = re.search(r"/(?:bound|free)/([^/]+)/output(?:/|$)", cwd)
         stage = stage_match.group(1) if stage_match else "unknown"
-        
         # Extract output file
         output_file = _extract_mbar_output_file(command)
-        
         return f"stage={stage}, output={output_file or 'unknown'}"
 
     def wait_for_completion(self):
@@ -523,7 +520,6 @@ class GlobalMBARManager:
             cwd = meta.get("cwd", "")
             cmd = meta.get("cmd", "")
             # script = meta.get("script", "")
-
             try:
                 rc, stdout, stderr, duration = future.result()
             except Exception as e:
@@ -551,7 +547,7 @@ class GlobalMBARManager:
             
 
             self._log_mbar_completion(cwd=cwd, job_id=job_id, success=success, duration=duration, 
-                                      error_msg=stderr if not success else None)
+                                      error_msg=stderr if not success else None, outputfile_path=ofile_path if success else None)
             if use_pb:
                 bar.update(1)
                 bar.set_postfix_str(f"ok={ok} fail={fail}")
@@ -1105,7 +1101,6 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
     logger.info("A3FE._virtual_queue was successfully patched for local execution")
 
 
-
 # NOTE: THIS PATCH IS FOR TESTING AND DEBUGGING PURPOSES ONLY
 def _debug_patch_stage_skip_adaptive_efficiency():
     """
@@ -1189,7 +1184,6 @@ def _debug_patch_stage_skip_adaptive_efficiency():
     # APPLY THE PATCH
     Stage._run_without_threading = patched_run_without_threading
     logger.info(f"Stage._run_without_threading patched to {'skip' if SKIP_ADAPTIVE_EFFICIENCY else 'include'} adaptive efficiency loop")
-
 
 
 def _debug_simulation_times(calc):
