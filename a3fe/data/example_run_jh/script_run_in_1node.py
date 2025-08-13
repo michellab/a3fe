@@ -367,6 +367,13 @@ _FALLBACK_RE = re.compile(r"(freenrg-MBAR[^\s/]*?\.dat)\b")
 def _extract_mbar_output_file(command: str) -> str | None:
     """
     Extract the MBAR output file basename from a CLI command string.
+
+    a command may look like:
+    analyse_freenrg mbar -i /project/6097686/jjhuang/fep_workflows/new_run_final_1/\
+        bound/restrain/output/lambda*/run_02/simfile_truncated_66.0_end_65.0_start.dat\
+            -p 100 --overlap -o \
+        /project/6097686/jjhuang/fep_workflows/new_run_final_1/bound/restrain/output/\
+            freenrg-MBAR-run_02_66.0_end_65.0_start.dat"
     """
     try:
         parts = shlex.split(command)  # safer than .split()
@@ -381,7 +388,6 @@ def _extract_mbar_output_file(command: str) -> str | None:
         elif tok.startswith("--output="):
             output_value = tok.split("=", 1)[1]
 
-    # Fallback: regex search in the whole command
     if not output_value:
         m = _FALLBACK_RE.search(command)
         if m:
@@ -434,7 +440,7 @@ class GlobalMBARManager:
             self.logger.warning(f"No explicit MBAR command found, running script directly")
             mbar_command = f"bash {script_path}"
 
-        ofile = _extract_mbar_output_file(mbar_command)
+        ofile = _extract_mbar_output_file(mbar_command)  # ofile can be None somehow
         if ofile:
             self.expected_outputs.add(os.path.join(cwd, ofile))
 
@@ -448,42 +454,32 @@ class GlobalMBARManager:
             "cmd": mbar_command, 
             "script": script_path
         }
-        self._log_mbar_start(cwd, mbar_command, job_id)
+        self._log_mbar_start(cwd=cwd, command=mbar_command, job_id=job_id)
         
         self.logger.info(f"Submitted MBAR job {job_id}: {mbar_command}")
         return job_id
     
     def _log_mbar_start(self, cwd: str, command: str, job_id: int):
         """Log MBAR job start to local_execution.log"""
-        try:
-            start_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            mbar_info = self._format_mbar_info(cwd, command)
-            
-            log_path = os.path.join(cwd, "local_execution.log")
-            os.makedirs(cwd, exist_ok=True)  # Ensure directory exists
-            
-            with open(log_path, "a") as f:
-                f.write(f"[LOCAL MBAR] {start_timestamp} Starting MBAR job {job_id}: {mbar_info}\n")
-                f.write(f"[LOCAL MBAR] Command: {command}\n")
-        except Exception as e:
-            self.logger.warning(f"Failed to log MBAR start: {e}")
+        start_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        mbar_info = self._format_mbar_info(cwd, command)
+        log_path = os.path.join(cwd, "local_execution.log")
+        os.makedirs(cwd, exist_ok=True)  # although should already exist
+        with open(log_path, "a") as f:
+            f.write(f"[LOCAL MBAR] {start_timestamp} Starting MBAR job {job_id}: {mbar_info}\n")
+            f.write(f"[LOCAL MBAR] Command: {command}\n")
 
     def _log_mbar_completion(self, cwd: str, job_id: int, success: bool, duration: float, error_msg: str = None):
         """Log MBAR job completion to local_execution.log"""
-        try:
-            end_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            status = "✅ SUCCESS" if success else "❌ FAILED"
-            
-            log_path = os.path.join(cwd, "local_execution.log")
-            with open(log_path, "a") as f:
-                f.write(f"[LOCAL MBAR] {end_timestamp} MBAR job {job_id} completed: {status}\n")
-                f.write(f"[LOCAL MBAR] Duration: {duration:.2f} seconds\n")
-                if not success and error_msg:
-                    f.write(f"[LOCAL MBAR] Error: {error_msg}\n")
-                else:
-                    f.write(f"[LOCAL MBAR] ❌ MBAR analysis failed (dummy output created)\n")
-        except Exception as e:
-            self.logger.warning(f"Failed to log MBAR completion: {e}")
+        end_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_path = os.path.join(cwd, "local_execution.log")
+        with open(log_path, "a") as f:
+            if success:
+                f.write(f"[LOCAL MBAR] {end_timestamp} ✅ MBAR job {job_id} completed in {duration:.2f} seconds\n")
+            else:
+                f.write(f"[LOCAL MBAR] {end_timestamp} ❌ MBAR job {job_id} failed (dummy output created)\n")
+                f.write(f"[LOCAL MBAR] Error: {error_msg}\n")
+
 
     def _format_mbar_info(self, cwd: str, command: str) -> str:
         """Format MBAR job info for logging"""
@@ -510,7 +506,6 @@ class GlobalMBARManager:
         use_pb = self.use_progress and (tqdm is not None) and sys.stderr.isatty()
         ok = 0
         fail = 0
-
         if use_pb:
             bar = tqdm(total=total, desc="MBAR analyses", unit="job", leave=True, smoothing=0.1)
             # (optional) hide noisy “running/submitted” logs while bar is active
@@ -518,7 +513,6 @@ class GlobalMBARManager:
                 shared_filter.suppress_mbar_noise = True
         else:
             self.logger.info(f"Waiting for {total} MBAR jobs to complete...")
-
         
         for future in concurrent.futures.as_completed(self.futures.values()):
             job_id = future_to_id.get(future)
@@ -542,6 +536,7 @@ class GlobalMBARManager:
                 self.logger.error(f"MBAR job {job_id} did not produce an output file")
                 rc = -1 
             else:
+                # when ofile is not None
                 ofile_path = os.path.join(cwd, ofile)
                 if rc == 0 and os.path.exists(ofile_path) and os.path.getsize(ofile_path) > 0:
                     success = True
@@ -555,7 +550,8 @@ class GlobalMBARManager:
                         self.logger.warning(f"MBAR job {job_id} failed: {error_msg}")
             
 
-            self._log_mbar_completion(cwd, job_id, success, duration, stderr if not success else None)
+            self._log_mbar_completion(cwd=cwd, job_id=job_id, success=success, duration=duration, 
+                                      error_msg=stderr if not success else None)
             if use_pb:
                 bar.update(1)
                 bar.set_postfix_str(f"ok={ok} fail={fail}")
@@ -570,7 +566,6 @@ class GlobalMBARManager:
         self.job_metadata.clear()
         self.logger.info(f"All MBAR jobs completed (ok={ok}, fail={fail})")
        
-    
     def has_pending_jobs(self) -> bool:
         """Check if there are any pending MBAR jobs."""
         return bool(self.futures)
