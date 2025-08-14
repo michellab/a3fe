@@ -85,7 +85,7 @@ class DedupStatusFilter(logging.Filter):
         self.debug_mode = debug_mode
         self.suppress_mbar_noise: bool = False
         self._mbar_noise = re.compile(
-            r"(?:Submitted MBAR job \d+:|\[LOCAL UPDATE\].*MBAR job \d+.*|MBAR job \d+ (?:running|completed successfully|failed))"
+            r"(?:Submitted MBAR job \d+:|\[LOCAL UPDATE\].*MBAR job \d+.*|MBAR job \d+ (?:running|completed successfully|failed))" 
         )
         self._last_status_by_job: dict[str, str] = (
             {}
@@ -99,7 +99,7 @@ class DedupStatusFilter(logging.Filter):
         name = record.name
 
         if self.debug_mode:
-            print(f"DEBUG: Processing message from {name}: {msg[:100]}...")
+            print(f"[LOCAL DEBUG]: Processing message from {name}: {msg[:100]}...")
 
         # For "Not running" messages, try to identify which job this is about
         if "Not running" in msg:
@@ -108,16 +108,16 @@ class DedupStatusFilter(logging.Filter):
             if job_key and job_key in self._not_running_jobs:
                 if self.debug_mode:
                     print(
-                        f"DEBUG: Suppressing duplicate 'Not running' for job {job_key}"
+                        f"[LOCAL DEBUG]: Suppressing duplicate 'Not running' for job {job_key}"
                     )
                 return False
             if job_key:
                 self._not_running_jobs.add(job_key)
                 if self.debug_mode:
-                    print(f"DEBUG: First 'Not running' for job {job_key}, allowing")
+                    print(f"[LOCAL DEBUG]: First 'Not running' for job {job_key}, allowing")
             else:
                 if self.debug_mode:
-                    print(f"DEBUG: Allowing 'Not running' (couldn't identify job)")
+                    print("[LOCAL DEBUG]: Allowing 'Not running' (couldn't identify job)")
             return True
 
         # For status messages
@@ -134,13 +134,13 @@ class DedupStatusFilter(logging.Filter):
 
                 if self.debug_mode:
                     print(
-                        f"DEBUG: Job key: '{unique_job_key}', Status: '{status}' (was: '{prev_status}')"
+                        f"[LOCAL DEBUG]: Job key: '{unique_job_key}', Status: '{status}' (was: '{prev_status}')"
                     )
 
                 if prev_status == status:
                     if self.debug_mode:
                         print(
-                            f"DEBUG: Suppressing duplicate status for {unique_job_key}"
+                            f"[LOCAL DEBUG]: Suppressing duplicate status for {unique_job_key}"
                         )
                     return False
 
@@ -154,14 +154,14 @@ class DedupStatusFilter(logging.Filter):
                     self._not_running_jobs.discard(unique_job_key)
                     if self.debug_mode:
                         print(
-                            f"DEBUG: Job {unique_job_key} finished, allowing future 'Not running'"
+                            f"[LOCAL DEBUG]: Job {unique_job_key} finished, allowing future 'Not running'"
                         )
 
         if self.suppress_mbar_noise and self._mbar_noise.search(msg):
             return False
 
         if self.debug_mode:
-            print(f"DEBUG: Allowing message through")
+            print("[LOCAL DEBUG]: Allowing message through")
         return True
 
     @lru_cache(maxsize=1000)
@@ -353,7 +353,7 @@ def _is_mbar_script(script_path) -> bool:
         with open(script_path, "r") as f:
             content = f.read()
         return "analyse_freenrg" in content or "freenrg-MBAR" in content
-    except:
+    except Exception:
         return False
 
 
@@ -374,7 +374,7 @@ def _create_dummy_mbar_output(output_path: str, cwd: str) -> None:
             f"'{os.path.join(dir, 'run_01/simfile_truncated_1.0_end_0.0_start.dat')}'"
             for dir in sorted(lambda_dirs)
         ]
-    except:
+    except Exception:
         lambda_files = [
             "'/path/to/lambda_0.000/run_01/simfile_truncated_1.0_end_0.0_start.dat'",
             "'/path/to/lambda_1.000/run_01/simfile_truncated_1.0_end_0.0_start.dat'",
@@ -486,7 +486,7 @@ class GlobalMBARManager:
 
         if not mbar_command:
             self.logger.warning(
-                f"No explicit MBAR command found, running script directly"
+                "No explicit MBAR command found, running script directly"
             )
             mbar_command = f"bash {script_path}"
 
@@ -586,9 +586,9 @@ class GlobalMBARManager:
             cmd = meta.get("cmd", "")
             # script = meta.get("script", "")
             try:
-                rc, stdout, stderr, duration = future.result()
+                rc, _, stderr, duration = future.result()
             except Exception as e:
-                rc, stdout, stderr, duration = -1, "", str(e)
+                rc, _, stderr, duration = -1, "", str(e)
 
             # NOTE: Success must also produce a .dat file
             ofile = _extract_mbar_output_file(cmd)
@@ -647,9 +647,9 @@ class GlobalMBARManager:
         future = self.futures[job_id]
         if future.done():
             try:
-                result = future.result()
+                _ = future.result()
                 return "FINISHED"
-            except:
+            except Exception:
                 return "FAILED"
         else:
             return "RUNNING"
@@ -713,7 +713,7 @@ def _install_mbar_barrier_wrapper(logger):
                         write_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         with open(log_path, "a") as f:
                             f.write(
-                                f"[LOCAL MBAR] {write_time} File not found on attempt {attempt + 1}, retrying: {ofile}\n"
+                                f"[LOCAL MBAR] {write_time} File not found on attempt {attempt + 1}, retrying: {ofile}\n"  # noqa: E501
                             )
 
                         time.sleep(retry_delay)
@@ -734,7 +734,7 @@ def _install_mbar_barrier_wrapper(logger):
                     write_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     with open(log_path, "a") as f:
                         f.write(
-                            f"[LOCAL MBAR] {write_time} Created dummy output for missing MBAR file after retries: {ofile}\n"
+                            f"[LOCAL MBAR] {write_time} Created dummy output for missing MBAR file after retries: {ofile}\n"  # noqa: E501
                         )
 
             if missing:
@@ -982,7 +982,7 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
                 f.write(f"[LOCAL SOMD] Starting {sim_info} at {start_timestamp}\n")
                 f.write(f"[LOCAL SOMD] Completed {sim_info} at {end_timestamp}\n")
                 f.write(f"Simulation took {duration_seconds:.2f} seconds\n")
-                f.write(f"✅ Job completed successfully\n")
+                f.write("✅ Job completed successfully\n")
             return 888888  # Return fake job ID on success
 
         except subprocess.CalledProcessError as e:
@@ -1020,7 +1020,7 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
 
         try:
             subprocess.run(python_command, shell=True, cwd=cwd, check=True)
-            logger.info(f"[LOCAL PREP] ✅ Completed successfully")
+            logger.info("[LOCAL PREP] ✅ Completed successfully")
             return 888888  # Return fake job ID
         except subprocess.CalledProcessError as e:
             logger.error(f"[LOCAL PREP] ❌ Failed with return code {e.returncode}")
@@ -1052,7 +1052,7 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
 
         if not mbar_command:
             logger.warning(
-                f"[LOCAL MBAR] No MBAR command found, trying to run script directly"
+                "[LOCAL MBAR] No MBAR command found, trying to run script directly"
             )
             mbar_command = f"bash {script_path}"
 
@@ -1068,7 +1068,7 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
                 text=True,
             )
 
-            logger.info(f"[LOCAL MBAR] ✅ MBAR analysis completed successfully")
+            logger.info("[LOCAL MBAR] ✅ MBAR analysis completed successfully")
             return 666666  # Return fake job ID
 
         except subprocess.CalledProcessError as e:
@@ -1079,10 +1079,10 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
 
             # MBAR often fails during early adaptive phases due to insufficient data
             logger.warning(
-                f"[LOCAL MBAR] ⚠️ MBAR failure is common during early adaptive phases"
+                "[LOCAL MBAR] ⚠️ MBAR failure is common during early adaptive phases"
             )
             logger.warning(
-                f"[LOCAL MBAR] ⚠️ Creating dummy output file to allow simulation to continue"
+                "[LOCAL MBAR] ⚠️ Creating dummy output file to allow simulation to continue"
             )
 
             # Create a realistic dummy output file that matches the expected MBAR format
