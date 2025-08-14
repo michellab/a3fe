@@ -133,9 +133,9 @@ class GradientData:
             sem_intra = _np.sqrt(squared_sem_intra)
             sem_inter = _np.sqrt(squared_sem_inter)
             # add this code for debugging
-            lens = [None if g is None else getattr(g, "shape", None) or (len(g) if hasattr(g, "__len__") else None)
-            for g in gradients_wind]
-            print("DEBUG gradients_wind shapes:", lens)
+            # lens = [None if g is None else getattr(g, "shape", None) or (len(g) if hasattr(g, "__len__") else None)
+            # for g in gradients_wind]
+            # print("DEBUG gradients_wind shapes:", lens)
             gradients_all_winds.append(_np.array(gradients_wind))
             gradients_subsampled_all_winds.append(gradients_subsampled_wind)
             means_all_winds.append(mean_overall)
