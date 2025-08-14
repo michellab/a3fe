@@ -38,7 +38,9 @@ FAST_UPDATE_INTERVAL = 3  # seconds between updates for local execution
 SKIP_ADAPTIVE_EFFICIENCY = False  # Set to True to skip adaptive efficiency checks
 
 
-# --- set up colored logging ---
+# ==================================================
+# LOGGING SETUP FOR LOCAL EXECUTION
+# ==================================================
 class ColorFormatter(logging.Formatter):
     ORANGE = "\033[33m"  # ANSI “yellow” as an orange stand‐in
     GREEN  = "\033[32m"
@@ -230,7 +232,10 @@ def add_filter_recursively(obj, filter_instance=shared_filter):
     for sub_obj in sub_objects:
         add_filter_recursively(sub_obj, filter_instance)
 
-    
+
+# ==================================================
+# UTILITY FUNCTIONS FOR LOCAL EXECUTION
+# ==================================================
 def _parse_sim_info_from_job(job) -> str:
     """
     Job.command_list is like:
@@ -323,9 +328,14 @@ def _is_mbar_script(script_path) -> bool:
     except:
         return False
 
-
+# TODO: we need to be cautious when function is called, as it creates dummy MBAR output files
 def _create_dummy_mbar_output(output_path: str, cwd: str) -> None:
-    """Create a realistic dummy MBAR output file that matches the expected format."""
+    """Create a realistic dummy MBAR output file that matches the expected format.
+       NOTE not sure about the behavior of this function -> how does this affect the final free 
+       energy result? I included this function to prevent breaking the code when MBAR output is missing.
+
+       why MBAR output is missing? are they really missing or just not generated yet?
+    """
     lambda_files = []
     try:
         import glob
@@ -338,26 +348,26 @@ def _create_dummy_mbar_output(output_path: str, cwd: str) -> None:
     
     # Create dummy content that matches the real MBAR output format
     dummy_content = f"""# Analysing data contained in file(s) [{', '.join(lambda_files)}]
-        # WARNING: This is a dummy MBAR output created due to insufficient simulation data
-        # This is expected during early adaptive equilibration phases
-        #Overlap matrix
-        0.0000 0.0000
-        0.0000 0.0000
-        #DG from neighbouring lambda in kcal/mol
-        0.0000 0.0000 0.0000 0.0000
-        #PMF from MBAR in kcal/mol
-        0.0000 0.0000 0.0000
-        0.0000 0.0000 0.0000
-        #TI average gradients and standard deviation in kcal/mol
-        0.0000 0.0000 0.0000
-        0.0000 0.0000 0.0000
-        #PMF from TI in kcal/mol
-        0.0000 0.0000
-        0.0000 0.0000
-        #MBAR free energy difference in kcal/mol: 
-        0.000000, 0.000000  #WARNING DUMMY OUTPUT - INSUFFICIENT DATA FOR REAL MBAR ANALYSIS
-        #TI free energy difference in kcal/mol: 
-        0.000000  #WARNING DUMMY OUTPUT - INSUFFICIENT DATA FOR REAL MBAR ANALYSIS
+# WARNING: This is a dummy MBAR output created due to insufficient simulation data
+# This is expected during early adaptive equilibration phases
+#Overlap matrix
+0.0000 0.0000
+0.0000 0.0000
+#DG from neighbouring lambda in kcal/mol
+0.0000 0.0000 0.0000 0.0000
+#PMF from MBAR in kcal/mol
+0.0000 0.0000 0.0000
+0.0000 0.0000 0.0000
+#TI average gradients and standard deviation in kcal/mol
+0.0000 0.0000 0.0000
+0.0000 0.0000 0.0000
+#PMF from TI in kcal/mol
+0.0000 0.0000
+0.0000 0.0000
+#MBAR free energy difference in kcal/mol: 
+0.000000, 0.000000  #WARNING DUMMY OUTPUT - INSUFFICIENT DATA FOR REAL MBAR ANALYSIS
+#TI free energy difference in kcal/mol: 
+0.000000  #WARNING DUMMY OUTPUT - INSUFFICIENT DATA FOR REAL MBAR ANALYSIS
         """
     with open(output_path, 'w') as f:
         f.write(dummy_content)
@@ -397,7 +407,7 @@ def _extract_mbar_output_file(command: str) -> str | None:
 
 
 # ==================================================
-# Global MBAR Manager for Parallel Execution
+# Global MBAR Manager FOR LOCAL AND PARALLEL EXECUTION
 # ==================================================
 class GlobalMBARManager:
     """Global manager for parallel MBAR execution with proper synchronization."""
@@ -454,8 +464,7 @@ class GlobalMBARManager:
             "cmd": mbar_command, 
             "script": script_path
         }
-        self._log_mbar_start(cwd=cwd, command=mbar_command, job_id=job_id)
-        
+        self._log_mbar_start(cwd=cwd, command=mbar_command, job_id=job_id)       
         self.logger.info(f"Submitted MBAR job {job_id}: {mbar_command}")
         return job_id
     
@@ -475,9 +484,9 @@ class GlobalMBARManager:
         log_path = os.path.join(cwd, "local_execution.log")
         with open(log_path, "a") as f:
             if success:
-                f.write(f"[LOCAL MBAR] {end_timestamp} ✅ MBAR job {job_id} completed in {duration:.2f} seconds; output -> {outputfile_path}\n")
+                f.write(f"[LOCAL MBAR] {end_timestamp} ✅ MBAR job completed! {job_id} completed in {duration:.2f} seconds; output -> {outputfile_path}\n")
             else:
-                f.write(f"[LOCAL MBAR] {end_timestamp} ❌ MBAR job {job_id} failed (dummy output created)\n")
+                f.write(f"[LOCAL MBAR] {end_timestamp} ❌ MBAR job failed! {job_id} failed (dummy output created)\n")
                 f.write(f"[LOCAL MBAR] Error: {error_msg}\n")
 
     def _format_mbar_info(self, cwd: str, command: str) -> str:
@@ -490,7 +499,8 @@ class GlobalMBARManager:
         return f"stage={stage}, output={output_file or 'unknown'}"
 
     def wait_for_completion(self):
-        """Wait for all submitted MBAR jobs to complete (robust)."""
+        """Wait for all submitted MBAR jobs to complete (robust).          
+        """
         if not self.futures:
             self.logger.info("No MBAR jobs to wait for")
             return
@@ -599,28 +609,61 @@ def _install_mbar_barrier_wrapper(logger):
         # Only say anything if there are outstanding MBAR futures
         has_pending = _GLOBAL_MBAR_MANAGER and _GLOBAL_MBAR_MANAGER.has_pending_jobs()
         if has_pending and not mbar_sync_in_progress:
-            logger.info("[MBAR SYNC] collect_mbar_slurm called - waiting for all MBAR jobs to complete")
+            logger.info("[LOCAL MBAR] collect_mbar_slurm called - waiting for all MBAR jobs to complete")
             mbar_sync_in_progress = True
 
         if has_pending:
             _GLOBAL_MBAR_MANAGER.wait_for_completion()
+            # IMPORTANT NOTE: Give file system time to sync
+            # It takes a few seconds for the file system to sync after MBAR jobs complete
+            # otherwise create dummy MBAR output files even if the jobs are done and outputs will be there
+            time.sleep(2) 
+
+        kwargs_modified = kwargs.copy()
+        kwargs_modified['delete_outfiles'] = False
+
 
         # Safety net: ensure all expected outputs exist (create dummies if not)
         if _GLOBAL_MBAR_MANAGER:
+            # IMPORTANT NOTE: same reason for the sleep(2) above, we need to wait a bit
+            max_retries = 3
+            retry_delay = 1.0
             missing = []
             for ofile in list(_GLOBAL_MBAR_MANAGER.expected_outputs):
-                if not os.path.exists(ofile):
-                    # raise FileNotFoundError(f"Expected MBAR output missing: {ofile}")
+                file_found = False
+                # Retry logic for file existence check
+                for attempt in range(max_retries):
+                    if os.path.exists(ofile) and os.path.getsize(ofile) > 0:
+                        file_found = True
+                        break
+                    elif attempt < max_retries - 1:
+                        logger.warning(f"[LOCAL MBAR] File not found on attempt {attempt + 1}, retrying: {ofile}")
+                        log_path = os.path.join(os.path.dirname(ofile), "local_execution.log")
+                        write_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        with open(log_path, "a") as f:
+                            f.write(f"[LOCAL MBAR] {write_time} File not found on attempt {attempt + 1}, retrying: {ofile}\n")
+
+                        time.sleep(retry_delay)
+                        retry_delay *= 1.5
+
+                if not file_found:
                     missing.append(ofile)
+                    # create a dummy output file so that the code can continue
                     _create_dummy_mbar_output(ofile, os.path.dirname(ofile))
-                    logger.warning(f"[MBAR SYNC] Missing MBAR output; created dummy: {ofile}")
+                    logger.warning(f"[LOCAL MBAR] Missing MBAR output after retries; created dummy: {ofile}")
+                    # we need to write this to local_execution.log
+                    # os.path.dirname(ofile) must be something like "~bound/discharge/output/"
+                    log_path = os.path.join(os.path.dirname(ofile), "local_execution.log")
+                    write_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    with open(log_path, "a") as f:
+                        f.write(f"[LOCAL MBAR] {write_time} Created dummy output for missing MBAR file after retries: {ofile}\n")
 
             if missing:
-                logger.warning(f"[MBAR SYNC] {len(missing)} MBAR outputs were missing and replaced with dummies.")
+                logger.warning(f"[LOCAL MBAR] {len(missing)} MBAR outputs were missing and replaced with dummies.")
 
         # Only print the completion line once per wave
         if has_pending and mbar_sync_in_progress:
-            logger.info("[MBAR SYNC] All MBAR jobs completed - proceeding to collect results")
+            logger.info("[LOCAL MBAR] All MBAR jobs completed - proceeding to collect results")
             mbar_sync_in_progress = False
 
         kwargs_modified = kwargs.copy()
@@ -666,7 +709,6 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
         return
     
     # Detect GPU availability
-    logger.info("Patching VirtualQueue for local execution...")
     logger.info(f"Force CPU: {FORCE_CPU_PLATFORM}")
 
     # Initialize global MBAR manager
@@ -877,7 +919,9 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
     
 
     def _run_mbar_locally(self, script_path, cwd) -> int: 
-        """Submit MBAR to the process pool and return a fake job id immediately."""
+        """Submit MBAR to the process pool and return a fake job id immediately.
+           This function runs mbar calc one-by-one, which is very slow so depreacted. 
+        """
         logger.info(f"[LOCAL MBAR] Queuing MBAR analysis in {cwd or os.getcwd()}")
 
         try:
@@ -1101,7 +1145,67 @@ def patch_virtual_queue_for_local_execution(use_faster_wait: bool = False):
     logger.info("A3FE._virtual_queue was successfully patched for local execution")
 
 
-# NOTE: THIS PATCH IS FOR TESTING AND DEBUGGING PURPOSES ONLY
+
+def patch_logging_into_local_execution_log():
+    """
+    Simply move loggings like:
+
+    /project/6097686/jjhuang/fep_workflows/a3fe_jh/a3fe/read/_process_somd_files.py:305: 
+    UserWarning: Very little data (< 50 lines) to write truncated simfile: \
+        /project/6097686/jjhuang/fep_workflows/new_run_final_1/bound/vanish/output/lambda_0.614/run_01/simfile.dat.
+    _warn(f"Very little data (< 50 lines) to write truncated simfile: {simfile}.")
+
+    into a local_execution.log file in the same directory as the simfile.
+
+    and move some other unimportant loggings into local_execution.log
+    """
+    import a3fe.read._process_somd_files as _a3fe_process_somd_files
+    logger = logging.getLogger(__name__ + ".SUPPRESS_LOGGINGS")
+
+    def _warn_to_local_log(message, *args, **kwargs):
+        # Try to find output directory from message (simfile path is inside message)
+        # Example: "Very little data ...: /path/to/output/lambda_0.000/run_01/simfile.dat"
+        m = re.search(r":\s*(/.*?/output/.*?/run_\d+/simfile\.dat)\.?\s*$", str(message))
+        if m:
+            simfile_path = m.group(1)
+            log_dir = os.path.dirname(simfile_path)
+            log_path = os.path.join(log_dir, "local_execution.log") 
+            os.makedirs(log_dir, exist_ok=True)
+            with open(log_path, "a") as flog:
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                flog.write(f"[LOCAL MBAR] {timestamp} {message}\n")
+        # Do NOT propagate to console
+        return
+
+
+    shared_filter.runtime_constant_patterns = [
+            re.compile(r"does not have the attribute runtime_constant and this will not be created"),
+            re.compile(r"Setting the attribute runtime_constant to"),
+        ]
+        
+    original_filter = shared_filter.filter
+    def enhanced_filter(self, record):
+        # First apply the original filtering logic
+        if not original_filter(record):
+            return False
+        
+        # Then check for runtime_constant patterns
+        msg = record.getMessage()
+        for pattern in self.runtime_constant_patterns:
+            if pattern.search(msg):
+                return False  # Suppress this message
+        
+        return True  # Allow message through
+        
+    _a3fe_process_somd_files._warn = _warn_to_local_log
+    shared_filter.filter = enhanced_filter.__get__(shared_filter, shared_filter.__class__)
+
+    logger.info("Patched some logging into local_execution.log for clearer output")
+
+
+# ==================================================
+# DEBUGGING HELPERS
+# ==================================================
 def _debug_patch_stage_skip_adaptive_efficiency():
     """
     Patch Stage._run_without_threading to optionally skip the adaptive efficiency loop.
@@ -1252,6 +1356,20 @@ def _debug_simulation_times(calc):
     return issues_found
 
 
+def _debug_patch_force_not_equilibrated():
+    """
+    Temporarily patch Stage.is_equilibrated() to always return False
+    for testing _run_loop_adaptive_equilibration_multiwindow().
+    """
+    logger = logging.getLogger(__name__ + ".DEBUG_PATCH")    
+
+    def force_false_equilibrated(self, run_nos=None):
+        return False
+    
+    Stage.is_equilibrated = force_false_equilibrated
+    logger.info("Stage.is_equilibrated() patched to always return False for testing purposes")
+
+
 if __name__ == "__main__":
     # Set up global logging first
     setup_global_logging()
@@ -1263,8 +1381,10 @@ if __name__ == "__main__":
    
 
     patch_virtual_queue_for_local_execution()
+    patch_logging_into_local_execution_log() 
 
     _debug_patch_stage_skip_adaptive_efficiency()
+    # _debug_patch_force_not_equilibrated()
     
     sysprep_cfg = SystemPreparationConfig(slurm=True) # use default settings
 
@@ -1283,11 +1403,5 @@ if __name__ == "__main__":
              parallel=False,
              runtime_constant=0.0005)              
     
-    calc.wait()
-    for leg in calc.legs:
-        for stage in leg.stages:
-            equilibrated = stage.is_equilibrated()
-            print(f"{leg.leg_type.name} {stage.stage_type.name}: equilibrated = {equilibrated}")
-
     calc.analyse()
     calc.save()
