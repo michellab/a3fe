@@ -1529,7 +1529,7 @@ if __name__ == "__main__":
     # Configure via environment variables
     FORCE_LOCAL_EXECUTION = True
     FORCE_CPU_PLATFORM = False
-    SKIP_ADAPTIVE_EFFICIENCY = True  # skip the adaptive efficiency optimization loop
+    # SKIP_ADAPTIVE_EFFICIENCY = True  # skip the adaptive efficiency optimization loop
 
     patch_virtual_queue_for_local_execution()
     patch_logging_into_local_execution_log()
