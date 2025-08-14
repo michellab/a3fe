@@ -1534,7 +1534,7 @@ if __name__ == "__main__":
     patch_virtual_queue_for_local_execution()
     patch_logging_into_local_execution_log()
 
-    _debug_patch_stage_skip_adaptive_efficiency()
+    # _debug_patch_stage_skip_adaptive_efficiency()
     # _debug_patch_force_not_equilibrated()
 
     sysprep_cfg = SystemPreparationConfig(slurm=True)  # use default settings
@@ -1544,15 +1544,15 @@ if __name__ == "__main__":
         input_dir="/Users/jingjinghuang/Documents/fep_workflow/test_somd_run_again7/input",
     )
 
-    # calc.setup(
-    #     bound_leg_sysprep_config=sysprep_cfg,
-    #     free_leg_sysprep_config=sysprep_cfg,
-    # )
+    calc.setup(
+        bound_leg_sysprep_config=sysprep_cfg,
+        free_leg_sysprep_config=sysprep_cfg,
+    )
 
-    # add_filter_recursively(calc)
+    add_filter_recursively(calc)
 
-    # calc.get_optimal_lam_vals(delta_er=0.5)
-    calc.run(adaptive=True, parallel=False, runtime_constant=0.0005)
+    calc.get_optimal_lam_vals(delta_er=0.5)
+    calc.run(adaptive=True, parallel=True)
 
     calc.analyse()
     calc.save()
