@@ -121,7 +121,22 @@ calc.save()
   - as a result, when using `skip_preparation=True` in Leg.setup(), we have to ensure that restraints are generated in the same run as  pre-equilibrated system is loaded. In other words, `restraints.pkl` and `Leg.pkl` must be created in the same run
 - pay attention to calculation.pkl (leg.pkl or stage.pkl) files when re-running a previously stopped calculation because the calculation will load these pickle file by default. These pickle files are use to load the previously saved `Calculation`, `Leg` and `Stage` objects.
 - some `simfile.dat` files generated from SOMD simulations may miss headers.
-- 
+- we might get this error at runtime
+    ```
+    │ /home/jjhuang/miniconda3/envs/a3fe_gra/lib/python3.12/site-packages/BioSimSp │
+    │ ace/Sandpit/Exscientia/Parameters/_parameters.py:568 in _parameterise_openff │
+    │                                                                              │
+    │    565 │   │   string = string.replace("Welcome to antechamber", "")         │
+    │    566 │   │                                                                 │
+    │    567 │   │   # Extract the version and convert to float.                   │
+    │ ❱  568 │   │   version = float(string.split(":")[0])                         │
+    │    569 │   │                                                                 │
+    │    570 │   │   # The version is okay, enable Open Force Field support.       │
+    │    571 │   │   if version >= 22:                                             │
+    ╰──────────────────────────────────────────────────────────────────────────────╯
+    ```
+    this is simply because calling `antechamber -v` failed to produce right version info. we could install a different version
+    or simply set `version=23`.  
 ### Running a3fe in one node
 - It is recommended to use script `a3fe_jh/a3fe/data/example_run_jh/script_run_in_1node.py` to run a3fe calculation in one node
   - for running in adaptive mode, make sure to remove this step `calc.set_equilibration_time()`
