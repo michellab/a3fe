@@ -186,7 +186,8 @@ if __name__ == "__main__":
                     help="Inclusive numeric range for mol numbers (e.g., 10 20).")
     ap.add_argument("--submit-only-range", nargs=2, type=int, metavar=("START","END"),
                     help="Submit existing PROJECT_ROOT/system_{num} for START..END (no creation).")
-
+    ap.add_argument("--submit-only-nums", nargs="*", type=int,
+                help="Submit existing PROJECT_ROOT/system_{num} for these nums (e.g., 2 5 9). No creation.")
 
     args = ap.parse_args()
 
@@ -221,6 +222,32 @@ if __name__ == "__main__":
             sbatch_submit(d) 
         raise SystemExit(0)     # IMPORTANT: exit so we don't fall through to creation
 
+    # ---- SUBMIT-ONLY (explicit nums, no creation) ----
+    if args.submit_only_nums:
+        nums = sorted(set(args.submit_only_nums))
+        systems = []
+        for n in nums:
+            d = PROJECT_ROOT / f"system_{n}"
+            sub = d / "submit.sh"
+            if sub.exists():
+                systems.append(d)
+            else:
+                print(f"[WARN] {d} has no submit.sh — skipping (submit-only mode never creates anything)")
+
+        if not systems:
+            raise SystemExit("[INFO] No existing systems with submit.sh found for the requested nums.")
+
+        print(f"[INFO] Submit-only mode: will submit {len(systems)} systems")
+        for d in systems:
+            print("  -", d)
+
+        import shutil as _shutil
+        if _shutil.which("sbatch") is None:
+            raise SystemExit("[ERROR] sbatch not found on PATH; cannot submit.")
+
+        for d in systems:
+            sbatch_submit(d)
+        raise SystemExit(0)  # IMPORTANT: exit so we don't fall through to creation
 
     if args.nums:
         nums = args.nums
