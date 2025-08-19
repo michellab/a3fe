@@ -15,13 +15,13 @@ def truncate_simulations_to_minimum(calc):
         The calculation object with potentially inconsistent simulation times
     """
     logger = calc._logger
-    logger.info("=== TRUNCATING SIMULATIONS TO MINIMUM RUNTIME ===\n")
+    logger.info("=== TRUNCATING SIMULATIONS TO MINIMUM RUNTIME ===")
     
     for leg in calc.legs:
-        logger.info(f"=== {leg.leg_type.name} LEG ===\n")
+        logger.info(f"=== {leg.leg_type.name} LEG ===")
         
         for stage in leg.stages:
-            logger.info(f"--- {stage.stage_type.name} STAGE ---\n")
+            logger.info(f"--- {stage.stage_type.name} STAGE ---")
             stage_has_issues = False
             
             for lam_window in stage.lam_windows:
@@ -44,7 +44,7 @@ def truncate_simulations_to_minimum(calc):
                     for i, sim in enumerate(lam_window.sims):
                         if sim_times[i] > min_time:
                             truncate_simulation_file(sim, min_time, logger)
-                            print(f"     Truncated run {sim.run_no}: {sim_times[i]:.6f} -> {min_time:.6f} ns")
+                            logger.info(f"     Truncated run {sim.run_no}: {sim_times[i]:.6f} -> {min_time:.6f} ns")
                     
                 else:
                     logger.debug(f"Lambda {lam_window.lam:.3f}: ✓ All runs consistent at {min_time:.6f} ns")
