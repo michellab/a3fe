@@ -1,11 +1,11 @@
 ## Common errors at runtime
-* We need to set `cutoff type = PME` for charged molecules. otherwise, we get the error below. 
+* [ERROR 1] We need to set `cutoff type = PME` for charged molecules. otherwise, we get the error below. 
     ```
     ValueError: The ligand has a non-zero charge (2), so SOMD must use PME for the 
     electrostatics. Please set the 'cutoff type' option in the somd.cfg file to 
     'PME'.
     ```
-* we need to firt check the protein-ligand system to see if they look right. This error is likely due to 1. ligand is too flexible or mobile, 2. insufficient sampling in the ensemble equilibraiton, 3. poor ligand-protein contacts in the binding pose, 4. maybe the restraint method is too strict? try using mdanalysis-based method? 
+* [ERROR 2] we need to firt check the protein-ligand system to see if they look right. This error is likely due to 1. ligand is too flexible or mobile, 2. insufficient sampling in the ensemble equilibraiton, 3. poor ligand-protein contacts in the binding pose, 4. maybe the restraint method is too strict? try using mdanalysis-based method? 
     ```
     INFO - 2025-08-15 23:57:14,823 - Leg (type = BOUND)_1 - Loading trajectory for run 2...
     INFO - 2025-08-15 23:57:23,586 - Leg (type = BOUND)_1 - Selecting restraints for run 2...
@@ -108,3 +108,27 @@
     AnalysisError: No candidate sets of Boresch restraints are suitable. Please 
     expand search criteria or increase force constants.
     ```
+* [ERROR 3] The most tricky issue is about convergence. For some lambda in some system, the predicted runtime increases as 
+the actual runtime increases. so why?
+  *   I took a look of one such lambda (I will check more later) and I found that 
+  ```
+    ================================================================================
+    FINAL SUMMARY: Predicted Maximum Efficiency Runtime vs Time
+    ================================================================================
+    Time/Rep(ns) Total(ns)  Actual(ns)  Predicted(ns)  Inter-run_SEM  Norm SEM      
+    --------------------------------------------------------------------------------
+    0.2          1.0        1.000       3.692          1.889          0.152046    
+    0.4          2.0        2.000       5.721          2.069          0.235568    
+    0.8          4.0        4.000       8.187          2.094          0.337114    
+    1.6          8.0        8.000       11.407         2.063          0.469720 
+  ```
+  In a3fe, `predicted runtime` by default is computed as following:
+  ```
+    total_times_all_runs = np.array(self.total_times) * len(self.run_nos)  
+    sem_inter *= np.sqrt(total_times_all_runs) -> this is the normalised SEM
+
+    predicted_run_time_max_eff = (1 / np.sqrt(runtime_constant * relative_simulation_cost)) * normalised_sem_dg
+    # for this specific lambda,  predicted_run_time_max_eff ~ 24.28 * normalised_sem_dg
+  ```
+  as indicated by the table, when extending the simulation, `normalised SEM` is increasing: 0.152 → 0.235 → 0.337 → 0.470. 
+  if 

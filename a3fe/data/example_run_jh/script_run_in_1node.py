@@ -1457,6 +1457,8 @@ def _debug_simulation_times(calc):
     │   641 │   │   │   )                                                                              │
     ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
     ValueError: Total simulation times are not the same for all runs. Please ensure that the total simulation times are the same for all runs.  # noqa: E501
+    
+    therefore must ensure consistent runtime for repeats and simply resume the calculation if the previous run failed or cancelled due to timeout
     """
     print("=== DEBUGGING SIMULATION TIMES ===")
 
@@ -1556,3 +1558,6 @@ if __name__ == "__main__":
 
     calc.analyse()
     calc.save()
+
+
+
