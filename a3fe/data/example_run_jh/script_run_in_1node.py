@@ -30,7 +30,7 @@ import subprocess
 from tqdm import tqdm
 import sys
 import shlex
-
+from a3fe.run.fix_simulation_times import fix_simulation_times
 
 # Configuration options
 FORCE_LOCAL_EXECUTION = True  # Set to False for normal SLURM execution
@@ -1460,50 +1460,48 @@ def _debug_simulation_times(calc):
     
     therefore must ensure consistent runtime for repeats and simply resume the calculation if the previous run failed or cancelled due to timeout
     """
-    print("=== DEBUGGING SIMULATION TIMES ===")
+    logger = calc._logger
+    logger.info("=== DEBUGGING SIMULATION TIMES ===")
 
     issues_found = []
 
     for leg in calc.legs:
-        print(f"\n=== {leg.leg_type.name} LEG ===")
         for stage in leg.stages:
-            print(f"\n--- {stage.stage_type.name} STAGE ---")
-
             stage_issues = []
             for win in stage.lam_windows:
-                print(f"\nLambda {win.lam:.3f}:")
+                logger.info(f"LEG {leg.leg_type.name} STAGE {stage.stage_type.name}  Lambda {win.lam:.3f}:")
                 simtimes = []
 
                 for i, sim in enumerate(win.sims, 1):
                     simtime = sim.get_tot_simtime()
                     simtimes.append(simtime)
-                    print(f"  Run {i}: {simtime:.6f} ns")
+                    logger.info(f"  Run {i}: {simtime:.6f} ns")
 
                     # Check if simulation output files exist
                     simfile_path = f"{sim.output_dir}/simfile.dat"
                     if not os.path.exists(simfile_path):
                         issue = f"Missing simfile.dat for {stage.stage_type.name} lambda {win.lam:.3f} run {i}"
-                        print(f"    ERROR: {issue}")
+                        logger.error(f"    ERROR: {issue}")
                         issues_found.append(issue)
                     elif os.path.getsize(simfile_path) == 0:
                         issue = f"Empty simfile.dat for {stage.stage_type.name} lambda {win.lam:.3f} run {i}"
-                        print(f"    ERROR: {issue}")
+                        logger.error(f"    ERROR: {issue}")
                         issues_found.append(issue)
 
                 # Check consistency within this lambda window
                 if len(set(f"{t:.6f}" for t in simtimes)) > 1:
                     issue = f"Inconsistent times in {stage.stage_type.name} lambda {win.lam:.3f}: {simtimes}"
-                    print(f"    ERROR: {issue}")
+                    logger.error(f"    ERROR: {issue}")
                     stage_issues.append((win.lam, simtimes))
                     issues_found.append(issue)
                 else:
-                    print(f"    ✓ All runs consistent: {simtimes[0]:.6f} ns")
+                    logger.info(f"    ✓ All runs consistent: {simtimes[0]:.6f} ns")
 
             # Check consistency across lambda windows in this stage
             if stage_issues:
-                print(f"\n  STAGE {stage.stage_type.name} HAS TIMING ISSUES:")
+                logger.warning(f"  STAGE {stage.stage_type.name} HAS TIMING ISSUES:")
                 for lam, times in stage_issues:
-                    print(f"    Lambda {lam:.3f}: {times}")
+                    logger.warning(f"    Lambda {lam:.3f}: {times}")
 
     return issues_found
 
@@ -1538,6 +1536,7 @@ if __name__ == "__main__":
 
     # _debug_patch_stage_skip_adaptive_efficiency()
     # _debug_patch_force_not_equilibrated()
+    # fix_simulation_times(calc)
 
     sysprep_cfg = SystemPreparationConfig(slurm=True)  # use default settings
 
