@@ -150,14 +150,10 @@ class GradientData:
             _np.array(stat_ineffs_all_winds) * lam_winds[0].sims[0].timestep
         )  # Timestep should be same for all sims
 
-        g_samples_all_winds = _np.array(stat_ineffs_all_winds)  # added by JH 2025-08-15
         # Get the SEMs of the free energy changes from the inter-run SEMs of the gradients
         lam_weights = _np.array([lam.lam_val_weight for lam in lam_winds])
 
-        sems_inter_corrected = _np.array(sems_inter_all_winds) * _np.sqrt(g_samples_all_winds)  # added by JH 2025-08-15
-
-        # sems_inter_delta_g = _np.array(sems_inter_all_winds) * lam_weights  # comment by JH 2025-08-15
-        sems_inter_delta_g = sems_inter_corrected * lam_weights  # added by JH 2025-08-15
+        sems_inter_delta_g = _np.array(sems_inter_all_winds) * lam_weights 
 
         # Get the times
         if equilibrated:
