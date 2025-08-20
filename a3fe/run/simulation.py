@@ -61,6 +61,7 @@ class Simulation(_SimulationRunner):
         stream_log_level: int = _logging.INFO,
         update_paths: bool = True,
         stage_type: _Optional[str] = None,  # Add this parameter for logging purposes
+        leg_type: _Optional[str] = None,
     ) -> None:
         """
         Initialise a Simulation object.
@@ -98,6 +99,7 @@ class Simulation(_SimulationRunner):
         self.lam = lam
         self.run_no = run_no
         self.stage_type = stage_type or "unknown"  # Default fallback
+        self.leg_type = leg_type or "unknown"  # Default fallback
 
         super().__init__(
             base_dir=base_dir,
@@ -131,7 +133,7 @@ class Simulation(_SimulationRunner):
             self._update_log()
 
     def __str__(self) -> str:
-        return f"Simulation (stage={self.stage_type}, lam={self.lam}, run_no={self.run_no})"
+        return f"Simulation (leg={self.leg_type}, stage={self.stage_type}, lam={self.lam}, run_no={self.run_no})"
 
     @property
     def running(self) -> bool:

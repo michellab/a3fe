@@ -53,6 +53,7 @@ from ..read._process_somd_files import write_simfile_option as _write_simfile_op
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._virtual_queue import VirtualQueue as _VirtualQueue
 from .enums import StageType as _StageType
+from .enums import LegType as _LegType
 from .lambda_window import LamWindow as _LamWindow
 
 
@@ -88,6 +89,7 @@ class Stage(_SimulationRunner):
         output_dir: _Optional[str] = None,
         stream_log_level: int = _logging.INFO,
         update_paths: bool = True,
+        leg_type: _Optional[_LegType] = None,
     ) -> None:
         """
         Initialise an ensemble of SOMD simulations, constituting the Stage. If Stage.pkl exists in the
@@ -138,7 +140,8 @@ class Stage(_SimulationRunner):
         """
         # Set the stage type first, as this is required for __str__,
         # and threrefore the super().__init__ call
-        self.stage_type = stage_type
+        self.stage_type = stage_type.name.lower()
+        self.leg_type = leg_type.name.lower() if leg_type is not None else 'unknown'  # Default fallback
 
         super().__init__(
             base_dir=base_dir,
@@ -183,7 +186,8 @@ class Stage(_SimulationRunner):
                         base_dir=lam_base_dir,
                         input_dir=self.input_dir,
                         stream_log_level=self.stream_log_level,
-                        stage_type=self.stage_type.name.lower(),  # pass stage type for logging purposes
+                        stage_type=self.stage_type,  # pass stage type for logging purposes
+                        leg_type=self.leg_type,
                     )
                 )
 
@@ -195,7 +199,7 @@ class Stage(_SimulationRunner):
             self._dump()
 
     def __str__(self) -> str:
-        return f"Stage (type = {self.stage_type.name.lower()})"
+        return f"Stage (type={self.stage_type}, leg={self.leg_type})"
 
     @property
     def lam_windows(self) -> _List[_LamWindow]:
@@ -1238,7 +1242,8 @@ class Stage(_SimulationRunner):
                 base_dir=lam_base_dir,
                 input_dir=self.input_dir,
                 stream_log_level=self.stream_log_level,
-                stage_type=self.stage_type.name.lower(),   # Pass stage type
+                stage_type=self.stage_type,   # Pass stage type
+                leg_type= self.leg_type,  # Pass leg type
             )
             # Overwrite the default equilibration detection algorithm
             new_lam_win.check_equil = old_lam_vals_attrs["check_equil"]
