@@ -153,7 +153,7 @@ def verify_truncation(calc):
     return all_consistent
 
 
-def fix_simulation_times(calc):
+def fix_simulation_times(calc, apply_truncation=True):
     """
     Complete workflow to fix inconsistent simulation times.
     
@@ -163,7 +163,10 @@ def fix_simulation_times(calc):
         The calculation object to fix
     """
     logger = calc._logger
-    truncate_simulations_to_minimum(calc)
+    if apply_truncation:
+        logger.info("Starting simulation time truncation process...")
+        truncate_simulations_to_minimum(calc)
+
     success = verify_truncation(calc)
     
     if success:

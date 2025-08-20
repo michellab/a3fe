@@ -125,7 +125,7 @@ the actual runtime increases. so why?
   In a3fe, `predicted runtime` by default is computed as following:
   ```
     total_times_all_runs = np.array(self.total_times) * len(self.run_nos)  
-    sem_inter *= np.sqrt(total_times_all_runs) -> this is the normalised SEM
+    sems_inter_delta_g *= np.sqrt(total_times_all_runs) -> this is the normalised SEM
 
     predicted_run_time_max_eff = (1 / np.sqrt(runtime_constant * relative_simulation_cost)) * normalised_sem_dg
     # for this specific lambda,  predicted_run_time_max_eff ~ 24.28 * normalised_sem_dg
