@@ -117,6 +117,11 @@ class LamWindow(_SimulationRunner):
         # and therefore the super().__init__ call
         self.lam = lam
 
+        # Set stage_type and leg_type BEFORE calling super().__init__()
+        # because __str__ is called during logging setup in super().__init__()
+        self.stage_type = stage_type or "unknown"  
+        self.leg_type = leg_type or "unknown"
+
         super().__init__(
             base_dir=base_dir,
             input_dir=input_dir,
@@ -147,9 +152,6 @@ class LamWindow(_SimulationRunner):
             self.runtime_constant = runtime_constant
             self.relative_simulation_cost = relative_simulation_cost
             self._running: bool = False
-
-            self.stage_type = stage_type or "unknown"  # Store stage type for logging
-            self.leg_type = leg_type or "unknown" # Store leg type for logging
 
             # Create the required simulations for this lambda value
             for run_no in range(1, ensemble_size + 1):
