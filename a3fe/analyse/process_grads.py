@@ -37,6 +37,7 @@ class GradientData:
         lam_winds: _List["LamWindow"],  # noqa: F821
         equilibrated: bool,
         run_nos: _Optional[_List[int]] = None,
+        use_stat_ineff_correct: bool = False,
     ) -> None:  # type: ignore
         """
         Calculate the gradients, means, and variances of the gradients for each lambda
@@ -84,6 +85,7 @@ class GradientData:
         sems_inter_all_winds = []
         vars_intra_all_winds = []
         stat_ineffs_all_winds = []
+        sems_inter_corrected_all_winds = []
 
         for lam in lam_winds:
             # Record the lambda value and get sensible run numbers
@@ -131,7 +133,14 @@ class GradientData:
                 squared_sem_inter + squared_sem_intra
             )  # This isn't really a meaningful quantity
             sem_intra = _np.sqrt(squared_sem_intra)
-            sem_inter = _np.sqrt(squared_sem_inter)
+            sem_inter = _np.sqrt(squared_sem_inter)  # ok this is meaningful
+
+            # NEW IMPLEMENTATION HERE - by JH 2025-08-15
+            stat_ineffs_array = _np.array(stat_ineffs_wind)
+            harmonic_mean_stat_ineff = len(stat_ineffs_array) / _np.sum(1.0 / stat_ineffs_array)
+            sem_inter_corrected = _np.sqrt(_np.var(means_intra) / len(run_nos)) * _np.sqrt(harmonic_mean_stat_ineff)
+            sems_inter_corrected_all_winds.append(sem_inter_corrected)
+
             # add this code for debugging
             # lens = [None if g is None else getattr(g, "shape", None) or (len(g) if hasattr(g, "__len__") else None)
             # for g in gradients_wind]
@@ -152,7 +161,13 @@ class GradientData:
 
         # Get the SEMs of the free energy changes from the inter-run SEMs of the gradients
         lam_weights = _np.array([lam.lam_val_weight for lam in lam_winds])
-        sems_inter_delta_g = _np.array(sems_inter_all_winds) * lam_weights
+
+        # NEW IMPLEMENTATION HERE - by JH 2025-08-15
+        if use_stat_ineff_correct:
+            print("Using statistical inefficiency correction for inter-run SEMs (SEM for delta G).")
+            sems_inter_delta_g = _np.array(sems_inter_corrected_all_winds) * lam_weights
+        else:
+            sems_inter_delta_g = _np.array(sems_inter_all_winds) * lam_weights
 
         # Get the times
         if equilibrated:
@@ -238,6 +253,7 @@ class GradientData:
         # Smoothen the standard error of the mean by a block average over 3 points
         smoothened_sems = []
         max_ind = len(sems) - 1  # type: ignore
+        # print('sems', sems, smoothened_sems)
         for i, sem in enumerate(sems):  # type: ignore
             # Calculate the block average for each point
             if i == 0:

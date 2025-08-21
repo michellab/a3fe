@@ -293,6 +293,7 @@ class Leg(_SimulationRunner):
                         _os.path.dirname(self.stage_input_dirs[stage_type]), "output"
                     ),
                     stream_log_level=self.stream_log_level,
+                    leg_type= self.leg_type,
                 )
             )
 

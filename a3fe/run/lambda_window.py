@@ -52,6 +52,7 @@ class LamWindow(_SimulationRunner):
         stream_log_level: int = _logging.INFO,
         update_paths: bool = True,
         stage_type: _Optional[str] = None,
+        leg_type: _Optional[str] = None, 
     ) -> None:
         """
         Initialise a LamWindow object.
@@ -116,6 +117,11 @@ class LamWindow(_SimulationRunner):
         # and therefore the super().__init__ call
         self.lam = lam
 
+        # Set stage_type and leg_type BEFORE calling super().__init__()
+        # because __str__ is called during logging setup in super().__init__()
+        self.stage_type = stage_type or "unknown"  
+        self.leg_type = leg_type or "unknown"
+
         super().__init__(
             base_dir=base_dir,
             input_dir=input_dir,
@@ -147,8 +153,6 @@ class LamWindow(_SimulationRunner):
             self.relative_simulation_cost = relative_simulation_cost
             self._running: bool = False
 
-            self.stage_type = stage_type  # Store stage type for logging
-
             # Create the required simulations for this lambda value
             for run_no in range(1, ensemble_size + 1):
                 # Copy the input files over to the simulation base directory,
@@ -179,7 +183,8 @@ class LamWindow(_SimulationRunner):
                         input_dir=sim_base_dir,
                         output_dir=sim_base_dir,
                         stream_log_level=stream_log_level,
-                        stage_type=stage_type,  
+                        stage_type=stage_type,
+                        leg_type=leg_type,
                     )
                 )
 
@@ -188,7 +193,7 @@ class LamWindow(_SimulationRunner):
             self._dump()
 
     def __str__(self) -> str:
-        return f"LamWindow (lam={self.lam:.3f})"
+        return f"LamWindow (leg={self.leg_type}, stage={self.stage_type}, lam={self.lam:.3f})"
 
     @property
     def sims(self) -> _List[_Simulation]:
