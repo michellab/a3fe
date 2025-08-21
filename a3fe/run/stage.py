@@ -141,7 +141,8 @@ class Stage(_SimulationRunner):
         # Set the stage type first, as this is required for __str__,
         # and threrefore the super().__init__ call
         self.stage_type = stage_type.name.lower()
-        self.leg_type = leg_type.name.lower() if leg_type is not None else 'unknown'  # Default fallback
+        # TODO: data type here is very messy
+        self.leg_type = leg_type.name.lower() if leg_type is not None else 'unknown' 
 
         super().__init__(
             base_dir=base_dir,
