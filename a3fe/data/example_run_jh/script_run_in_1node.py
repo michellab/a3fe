@@ -461,11 +461,18 @@ class GlobalMBARManager:
         self.job_counter = itertools.count(600000)
         self.expected_outputs = set()
         self.logger = logging.getLogger(__name__ + ".MBAR_MANAGER")
+        self.jobs_by_leg_stage = {} # (leg_type, stage_type) -> [job_ids]
 
-    def submit_mbar_job(self, script_path: str, cwd: str) -> int:
+    def submit_mbar_job(self, script_path: str, cwd: str, leg_type: str = None, stage_type: str = None) -> int:
         """Submit an MBAR job for parallel execution."""
         if hasattr(shared_filter, "suppress_mbar_noise"):
             shared_filter.suppress_mbar_noise = True
+
+        if leg_type is None or stage_type is None:
+            leg_type_parsed, stage_type_parsed = self._parse_leg_stage_from_path(cwd)
+            leg_type = leg_type or leg_type_parsed
+            stage_type = stage_type or stage_type_parsed
+
         # Parse the MBAR command from script
         try:
             with open(script_path) as f:
@@ -503,20 +510,47 @@ class GlobalMBARManager:
             "cwd": cwd,
             "cmd": mbar_command,
             "script": script_path,
+            "leg_type": leg_type,
+            "stage_type": stage_type,
         }
-        self._log_mbar_start(cwd=cwd, command=mbar_command, job_id=job_id)
-        self.logger.info(f"Submitted MBAR job {job_id}: {mbar_command}")
+
+        # Track jobs by leg/stage
+        leg_stage_key = (leg_type, stage_type)
+        if leg_stage_key not in self.jobs_by_leg_stage:
+            self.jobs_by_leg_stage[leg_stage_key] = []
+        self.jobs_by_leg_stage[leg_stage_key].append(job_id)
+
+        self._log_mbar_start(cwd=cwd, command=mbar_command, job_id=job_id, leg_type=leg_type, stage_type=stage_type)
+        self.logger.info(f"Submitted MBAR job {job_id} for {leg_type}/{stage_type}: {mbar_command}")
         return job_id
 
-    def _log_mbar_start(self, cwd: str, command: str, job_id: int):
+    def _parse_leg_stage_from_path(self, cwd: str) -> tuple[str, str]:
+        """Parse leg_type and stage_type from the working directory path."""
+        leg_type = "unknown"
+        stage_type = "unknown"
+        
+        # Extract leg type: bound or free
+        if "/bound/" in cwd:
+            leg_type = "bound"
+        elif "/free/" in cwd:
+            leg_type = "free"
+            
+        # Extract stage type: vanish, restrain, discharge, etc.
+        stage_match = re.search(r"/(?:bound|free)/([^/]+)/output", cwd)
+        if stage_match:
+            stage_type = stage_match.group(1)
+            
+        return leg_type, stage_type
+    
+    def _log_mbar_start(self, cwd: str, command: str, job_id: int, leg_type: str = "unknown", stage_type: str = "unknown"):
         """Log MBAR job start to local_execution.log"""
         start_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        mbar_info = self._format_mbar_info(cwd, command)
+        mbar_info = self._format_mbar_info(cwd, command, leg_type, stage_type)
         log_path = os.path.join(cwd, "local_execution.log")
         os.makedirs(cwd, exist_ok=True)  # although should already exist
         with open(log_path, "a") as f:
             f.write(
-                f"[LOCAL MBAR] {start_timestamp} Starting MBAR job {job_id}: {mbar_info}\n"
+                f"[LOCAL MBAR] {start_timestamp} Starting MBAR job {job_id} for {leg_type}/{stage_type}: {mbar_info}\n"
             )
             f.write(f"[LOCAL MBAR] Command: {command}\n")
 
@@ -528,6 +562,8 @@ class GlobalMBARManager:
         duration: float,
         error_msg: str = None,
         outputfile_path: str = None,
+        leg_type: str = "unknown",
+        stage_type: str = "unknown",
     ):
         """Log MBAR job completion to local_execution.log"""
         end_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -535,22 +571,18 @@ class GlobalMBARManager:
         with open(log_path, "a") as f:
             if success:
                 f.write(
-                    f"[LOCAL MBAR] {end_timestamp} ✅ MBAR job completed! {job_id} completed in {duration:.2f} seconds; output -> {outputfile_path}\n"
+                    f"[LOCAL MBAR] {end_timestamp} ✅ MBAR job completed! {job_id} ({leg_type}/{stage_type}) completed in {duration:.2f} seconds; output -> {outputfile_path}\n"
                 )
             else:
                 f.write(
-                    f"[LOCAL MBAR] {end_timestamp} ❌ MBAR job failed! {job_id} failed (dummy output created)\n"
+                    f"[LOCAL MBAR] {end_timestamp} ❌ MBAR job failed! {job_id} ({leg_type}/{stage_type}) failed (dummy output created)\n"
                 )
                 f.write(f"[LOCAL MBAR] Error: {error_msg}\n")
 
-    def _format_mbar_info(self, cwd: str, command: str) -> str:
+    def _format_mbar_info(self, cwd: str, command: str, leg_type: str = "unknown", stage_type: str = "unknown") -> str:
         """Format MBAR job info for logging"""
-        # Extract stage info from path
-        stage_match = re.search(r"/(?:bound|free)/([^/]+)/output(?:/|$)", cwd)
-        stage = stage_match.group(1) if stage_match else "unknown"
-        # Extract output file
         output_file = _extract_mbar_output_file(command)
-        return f"stage={stage}, output={output_file or 'unknown'}"
+        return f"leg={leg_type}, stage={stage_type}, output={output_file or 'unknown'}"
 
     def wait_for_completion(self):
         """Wait for all submitted MBAR jobs to complete (robust)."""
@@ -564,6 +596,7 @@ class GlobalMBARManager:
         future_to_id = {fut: jid for jid, fut in self.futures.items()}
         # Use a TTY-aware progress bar if available
         use_pb = self.use_progress and (tqdm is not None) and sys.stderr.isatty()
+        completed_by_leg_stage = {}
         ok = 0
         fail = 0
         if use_pb:
@@ -584,7 +617,14 @@ class GlobalMBARManager:
             meta = self.job_metadata.get(job_id, {})
             cwd = meta.get("cwd", "")
             cmd = meta.get("cmd", "")
-            # script = meta.get("script", "")
+            leg_type = meta.get("leg_type", "unknown")
+            stage_type = meta.get("stage_type", "unknown")
+
+            # Track completion by leg/stage
+            leg_stage_key = (leg_type, stage_type)
+            if leg_stage_key not in completed_by_leg_stage:
+                completed_by_leg_stage[leg_stage_key] = {"ok": 0, "fail": 0}
+
             try:
                 rc, _, stderr, duration = future.result()
             except Exception as e:
@@ -594,7 +634,7 @@ class GlobalMBARManager:
             ofile = _extract_mbar_output_file(cmd)
             success = False
             if ofile is None:
-                self.logger.error(f"MBAR job {job_id} did not produce an output file")
+                self.logger.error(f"MBAR job {job_id} ({leg_type}/{stage_type}) did not produce an output file")
                 rc = -1
             else:
                 # when ofile is not None
@@ -606,13 +646,15 @@ class GlobalMBARManager:
                 ):
                     success = True
                     ok += 1
+                    completed_by_leg_stage[leg_stage_key]["ok"] += 1
                     if not use_pb:
-                        self.logger.info(f"MBAR job {job_id} completed successfully")
+                        self.logger.info(f"MBAR job {job_id} ({leg_type}/{stage_type}) completed successfully")
                 else:
                     fail += 1
+                    completed_by_leg_stage[leg_stage_key]["fail"] += 1
                     error_msg = stderr if stderr else "Output file missing or empty"
                     if not use_pb:
-                        self.logger.warning(f"MBAR job {job_id} failed: {error_msg}")
+                        self.logger.warning(f"MBAR job {job_id} ({leg_type}/{stage_type}) failed: {error_msg}")
 
             self._log_mbar_completion(
                 cwd=cwd,
@@ -621,6 +663,8 @@ class GlobalMBARManager:
                 duration=duration,
                 error_msg=stderr if not success else None,
                 outputfile_path=ofile_path if success else None,
+                leg_type=leg_type,
+                stage_type=stage_type,
             )
             if use_pb:
                 bar.update(1)
@@ -633,8 +677,33 @@ class GlobalMBARManager:
 
         self.futures.clear()
         self.job_metadata.clear()
-        self.logger.info(f"All MBAR jobs completed (ok={ok}, fail={fail})")
+        completion_breakdown = self._format_completion_breakdown(completed_by_leg_stage)
+        self.logger.info(f"All MBAR jobs completed (ok={ok}, fail={fail}) - {completion_breakdown}")
 
+    def _get_job_breakdown_string(self) -> str:
+        """Get a string describing the breakdown of jobs by leg/stage."""
+        breakdown = {}
+        for (leg_type, stage_type), job_ids in self.jobs_by_leg_stage.items():
+            key = f"{leg_type}/{stage_type}"
+            breakdown[key] = len(job_ids)
+        
+        breakdown_parts = [f"{key}:{count}" for key, count in sorted(breakdown.items())]
+        return ", ".join(breakdown_parts)
+
+    def _format_completion_breakdown(self, completed_by_leg_stage: dict) -> str:
+        """Format completion breakdown by leg/stage."""
+        breakdown_parts = []
+        for (leg_type, stage_type), counts in sorted(completed_by_leg_stage.items()):
+            key = f"{leg_type}/{stage_type}"
+            ok_count = counts["ok"]
+            fail_count = counts["fail"]
+            if fail_count > 0:
+                breakdown_parts.append(f"{key}:✅{ok_count}/❌{fail_count}")
+            else:
+                breakdown_parts.append(f"{key}:✅{ok_count}")
+        
+        return ", ".join(breakdown_parts)
+    
     def has_pending_jobs(self) -> bool:
         """Check if there are any pending MBAR jobs."""
         return bool(self.futures)
