@@ -140,10 +140,8 @@ class Stage(_SimulationRunner):
         """
         # Set the stage type first, as this is required for __str__,
         # and threrefore the super().__init__ call
-        self.stage_type = stage_type.name.lower()
-        # TODO: data type here is very messy
-        self.leg_type = leg_type.name.lower() if leg_type is not None else 'unknown' 
-
+        self.stage_type = stage_type 
+        self.leg_type = leg_type
         super().__init__(
             base_dir=base_dir,
             input_dir=input_dir,
@@ -200,7 +198,17 @@ class Stage(_SimulationRunner):
             self._dump()
 
     def __str__(self) -> str:
-        return f"Stage (type={self.stage_type}, leg={self.leg_type})"
+        if self.leg_type is None:
+            leg_type_str = "unknown"
+        else:
+            leg_type_str = self.leg_type.name.lower()
+
+        if self.stage_type is None:
+            stage_type_str = "unknown"
+        else:
+            stage_type_str = self.stage_type.name.lower()
+
+        return f"Stage (type={stage_type_str}, leg={leg_type_str})"
 
     @property
     def lam_windows(self) -> _List[_LamWindow]:

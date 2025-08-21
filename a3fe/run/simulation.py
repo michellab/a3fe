@@ -22,6 +22,8 @@ from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._virtual_queue import Job as _Job
 from ._virtual_queue import VirtualQueue as _VirtualQueue
 from .enums import JobStatus as _JobStatus
+from .enums import StageType as _StageType
+from .enums import LegType as _LegType
 
 
 class Simulation(_SimulationRunner):
@@ -60,8 +62,8 @@ class Simulation(_SimulationRunner):
         output_dir: _Optional[str] = None,
         stream_log_level: int = _logging.INFO,
         update_paths: bool = True,
-        stage_type: _Optional[str] = None,  # Add this parameter for logging purposes
-        leg_type: _Optional[str] = None,
+        stage_type: _Optional[_StageType] = None,  # Add this parameter for logging purposes
+        leg_type: _Optional[_LegType] = None,
     ) -> None:
         """
         Initialise a Simulation object.
@@ -98,8 +100,8 @@ class Simulation(_SimulationRunner):
         # required for __str__, and therefore the super().__init__ call
         self.lam = lam
         self.run_no = run_no
-        self.stage_type = stage_type or "unknown"  # Default fallback
-        self.leg_type = leg_type or "unknown"  # Default fallback
+        self.stage_type = stage_type
+        self.leg_type = leg_type
 
         super().__init__(
             base_dir=base_dir,
@@ -133,7 +135,16 @@ class Simulation(_SimulationRunner):
             self._update_log()
 
     def __str__(self) -> str:
-        return f"Simulation (leg={self.leg_type}, stage={self.stage_type}, lam={self.lam}, run_no={self.run_no})"
+        if self.leg_type is None:
+            leg_type_str = "unknown"
+        else:
+            leg_type_str = self.leg_type.name.lower()
+        if self.stage_type is None:
+            stage_type_str = "unknown"
+        else:
+            stage_type_str = self.stage_type.name.lower()
+
+        return f"Simulation (leg={leg_type_str}, stage={stage_type_str}, lam={self.lam}, run_no={self.run_no})"
 
     @property
     def running(self) -> bool:
