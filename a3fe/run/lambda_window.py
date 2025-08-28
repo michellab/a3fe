@@ -43,7 +43,7 @@ class LamWindow(_SimulationRunner):
         equil_detection: str = "multiwindow",
         slurm_equil_detection: bool = True,
         gradient_threshold: _Optional[float] = None,
-        runtime_constant: _Optional[float] = 0.005,
+        runtime_constant: _Optional[float] = 0.0005,
         relative_simulation_cost: float = 1,
         ensemble_size: int = 5,
         base_dir: _Optional[str] = None,
@@ -80,7 +80,7 @@ class LamWindow(_SimulationRunner):
             set and the simulation is equilibrated when the gradient passes through 0. A
             sensible value appears to be 0.5 kcal mol-1 ns-1. Only required when the equilibration
             detection method is "block_gradient".
-        runtime_constant: float, Optional, default: 0.005
+        runtime_constant: float, Optional, default: 0.0005
             The runtime_constant (kcal**2 mol**-2 ns*-1) only affects behaviour if running adaptively, and must
             be supplied if running adaptively. This is used to calculate how long to run each simulation for based on
             the current uncertainty of the per-window free energy estimate, as discussed in the docstring of the run() method.

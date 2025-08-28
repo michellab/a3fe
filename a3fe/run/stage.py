@@ -79,7 +79,7 @@ class Stage(_SimulationRunner):
         self,
         stage_type: _StageType,
         equil_detection: str = "multiwindow",
-        runtime_constant: _Optional[float] = 0.005,
+        runtime_constant: _Optional[float] = 0.0005,
         relative_simulation_cost: float = 1,
         ensemble_size: int = 5,
         lambda_values: _Optional[_List[float]] = None,
@@ -102,7 +102,7 @@ class Stage(_SimulationRunner):
             Method to use for equilibration detection. Options are:
             - "multiwindow": Use the multiwindow paired t-test method to detect equilibration.
             - "chodera": Use Chodera's method to detect equilibration.
-        runtime_constant : float, Optional, default: 0.005
+        runtime_constant : float, Optional, default: 0.0005
             The runtime_constant (kcal**2 mol**-2 ns*-1) only affects behaviour if running adaptively, and must
             be supplied if running adaptively. This is used to calculate how long to run each simulation for based on
             the current uncertainty of the per-window free energy estimate, as discussed in the docstring of the run() method.
@@ -634,8 +634,8 @@ class Stage(_SimulationRunner):
             between each lambda value, in kcal mol^(-1). If er_type == "sem", the
             desired integrated standard error of the mean of the gradients between each lambda
             value, in kcal mol^(-1) ns^(1/2). A sensible default for sem is 0.1 kcal mol-1 ns1/2,
-            and for root_var is 1 kcal mol-1.  If not provided, the number of lambda windows must be
-            provided with n_lam_vals.
+            and for root_var is 2 kcal mol-1.  If not provided, the number of lambda windows must be
+            provided with n_lam_vals. This is referred to as 'thermodynamic speed' in the publication.
         n_lam_vals : int, optional, default=None
             The number of lambda values to sample. If not provided, delta_er must be provided.
         run_nos : List[int], optional, default=[1]

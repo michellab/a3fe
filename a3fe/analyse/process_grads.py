@@ -312,7 +312,8 @@ class GradientData:
             between each lambda value, in kcal mol^(-1). If er_type == "sem", the
             desired integrated standard error of the mean of the gradients between each lambda
             value, in kcal mol^(-1) ns^(1/2). If not provided, the number of lambda
-            windows must be provided with n_lam_vals.
+            windows must be provided with n_lam_vals. This is referred to as 'thermodynamic speed'
+            in the publication.
         n_lam_vals : int, optional
             The number of lambda values to sample. If not provided, delta_er must be provided.
         sem_origin: str, optional, default="inter"
