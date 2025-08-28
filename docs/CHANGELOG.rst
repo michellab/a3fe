@@ -2,6 +2,10 @@
 Change Log
 ===============
 
+0.3.5
+====================
+- Changed the defaults for runtime_constants and thermodynamic speed ("delta_er") to be consistent with the optimised values in the publication (https://pubs.acs.org/doi/full/10.1021/acs.jctc.4c00806).
+
 0.3.4
 ====================
 - Added loguru to make dependency explicit in the environment.yaml and conda-envs/test_env.yaml files.

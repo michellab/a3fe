@@ -62,7 +62,7 @@ class Leg(_SimulationRunner):
         self,
         leg_type: _LegType,
         equil_detection: str = "multiwindow",
-        runtime_constant: _Optional[float] = 0.005,
+        runtime_constant: _Optional[float] = 0.0005,
         relative_simulation_cost: float = 1,
         ensemble_size: int = 5,
         base_dir: _Optional[str] = None,
@@ -83,7 +83,7 @@ class Leg(_SimulationRunner):
             Method to use for equilibration detection. Options are:
             - "multiwindow": Use the multiwindow paired t-test method to detect equilibration.
             - "chodera": Use Chodera's method to detect equilibration.
-        runtime_constant: float, Optional, default: 0.005
+        runtime_constant: float, Optional, default: 0.0005
             The runtime_constant (kcal**2 mol**-2 ns*-1) only affects behaviour if running adaptively, and must
             be supplied if running adaptively. This is used to calculate how long to run each simulation for based on
             the current uncertainty of the per-window free energy estimate, as discussed in the docstring of the run() method.
@@ -276,7 +276,7 @@ class Leg(_SimulationRunner):
         self,
         simtime: _Optional[float] = 0.1,
         er_type: str = "root_var",
-        delta_er: float = 1,
+        delta_er: float = 2,
         set_relative_sim_cost: bool = True,
         reference_sim_cost: float = 0.21,
         run_nos: _List[int] = [1],
@@ -297,12 +297,13 @@ class Leg(_SimulationRunner):
             Whether to integrate the standard error of the mean ("sem") or root
             variance of the gradients ("root_var") to calculate the optimal
             lambda values.
-        delta_er : float, default=1
+        delta_er : float, default=2
             If er_type == "root_var", the desired integrated root variance of the gradients
             between each lambda value, in kcal mol^(-1). If er_type == "sem", the
             desired integrated standard error of the mean of the gradients between each lambda
-            value, in kcal mol^(-1) ns^(1/2). A sensible default for root_var is 1 kcal mol-1,
-            and 0.1 kcal mol-1 ns^(1/2) for sem.
+            value, in kcal mol^(-1) ns^(1/2). A sensible default for root_var is 2 kcal mol-1,
+            and 0.1 kcal mol-1 ns^(1/2) for sem. This is referred to as 'thermodynamic speed'
+            in the publication.
         set_relative_sim_cost: bool, optional, default=True
             Whether to recursively set the relative simulation cost for the leg and all
             sub simulation runners according to the mean simulation cost of the leg.
