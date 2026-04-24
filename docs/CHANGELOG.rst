@@ -4,7 +4,8 @@ Change Log
 
 0.4.2
 ====================
-- Added nmoves as a configurable field and changed ncycles to a computed property in engine_config.py to prevent memory overflow from single-cycle runtimes.
+- Added ``max_nmoves`` as a configurable field in ``SomdConfig`` and made ``nmoves``/``ncycles`` computed properties derived from ``runtime``, ``timestep``, ``max_nmoves`` and ``energy_frequency``.
+This prevents memory overflow from single-cycle long runtimes while keeping ``runtime`` the single source of truth.
 
 0.4.1
 ====================
