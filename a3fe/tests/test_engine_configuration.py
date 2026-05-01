@@ -106,6 +106,95 @@ def test_charge_cutoff_validation(engine_config, charge, cutoff, should_pass):
             engine_config(ligand_charge=charge, cutoff_type=cutoff, runtime=1)
 
 
+@pytest.mark.parametrize(
+    "runtime,max_nmoves,timestep,expected_nmoves,expected_ncycles",
+    [
+        # total_nmoves < max_nmoves: single cycle
+        (0.008, 250000, 4.0, 2000, 1),
+        # total_nmoves == max_nmoves: single cycle boundary
+        (1.0, 250000, 4.0, 250000, 1),
+        # Clean division into max-sized cycles (adaptive 0.1 ns grid typical case)
+        (5.0, 250000, 4.0, 250000, 5),
+        # 0.1 ns grid not divisible by max_nmoves: largest energy_frequency-aligned factor
+        # 5.3 ns -> total=1_325_000, largest factor <=250_000 and %200==0 is 53_000
+        (5.3, 250000, 4.0, 53000, 25),
+    ],
+)
+def test_ncycles_calculation(
+    somd_engine_config, runtime, max_nmoves, timestep, expected_nmoves, expected_ncycles
+):
+    """Test that nmoves and ncycles are correctly computed from runtime, max_nmoves and timestep."""
+    config = somd_engine_config(
+        runtime=runtime, max_nmoves=max_nmoves, timestep=timestep
+    )
+    assert config.nmoves == expected_nmoves
+    assert config.ncycles == expected_ncycles
+    assert config.nmoves * config.ncycles == config._get_total_nmoves()
+    assert config.nmoves % config.energy_frequency == 0
+
+
+def test_ncycles_invalid_runtime(somd_engine_config):
+    """Test that ValueError is raised when runtime is not a multiple of timestep or energy_frequency * timestep."""
+    with pytest.raises(ValueError, match="Runtime must be a multiple of timestep"):
+        somd_engine_config(runtime=5.0, timestep=3.0)
+    # 0.123 ns: total_nmoves=30750, 30750 % 200 = 150 != 0
+    with pytest.raises(ValueError, match="energy_frequency"):
+        somd_engine_config(runtime=0.123, timestep=4.0)
+    # 6.666 ns: total_nmoves=1_666_500, 1_666_500 % 200 = 100 != 0
+    with pytest.raises(ValueError, match="energy_frequency"):
+        somd_engine_config(runtime=6.666, timestep=4.0)
+
+
+def test_ncycles_updates_on_runtime_change(somd_engine_config):
+    """Test that nmoves and ncycles update when runtime is changed."""
+    config = somd_engine_config(runtime=5.0, max_nmoves=250000, timestep=4.0)
+    assert config.nmoves == 250000
+    assert config.ncycles == 5
+
+    config.runtime = 10.0
+    assert config.nmoves == 250000
+    assert config.ncycles == 10
+
+
+def test_ncycles_updates_on_timestep_or_max_nmoves_change(somd_engine_config):
+    """SSOT: changing timestep or max_nmoves re-derives nmoves/ncycles."""
+    config = somd_engine_config(runtime=5.0, timestep=4.0, max_nmoves=250000)
+    assert config.nmoves == 250000 and config.ncycles == 5
+
+    config.timestep = 2.0  # total_nmoves doubles to 2_500_000
+    assert config.nmoves == 250000
+    assert config.ncycles == 10
+
+    config.max_nmoves = 500000  # now single cycle fits? total=2_500_000 > 500_000
+    assert config.nmoves == 500000
+    assert config.ncycles == 5
+
+
+def test_max_nmoves_below_energy_frequency_rejected(somd_engine_config):
+    """max_nmoves must be >= energy_frequency to guarantee an energy output per cycle."""
+    with pytest.raises(ValueError, match="max_nmoves"):
+        somd_engine_config(runtime=1.0, timestep=4.0, max_nmoves=100)
+
+
+def test_write_config_cycles_match_properties(somd_engine_config):
+    """The written somd.cfg must contain ncycles/nmoves matching the computed properties."""
+    with TemporaryDirectory() as dirname:
+        config = somd_engine_config(runtime=10.0, timestep=4.0)
+        config.lambda_values = [0.0, 0.5, 1.0]
+        config.write_config(
+            run_dir=dirname,
+            lambda_val=0.0,
+            runtime=config.runtime,
+            top_file="somd.prm7",
+            coord_file="somd.rst7",
+            morph_file="somd.pert",
+        )
+        with open(os.path.join(dirname, config.get_file_name()), "r") as f:
+            content = f.read()
+        assert f"ncycles = {config.ncycles}" in content
+        assert f"nmoves = {config.nmoves}" in content
+
+
 def test_ligand_charge_validation(engine_config):
     """Test that ligand charge validation works correctly."""
 

@@ -4,6 +4,7 @@ __all__ = [
     "SomdConfig",
 ]
 
+import math as _math
 import os as _os
 from abc import ABC as _ABC
 from abc import abstractmethod as _abstractmethod
@@ -117,9 +118,13 @@ class SomdConfig(_EngineConfig):
 
     ### Integrator - ncycles modified as required by a3fe ###
     timestep: float = _Field(4.0, description="Timestep in femtoseconds(fs)")
+    max_nmoves: int = _Field(
+        250000,
+        description="Maximum number of moves per cycle. nmoves and ncycles are computed from runtime, timestep, and max_nmoves.",
+    )
     runtime: _Union[int, float] = _Field(
         5.0,
-        description="Runtime in nanoseconds(ns), and must be a multiple of timestep",
+        description="Runtime in nanoseconds(ns), must be a multiple of timestep and ncycles will be calculated from runtime and nmoves",
     )
 
     ### Constraints ###
@@ -224,30 +229,72 @@ class SomdConfig(_EngineConfig):
         default_factory=dict, description="Extra options to pass to the SOMD engine"
     )
 
+    def _get_total_nmoves(self) -> int:
+        """Calculate total number of moves from runtime and timestep."""
+        runtime_fs = _Decimal(str(self.runtime)) * _Decimal("1_000_000")
+        timestep = _Decimal(str(self.timestep))
+        return int(runtime_fs / timestep)
+
     @property
     def nmoves(self) -> int:
         """
-        Make sure runtime is a multiple of timestep
+        Number of moves per cycle.
+
+        If total_nmoves <= max_nmoves, returns total_nmoves (ncycles=1).
+        Otherwise returns the largest factor of total_nmoves that is both
+        <= max_nmoves and divisible by energy_frequency(default 200), ensuring that
+        energy output points align with every cycle boundary.
         """
-        # Convert runtime to femtoseconds (ns -> fs)
+        total_nmoves = self._get_total_nmoves()
+
+        if total_nmoves <= self.max_nmoves:
+            return total_nmoves
+
+        best = 1
+        for d in range(1, int(_math.isqrt(total_nmoves)) + 1):
+            if total_nmoves % d == 0:
+                for candidate in (d, total_nmoves // d):
+                    if (
+                        candidate <= self.max_nmoves
+                        and candidate % self.energy_frequency == 0
+                    ):
+                        best = max(best, candidate)
+
+        return best
+
+    @property
+    def ncycles(self) -> int:
+        """Number of cycles, computed as total_nmoves / nmoves."""
+        return max(1, self._get_total_nmoves() // self.nmoves)
+
+    @_model_validator(mode="after")
+    def _validate_runtime_timestep_nmoves(self):
+        """Validate that runtime is a multiple of both timestep and energy_frequency * timestep."""
+        if self.max_nmoves < self.energy_frequency:
+            raise ValueError(
+                f"max_nmoves ({self.max_nmoves}) must be >= energy_frequency "
+                f"({self.energy_frequency}) so that each cycle contains at least one energy output."
+            )
+
         runtime_fs = _Decimal(str(self.runtime)) * _Decimal("1_000_000")
         timestep = _Decimal(str(self.timestep))
 
-        # Check if runtime is a multiple of timestep
-        remainder = runtime_fs % timestep
-        if round(float(remainder), 4) != 0:
+        if round(float(runtime_fs % timestep), 4) != 0:
             raise ValueError(
-                (
-                    "Runtime must be a multiple of the timestep. "
-                    f"Runtime is {self.runtime} ns ({runtime_fs} fs), "
-                    f"and timestep is {self.timestep} fs."
-                )
+                f"Runtime must be a multiple of timestep. "
+                f"Runtime is {self.runtime} ns ({runtime_fs} fs), "
+                f"timestep is {self.timestep} fs."
             )
 
-        # Calculate the number of moves
-        nmoves = round(float(runtime_fs) / float(timestep))
+        energy_block_fs = timestep * _Decimal(str(self.energy_frequency))
+        if round(float(runtime_fs % energy_block_fs), 4) != 0:
+            raise ValueError(
+                f"Runtime must be a multiple of energy_frequency * timestep "
+                f"({self.energy_frequency} * {self.timestep} fs = {float(energy_block_fs)} fs). "
+                f"Runtime is {self.runtime} ns ({runtime_fs} fs)."
+            )
 
-        return nmoves
+        return self
 
     @_model_validator(mode="after")
     def _check_rf_dielectric(self):
@@ -336,6 +383,7 @@ class SomdConfig(_EngineConfig):
         config_lines = [
             "### Integrator ###",
             f"timestep = {self.timestep} * femtosecond",
+            f"ncycles = {self.ncycles}",
             f"nmoves = {self.nmoves}",
             f"constraint = {self.constraint}",
             f"hydrogen mass repartitioning factor = {self.hydrogen_mass_factor}",
