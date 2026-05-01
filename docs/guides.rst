@@ -136,11 +136,11 @@ For example, to change the timestep, create a ``SomdConfig`` object and pass it 
     # Or modify parameters after creating the Calculation
     calc = a3.Calculation()
     # Before setup(): modify the engine_config directly
-    calc.engine_config.timestep = 2.0
+    calc.engine_config.timestep = 2.0  # fs
 
     # After setup(): use update_engine_config_option(option, value)
     # to propagate the change to all sub-simulations
-    calc.update_engine_config_option("timestep", 2.0)
+    calc.update_engine_config_option("timestep", 2.0)  # fs
 
 .. warning::
    After calling ``calc.setup()``, always use ``calc.update_engine_config_option("option", value)``
