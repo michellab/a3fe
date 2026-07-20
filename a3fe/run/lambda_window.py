@@ -354,6 +354,7 @@ class LamWindow(_SimulationRunner):
         equil_index = (
             int(
                 self._equil_time
+                * 1_000_000
                 / (
                     self.sims[0].engine_config.timestep
                     * self.sims[0].engine_config.energy_frequency
