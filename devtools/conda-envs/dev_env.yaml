@@ -22,7 +22,7 @@ dependencies:
   - biosimspace>2023.4
   - numpydoc
   - pydantic
-  - ruff
+  - ruff=0.14.13
   - pyyaml
 
     # Testing
