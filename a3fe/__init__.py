@@ -15,6 +15,7 @@ import warnings as _warnings
 from ._version import __version__
 from .configuration import (
     EngineType,
+    GromacsConfig,
     GromacsSystemPreparationConfig,
     JobStatus,
     LegType,

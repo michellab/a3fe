@@ -702,30 +702,30 @@ class GromacsConfig(_EngineConfig):
             self.tcoupl = "no"
             self.pcoupl = "no"
             self.gen_vel = "no"
-            self.nsteps = 10000
+            self.nsteps = 1000
             self.emtol = 10
             self.emstep = 0.01
             self.nstcomm = 100
             self.nstxout = 250
             self.nstlist = 1
 
-        elif self.mdp_type == "nvt":
-            self.nsteps = 5000  # 10 ps
-            self.continuation = "no"
-            self.gen_vel = "yes"
-            self.pcoupl = "no"
-            self.nstxout = 25000
+        # elif self.mdp_type == "nvt":
+        #     self.nsteps = 5000  # 10 ps
+        #     self.continuation = "no"
+        #     self.gen_vel = "yes"
+        #     self.pcoupl = "no"
+        #     self.nstxout = 25000
 
-        elif self.mdp_type == "npt":
-            self.nsteps = 50000  # 100 ps
-            self.pcoupl = "C-rescale"  # GROMACS 2025
-            self.tau_p = 1.0
-            self.refcoord_scaling = "all"
-            self.nstxout = 25000
+        # elif self.mdp_type == "npt":
+        #     self.nsteps = 50000  # 100 ps
+        #     self.pcoupl = "C-rescale"  # GROMACS 2025
+        #     self.tau_p = 1.0
+        #     self.refcoord_scaling = "all"
+        #     self.nstxout = 25000
 
-        elif self.mdp_type == "npt-norest":
-            self.nsteps = 250000  # 500 ps
-            self.nstxout = 25000
+        # elif self.mdp_type == "npt-norest":
+        #     self.nsteps = 250000  # 500 ps
+        #     self.nstxout = 25000
 
         else:  # prod
             self.nsteps = 2500000  # 5 ns (will be overridden by runtime)
@@ -1124,7 +1124,7 @@ class GromacsConfig(_EngineConfig):
         runtime: float,
     ) -> None:
         """
-        Generate all GROMACS stage MDP files (em, nvt, npt, npt-norest, prod).
+        Generate GROMACS production MDP files.
         Creates subdirectories for each stage and writes stage-specific MDP files.
 
         Parameters
@@ -1136,7 +1136,8 @@ class GromacsConfig(_EngineConfig):
         runtime : float
             Runtime for production stage (ns)
         """
-        stages = ["em", "nvt", "npt", "npt-norest", "prod"]
+        # stages = ["em", "nvt", "npt", "npt-norest", "prod"]
+        stages = ["em", "prod"]
 
         for stage in stages:
             stage_dir = _os.path.join(run_dir, stage)
@@ -1163,7 +1164,8 @@ class GromacsConfig(_EngineConfig):
             self.define = original_define
 
     def get_run_cmd(self, lam: float) -> str:
-        stages = ["em", "nvt", "npt", "npt-norest", "prod"]
+        # stages = ["em", "nvt", "npt", "npt-norest", "prod"]
+        stages = ["em", "prod"]
         commands = []
 
         for i, stage in enumerate(stages):

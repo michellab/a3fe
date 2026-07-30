@@ -14,6 +14,7 @@ from scipy import stats as _stats
 
 from ..analyse.analyse_set import compute_stats as _compute_stats
 from ..analyse.plot import plot_against_exp as _plt_against_exp
+from ..configuration import EngineType as _EngineType
 from ..configuration import SlurmConfig as _SlurmConfig
 from ..configuration import _BaseSystemPreparationConfig, _EngineConfig
 from ..read._read_exp_dgs import read_exp_dgs as _read_exp_dgs
@@ -40,6 +41,7 @@ class CalcSet(_SimulationRunner):
         slurm_config: _Optional[_SlurmConfig] = None,
         analysis_slurm_config: _Optional[_SlurmConfig] = None,
         engine_config: _Optional[_EngineConfig] = None,
+        engine_type: _EngineType = _EngineType.SOMD,
         update_paths: bool = True,
     ) -> None:
         """
@@ -75,6 +77,8 @@ class CalcSet(_SimulationRunner):
             partition, but the main simulation to the GPU partition. If None,
         engine_config: EngineConfig, default: None
             Configuration for the engine. If None, the default configuration is used.
+        engine_type: EngineType, default: EngineType.SOMD
+            The type of engine to use for the production simulations.
         update_paths: bool, Optional, default: True
             If True, if the simulation runner is loaded by unpickling, then
             update_paths() is called.
@@ -92,6 +96,7 @@ class CalcSet(_SimulationRunner):
             slurm_config=slurm_config,
             analysis_slurm_config=analysis_slurm_config,
             engine_config=engine_config,
+            engine_type=engine_type,
         )
 
         if not self.loaded_from_pickle:
@@ -111,9 +116,16 @@ class CalcSet(_SimulationRunner):
                 calc_args["analysis_slurm_config"] = self.analysis_slurm_config
             self._calc_args = calc_args
 
-            # Ensure that all calculations share the same somd config by adding this if it is not present
+            # Ensure that all calculations share the same engine settings by adding these if they are not present
+            calc_engine_type = calc_args.get("engine_type", self.engine_type)
+            if calc_args.get("engine_type") is None:
+                calc_args["engine_type"] = self.engine_type
             if calc_args.get("engine_config") is None:
-                calc_args["engine_config"] = self.engine_config
+                calc_args["engine_config"] = (
+                    self.engine_config
+                    if calc_engine_type == self.engine_type
+                    else calc_engine_type.engine_config(input_dir=self.input_dir)
+                )
             self._calc_args = calc_args
 
             # Check that we can load all of the calculations

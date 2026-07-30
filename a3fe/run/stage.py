@@ -790,6 +790,11 @@ class Stage(_SimulationRunner):
                     win._write_equilibrated_simfiles()
 
             # Run MBAR and compute mean and 95 % C.I. of free energy
+            mbar_temperature = (
+                self.engine_config.ref_t
+                if self.engine_type == _EngineType.GROMACS
+                else 298.15
+            )
             # GROMACS doesn't need SLURM (Python function can use multiprocessing)
             if not slurm or self.engine_type == _EngineType.GROMACS:
                 free_energies, errors, mbar_outfiles, _ = _run_mbar(
@@ -800,6 +805,7 @@ class Stage(_SimulationRunner):
                     percentage_start=0,
                     subsampling=subsampling,
                     equilibrated=True,
+                    temperature=mbar_temperature,
                 )
             else:
                 jobs, mbar_outfiles, tmp_files = _submit_mbar_slurm(
@@ -1049,6 +1055,11 @@ class Stage(_SimulationRunner):
             for win in self.lam_windows:
                 win._write_equilibrated_simfiles()
 
+        mbar_temperature = (
+            self.engine_config.ref_t
+            if self.engine_type == _EngineType.GROMACS
+            else 298.15
+        )
         # GROMACS doesn't need SLURM (Python function can use multiprocessing)
         if not slurm or self.engine_type == _EngineType.GROMACS:
             # Now run mbar with multiprocessing to speed things up
@@ -1065,6 +1076,7 @@ class Stage(_SimulationRunner):
                             True,  # Delete output files
                             equilibrated,  # Equilibrated
                             self.engine_type,
+                            mbar_temperature,
                         )
                         for start_percent, end_percent in zip(
                             start_percents, end_percents
@@ -1223,6 +1235,7 @@ class Stage(_SimulationRunner):
                 slurm_config=self.slurm_config,
                 analysis_slurm_config=self.analysis_slurm_config,
                 engine_config=self.engine_config.copy(),
+                engine_type=self.engine_type,
             )
             # Overwrite the default equilibration detection algorithm
             new_lam_win.check_equil = old_lam_vals_attrs["check_equil"]

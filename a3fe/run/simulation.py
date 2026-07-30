@@ -180,7 +180,7 @@ class Simulation(_SimulationRunner):
             # Check that job finished successfully
             if self.job.status == _JobStatus.FINISHED:
                 self._logger.info(f"{self.job} finished successfully")
-            elif self.job.status == "FAILED":
+            elif self.job.status == _JobStatus.FAILED:
                 old_job = self.job
                 self._logger.info(f"{old_job} failed - resubmitting")
                 # Move log files and checkpoint files so that the job does not restart

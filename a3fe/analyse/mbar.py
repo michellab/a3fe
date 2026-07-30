@@ -1,7 +1,4 @@
-"""
-Functionality for running mbar on SOMD output files. This uses
-pymbar through SOMD
-"""
+"""Functionality for running MBAR on SOMD and GROMACS output files."""
 
 __all__ = ["run_mbar"]
 
@@ -14,7 +11,11 @@ from typing import List as _List
 from typing import Tuple as _Tuple
 
 import numpy as _np
+from scipy.constants import gas_constant as _R
 
+from ..configuration import EngineType as _EngineType
+from ..configuration import SlurmConfig as _SlurmConfig
+from ..read._process_gmx_files import write_truncated_xvg as _write_truncated_xvg
 from ..read._process_somd_files import read_mbar_gradients as _read_mbar_gradients
 from ..read._process_somd_files import read_mbar_result as _read_mbar_result
 from ..read._process_somd_files import (
@@ -22,8 +23,6 @@ from ..read._process_somd_files import (
 )
 from ..run._virtual_queue import Job as _Job
 from ..run._virtual_queue import VirtualQueue as _VirtualQueue
-
-from ..configuration import SlurmConfig as _SlurmConfig
 
 
 def run_mbar(
@@ -34,9 +33,11 @@ def run_mbar(
     subsampling: bool = False,
     delete_outfiles: bool = False,
     equilibrated: bool = True,
+    engine_type: _EngineType = _EngineType.SOMD,
+    temperature: float = 298.15,
 ) -> _Tuple[_np.ndarray, _np.ndarray, _List[str], _Dict[str, _Dict[str, _np.ndarray]]]:
     """
-    Run MBAR on SOMD output files.
+    Run MBAR on output files.
 
     Parameters
     ----------
@@ -61,6 +62,10 @@ def run_mbar(
         Whether to use the equilibrated datafiles or the full datafiles.
         If true, the files name simfile_equilibrated.dat will be used,
         otherwise simfile.dat will be used.
+    engine_type : EngineType, Optional, default: EngineType.SOMD
+        The engine type that produced the output files.
+    temperature : float, Optional, default: 298.15
+        Temperature in K to use when analysing GROMACS output files.
 
     Returns
     -------
@@ -74,6 +79,18 @@ def run_mbar(
         The gradients of the free energies obtained from the MBAR results (not TI),
         for each run.
     """
+    if engine_type == _EngineType.GROMACS:
+        return _run_mbar_gromacs(
+            output_dir=output_dir,
+            run_nos=run_nos,
+            percentage_end=percentage_end,
+            percentage_start=percentage_start,
+            subsampling=subsampling,
+            delete_outfiles=delete_outfiles,
+            equilibrated=equilibrated,
+            temperature=temperature,
+        )
+
     tmp_files = _prepare_simfiles(
         output_dir=output_dir,
         run_nos=run_nos,
@@ -85,7 +102,11 @@ def run_mbar(
     # Run MBAR using pymbar through SOMD
     mbar_out_files = []
     for run_no in run_nos:
-        outfile = f"{output_dir}/freenrg-MBAR-run_{str(run_no).zfill(2)}_{round(percentage_end, 3)}_end_{round(percentage_start, 3)}_start.dat"
+        outfile = (
+            f"{output_dir}/freenrg-MBAR-run_{str(run_no).zfill(2)}_"
+            f"{round(percentage_end, 3)}_end_"
+            f"{round(percentage_start, 3)}_start.dat"
+        )
         mbar_out_files.append(outfile)
         with open(outfile, "w") as ofile:
             cmd_list = [
@@ -123,6 +144,101 @@ def run_mbar(
         _subprocess.run(["rm", tmp_file])
 
     return free_energies, errors, mbar_out_files, mbar_grads
+
+
+def _run_mbar_gromacs(
+    output_dir: str,
+    run_nos: _List[int],
+    percentage_end: float = 100,
+    percentage_start: float = 0,
+    subsampling: bool = False,
+    delete_outfiles: bool = False,
+    equilibrated: bool = True,
+    temperature: float = 298.15,
+) -> _Tuple[_np.ndarray, _np.ndarray, _List[str], _Dict[str, _Dict[str, _np.ndarray]]]:
+    """
+    Run MBAR on GROMACS dhdl output files using alchemlyb and pymbar.
+    """
+    if subsampling:
+        raise NotImplementedError("Subsampling is not implemented for GROMACS MBAR.")
+
+    import pandas as _pd
+    import pymbar as _pymbar
+    from alchemlyb.parsing.gmx import extract_u_nk as _extract_u_nk
+
+    tmp_files = _prepare_xvg_files(
+        output_dir=output_dir,
+        run_nos=run_nos,
+        percentage_end=percentage_end,
+        percentage_start=percentage_start,
+        equilibrated=equilibrated,
+    )
+
+    mbar_out_files = []
+    free_energies = []
+    errors = []
+    mbar_grads = {}
+    kt = _R * temperature / 4184
+
+    for run_no in run_nos:
+        xvg_files = _get_gromacs_xvg_files(
+            output_dir=output_dir,
+            run_no=run_no,
+            percentage_end=percentage_end,
+            percentage_start=percentage_start,
+        )
+        u_nk = _pd.concat(
+            [_extract_u_nk(xvg_file, temperature) for xvg_file in xvg_files]
+        )
+        u_nk = u_nk.sort_index(level=u_nk.index.names[1:])
+        groups = u_nk.groupby(level=u_nk.index.names[1:])
+        n_k = [
+            len(groups.get_group(state)) if state in groups.groups else 0
+            for state in u_nk.columns
+        ]
+        mbar = _pymbar.MBAR(u_nk.T, n_k)
+        delta_f, d_delta_f, _ = mbar.getFreeEnergyDifferences(return_theta=True)
+
+        outfile = (
+            f"{output_dir}/freenrg-MBAR-run_{str(run_no).zfill(2)}_"
+            f"{round(percentage_end, 3)}_end_"
+            f"{round(percentage_start, 3)}_start.dat"
+        )
+        mbar_out_files.append(outfile)
+
+        lam_vals = _get_lambda_values_from_xvg_files(xvg_files)
+        delta_f = _np.array(delta_f) * kt
+        d_delta_f = _np.array(d_delta_f) * kt
+        overlap = _get_overlap_matrix(mbar)
+
+        free_energies.append(delta_f[0, -1])
+        errors.append(d_delta_f[0, -1])
+
+        _write_gromacs_mbar_output(
+            outfile=outfile,
+            xvg_files=xvg_files,
+            lam_vals=lam_vals,
+            delta_f=delta_f,
+            d_delta_f=d_delta_f,
+            overlap=overlap,
+            subsampling=subsampling,
+        )
+
+        mbar_grads[f"run_{run_no}"] = {}
+        lam_vals, grads, grad_errors = _read_mbar_gradients(outfile)
+        mbar_grads[f"run_{run_no}"]["lam_vals"] = lam_vals
+        mbar_grads[f"run_{run_no}"]["grads"] = grads
+        mbar_grads[f"run_{run_no}"]["grad_errors"] = grad_errors
+
+    if delete_outfiles:
+        for ofile in mbar_out_files:
+            _subprocess.run(["rm", ofile])
+        mbar_out_files = []
+
+    for tmp_file in tmp_files:
+        _subprocess.run(["rm", tmp_file])
+
+    return _np.array(free_energies), _np.array(errors), mbar_out_files, mbar_grads
 
 
 def submit_mbar_slurm(
@@ -194,7 +310,11 @@ def submit_mbar_slurm(
 
     for run_no in run_nos:
         # Get the name of the output files - the first for the MBAR output, and the second for the SLURM output
-        outfile = f"{output_dir}/freenrg-MBAR-run_{str(run_no).zfill(2)}_{round(percentage_end, 3)}_end_{round(percentage_start, 3)}_start.dat"
+        outfile = (
+            f"{output_dir}/freenrg-MBAR-run_{str(run_no).zfill(2)}_"
+            f"{round(percentage_end, 3)}_end_"
+            f"{round(percentage_start, 3)}_start.dat"
+        )
         mbar_out_files.append(outfile)
         slurm_outfile = f"slurm_freenrg-MBAR-run_{str(run_no).zfill(2)}_{round(percentage_end, 3)}_end_{round(percentage_start, 3)}_start.out"
         slurm_config.output = slurm_outfile
@@ -368,3 +488,140 @@ def _prepare_simfiles(
         )
 
     return tmp_files
+
+
+def _prepare_xvg_files(
+    output_dir: str,
+    run_nos: _List[int],
+    percentage_end: float = 100,
+    percentage_start: float = 0,
+    equilibrated: bool = True,
+) -> _List[str]:
+    """
+    Helper function to prepare the xvg files for GROMACS MBAR analysis.
+    """
+    file_name = "prod_equilibrated.xvg" if equilibrated else "prod.xvg"
+    xvg_files = _glob.glob(f"{output_dir}/lambda*/run_*/prod/{file_name}")
+    if run_nos is not None:
+        xvg_files = [
+            xvg_file
+            for xvg_file in xvg_files
+            if int(
+                _os.path.basename(_os.path.dirname(_os.path.dirname(xvg_file))).split(
+                    "_"
+                )[-1]
+            )
+            in run_nos
+        ]
+
+    if len(xvg_files) == 0:
+        raise FileNotFoundError(
+            "No equilibrated GROMACS xvg files found. Have you run the simulations "
+            "and checked for equilibration?"
+        )
+
+    tmp_files = []
+    for xvg_file in xvg_files:
+        tmp_file = _os.path.join(
+            _os.path.dirname(xvg_file),
+            f"prod_truncated_{round(percentage_end, 3)}_end_"
+            f"{round(percentage_start, 3)}_start.xvg",
+        )
+        tmp_files.append(tmp_file)
+        _write_truncated_xvg(
+            xvg_file,
+            tmp_file,
+            fraction_final=percentage_end / 100,
+            fraction_initial=percentage_start / 100,
+        )
+
+    return tmp_files
+
+
+def _get_gromacs_xvg_files(
+    output_dir: str,
+    run_no: int,
+    percentage_end: float = 100,
+    percentage_start: float = 0,
+) -> _List[str]:
+    """Return the truncated GROMACS xvg files for a single run."""
+    xvg_files = _glob.glob(
+        f"{output_dir}/lambda*/run_{str(run_no).zfill(2)}/prod/"
+        f"prod_truncated_{round(percentage_end, 3)}_end_"
+        f"{round(percentage_start, 3)}_start.xvg"
+    )
+    xvg_files = sorted(xvg_files, key=_get_lambda_value_from_xvg_file)
+    if len(xvg_files) == 0:
+        raise FileNotFoundError(f"No GROMACS xvg files found for run {run_no}.")
+    return xvg_files
+
+
+def _get_lambda_values_from_xvg_files(xvg_files: _List[str]) -> _np.ndarray:
+    """Return lambda values inferred from lambda directory names."""
+    return _np.array(
+        [_get_lambda_value_from_xvg_file(xvg_file) for xvg_file in xvg_files]
+    )
+
+
+def _get_lambda_value_from_xvg_file(xvg_file: str) -> float:
+    """Return the lambda value inferred from a GROMACS xvg file path."""
+    lambda_dir = _os.path.basename(
+        _os.path.dirname(_os.path.dirname(_os.path.dirname(xvg_file)))
+    )
+    return float(lambda_dir.split("_")[-1])
+
+
+def _get_overlap_matrix(mbar) -> _np.ndarray:
+    """Return an overlap matrix from a pymbar or alchemlyb MBAR estimator."""
+    overlap = getattr(mbar, "overlap_matrix", None)
+    if overlap is not None:
+        return _np.array(overlap)
+    mbar_objects = [mbar]
+    if hasattr(mbar, "_mbar"):
+        mbar_objects.append(mbar._mbar)
+    for mbar_object in mbar_objects:
+        for method_name in ["computeOverlap", "compute_overlap"]:
+            if hasattr(mbar_object, method_name):
+                overlap = getattr(mbar_object, method_name)()
+                if isinstance(overlap, dict):
+                    overlap = overlap["matrix"]
+                return _np.array(overlap)
+    raise AttributeError("Could not extract an overlap matrix from the MBAR result.")
+
+
+def _write_gromacs_mbar_output(
+    outfile: str,
+    xvg_files: _List[str],
+    lam_vals: _np.ndarray,
+    delta_f: _np.ndarray,
+    d_delta_f: _np.ndarray,
+    overlap: _np.ndarray,
+    subsampling: bool = False,
+) -> None:
+    """Write GROMACS MBAR results in the existing a3fe MBAR output format."""
+    warning = ""
+    if not subsampling:
+        warning = (
+            "  #WARNING SUBSAMPLING DISABLED, CONSIDER RERUN WITH SUBSAMPLING OPTION"
+        )
+
+    with open(outfile, "w") as ofile:
+        ofile.write(f"# Analysing data contained in file(s) {xvg_files}\n")
+        ofile.write("# MBAR analysis performed with alchemlyb on GROMACS xvg files\n")
+        ofile.write("#Overlap matrix\n")
+        for row in overlap:
+            ofile.write(" ".join(f"{val:.4f}" for val in row) + "\n")
+
+        ofile.write("#DG from neighbouring lambda in kcal/mol\n")
+        for i in range(len(lam_vals) - 1):
+            ofile.write(
+                f"{lam_vals[i]:.4f} {lam_vals[i + 1]:.4f} "
+                f"{delta_f[i, i + 1]:.4f} {d_delta_f[i, i + 1]:.4f}\n"
+            )
+
+        ofile.write("#PMF from MBAR in kcal/mol\n")
+        for i, lam_val in enumerate(lam_vals):
+            ofile.write(f"{lam_val:.4f} {delta_f[0, i]:.4f} {d_delta_f[0, i]:.4f}\n")
+
+        ofile.write("#MBAR free energy difference in kcal/mol: \n")
+        ofile.write(f"{delta_f[0, -1]:.6f}, {d_delta_f[0, -1]:.6f}{warning}\n")

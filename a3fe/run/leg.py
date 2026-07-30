@@ -465,6 +465,15 @@ class Leg(_SimulationRunner):
         # Update the preparation stage
         self.prep_stage = next_prep_stage
 
+    def _ensemble_equilibration_output_files(self) -> _List[str]:
+        """Return the files expected from ensemble equilibration."""
+        if self.engine_type == _EngineType.GROMACS:
+            files = ["gromacs.gro"]
+            if self.leg_type == _LegType.BOUND:
+                files.append("gromacs.xtc")
+            return files
+        return ["somd.rst7"]
+
     def run_ensemble_equilibration(
         self,
         sysprep_config: _BaseSystemPreparationConfig,
@@ -526,24 +535,6 @@ class Leg(_SimulationRunner):
 
             self.virtual_queue.wait()  # Wait for all jobs to finish
 
-            # Check that the required input files have been produced, since slurm can fail silently
-            for i, outdir in enumerate(outdirs_to_run):
-                for file in (
-                    _PreparationStage.PREEQUILIBRATED.get_simulation_input_files(
-                        self.leg_type
-                    )
-                    + (
-                        ["somd.rst7"]
-                        if self.engine_type == _EngineType.SOMD
-                        else ["gromacs.gro"]
-                    )
-                ):
-                    if not _os.path.isfile(f"{outdir}/{file}"):
-                        raise RuntimeError(
-                            f"SLURM job failed to produce {file}. Please check the output of the "
-                            f"last slurm log in {outdir} directory for errors."
-                        )
-
         else:  # Not slurm
             for i, outdir in enumerate(outdirs_to_run):
                 self._logger.info(
@@ -555,6 +546,15 @@ class Leg(_SimulationRunner):
                     input_dir=self.input_dir,
                     output_dir=outdir,
                 )
+
+        # Check that the required output files have been produced, since jobs can fail silently
+        for outdir in outdirs_to_run:
+            for file in self._ensemble_equilibration_output_files():
+                if not _os.path.isfile(f"{outdir}/{file}"):
+                    raise RuntimeError(
+                        f"Ensemble equilibration failed to produce {file}. Please check the output of the "
+                        f"last log in {outdir} directory for errors."
+                    )
 
         # Give the output files unique names
         equil_numbers = [int(outdir.split("_")[-1]) for outdir in outdirs_to_run]
