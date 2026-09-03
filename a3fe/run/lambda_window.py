@@ -348,6 +348,8 @@ class LamWindow(_SimulationRunner):
                 "Equilibration time not set. "
                 "Please run is_equilibrated() before calling this function."
             )
+        if self._equil_time < 0:
+            raise ValueError("Equilibration time cannot be negative.")
 
         # Get the index of the first equilibrated data point
         config = self.sims[0].engine_config
@@ -361,13 +363,7 @@ class LamWindow(_SimulationRunner):
             # SOMD: timestep in fs, energy_frequency is steps, convert to ns
             # First energy is only written after the first nrg_freq steps, so subtract 1
             time_per_energy = config.timestep * config.energy_frequency / 1_000_000
-            equil_index = int(self._equil_time / time_per_energy) - 1
-
-        if equil_index < 0:
-            raise ValueError(
-                f"Equilibration time ({self._equil_time:.3f} ns) is too short. "
-                f"Must be at least {time_per_energy:.6f} ns (one energy output interval)."
-            )
+            equil_index = max(0, int(self._equil_time / time_per_energy) - 1)
 
         # Write the equilibrated data for each simulation
         for sim in self.sims:

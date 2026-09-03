@@ -6,6 +6,7 @@ __all__ = [
 ]
 
 import os as _os
+import shlex as _shlex
 from abc import ABC as _ABC
 from abc import abstractmethod as _abstractmethod
 from decimal import Decimal as _Decimal
@@ -460,9 +461,10 @@ class GromacsConfig(_EngineConfig):
     """
 
     ### Simulation Type ###
-    mdp_type: _Literal["em", "nvt", "npt", "npt-norest", "prod"] = _Field(
-        "prod", description="Type of simulation"
+    executable: str = _Field(
+        "gmx", description="GROMACS executable, for example 'gmx' or 'gmx_mpi'"
     )
+    mdp_type: _Literal["em", "prod"] = _Field("prod", description="Type of simulation")
 
     ### Run Control ###
     define: _Optional[str] = _Field(
@@ -681,22 +683,10 @@ class GromacsConfig(_EngineConfig):
     def _configure_for_mdp_type(self) -> None:
         """
         Configure parameters based on mdp_type.
-        Resets all parameters to GROMACS defaults first, then applies stage-specific settings.
+        Energy minimisation uses a stage-specific copy of the configuration, so
+        these changes never leak back into the production settings.
         """
-        # Reset all parameters to MD defaults (for nvt/npt/prod)
-        self.integrator = "sd"
-        self.constraints = "h-bonds"
-        self.tcoupl = "yes"
-        self.pcoupl = "Parrinello-Rahman"
-        self.continuation = "yes"
-        self.gen_vel = "no"
-        self.tau_p = 2.0
-        self.nstcomm = 50
-        self.nstlist = 20
-
-        # Apply stage-specific settings
         if self.mdp_type == "em":
-            # EM is completely different from MD
             self.integrator = "steep"
             self.constraints = "none"
             self.tcoupl = "no"
@@ -708,28 +698,10 @@ class GromacsConfig(_EngineConfig):
             self.nstcomm = 100
             self.nstxout = 250
             self.nstlist = 1
-
-        # elif self.mdp_type == "nvt":
-        #     self.nsteps = 5000  # 10 ps
-        #     self.continuation = "no"
-        #     self.gen_vel = "yes"
-        #     self.pcoupl = "no"
-        #     self.nstxout = 25000
-
-        # elif self.mdp_type == "npt":
-        #     self.nsteps = 50000  # 100 ps
-        #     self.pcoupl = "C-rescale"  # GROMACS 2025
-        #     self.tau_p = 1.0
-        #     self.refcoord_scaling = "all"
-        #     self.nstxout = 25000
-
-        # elif self.mdp_type == "npt-norest":
-        #     self.nsteps = 250000  # 500 ps
-        #     self.nstxout = 25000
-
-        else:  # prod
-            self.nsteps = 2500000  # 5 ns (will be overridden by runtime)
-            self.nstxout = 0
+        else:
+            # Match the fragment-opt-abfe-benchmark production protocol.
+            self.continuation = "yes"
+            self.gen_vel = "no"
 
     def write_config(
         self,
@@ -746,10 +718,25 @@ class GromacsConfig(_EngineConfig):
         # Configure based on type
         self._configure_for_mdp_type()
 
-        # Override nsteps for prod based on runtime
+        # Override nsteps for prod based on runtime. Decimal arithmetic avoids
+        # silently truncating a requested runtime because of floating-point noise.
         if self.mdp_type == "prod":
-            runtime_ps = runtime * 1000
-            self.nsteps = int(runtime_ps / self.dt)
+            runtime_ps = _Decimal(str(runtime)) * _Decimal("1000")
+            dt_ps = _Decimal(str(self.dt))
+            if runtime_ps <= 0:
+                raise ValueError("GROMACS runtime must be greater than zero.")
+            nsteps = runtime_ps / dt_ps
+            if nsteps != nsteps.to_integral_value():
+                raise ValueError(
+                    f"Runtime {runtime} ns is not an exact multiple of the "
+                    f"GROMACS timestep {self.dt} ps."
+                )
+            self.nsteps = int(nsteps)
+            if self.nsteps < self.nstdhdl:
+                raise ValueError(
+                    f"Runtime {runtime} ns produces only {self.nsteps} steps, fewer "
+                    f"than one nstdhdl interval ({self.nstdhdl} steps)."
+                )
 
         # Find lambda state index from the active lambda array
         # Priority: find array containing lambda_val, otherwise use varying array
@@ -826,7 +813,7 @@ class GromacsConfig(_EngineConfig):
             mdp_lines.extend(
                 [
                     f"integrator   = {self.integrator:<13} ; langevin integrator",
-                    f"nsteps       = {self.nsteps:<13} ; {self.dt} * {self.nsteps} fs = {self.nsteps * self.dt * 0.001:.0f} ps",
+                    f"nsteps       = {self.nsteps:<13} ; {self.nsteps * self.dt:.3f} ps",
                     f"dt           = {self.dt:<13} ; {self.dt * 1000:.0f} fs",
                     f"comm-mode    = {self.comm_mode:<13} ; remove center of mass translation",
                     f"nstcomm      = {self.nstcomm:<13} ; frequency for center of mass motion removal",
@@ -869,7 +856,6 @@ class GromacsConfig(_EngineConfig):
                     "; NEIGHBOR SEARCHING",
                     ";----------------------------------------------------",
                     f"cutoff-scheme          = {self.cutoff_scheme}",
-                    f"ns-type                = {self.ns_type}",
                     f"nstlist                = {self.nstlist}",
                     f"rlist                  = {self.rlist}",
                     "",
@@ -878,12 +864,9 @@ class GromacsConfig(_EngineConfig):
         else:
             mdp_lines.extend(
                 [
-                    "; NEIGHBOR SEARCHING"
-                    if self.mdp_type == "nvt"
-                    else ";----------------------------------------------------",
+                    ";----------------------------------------------------",
                     ";----------------------------------------------------",
                     f"cutoff-scheme       = {self.cutoff_scheme}",
-                    f"ns-type             = {self.ns_type:<6} ; search neighboring grid cells",
                     f"nstlist             = {self.nstlist:<6} ; {self.nstlist * self.dt * 1000:.0f} fs",
                     f"rlist               = {self.rlist:<6} ; short-range neighborlist cutoff (in nm)",
                     f"pbc                 = {self.pbc:<6} ; 3D PBC",
@@ -893,11 +876,6 @@ class GromacsConfig(_EngineConfig):
 
         # Bonds (skip for EM)
         if self.mdp_type != "em":
-            bonds_header = (
-                "; BONDS"
-                if self.mdp_type == "nvt"
-                else ";----------------------------------------------------"
-            )
             constraints_comment = (
                 " ; all bonds are constrained (HMR)"
                 if self.constraints == "all-bonds"
@@ -905,7 +883,7 @@ class GromacsConfig(_EngineConfig):
             )
 
             bonds_section = [
-                bonds_header,
+                ";----------------------------------------------------",
                 ";----------------------------------------------------",
                 f"constraint_algorithm   = {self.constraint_algorithm:<9} ; holonomic constraints",
                 f"constraints            = {self.constraints:<9}{constraints_comment}",
@@ -939,14 +917,9 @@ class GromacsConfig(_EngineConfig):
                 ]
             )
         else:
-            elec_header = (
-                "; ELECTROSTATICS"
-                if self.mdp_type == "nvt"
-                else "; ELECTROSTATICS & EWALD"
-            )
             mdp_lines.extend(
                 [
-                    elec_header,
+                    "; ELECTROSTATICS & EWALD",
                     ";----------------------------------------------------",
                     f"coulombtype      = {self.coulombtype:<6} ; Particle Mesh Ewald for long-range electrostatics",
                     f"rcoulomb         = {self.rcoulomb:<6} ; short-range electrostatic cutoff (in nm)",
@@ -959,25 +932,11 @@ class GromacsConfig(_EngineConfig):
             )
 
         # VDW
-        if self.mdp_type == "em":
-            vdw_header = [
-                ";----------------------------------------------------",
-                "; VDW",
-                ";----------------------------------------------------",
-            ]
-        else:
-            vdw_header = (
-                [
-                    "; VAN DER WAALS",
-                    ";----------------------------------------------------",
-                ]
-                if self.mdp_type == "nvt"
-                else [
-                    ";----------------------------------------------------",
-                    "; VDW",
-                    ";----------------------------------------------------",
-                ]
-            )
+        vdw_header = [
+            ";----------------------------------------------------",
+            "; VDW",
+            ";----------------------------------------------------",
+        ]
 
         mdp_lines.extend(
             [
@@ -1016,22 +975,7 @@ class GromacsConfig(_EngineConfig):
                     "",
                 ]
             )
-        elif self.mdp_type == "nvt":
-            mdp_lines.extend(
-                [
-                    "; TEMPERATURE COUPLING",
-                    ";----------------------------------------------------",
-                    f"tc-grps    =  {self.tc_grps}",
-                    f"tau-t      =  {self.tau_t}",
-                    f"ref-t      =  {self.ref_t}",
-                    "",
-                    "; PRESSURE COUPLING",
-                    ";----------------------------------------------------",
-                    f"pcoupl           = {self.pcoupl}",
-                    "",
-                ]
-            )
-        else:  # npt, npt-norest, prod
+        else:
             mdp_lines.extend(
                 [
                     ";----------------------------------------------------",
@@ -1124,8 +1068,8 @@ class GromacsConfig(_EngineConfig):
         runtime: float,
     ) -> None:
         """
-        Generate GROMACS production MDP files.
-        Creates subdirectories for each stage and writes stage-specific MDP files.
+        Generate GROMACS energy-minimisation and production MDP files.
+        Creates one subdirectory for each stage and writes its MDP file.
 
         Parameters
         ----------
@@ -1136,37 +1080,32 @@ class GromacsConfig(_EngineConfig):
         runtime : float
             Runtime for production stage (ns)
         """
-        # stages = ["em", "nvt", "npt", "npt-norest", "prod"]
         stages = ["em", "prod"]
 
         for stage in stages:
             stage_dir = _os.path.join(run_dir, stage)
             _os.makedirs(stage_dir, exist_ok=True)
 
-            original_mdp_type = self.mdp_type
-            original_define = self.define
-
-            self.mdp_type = stage
+            # Keep EM-specific settings from mutating the production configuration.
+            stage_config = self.model_copy(deep=True)
+            stage_config.mdp_type = stage
 
             # Set define based on stage
             if stage == "em":
-                self.define = "-DFLEXIBLE"
+                stage_config.define = "-DFLEXIBLE"
             else:
-                self.define = None
+                stage_config.define = None
 
-            self.write_config(
+            stage_config.write_config(
                 run_dir=stage_dir,
                 lambda_val=lambda_val,
                 runtime=runtime if stage == "prod" else 0.1,
             )
 
-            self.mdp_type = original_mdp_type
-            self.define = original_define
-
     def get_run_cmd(self, lam: float) -> str:
-        # stages = ["em", "nvt", "npt", "npt-norest", "prod"]
         stages = ["em", "prod"]
         commands = []
+        executable = _shlex.quote(self.executable)
 
         for i, stage in enumerate(stages):
             # prepare input coordinates
@@ -1179,8 +1118,8 @@ class GromacsConfig(_EngineConfig):
             # grompp + mdrun
             cmd = (
                 f"cd {stage} && "
-                f"gmx grompp -f gromacs.mdp -c {input_gro} -p ../gromacs.top -o {stage}.tpr && "
-                f"gmx mdrun -s {stage}.tpr -deffnm {stage} -v && "
+                f"{executable} grompp -f gromacs.mdp -c {input_gro} -p ../gromacs.top -o {stage}.tpr && "
+                f"{executable} mdrun -s {stage}.tpr -deffnm {stage} -v && "
                 f"cd .."
             )
             commands.append(cmd)

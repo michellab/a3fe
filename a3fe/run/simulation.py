@@ -24,7 +24,7 @@ from ._virtual_queue import VirtualQueue as _VirtualQueue
 
 
 class Simulation(_SimulationRunner):
-    """Class to store information about a single SOMD simulation."""
+    """Class to store information about a single simulation."""
 
     required_input_files = {
         _EngineType.SOMD: [
@@ -354,18 +354,25 @@ class Simulation(_SimulationRunner):
             data_file = f"{self.output_dir}/prod/prod.xvg"
             if not _pathlib.Path(data_file).is_file():
                 return 0
-            elif _os.stat(data_file).st_size == 0:
+            if _os.stat(data_file).st_size == 0:
                 return 0
-            else:
-                # Read last non-comment line of xvg file
-                last_line = (
-                    _subprocess.check_output(["grep", "-v", "^[#@]", data_file])
-                    .decode("utf-8")
-                    .strip()
-                    .split("\n")[-1]
-                )
-                time_ps = float(last_line.split()[0])
-                return time_ps / 1000.0  # ps to ns
+
+            last_time_ps = None
+            with open(data_file, "rt") as f:
+                for line_number, line in enumerate(f, start=1):
+                    stripped = line.strip()
+                    if not stripped or stripped.startswith(("#", "@", "&")):
+                        continue
+                    try:
+                        last_time_ps = float(stripped.split()[0])
+                    except (IndexError, ValueError) as e:
+                        raise ValueError(
+                            f"Could not read time from {data_file}, line "
+                            f"{line_number}: {stripped!r}"
+                        ) from e
+
+            # A header-only XVG is normal while grompp/mdrun are starting.
+            return 0 if last_time_ps is None else last_time_ps / 1000.0
         else:  # SOMD
             data_simfile = f"{self.output_dir}/simfile.dat"
             if not _pathlib.Path(data_simfile).is_file():
@@ -445,6 +452,12 @@ class Simulation(_SimulationRunner):
         if self.running:
             return False
 
+        if self.job is None:
+            return False
+
+        if self.engine_type == _EngineType.GROMACS:
+            return not self._gromacs_run_completed()
+
         # We are not running, so all slurm output files should contain the
         # "Simulation took" line
         if self.slurm_output_files:
@@ -471,12 +484,17 @@ class Simulation(_SimulationRunner):
         with open(slurm_file, "rt") as f:
             content = f.read()
 
-        if self.engine_type == _EngineType.SOMD:
-            # SOMD success: "Simulation took" line in SLURM output
-            return "Simulation took" in content
-        else:  # GROMACS
-            # GROMACS success: Performance line appears only when stage completes
-            return "Performance:" in content
+        # SOMD success: "Simulation took" line in SLURM output
+        return "Simulation took" in content
+
+    def _gromacs_run_completed(self) -> bool:
+        """Return whether GROMACS production completed successfully."""
+        prod_log = _pathlib.Path(self.output_dir, "prod", "prod.log")
+        if not prod_log.is_file():
+            return False
+
+        with open(prod_log, "rt") as f:
+            return "Performance:" in f.read()
 
     @property
     def slurm_output_files(self) -> _List[str]:
