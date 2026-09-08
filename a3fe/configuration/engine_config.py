@@ -1106,6 +1106,8 @@ class GromacsConfig(_EngineConfig):
         stages = ["em", "prod"]
         commands = []
         executable = _shlex.quote(self.executable)
+        maxwarn = " -maxwarn 1" if self.ligand_charge != 0 else ""
+        use_reference = self.ligand_charge != 0
 
         for i, stage in enumerate(stages):
             # prepare input coordinates
@@ -1114,11 +1116,12 @@ class GromacsConfig(_EngineConfig):
             else:
                 prev_stage = stages[i - 1]
                 input_gro = f"../{prev_stage}/{prev_stage}.gro"
+            reference = f" -r {input_gro}" if use_reference else ""
 
             # grompp + mdrun
             cmd = (
                 f"cd {stage} && "
-                f"{executable} grompp -f gromacs.mdp -c {input_gro} -p ../gromacs.top -o {stage}.tpr && "
+                f"{executable} grompp -f gromacs.mdp -c {input_gro}{reference} -p ../gromacs.top -o {stage}.tpr{maxwarn} && "
                 f"{executable} mdrun -s {stage}.tpr -deffnm {stage} -v && "
                 f"cd .."
             )

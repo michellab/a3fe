@@ -196,7 +196,7 @@ def _run_mbar_gromacs(
             len(groups.get_group(state)) if state in groups.groups else 0
             for state in u_nk.columns
         ]
-        mbar = _pymbar.MBAR(u_nk.T, n_k)
+        mbar = _pymbar.MBAR(u_nk.T, n_k, initialize="BAR")
         delta_f, d_delta_f, _ = mbar.getFreeEnergyDifferences(return_theta=True)
 
         outfile = (
