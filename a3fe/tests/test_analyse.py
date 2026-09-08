@@ -133,12 +133,68 @@ EXPECTED_CONVERGENCE_RESULTS = np.array(
     ]
 )
 
+EXPECTED_GROMACS_CONVERGENCE_RESULTS = np.array(
+    [
+        [
+            171.334206,
+            171.088335,
+            170.616610,
+            169.953209,
+            169.736075,
+            169.738032,
+            169.864881,
+            169.790340,
+            169.808391,
+            169.823047,
+            169.633350,
+            169.648125,
+            169.827001,
+            169.934528,
+            169.965498,
+            169.727124,
+            169.468561,
+            169.310908,
+            169.159354,
+            169.117092,
+        ],
+        [
+            169.177818,
+            167.233473,
+            167.726435,
+            168.094822,
+            168.005101,
+            168.166493,
+            167.860704,
+            168.344066,
+            168.287133,
+            168.488672,
+            168.783518,
+            168.653979,
+            168.622881,
+            168.651352,
+            168.748482,
+            168.806383,
+            168.755156,
+            168.782243,
+            168.772195,
+            168.683076,
+        ],
+    ]
+)
+
 
 def test_analysis_all_runs(restrain_stage):
     """Check that the analysis works on all runs."""
     res, err = restrain_stage.analyse()
     assert res.mean() == pytest.approx(1.4395, abs=1e-2)
     assert err.mean() == pytest.approx(0.0267, abs=1e-3)
+
+
+def test_analysis_all_runs_gromacs(gromacs_discharge_stage):
+    """Check that the GROMACS analysis works on all runs."""
+    res, err = gromacs_discharge_stage.analyse()
+    assert res.mean() == pytest.approx(168.9001, abs=1e-3)
+    assert err.mean() == pytest.approx(0.3085, abs=1e-3)
 
 
 def test_analysis_all_runs_fraction(restrain_stage):
@@ -178,6 +234,13 @@ def test_convergence_analysis(restrain_stage):
     stage = restrain_stage
     _, free_energies = stage.analyse_convergence()
     assert np.allclose(free_energies, EXPECTED_CONVERGENCE_RESULTS, atol=1e-2)
+
+
+def test_convergence_analysis_gromacs(gromacs_discharge_stage):
+    """Test the GROMACS convergence analysis."""
+    stage = gromacs_discharge_stage
+    _, free_energies = stage.analyse_convergence()
+    assert np.allclose(free_energies, EXPECTED_GROMACS_CONVERGENCE_RESULTS, atol=1e-2)
 
 
 def test_get_time_series_multiwindow(restrain_stage):

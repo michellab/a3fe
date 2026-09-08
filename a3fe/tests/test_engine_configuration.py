@@ -6,6 +6,8 @@ from tempfile import TemporaryDirectory
 import pytest
 from pydantic import ValidationError
 
+from a3fe.configuration import GromacsConfig
+
 
 def test_config_yaml_save_and_load(engine_config):
     """Test that the config can be saved to and loaded from YAML."""
@@ -263,3 +265,31 @@ def test_copy_from_existing_config(somd_engine_config):
         '"kthetaB":9.98, "kphiA":16.70, "kphiB":24.63, "kphiC":5.52}}'
     )
     assert c.boresch_restraints_dictionary == expected_boresch_dict
+
+
+def test_write_all_stage_configs_gromacs_em_prod_only():
+    """Test that GROMACS production setup writes only EM and production stages."""
+    with TemporaryDirectory() as dirname:
+        config = GromacsConfig(
+            lambda_values=[0.0, 1.0],
+            bonded_lambdas=[1.0, 1.0],
+            coul_lambdas=[0.0, 1.0],
+            vdw_lambdas=[0.0, 0.0],
+        )
+        config.write_all_stage_configs(dirname, lambda_val=0.0, runtime=0.1)
+
+        assert sorted(os.listdir(dirname)) == ["em", "prod"]
+        assert os.path.isfile(os.path.join(dirname, "em", "gromacs.mdp"))
+        assert os.path.isfile(os.path.join(dirname, "prod", "gromacs.mdp"))
+
+        with open(os.path.join(dirname, "em", "gromacs.mdp"), "r") as f:
+            em_config = f.read()
+        assert "integrator             = steep" in em_config
+        assert "nsteps                 = 1000" in em_config
+
+        run_cmd = config.get_run_cmd(lam=0.0)
+        assert "cd em" in run_cmd
+        assert "cd prod" in run_cmd
+        assert "../em/em.gro" in run_cmd
+        assert "nvt" not in run_cmd
+        assert "npt" not in run_cmd

@@ -15,6 +15,7 @@ import pytest
 
 import a3fe as a3
 from a3fe.analyse.detect_equil import dummy_check_equil_multiwindow
+from a3fe.run.leg import _add_gromacs_alchemical_ions
 
 LEGS_WITH_STAGES = {"bound": ["discharge", "vanish"], "free": ["discharge", "vanish"]}
 
@@ -296,6 +297,25 @@ def test_parameterisation_bound(t4l_calc, system_prep_config, engine_type):
     # Always delete Leg.pkl
     finally:
         os.remove(f"{bound_leg.base_dir}/Leg.pkl")
+
+
+def test_add_gromacs_alchemical_ions(charged_sys):
+    """Test that a counterion is made alchemical for a charged GROMACS ligand."""
+    system = charged_sys.copy()
+    ligand = BSS.Align.decouple(system[0], intramol=True)
+    system.updateMolecule(0, ligand)
+    ligand_charge = round(ligand.charge().value())
+
+    _add_gromacs_alchemical_ions(system, ligand, ligand_charge)
+
+    alchemical_ions = [
+        mol for mol in system if "AlchemicalIon" in mol._sire_object.property_keys()
+    ]
+    assert len(alchemical_ions) == 1
+
+    ion = alchemical_ions[0].getAtoms()[0]._sire_object
+    assert ion.property("charge0").value() == pytest.approx(-1)
+    assert ion.property("charge1").value() == pytest.approx(0)
 
 
 class TestCalcSetup:
