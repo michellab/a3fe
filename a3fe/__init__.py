@@ -2,8 +2,9 @@
 Automated Adaptive Absolute alchemical Free Energy calculator. A package for running
 adaptive alchemical absolute binding free energy calculations with SOMD
 (distributed within sire(https://sire.openbiosim.org/)) using adaptive
-protocols based on an ensemble of simulations. This requires the SLURM scheduling
-system. Please see the documentation (https://a3fe.readthedocs.io/en/latest/?badge=latest).
+protocols based on an ensemble of simulations. GROMACS can also be used as the
+production engine for non-adaptive ABFE calculations. This requires the SLURM
+scheduling system. Please see the documentation (https://a3fe.readthedocs.io/en/latest/?badge=latest).
 """
 
 # This package was previously named "EnsEquil". To allow objects pickled with the

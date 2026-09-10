@@ -1,6 +1,7 @@
 Getting Started
 ===============
 a3fe is a package for running alchemical absolute binding free energy calculations with SOMD (Sire / OpenMM Molecular Dynamics) through SLURM.
+GROMACS can also be used as the production engine for non-adaptive calculations.
 It is based on Sire(https://sire.openbiosim.org/) and also uses BioSimSpace(https://biosimspace.openbiosim.org/) during the set-up stages. For a
 discussion of the algorithms used, please see (https://pubs.acs.org/doi/10.1021/acs.jctc.4c00806).
 
@@ -26,6 +27,16 @@ Quick Start
     calc.set_equilibration_time(1) # Discard the first ns of simulation time
     calc.analyse()
     calc.save()
+
+The default simulation engine is SOMD. To use GROMACS, initialise the calculation with:
+
+.. code-block:: python
+
+    calc = a3.Calculation(
+        engine_type=a3.EngineType.GROMACS,
+    )
+
+GROMACS calculations currently support non-adaptive runs only, as shown above.
 
 - Check the results in the ``output`` directories (separate output directories are created for the Calculation, Legs, and Stages)
 

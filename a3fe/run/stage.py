@@ -1,5 +1,5 @@
-"""Functions for running free energy calculations with SOMD with automated
-equilibration detection based on an ensemble of simulations."""
+"""Functions for running free energy calculations with automated equilibration
+detection based on an ensemble of simulations."""
 
 __all__ = ["Stage"]
 
@@ -60,8 +60,8 @@ from .lambda_window import LamWindow as _LamWindow
 
 class Stage(_SimulationRunner):
     """
-    Class to hold and manipulate an ensemble of SOMD simulations for a
-    single stage of a calculation.
+    Class to hold and manipulate an ensemble of simulations for a single stage
+    of a calculation.
     """
 
     # Files to be cleaned by self.clean()
@@ -95,7 +95,7 @@ class Stage(_SimulationRunner):
         update_paths: bool = True,
     ) -> None:
         """
-        Initialise an ensemble of SOMD simulations, constituting the Stage. If Stage.pkl exists in the
+        Initialise an ensemble of simulations constituting the Stage. If Stage.pkl exists in the
         output directory, the Stage will be loaded from this file and any arguments
         supplied will be overwritten.
 
@@ -276,6 +276,7 @@ class Stage(_SimulationRunner):
         adaptive : bool, Optional, default: True
             If True, the stage will run until the simulations are equilibrated and perform analysis afterwards.
             If False, the stage will run for the specified runtime and analysis will not be performed.
+            Adaptive runs are not currently supported with GROMACS.
         runtime : float, Optional, default: None
             If adaptive is False, runtime must be supplied and stage will run for this number of nanoseconds.
         runtime_constant: float, Optional, default: None

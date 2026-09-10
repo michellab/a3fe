@@ -8,6 +8,7 @@ API Documentation
    a3fe.configuration.slurm_config
    a3fe.configuration.engine_config
    a3fe.configuration.system_prep_config
+   a3fe.configuration.enums
 
    a3fe.run
    a3fe.run._simulation_runner
@@ -17,7 +18,6 @@ API Documentation
    a3fe.run.Stage
    a3fe.run.LamWindow
    a3fe.run.Simulation
-   a3fe.run.enums
    a3fe.run.system_prep
    a3fe.run._virtual_queue
    a3fe.run._utils

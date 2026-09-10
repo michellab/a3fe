@@ -102,6 +102,8 @@ class LegType(_YamlSerialisableEnum):
 
 
 class EngineType(_YamlSerialisableEnum):
+    """The simulation engine used for production simulations."""
+
     SOMD = 1
     GROMACS = 2
 

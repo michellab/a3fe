@@ -175,7 +175,7 @@ texinfo_documents = [
         "a3fe Documentation",
         author,
         "a3fe",
-        "Automated Adaptive Absolute alchemical Free Energy calculator. A package for running adaptive alchemical absolute binding free energy calculations with SOMD."
+        "Automated Adaptive Absolute alchemical Free Energy calculator. A package for running adaptive alchemical absolute binding free energy calculations with SOMD. GROMACS can also be used for non-adaptive ABFE calculations.",
         "Miscellaneous",
     ),
 ]

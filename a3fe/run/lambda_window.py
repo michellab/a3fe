@@ -26,7 +26,7 @@ from .simulation import Simulation as _Simulation
 
 
 class LamWindow(_SimulationRunner):
-    """A class to hold and manipulate a set of SOMD simulations at a given lambda value."""
+    """A class to hold and manipulate simulations at a given lambda value."""
 
     equil_detection_methods = {
         "multiwindow": _dummy_check_equil_multiwindow,

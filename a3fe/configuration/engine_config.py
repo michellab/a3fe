@@ -1,4 +1,4 @@
-"""Configuration classes for SOMD engine configuration."""
+"""Configuration classes for simulation engines."""
 
 __all__ = [
     "SomdConfig",

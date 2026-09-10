@@ -520,7 +520,7 @@ class Leg(_SimulationRunner):
         sysprep_config: _BaseSystemPreparationConfig,
     ) -> _BSS._SireWrappers._system.System:
         """
-        Run 5 ns simulations with SOMD for each of the ensemble_size runs and extract the final structures
+        Run 5 ns simulations for each of the ensemble_size runs and extract the final structures
         to use as diverse starting points for the production runs. If this is the bound leg, the restraints
         will also be extracted from the simulations and saved to a file. The simulations will be run in a
         subdirectory of the stage base directory called ensemble_equilibration, and the restraints and
@@ -912,6 +912,7 @@ class Leg(_SimulationRunner):
         adaptive : bool, Optional, default: True
             If True, the stages will run until the simulations are equilibrated and perform analysis afterwards.
             If False, the stages will run for the specified runtime and analysis will not be performed.
+            Adaptive runs are not currently supported with GROMACS.
         runtime : float, Optional, default: None
             If adaptive is False, runtime must be supplied and stage will run for this number of nanoseconds.
         runtime_constant: float, Optional, default: None
