@@ -2,6 +2,7 @@
 
 - `example_exp_dgs`: Example of how experimental data should be structured for use with the `calc_set` class.
 - `example_gromacs_discharge_stage`: Example of a complete charged-ligand GROMACS discharge stage. Trajectory and restart data have been removed.
+- `gromacs_integration_input`: Minimal neutral free-leg discharge input for GROMACS SLURM integration testing.
 - `example_output`: Example SOMD output data for testing.
 - `example_restraint_stage`: Example of a complete restraint stage. Trajectory data has been removed.
 - `example_run_dir`: Example of an almost complete calculation (although only with the `discharge` stages) which has not yet been run.
