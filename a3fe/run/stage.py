@@ -1,5 +1,5 @@
-"""Functions for running free energy calculations with SOMD with automated
-equilibration detection based on an ensemble of simulations."""
+"""Functions for running free energy calculations with automated equilibration
+detection based on an ensemble of simulations."""
 
 __all__ = ["Stage"]
 
@@ -9,7 +9,6 @@ import pathlib as _pathlib
 import threading as _threading
 from copy import deepcopy as _deepcopy
 from math import ceil as _ceil
-import matplotlib.pyplot as _plt
 from multiprocessing import get_context as _get_context
 from time import sleep as _sleep
 from typing import Any as _Any
@@ -20,6 +19,7 @@ from typing import Optional as _Optional
 from typing import Tuple as _Tuple
 from typing import Union as _Union
 
+import matplotlib.pyplot as _plt
 import numpy as _np
 import pandas as _pd
 import scipy.stats as _stats
@@ -49,19 +49,19 @@ from ..analyse.plot import plot_overlap_mats as _plot_overlap_mats
 from ..analyse.plot import plot_rmsds as _plot_rmsds
 from ..analyse.plot import plot_sq_sem_convergence as _plot_sq_sem_convergence
 from ..analyse.process_grads import GradientData as _GradientData
+from ..configuration import EngineType as _EngineType
+from ..configuration import SlurmConfig as _SlurmConfig
+from ..configuration import StageType as _StageType
+from ..configuration import _EngineConfig
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._virtual_queue import VirtualQueue as _VirtualQueue
-from ..configuration import StageType as _StageType
 from .lambda_window import LamWindow as _LamWindow
-from ..configuration import SlurmConfig as _SlurmConfig
-from ..configuration import _EngineConfig
-from ..configuration import EngineType as _EngineType
 
 
 class Stage(_SimulationRunner):
     """
-    Class to hold and manipulate an ensemble of SOMD simulations for a
-    single stage of a calculation.
+    Class to hold and manipulate an ensemble of simulations for a single stage
+    of a calculation.
     """
 
     # Files to be cleaned by self.clean()
@@ -95,7 +95,7 @@ class Stage(_SimulationRunner):
         update_paths: bool = True,
     ) -> None:
         """
-        Initialise an ensemble of SOMD simulations, constituting the Stage. If Stage.pkl exists in the
+        Initialise an ensemble of simulations constituting the Stage. If Stage.pkl exists in the
         output directory, the Stage will be loaded from this file and any arguments
         supplied will be overwritten.
 
@@ -276,6 +276,7 @@ class Stage(_SimulationRunner):
         adaptive : bool, Optional, default: True
             If True, the stage will run until the simulations are equilibrated and perform analysis afterwards.
             If False, the stage will run for the specified runtime and analysis will not be performed.
+            Adaptive runs are not currently supported with GROMACS.
         runtime : float, Optional, default: None
             If adaptive is False, runtime must be supplied and stage will run for this number of nanoseconds.
         runtime_constant: float, Optional, default: None
@@ -287,6 +288,13 @@ class Stage(_SimulationRunner):
         -------
         None
         """
+        if self.engine_type == _EngineType.GROMACS and adaptive:
+            raise NotImplementedError(
+                "Adaptive GROMACS runs are not supported yet because repeated "
+                "submissions do not currently continue from checkpoints. Use "
+                "adaptive=False and supply a fixed runtime."
+            )
+
         run_nos = self._get_valid_run_nos(run_nos)
 
         if not adaptive and runtime is None:
@@ -790,14 +798,22 @@ class Stage(_SimulationRunner):
                     win._write_equilibrated_simfiles()
 
             # Run MBAR and compute mean and 95 % C.I. of free energy
-            if not slurm:
+            mbar_temperature = (
+                self.engine_config.ref_t
+                if self.engine_type == _EngineType.GROMACS
+                else 298.15
+            )
+            # GROMACS doesn't need SLURM (Python function can use multiprocessing)
+            if not slurm or self.engine_type == _EngineType.GROMACS:
                 free_energies, errors, mbar_outfiles, _ = _run_mbar(
+                    engine_type=self.engine_type,
                     run_nos=run_nos,
                     output_dir=self.output_dir,
                     percentage_end=fraction * 100,
                     percentage_start=0,
                     subsampling=subsampling,
                     equilibrated=True,
+                    temperature=mbar_temperature,
                 )
             else:
                 jobs, mbar_outfiles, tmp_files = _submit_mbar_slurm(
@@ -820,36 +836,37 @@ class Stage(_SimulationRunner):
                     tmp_files=tmp_files,
                 )
 
-                mean_free_energy = _np.mean(free_energies)
-                # Gaussian 95 % C.I.
-                conf_int = (
-                    _stats.t.interval(
-                        0.95,
-                        len(free_energies) - 1,
-                        mean_free_energy,
-                        scale=_stats.sem(free_energies),
-                    )[1]
-                    - mean_free_energy
-                )  # 95 % C.I.
+            mean_free_energy = _np.mean(free_energies)
+            # Gaussian 95 % C.I.
+            conf_int = (
+                _stats.t.interval(
+                    0.95,
+                    len(free_energies) - 1,
+                    mean_free_energy,
+                    scale=_stats.sem(free_energies),
+                )[1]
+                - mean_free_energy
+            )  # 95 % C.I.
 
-                # Write overall MBAR stats to file
-                with open(f"{self.output_dir}/overall_stats.dat", "a") as ofile:
-                    if get_frnrg:
+            # Write overall MBAR stats to file
+            with open(f"{self.output_dir}/overall_stats.dat", "a") as ofile:
+                if get_frnrg:
+                    ofile.write(
+                        "###################################### Free Energies ########################################\n"
+                    )
+                    ofile.write(
+                        f"Mean free energy: {mean_free_energy: .3f} + /- {conf_int:.3f} kcal/mol\n"
+                    )
+                    for i in range(len(free_energies)):
                         ofile.write(
-                            "###################################### Free Energies ########################################\n"
+                            f"Free energy from run {i + 1}: {free_energies[i]: .3f} +/- {errors[i]:.3f} kcal/mol\n"
                         )
-                        ofile.write(
-                            f"Mean free energy: {mean_free_energy: .3f} + /- {conf_int:.3f} kcal/mol\n"
-                        )
-                        for i in range(len(free_energies)):
-                            ofile.write(
-                                f"Free energy from run {i + 1}: {free_energies[i]: .3f} +/- {errors[i]:.3f} kcal/mol\n"
-                            )
-                        ofile.write(
-                            "Errors are 95 % C.I.s based on the assumption of a Gaussian distribution of free energies\n"
-                        )
-                        ofile.write(f"Runs analysed: {run_nos}\n")
+                    ofile.write(
+                        "Errors are 95 % C.I.s based on the assumption of a Gaussian distribution of free energies\n"
+                    )
+                    ofile.write(f"Runs analysed: {run_nos}\n")
 
+            if get_frnrg:
                 # Plot overlap matrices and PMFs
                 _plot_overlap_mats(
                     output_dir=self.output_dir,
@@ -1046,7 +1063,13 @@ class Stage(_SimulationRunner):
             for win in self.lam_windows:
                 win._write_equilibrated_simfiles()
 
-        if not slurm:
+        mbar_temperature = (
+            self.engine_config.ref_t
+            if self.engine_type == _EngineType.GROMACS
+            else 298.15
+        )
+        # GROMACS doesn't need SLURM (Python function can use multiprocessing)
+        if not slurm or self.engine_type == _EngineType.GROMACS:
             # Now run mbar with multiprocessing to speed things up
             with _get_context("spawn").Pool() as pool:
                 results = pool.starmap(
@@ -1060,13 +1083,15 @@ class Stage(_SimulationRunner):
                             False,  # Subsample
                             True,  # Delete output files
                             equilibrated,  # Equilibrated
+                            self.engine_type,
+                            mbar_temperature,
                         )
                         for start_percent, end_percent in zip(
                             start_percents, end_percents
                         )
                     ],
                 )
-        else:  # Use slurm
+        else:  # Use SLURM (SOMD only)
             frac_jobs = []
             results = []
             for start_percent, end_percent in zip(start_percents, end_percents):
@@ -1218,6 +1243,7 @@ class Stage(_SimulationRunner):
                 slurm_config=self.slurm_config,
                 analysis_slurm_config=self.analysis_slurm_config,
                 engine_config=self.engine_config.copy(),
+                engine_type=self.engine_type,
             )
             # Overwrite the default equilibration detection algorithm
             new_lam_win.check_equil = old_lam_vals_attrs["check_equil"]

@@ -18,16 +18,17 @@ RUN_SLURM_TESTS=1 pytest a3fe/tests/test_run_integration.py::TestSlurmIntegratio
 See README.md in this directory for more information on running these tests.
 """
 
-import os
-import pytest
-import subprocess
 import glob
-from tempfile import TemporaryDirectory
 import logging
+import math
+import os
+import subprocess
+from tempfile import TemporaryDirectory
+
+import pytest
 
 import a3fe as a3
-from a3fe.tests import SLURM_PRESENT, RUN_SLURM_TESTS
-
+from a3fe.tests import GROMACS_PRESENT, RUN_SLURM_TESTS, SLURM_PRESENT
 
 # Define the legs and stages for testing
 LEGS_WITH_STAGES = {
@@ -68,6 +69,33 @@ def slurm_calc_non_adaptive(engine_type):
 def slurm_calc_adaptive(engine_type):
     """Set up a calculation for adaptive slurm tests"""
     yield from _create_example_input_dir(engine_type)
+
+
+@pytest.fixture(scope="class")
+def gromacs_slurm_discharge_stage():
+    """Set up a minimal GROMACS stage for SLURM integration testing."""
+    with TemporaryDirectory() as temp_dir:
+        input_dir = os.path.join(temp_dir, "input")
+        subprocess.run(
+            [
+                "cp",
+                "-r",
+                "a3fe/data/gromacs_integration_input",
+                input_dir,
+            ],
+            check=True,
+        )
+        engine_config = a3.GromacsConfig(lambda_values=[0.0, 1.0])
+        engine_config.setup_lambda_arrays(a3.StageType.DISCHARGE)
+        yield a3.Stage(
+            stage_type=a3.StageType.DISCHARGE,
+            ensemble_size=2,
+            base_dir=temp_dir,
+            input_dir=input_dir,
+            stream_log_level=logging.CRITICAL,
+            engine_config=engine_config,
+            engine_type=a3.EngineType.GROMACS,
+        )
 
 
 @pytest.mark.integration
@@ -258,3 +286,33 @@ class TestSlurmIntegration:
 
         except FileNotFoundError as e:
             pytest.fail(f"SLURM job file not found: {str(e)}")
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(not SLURM_PRESENT, reason="SLURM not present")
+@pytest.mark.skipif(not GROMACS_PRESENT, reason="GROMACS not present")
+@pytest.mark.skipif(not RUN_SLURM_TESTS, reason="RUN_SLURM_TESTS is False")
+class TestGromacsSlurmIntegration:
+    """Integration tests for running GROMACS through SLURM."""
+
+    def test_gromacs_slurm_discharge_stage(self, gromacs_slurm_discharge_stage):
+        """Run and analyse a minimal GROMACS discharge stage."""
+        runtime = 0.02
+        gromacs_slurm_discharge_stage.run(adaptive=False, runtime=runtime)
+        gromacs_slurm_discharge_stage.wait()
+
+        assert not gromacs_slurm_discharge_stage.running
+        assert not gromacs_slurm_discharge_stage.failed_simulations
+
+        for lam_win in gromacs_slurm_discharge_stage.lam_windows:
+            for sim in lam_win.sims:
+                assert os.path.isfile(os.path.join(sim.output_dir, "prod", "prod.xvg"))
+                assert sim.tot_simtime == pytest.approx(runtime)
+
+        gromacs_slurm_discharge_stage.set_equilibration_time(0)
+        free_energies, errors = gromacs_slurm_discharge_stage.analyse()
+
+        assert len(free_energies) == gromacs_slurm_discharge_stage.ensemble_size
+        assert len(errors) == gromacs_slurm_discharge_stage.ensemble_size
+        assert all(math.isfinite(value) for value in free_energies)
+        assert all(math.isfinite(value) for value in errors)

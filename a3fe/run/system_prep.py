@@ -14,11 +14,11 @@ from typing import Optional as _Optional
 
 import BioSimSpace.Sandpit.Exscientia as _BSS
 
-from ..read._process_bss_systems import rename_lig as _rename_lig
-from ._utils import check_has_wat_and_box as _check_has_wat_and_box
+from ..configuration import EngineType as _EngineType
 from ..configuration import LegType as _LegType
 from ..configuration import PreparationStage as _PreparationStage
-from ..configuration import EngineType as _EngineType
+from ..read._process_bss_systems import rename_lig as _rename_lig
+from ._utils import check_has_wat_and_box as _check_has_wat_and_box
 
 
 def parameterise_input(
@@ -452,7 +452,7 @@ def run_ensemble_equilibration(
     print(
         f"Running ensemble equilibration simulation with GROMACS for {cfg.ensemble_equilibration_time} ps"
     )
-    if leg_type == _LegType.BOUND:
+    if leg_type == _LegType.BOUND or engine_type == _EngineType.GROMACS:
         work_dir = output_dir
     else:
         work_dir = None
@@ -461,13 +461,16 @@ def run_ensemble_equilibration(
     # Save the coordinates only, renaming the velocity property to foo so avoid saving velocities. Saving the
     # velocities sometimes causes issues with the size of the floats overflowing the RST7
     # format.
-    print(f"Saving somd.rst7 to {output_dir}")
-    _BSS.IO.saveMolecules(
-        f"{output_dir}/somd",
-        final_system,
-        fileformat=["rst7"],
-        property_map={"velocity": "foo"},
-    )
+    if engine_type == _EngineType.GROMACS:
+        print(f"GROMACS files already saved to {output_dir}")
+    else:
+        print(f"Saving somd.rst7 to {output_dir}")
+        _BSS.IO.saveMolecules(
+            f"{output_dir}/somd",
+            final_system,
+            fileformat=["rst7"],
+            property_map={"velocity": "foo"},
+        )
 
 
 def run_process(

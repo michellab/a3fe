@@ -1,9 +1,10 @@
 """Test the functionality of updating engine_config (SomdConfig) options."""
 
-from a3fe import SomdConfig
-from a3fe.run._simulation_runner import SimulationRunner
 import pytest
 from pydantic import ValidationError
+
+from a3fe import SomdConfig
+from a3fe.run._simulation_runner import SimulationRunner
 
 
 class MockSimulationRunner(SimulationRunner):

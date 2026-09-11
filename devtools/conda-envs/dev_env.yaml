@@ -17,6 +17,7 @@ dependencies:
   - scipy
   - ipython
   - pymbar<4
+  - alchemlyb=1.0.1  # for pymbar<4
   - ambertools
   - biosimspace>2023.4
   - numpydoc

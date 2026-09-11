@@ -9,7 +9,7 @@ a3fe
 
 <img src="./a3fe_logo.png" alt="Alt text" style="width: 50%; height: 50%;">
 
-**A**utomated **A**daptive **A**bsolute alchemical **F**ree **E**nergy calculator. A package for running adaptive alchemical absolute binding free energy calculations with SOMD (distributed within [sire](https://sire.openbiosim.org/)) using adaptive protocols based on an ensemble of simulations. This requires the SLURM scheduling system. Please see the [**documentation**](https://a3fe.readthedocs.io/en/latest/?badge=latest).
+**A**utomated **A**daptive **A**bsolute alchemical **F**ree **E**nergy calculator. A package for running adaptive alchemical absolute binding free energy calculations with SOMD (distributed within [sire](https://sire.openbiosim.org/)) using adaptive protocols based on an ensemble of simulations. GROMACS can also be used as the production engine for non-adaptive ABFE calculations. This requires the SLURM scheduling system. Please see the [**documentation**](https://a3fe.readthedocs.io/en/latest/?badge=latest).
 
 For details of the algorithms and testing, please see the assocated paper:
 
@@ -33,7 +33,7 @@ Additionally, please cite the underlying software that makes a3fe possible:
 
 ### Installation
 
-a3fe depends on SLURM for scheduling jobs, and on GROMACS for running initial equilibration simulations. Please ensure that your have sourced your GMXRC or loaded your GROMACS module before proceeding with the installation. While we recommend installing with [mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html), you can substitute `mamba` with `conda` in the following commands.
+a3fe depends on SLURM for scheduling jobs, and on GROMACS for running initial equilibration simulations and, optionally, production simulations. Please ensure that your have sourced your GMXRC or loaded your GROMACS module before proceeding with the installation. While we recommend installing with [mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html), you can substitute `mamba` with `conda` in the following commands.
 
 Now, download and install a3fe. Choose the appropriate environment for your use case:
 
@@ -71,6 +71,16 @@ calc.set_equilibration_time(1) # Discard the first ns of simulation time
 calc.analyse()
 calc.save()
 ```
+
+To use GROMACS rather than the default SOMD engine, initialise the calculation with:
+
+```python
+calc = a3.Calculation(
+    engine_type=a3.EngineType.GROMACS,
+)
+```
+
+GROMACS calculations currently support non-adaptive runs only, as shown above.
 
 - Check the results in the ``output`` directories (separate output directories are created for the Calculation, Legs, and Stages)
 

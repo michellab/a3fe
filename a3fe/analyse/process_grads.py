@@ -12,6 +12,7 @@ from typing import Tuple as _Tuple
 import numpy as _np
 from scipy.constants import gas_constant as _R
 
+from ..configuration import EngineType as _EngineType
 from .autocorrelation import (
     get_statistical_inefficiency as _get_statistical_inefficiency,
 )
@@ -727,13 +728,33 @@ def get_time_series_multiwindow_mbar(
             "use_slurm is the same for all lambda windows."
         )
 
-    if not use_slurms[0]:
+    engine_type = lambda_windows[0].engine_type
+    if not all(lam_win.engine_type == engine_type for lam_win in lambda_windows):
+        raise ValueError(
+            "engine_type is not the same for all lambda windows. Please ensure that "
+            "engine_type is the same for all lambda windows."
+        )
+    mbar_temperature = (
+        lambda_windows[0].engine_config.ref_t
+        if engine_type == _EngineType.GROMACS
+        else 298.15
+    )
+
+    if not use_slurms[0] or engine_type == _EngineType.GROMACS:
         # Run MBAR in parallel
         with _get_context("spawn").Pool() as pool:
             results = pool.starmap(
                 _compute_dg,
                 [
-                    (run_no, start_frac, end_frac, output_dir, equilibrated)
+                    (
+                        run_no,
+                        start_frac,
+                        end_frac,
+                        output_dir,
+                        equilibrated,
+                        engine_type,
+                        mbar_temperature,
+                    )
                     for run_no in run_nos
                     for start_frac, end_frac in start_and_end_fracs
                 ],
@@ -816,7 +837,13 @@ def get_time_series_multiwindow_mbar(
 
 
 def _compute_dg(
-    run_no: int, start_frac: float, end_frac: float, output_dir: str, equilibrated: bool
+    run_no: int,
+    start_frac: float,
+    end_frac: float,
+    output_dir: str,
+    equilibrated: bool,
+    engine_type: _EngineType,
+    temperature: float,
 ) -> float:
     """
     Helper function to compute the free energy change for a single run. Arguments are as
@@ -831,5 +858,7 @@ def _compute_dg(
         percentage_start=start_frac * 100,
         subsampling=False,
         delete_outfiles=True,
+        engine_type=engine_type,
+        temperature=temperature,
     )
     return free_energies[0]

@@ -7,6 +7,7 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
+from ..read._process_gmx_files import write_truncated_xvg
 from ..read._process_somd_files import (
     read_mbar_gradients,
     read_mbar_pmf,
@@ -112,3 +113,30 @@ def test_write_truncated_sim_datafile_end_and_start():
             lines = f.readlines()
         assert lines[13].split()[0] == "5000"
         assert lines[-2].split()[0] == "9000"
+
+
+def test_write_truncated_xvg_end_and_start():
+    """Test that GROMACS xvg files are truncated while preserving the header."""
+    with TemporaryDirectory() as tmpdir:
+        xvg_file = os.path.join(tmpdir, "prod.xvg")
+        truncated_file = os.path.join(tmpdir, "prod_truncated.xvg")
+        with open(xvg_file, "w") as f:
+            f.write("# header\n")
+            f.write('@ title "dhdl"\n')
+            for i in range(200):
+                f.write(f"{i}.0 {i}.1 {i}.2\n")
+
+        write_truncated_xvg(
+            xvg_file,
+            truncated_file,
+            fraction_final=0.75,
+            fraction_initial=0.25,
+        )
+
+        with open(truncated_file, "r") as f:
+            lines = f.readlines()
+
+        assert lines[0] == "# header\n"
+        assert lines[1] == '@ title "dhdl"\n'
+        assert lines[2].split()[0] == "50.0"
+        assert lines[-1].split()[0] == "149.0"

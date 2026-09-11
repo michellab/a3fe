@@ -18,24 +18,64 @@ from typing import Tuple as _Tuple
 import BioSimSpace.Sandpit.Exscientia as _BSS
 import numpy as _np
 import pandas as _pd
+from BioSimSpace.Sandpit.Exscientia.Align._alch_ion import (
+    _mark_alchemical_ion,
+)
 
 from ..analyse.plot import plot_convergence as _plot_convergence
 from ..analyse.plot import plot_rmsds as _plot_rmsds
 from ..analyse.plot import plot_sq_sem_convergence as _plot_sq_sem_convergence
+from ..configuration import EngineType as _EngineType
+from ..configuration import LegType as _LegType
+from ..configuration import PreparationStage as _PreparationStage
+from ..configuration import SlurmConfig as _SlurmConfig
+from ..configuration import StageType as _StageType
+from ..configuration import _BaseSystemPreparationConfig, _EngineConfig
 from . import system_prep as _system_prep
 from ._restraint import A3feRestraint as _A3feRestraint
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._utils import get_single_mol as _get_single_mol
 from ._virtual_queue import Job as _Job
 from ._virtual_queue import VirtualQueue as _VirtualQueue
-from ..configuration import LegType as _LegType
-from ..configuration import PreparationStage as _PreparationStage
-from ..configuration import StageType as _StageType
-from ..configuration import EngineType as _EngineType
-from ..configuration import _EngineConfig
-from ..configuration import SlurmConfig as _SlurmConfig
 from .stage import Stage as _Stage
-from ..configuration import _BaseSystemPreparationConfig
+
+
+def _add_gromacs_alchemical_ions(
+    system: _BSS._SireWrappers._system.System,  # type: ignore
+    ligand: _BSS._SireWrappers._molecule.Molecule,  # type: ignore
+    ligand_charge: int,
+) -> None:
+    """Add co-alchemical counterions for a GROMACS ligand decoupling."""
+    ion_charge = -1 if ligand_charge > 0 else 1
+    ions = [
+        mol
+        for mol in system
+        if mol.nAtoms() == 1 and round(mol.charge().value()) == ion_charge
+    ]
+    if len(ions) < abs(ligand_charge):
+        raise ValueError(
+            f"Could not find {abs(ligand_charge)} monovalent counterion(s) "
+            "for the charged ligand."
+        )
+
+    space = system._sire_object.property("space")
+    ligand_centre = ligand.getAtoms()[ligand.getCOMIdx()]._sire_object.property(
+        "coordinates"
+    )
+    ions.sort(
+        key=lambda ion: space.calc_dist(
+            ion.getAtoms()[0]._sire_object.property("coordinates"), ligand_centre
+        ),
+        reverse=True,
+    )
+
+    for ion in ions[: abs(ligand_charge)]:
+        perturbed_ion = _BSS.Align.merge(ion, ion, mapping={0: 0})
+        cursor = perturbed_ion._sire_object.cursor()
+        charge = perturbed_ion.getAtoms()[0]._sire_object.property("charge1")
+        cursor[0]["charge1"] = 0 * charge
+        perturbed_ion._sire_object = cursor.commit()
+        system.updateMolecule(system.getIndex(ion), _mark_alchemical_ion(perturbed_ion))
 
 
 class Leg(_SimulationRunner):
@@ -466,12 +506,21 @@ class Leg(_SimulationRunner):
         # Update the preparation stage
         self.prep_stage = next_prep_stage
 
+    def _ensemble_equilibration_output_files(self) -> _List[str]:
+        """Return the files expected from ensemble equilibration."""
+        if self.engine_type == _EngineType.GROMACS:
+            files = ["gromacs.gro"]
+            if self.leg_type == _LegType.BOUND:
+                files.append("gromacs.xtc")
+            return files
+        return ["somd.rst7"]
+
     def run_ensemble_equilibration(
         self,
         sysprep_config: _BaseSystemPreparationConfig,
     ) -> _BSS._SireWrappers._system.System:
         """
-        Run 5 ns simulations with SOMD for each of the ensemble_size runs and extract the final structures
+        Run 5 ns simulations for each of the ensemble_size runs and extract the final structures
         to use as diverse starting points for the production runs. If this is the bound leg, the restraints
         will also be extracted from the simulations and saved to a file. The simulations will be run in a
         subdirectory of the stage base directory called ensemble_equilibration, and the restraints and
@@ -527,20 +576,6 @@ class Leg(_SimulationRunner):
 
             self.virtual_queue.wait()  # Wait for all jobs to finish
 
-            # Check that the required input files have been produced, since slurm can fail silently
-            for i, outdir in enumerate(outdirs_to_run):
-                for file in (
-                    _PreparationStage.PREEQUILIBRATED.get_simulation_input_files(
-                        self.leg_type
-                    )
-                    + ["somd.rst7"]
-                ):
-                    if not _os.path.isfile(f"{outdir}/{file}"):
-                        raise RuntimeError(
-                            f"SLURM job failed to produce {file}. Please check the output of the "
-                            f"last slurm log in {outdir} directory for errors."
-                        )
-
         else:  # Not slurm
             for i, outdir in enumerate(outdirs_to_run):
                 self._logger.info(
@@ -553,13 +588,32 @@ class Leg(_SimulationRunner):
                     output_dir=outdir,
                 )
 
+        # Check that the required output files have been produced, since jobs can fail silently
+        for outdir in outdirs_to_run:
+            for file in self._ensemble_equilibration_output_files():
+                if not _os.path.isfile(f"{outdir}/{file}"):
+                    raise RuntimeError(
+                        f"Ensemble equilibration failed to produce {file}. Please check the output of the "
+                        f"last log in {outdir} directory for errors."
+                    )
+
         # Give the output files unique names
         equil_numbers = [int(outdir.split("_")[-1]) for outdir in outdirs_to_run]
         for equil_number, outdir in zip(equil_numbers, outdirs_to_run):
-            _subprocess.run(
-                ["mv", f"{outdir}/somd.rst7", f"{outdir}/somd_{equil_number}.rst7"],
-                check=True,
-            )
+            if self.engine_type == _EngineType.GROMACS:
+                _subprocess.run(
+                    [
+                        "mv",
+                        f"{outdir}/gromacs.gro",
+                        f"{outdir}/gromacs_{equil_number}.gro",
+                    ],
+                    check=True,
+                )
+            else:
+                _subprocess.run(
+                    ["mv", f"{outdir}/somd.rst7", f"{outdir}/somd_{equil_number}.rst7"],
+                    check=True,
+                )
 
         # Load the system and mark the ligand to be decoupled
         self._logger.info("Loading pre-equilibrated system...")
@@ -603,7 +657,10 @@ class Leg(_SimulationRunner):
 
                 # Save the restraints to a text file and store within the Leg object
                 with open(f"{outdir}/restraint_{i + 1}.txt", "w") as f:
-                    f.write(restraint.toString(engine="SOMD"))  # type: ignore
+                    run_engine = (
+                        "GROMACS" if self.engine_type == _EngineType.GROMACS else "SOMD"
+                    )
+                    f.write(restraint.toString(engine=run_engine))  # type: ignore
                 self.restraints.append(restraint)
 
             return pre_equilibrated_system
@@ -641,6 +698,8 @@ class Leg(_SimulationRunner):
                 f"The ligand has a charge of {lig_charge}. Using co-alchemical ion approach to maintain neutrality. "
                 "Please note: The cutoff type should be PME and the cutoff length can be adjusted to other values, e.g., 10 Å."
             )
+            if self.engine_type == _EngineType.GROMACS:
+                _add_gromacs_alchemical_ions(pre_equilibrated_system, lig, lig_charge)
         # Figure out where the ligand is in the system
         perturbed_resnum = pre_equilibrated_system.getIndex(lig) + 1
 
@@ -656,28 +715,41 @@ class Leg(_SimulationRunner):
                 f"Setting up {self.leg_type.name} leg {stage_type.name} stage"
             )
             restraint = self.restraints[0] if self.leg_type == _LegType.BOUND else None
-            protocol = _BSS.Protocol.FreeEnergy(
-                runtime=dummy_runtime * _BSS.Units.Time.nanosecond,  # type: ignore
-                lam_vals=dummy_lam_vals,
-                perturbation_type=stage_type.bss_perturbation_type,
-            )
+            if self.engine_type == _EngineType.GROMACS:
+                protocol = _BSS.Protocol.FreeEnergy(
+                    runtime=dummy_runtime * _BSS.Units.Time.nanosecond,  # type: ignore
+                    lam_vals=dummy_lam_vals,
+                    perturbation_type="full",
+                )
+            else:
+                protocol = _BSS.Protocol.FreeEnergy(
+                    runtime=dummy_runtime * _BSS.Units.Time.nanosecond,  # type: ignore
+                    lam_vals=dummy_lam_vals,
+                    perturbation_type=stage_type.bss_perturbation_type,
+                )
             self._logger.info(f"Perturbation type: {stage_type.bss_perturbation_type}")
             # Ensure we remove the velocites to avoid RST7 file writing issues, as before
+            run_engine = (
+                "gromacs" if self.engine_type == _EngineType.GROMACS else "somd"
+            )
             _BSS.FreeEnergy.AlchemicalFreeEnergy(
                 pre_equilibrated_system,
                 protocol,
-                engine="SOMD",
+                engine=run_engine,
                 restraint=restraint,
                 work_dir=stage_input_dir,
                 setup_only=True,
+                ignore_warnings=(
+                    self.engine_type == _EngineType.GROMACS and lig_charge != 0
+                ),
                 property_map={"velocity": "foo"},
             )  # We will run outside of BSS
 
-            # Copy input written by BSS to the stage input directory, excluding only somd.cfg
+            # Copy input written by BSS to the stage input directory, excluding cfg and mdp
             files = [
                 file
-                for file in _glob.glob(f"{stage_input_dir}/lambda_0.0000/*")
-                if not file.endswith(".cfg")
+                for file in _glob.glob(f"{stage_input_dir}/lambda_*/*")
+                if not file.endswith((".cfg", ".mdp", ".tpr"))
             ]
             for file in files:
                 _shutil.copy(file, stage_input_dir)
@@ -686,30 +758,41 @@ class Leg(_SimulationRunner):
 
             # Create a seperate config for this stage
             stage_config = self.engine_config.copy()
+            if self.engine_type == _EngineType.GROMACS and lig_charge != 0:
+                stage_config.refcoord_scaling = "com"
 
             # Copy the final coordinates from the ensemble equilibration stage to the stage input directory
             # and, if this is the bound stage, read in the restraints
             for i in range(self.ensemble_size):
                 ens_equil_output_dir = f"{self.base_dir}/ensemble_equilibration_{i + 1}"
-                coordinates_file = f"{ens_equil_output_dir}/somd_{i + 1}.rst7"
-                _shutil.copy(coordinates_file, f"{stage_input_dir}/somd_{i + 1}.rst7")
+                coordinates_file = (
+                    f"{ens_equil_output_dir}/somd_{i + 1}.rst7"
+                    if self.engine_type == _EngineType.SOMD
+                    else f"{ens_equil_output_dir}/gromacs_{i + 1}.gro"
+                )
+                _shutil.copy(
+                    coordinates_file,
+                    f"{stage_input_dir}/somd_{i + 1}.rst7"
+                    if self.engine_type == _EngineType.SOMD
+                    else f"{stage_input_dir}/gromacs_{i + 1}.gro",
+                )
 
                 if self.leg_type == _LegType.BOUND:
-                    # Read in the first restraint file
-                    with open(
-                        f"{ens_equil_output_dir}/restraint_{i + 1}.txt", "r"
-                    ) as f:
-                        lines = f.readlines()
-                        restraint_type, restraint_dict = [
-                            item.strip() for item in lines[0].split("=")
-                        ]
+                    if self.engine_type == _EngineType.SOMD:
+                        with open(
+                            f"{ens_equil_output_dir}/restraint_{i + 1}.txt", "r"
+                        ) as f:
+                            lines = f.readlines()
+                            restraint_type, restraint_dict = [
+                                item.strip() for item in lines[0].split("=")
+                            ]
 
-                    if restraint_type != "boresch restraints dictionary":
-                        raise ValueError(
-                            f"Only Boresch restraints are supported. Found {restraint_type} restraints."
-                        )
+                        if restraint_type != "boresch restraints dictionary":
+                            raise ValueError(
+                                f"Only Boresch restraints are supported. Found {restraint_type} restraints."
+                            )
 
-                    stage_config.boresch_restraints_dictionary = restraint_dict
+                        stage_config.boresch_restraints_dictionary = restraint_dict
 
             # Set configuration options
             stage_config.perturbed_residue_number = perturbed_resnum
@@ -723,7 +806,7 @@ class Leg(_SimulationRunner):
             stage_config.lambda_values = sys_prep_config.lambda_values[self.leg_type][
                 stage_type
             ]
-
+            stage_config.setup_lambda_arrays(stage_type)
             stage_configs[stage_type] = stage_config
 
         # We no longer need to store the large BSS restraint classes.
@@ -829,6 +912,7 @@ class Leg(_SimulationRunner):
         adaptive : bool, Optional, default: True
             If True, the stages will run until the simulations are equilibrated and perform analysis afterwards.
             If False, the stages will run for the specified runtime and analysis will not be performed.
+            Adaptive runs are not currently supported with GROMACS.
         runtime : float, Optional, default: None
             If adaptive is False, runtime must be supplied and stage will run for this number of nanoseconds.
         runtime_constant: float, Optional, default: None

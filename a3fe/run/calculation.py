@@ -6,17 +6,16 @@ __all__ = ["Calculation"]
 import logging as _logging
 import os as _os
 import time as _time
+from pathlib import Path as _Path
 from typing import List as _List
 from typing import Optional as _Optional
-from pathlib import Path as _Path
 
-from ._simulation_runner import SimulationRunner as _SimulationRunner
-from ..configuration.enums import PreparationStage as _PreparationStage
-from .leg import Leg as _Leg
-from ..configuration import _BaseSystemPreparationConfig
-from ..configuration import SlurmConfig as _SlurmConfig
-from ..configuration import _EngineConfig
 from ..configuration import EngineType as _EngineType
+from ..configuration import SlurmConfig as _SlurmConfig
+from ..configuration import _BaseSystemPreparationConfig, _EngineConfig
+from ..configuration.enums import PreparationStage as _PreparationStage
+from ._simulation_runner import SimulationRunner as _SimulationRunner
+from .leg import Leg as _Leg
 
 
 class Calculation(_SimulationRunner):
@@ -356,6 +355,7 @@ class Calculation(_SimulationRunner):
         adaptive : bool, Optional, default: True
             If True, the stages will run until the simulations are equilibrated and perform analysis afterwards.
             If False, the stages will run for the specified runtime and analysis will not be performed.
+            Adaptive runs are not currently supported with GROMACS.
         runtime : float, Optional, default: None
             If adaptive is False, runtime must be supplied and stage will run for this number of nanoseconds.
         runtime_constant: float, Optional, default: None

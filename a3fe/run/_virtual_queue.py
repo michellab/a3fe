@@ -10,9 +10,9 @@ from time import sleep as _sleep
 from typing import List as _List
 from typing import Optional as _Optional
 
+from ..configuration.enums import JobStatus as _JobStatus
 from ._logging_formatters import _A3feFileFormatter, _A3feStreamFormatter
 from ._utils import retry as _retry
-from ..configuration.enums import JobStatus as _JobStatus
 
 
 @_dataclass
