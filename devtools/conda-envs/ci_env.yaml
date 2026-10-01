@@ -23,7 +23,7 @@ dependencies:
   - numpydoc
   - gromacs
   - pydantic
-  - ruff
+  - ruff=0.14.13
   - mkl>=2022.1.0
   - loguru
   - pyyaml

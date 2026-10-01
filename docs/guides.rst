@@ -126,7 +126,7 @@ Customising Calculations
 *************************
 
 Engine Configuration
------------------
+--------------------
 
 The default simulation engine is SOMD. You can customize its configuration by using :class:`a3fe.configuration.engine_config.SomdConfig`.
 For example, to change the timestep, create a ``SomdConfig`` object and pass it to ``Calculation``:
@@ -138,14 +138,20 @@ For example, to change the timestep, create a ``SomdConfig`` object and pass it 
 
     # Or modify parameters after creating the Calculation
     calc = a3.Calculation()
-    # Works if the calculation has not been setup yet
-    calc.engine_config.timestep = 2.0 # fs
-    # Works if the calculation has already been setup
-    calc.update_engine_config_option(timestep=2.0) # fs
+    # Before setup(): modify the engine_config directly
+    calc.engine_config.timestep = 2.0  # fs
+
+    # After setup(): use update_engine_config_option(option, value)
+    # to propagate the change to all sub-simulations
+    calc.update_engine_config_option("timestep", 2.0)  # fs
 
 .. warning::
-   After calling ``calc.setup()``, do not modify engine_config directly.
-   Use ``calc.update_engine_config_option()`` instead.
+   After calling ``calc.setup()``, always use ``calc.update_engine_config_option("option", value)``
+   rather than modifying ``engine_config`` directly.
+
+.. note::
+   ``nmoves`` and ``ncycles`` are computed properties derived from ``runtime``, ``timestep``,
+   ``max_nmoves`` and ``energy_frequency``; they cannot be set directly.
 
 To see a complete list of available configuration options, run ``somd-freenrg --help-config``
 or inspect the :class:`a3.SomdConfig` API reference.
@@ -161,7 +167,7 @@ To use GROMACS instead, pass the engine type to ``Calculation``:
 GROMACS currently supports non-adaptive production simulations only.
 
 System Preparation Configuration
------------------
+--------------------------------
 
 Calculation setup options, including the force fields, lambda schedules, and length of the equilibration steps, can be customised using :class:`a3fe.configuration.system_preparation.SomdSystemPreparationConfig`.
 For example, to use GAFF2 instead of OFF2 for the small molecule, set this in the config object and pass this to ``calc.setup()``:

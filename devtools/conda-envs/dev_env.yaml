@@ -17,12 +17,12 @@ dependencies:
   - scipy
   - ipython
   - pymbar<4
-  - alchemlyb=1.0.1  # for pymbar<4
+  - alchemlyb=1.0.1
   - ambertools
   - biosimspace>2023.4
   - numpydoc
   - pydantic
-  - ruff
+  - ruff=0.14.13
   - pyyaml
 
     # Testing
@@ -37,4 +37,3 @@ dependencies:
 
     # Development tools
   - pre-commit
-
