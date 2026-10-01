@@ -17,13 +17,28 @@ class EngineBackend(_ABC):
     """Stateless interface for engine-specific run behaviour."""
 
     run_engine: str
+    """Engine name used by BioSimSpace."""
+
     supports_adaptive: bool
+    """Whether the engine supports adaptive simulations."""
+
     coordinate_prefix_and_extension: _Tuple[str, str]
+    """Prefix and extension of the engine coordinate file."""
+
     required_input_files: _Tuple[str, ...]
+    """Files required to run a simulation."""
+
     restart_file_pattern: str
+    """Glob pattern matching engine restart files."""
+
     config_file_suffixes: _Tuple[str, ...]
+    """Configuration file suffixes generated during setup."""
+
     clean_file_patterns: _Tuple[str, ...]
+    """Glob patterns for engine output removed by `clean`."""
+
     lighten_file_patterns: _Tuple[str, ...]
+    """Glob patterns for engine output removed by `lighten`."""
 
     @_abstractmethod
     def perturbation_type(self, stage_type: _StageType) -> str:

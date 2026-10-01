@@ -711,9 +711,10 @@ class GromacsConfig(_EngineConfig):
         return self.ref_t
 
     def set_ligand_charge(self, ligand_charge: int) -> None:
-        """Set the ligand charge change used by GROMACS."""
-        self.ligand_charge = -ligand_charge
-        if ligand_charge != 0:
+        """Set the charge change on decoupling, opposite to the ligand net charge."""
+        ligand_charge_change = -ligand_charge
+        self.ligand_charge = ligand_charge_change
+        if ligand_charge_change != 0:
             self.refcoord_scaling = "com"
 
     @_model_validator(mode="after")

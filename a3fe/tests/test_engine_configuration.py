@@ -28,6 +28,15 @@ def test_gradient_output_interval():
     )
 
 
+@pytest.mark.parametrize("ligand_charge", [-1, 1])
+def test_gromacs_ligand_charge_change(ligand_charge):
+    """Decoupling reverses the ligand charge while retaining PME."""
+    config = GromacsConfig()
+    config.set_ligand_charge(ligand_charge)
+    assert config.ligand_charge == -ligand_charge
+    assert config.refcoord_scaling == "com"
+
+
 def test_write_config_somd(engine_config):
     """Test that the somd configuration file is generated correctly."""
     with TemporaryDirectory() as dirname:

@@ -172,4 +172,5 @@ class GromacsBackend(_EngineBackend):
                 )
             gradients = data[:, gradient_columns[0]]
 
+        # Convert time from ps to ns and gradients from kJ/mol to kcal/mol.
         return times / 1000, gradients / 4.184

@@ -291,9 +291,9 @@ class Stage(_SimulationRunner):
         """
         if adaptive and not self.engine_backend.supports_adaptive:
             raise NotImplementedError(
-                "Adaptive GROMACS runs are not supported yet because repeated "
-                "submissions do not currently continue from checkpoints. Use "
-                "adaptive=False and supply a fixed runtime."
+                f"Adaptive {self.engine_backend.run_engine} runs are not supported yet "
+                "because repeated submissions do not currently continue from "
+                "checkpoints. Use adaptive=False and supply a fixed runtime."
             )
 
         run_nos = self._get_valid_run_nos(run_nos)

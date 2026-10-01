@@ -28,7 +28,6 @@ from ..configuration import PreparationStage as _PreparationStage
 from ..configuration import SlurmConfig as _SlurmConfig
 from ..configuration import StageType as _StageType
 from ..configuration import _BaseSystemPreparationConfig, _EngineConfig
-from ..engines import CONFIG_FILE_SUFFIXES as _CONFIG_FILE_SUFFIXES
 from . import system_prep as _system_prep
 from ._restraint import A3feRestraint as _A3feRestraint
 from ._simulation_runner import SimulationRunner as _SimulationRunner
@@ -686,11 +685,11 @@ class Leg(_SimulationRunner):
                 property_map={"velocity": "foo"},
             )  # We will run outside of BSS
 
-            # Copy input written by BSS to the stage input directory, excluding cfg and mdp
+            # Copy input written by BSS to the stage input directory, excluding config files
             files = [
                 file
                 for file in _glob.glob(f"{stage_input_dir}/lambda_*/*")
-                if not file.endswith(_CONFIG_FILE_SUFFIXES)
+                if not file.endswith(self.engine_backend.config_file_suffixes)
             ]
             for file in files:
                 _shutil.copy(file, stage_input_dir)

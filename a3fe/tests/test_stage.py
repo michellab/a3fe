@@ -7,7 +7,15 @@ import os
 import subprocess
 from tempfile import TemporaryDirectory
 
+import pytest
+
 import a3fe as a3
+
+
+def test_unsupported_adaptive_run_names_engine(gromacs_discharge_stage):
+    """The adaptive-run error identifies the selected engine backend."""
+    with pytest.raises(NotImplementedError, match="Adaptive GROMACS runs"):
+        gromacs_discharge_stage.run(adaptive=True)
 
 
 def test_dirs_created(engine_config):

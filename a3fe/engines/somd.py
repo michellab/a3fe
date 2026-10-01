@@ -140,6 +140,13 @@ class SomdBackend(_EngineBackend):
                     gradient = float(values[2])
                 gradients.append(gradient)
 
+        if temperature is None:
+            raise ValueError(
+                f"Could not find the generating temperature in {filename}."
+            )
+
+        # Convert steps to ns using the fs timestep, then reduced gradients to
+        # kcal/mol using k_B T (k_B is expressed in kcal mol^-1 K^-1).
         times = _np.array(steps) * (config.timestep / 1_000_000)  # type: ignore
         gradients_array = _np.array(gradients)
         gradients_array *= temperature * _k_boltz.value()
