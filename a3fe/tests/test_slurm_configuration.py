@@ -1,13 +1,10 @@
 """Unit and regression tests for the SlurmConfig class."""
 
+import os
 from tempfile import TemporaryDirectory
-
-
 from unittest.mock import patch
 
 from a3fe import SlurmConfig
-
-import os
 
 
 def test_create_default_config():

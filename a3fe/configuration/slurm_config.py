@@ -4,17 +4,16 @@ __all__ = [
     "SlurmConfig",
 ]
 
-import yaml as _yaml
-import subprocess as _subprocess
-import re as _re
-
-from pydantic import BaseModel as _BaseModel
-from pydantic import Field as _Field
-from pydantic import ConfigDict as _ConfigDict
-
 import os as _os
+import re as _re
+import subprocess as _subprocess
+from typing import Dict as _Dict
+from typing import List as _List
 
-from typing import List as _List, Dict as _Dict
+import yaml as _yaml
+from pydantic import BaseModel as _BaseModel
+from pydantic import ConfigDict as _ConfigDict
+from pydantic import Field as _Field
 
 
 class SlurmConfig(_BaseModel):
@@ -33,8 +32,12 @@ class SlurmConfig(_BaseModel):
     extra_options: _Dict[str, str] = _Field(
         {}, description="Extra options to pass to SLURM. For example, {'account': 'qt'}"
     )
-    queue_check_interval: int = _Field(30, ge=1, description="Interval in seconds between SLURM queue status checks.")
-    job_submission_wait: int = _Field(300, ge=1, description="Wait time in seconds for job submission to SLURM queue.")
+    queue_check_interval: int = _Field(
+        30, ge=1, description="Interval in seconds between SLURM queue status checks."
+    )
+    job_submission_wait: int = _Field(
+        300, ge=1, description="Wait time in seconds for job submission to SLURM queue."
+    )
 
     model_config = _ConfigDict(validate_assignment=True)
 

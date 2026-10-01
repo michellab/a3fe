@@ -1,12 +1,15 @@
 """Enums required for Classes in the run package."""
 
 from enum import Enum as _Enum
+from typing import Any as _Any
 from typing import List as _List
+from typing import Type as _Type
+
 import yaml as _yaml
 
-from .engine_config import _EngineConfig, SomdConfig as _SomdConfig
-
-from typing import Any as _Any
+from .engine_config import GromacsConfig as _GromacsConfig
+from .engine_config import SomdConfig as _SomdConfig
+from .engine_config import _EngineConfig
 
 __all__ = [
     "JobStatus",
@@ -94,25 +97,33 @@ class LegType(_YamlSerialisableEnum):
 
 
 class EngineType(_YamlSerialisableEnum):
+    """The simulation engine used for production simulations."""
+
     SOMD = 1
+    GROMACS = 2
 
     @property
-    def engine_config(self) -> _EngineConfig:
+    def engine_config(self) -> _Type[_EngineConfig]:
         """Return the configuration class for the engine."""
         engine_configs = {
             EngineType.SOMD: _SomdConfig,
+            EngineType.GROMACS: _GromacsConfig,
         }
         return engine_configs[self]
 
     @property
     def system_prep_config(self):
+        """Return the system preparation configuration class."""
+        from .system_prep_config import (
+            GromacsSystemPreparationConfig as _GromacsSystemPreparationConfig,
+        )
         from .system_prep_config import (
             SomdSystemPreparationConfig as _SomdSystemPreparationConfig,
         )
 
-        """Return the system preparation configuration class."""
         system_prep_configs = {
             EngineType.SOMD: _SomdSystemPreparationConfig,
+            EngineType.GROMACS: _GromacsSystemPreparationConfig,
         }
         return system_prep_configs[self]
 
@@ -142,10 +153,16 @@ class PreparationStage(_YamlSerialisableEnum):
     def prep_fn(self):
         """The function to use to prepare the input files for this stage."""
         from ..run.system_prep import (
-            parameterise_input as _parameterise_input,
-            solvate_input as _solvate_input,
-            minimise_input as _minimise_input,
             heat_and_preequil_input as _heat_and_preequil_input,
+        )
+        from ..run.system_prep import (
+            minimise_input as _minimise_input,
+        )
+        from ..run.system_prep import (
+            parameterise_input as _parameterise_input,
+        )
+        from ..run.system_prep import (
+            solvate_input as _solvate_input,
         )
 
         prep_fns = {

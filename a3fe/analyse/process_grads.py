@@ -12,6 +12,7 @@ from typing import Tuple as _Tuple
 import numpy as _np
 from scipy.constants import gas_constant as _R
 
+from ..configuration import EngineType as _EngineType
 from .autocorrelation import (
     get_statistical_inefficiency as _get_statistical_inefficiency,
 )
@@ -135,8 +136,8 @@ class GradientData:
         # Get the statistical inefficiencies in units of simulation time
         stat_ineffs_all_winds = (
             _np.array(stat_ineffs_all_winds)
-            * lam_winds[0].sims[0].engine_config.timestep
-        )  # Timestep should be same for all sims
+            * lam_winds[0].sims[0].engine_config.gradient_output_interval
+        )  # Output interval should be same for all sims
 
         # Get the SEMs of the free energy changes from the inter-run SEMs of the gradients
         lam_weights = _np.array([lam.lam_val_weight for lam in lam_winds])
@@ -727,13 +728,29 @@ def get_time_series_multiwindow_mbar(
             "use_slurm is the same for all lambda windows."
         )
 
+    engine_type = lambda_windows[0].engine_type
+    if not all(lam_win.engine_type == engine_type for lam_win in lambda_windows):
+        raise ValueError(
+            "engine_type is not the same for all lambda windows. Please ensure that "
+            "engine_type is the same for all lambda windows."
+        )
+    mbar_temperature = lambda_windows[0].engine_config.analysis_temperature
+
     if not use_slurms[0]:
         # Run MBAR in parallel
         with _get_context("spawn").Pool() as pool:
             results = pool.starmap(
                 _compute_dg,
                 [
-                    (run_no, start_frac, end_frac, output_dir, equilibrated)
+                    (
+                        run_no,
+                        start_frac,
+                        end_frac,
+                        output_dir,
+                        equilibrated,
+                        engine_type,
+                        mbar_temperature,
+                    )
                     for run_no in run_nos
                     for start_frac, end_frac in start_and_end_fracs
                 ],
@@ -758,6 +775,8 @@ def get_time_series_multiwindow_mbar(
                     percentage_start=start_frac * 100,
                     subsampling=False,
                     equilibrated=equilibrated,
+                    engine_type=engine_type,
+                    temperature=mbar_temperature,
                 )
             )
 
@@ -816,7 +835,13 @@ def get_time_series_multiwindow_mbar(
 
 
 def _compute_dg(
-    run_no: int, start_frac: float, end_frac: float, output_dir: str, equilibrated: bool
+    run_no: int,
+    start_frac: float,
+    end_frac: float,
+    output_dir: str,
+    equilibrated: bool,
+    engine_type: _EngineType,
+    temperature: float,
 ) -> float:
     """
     Helper function to compute the free energy change for a single run. Arguments are as
@@ -831,5 +856,7 @@ def _compute_dg(
         percentage_start=start_frac * 100,
         subsampling=False,
         delete_outfiles=True,
+        engine_type=engine_type,
+        temperature=temperature,
     )
     return free_energies[0]

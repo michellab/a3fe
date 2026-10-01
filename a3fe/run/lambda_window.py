@@ -17,16 +17,16 @@ from ..analyse.detect_equil import check_equil_chodera as _check_equil_chodera
 from ..analyse.detect_equil import (
     dummy_check_equil_multiwindow as _dummy_check_equil_multiwindow,
 )
+from ..configuration import EngineType as _EngineType
+from ..configuration import SlurmConfig as _SlurmConfig
+from ..configuration import _EngineConfig
 from ._simulation_runner import SimulationRunner as _SimulationRunner
 from ._virtual_queue import VirtualQueue as _VirtualQueue
 from .simulation import Simulation as _Simulation
-from ..configuration import SlurmConfig as _SlurmConfig
-from ..configuration import _EngineConfig
-from ..configuration import EngineType as _EngineType
 
 
 class LamWindow(_SimulationRunner):
-    """A class to hold and manipulate a set of SOMD simulations at a given lambda value."""
+    """A class to hold and manipulate simulations at a given lambda value."""
 
     equil_detection_methods = {
         "multiwindow": _dummy_check_equil_multiwindow,
@@ -348,38 +348,31 @@ class LamWindow(_SimulationRunner):
                 "Equilibration time not set. "
                 "Please run is_equilibrated() before calling this function."
             )
+        if self._equil_time < 0:
+            raise ValueError("Equilibration time cannot be negative.")
 
         # Get the index of the first equilibrated data point
-        # Minus 1 because first energy is only written after the first nrg_freq steps
-        equil_index = (
-            int(
-                self._equil_time
-                / (
-                    self.sims[0].engine_config.timestep
-                    * self.sims[0].engine_config.energy_frequency
-                )
-            )
-            - 1  # type: ignore
-        )
+        equil_index = self.sims[0].engine_config.get_equil_index(self._equil_time)
 
         # Write the equilibrated data for each simulation
         for sim in self.sims:
-            in_simfile = sim.output_dir + "/simfile.dat"
-            out_simfile = sim.output_dir + "/simfile_equilibrated.dat"
+            in_file, out_file, header_chars = (
+                sim.engine_backend.get_equilibrated_data_files(sim.output_dir)
+            )
 
-            with open(in_simfile, "r") as ifile:
+            with open(in_file, "r") as ifile:
                 lines = ifile.readlines()
 
             # Figure out how many lines come before the data
             non_data_lines = 0
             for line in lines:
-                if line.startswith("#"):
+                if line.startswith(header_chars) or not line.strip():
                     non_data_lines += 1
                 else:
                     break
 
-            # Overwrite the original file with one containing only the equilibrated data
-            with open(out_simfile, "w") as ofile:
+            # Write a new file containing only the equilibrated data
+            with open(out_file, "w") as ofile:
                 # First, write the header
                 for line in lines[:non_data_lines]:
                     ofile.write(line)

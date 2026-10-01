@@ -9,7 +9,7 @@ The most basic input that a3fe accepts is PDB files of the protein and crystallo
 file for the ligand. Pre-parameterised inputs in AMBER-format are also accepted. The table below details the combinations
 of input files that can be supplied to a3fe, and the names that they must be given (files for both the free and bound leg must
 be provided). The preparation stage will be detected by a3fe when you instantiate a Calculation, and only the required preparation
-steps will be carried out for each leg. 
+steps will be carried out for each leg.
 
 You can also find out which input files are required for a given preparation stage for a given leg programmatically, e.g:
 
@@ -21,7 +21,7 @@ You can also find out which input files are required for a given preparation sta
 .. list-table:: Preparation stage types and required input files
    :widths: 25 25 25 50
    :header-rows: 1
-   
+
    * - PreparationStage
      - LegType
      - Required Input Files
@@ -95,13 +95,13 @@ completely happy with the input files.
    * If the above fails, this is often due to residue/ atom names which do not match the templates. Read the errors to find out which residues / atoms are causing the issues, then check the expected names in library which was loaded after typing ``source leaprc.protein.ff14SB`` e.g. ``cat $AMBERHOME/dat/leap/lib/amino12.lib``.  Rename the offending atoms/ residues and repeat the above step.
    * Finally, rename ``protein_fully_sanitised.pdb`` to ``protein.pdb`` and run a3fe again.
 
-Alternatively, if you have a parameterised protein (protein.rst7 and protein.prm7), and ligand.sdf (and optionally waters.prm7 and waters.rst7), you can use the 
+Alternatively, if you have a parameterised protein (protein.rst7 and protein.prm7), and ligand.sdf (and optionally waters.prm7 and waters.rst7), you can use the
 notebook supplied in a3fe/a3fe/data/example_run_dir/parameterise_and_assemble_input.ipynb to parameterise the ligand and create the parameterised input files required by a3fe.
 
 Running Standard Non-Adaptive Calculations
 *******************************************
 
-Once you have the required files in `input` as described above, you can run a standard non-adaptive ABFE calculation. To run 5 replicates with 5 ns of sampling per window 
+Once you have the required files in `input` as described above, you can run a standard non-adaptive ABFE calculation. To run 5 replicates with 5 ns of sampling per window
 (discarding 1 ns of this to equilibration):
 
 .. code-block:: python
@@ -115,6 +115,9 @@ Once you have the required files in `input` as described above, you can run a st
     calc.analyse() # Fast analyses
     calc.analyse_convergence() # Slower convergence analysis
     calc.save()
+
+The default simulation engine is SOMD. To use GROMACS for production simulations, initialise the calculation with ``engine_type=a3.EngineType.GROMACS``.
+GROMACS calculations currently support non-adaptive runs only.
 
 We suggest running this through ipython (so that you can interact with the calculation while it is running) in a tmux session (so that the process
 is not killed when you log out).
@@ -132,7 +135,7 @@ For example, to change the timestep, create a ``SomdConfig`` object and pass it 
 
     engine_config = a3.SomdConfig(timestep=2.0) # fs (femtoseconds), Create configuration with custom parameters
     calc = a3.Calculation(engine_config=engine_config) # Pass to Calculation during creation
-    
+
     # Or modify parameters after creating the Calculation
     calc = a3.Calculation()
     # Works if the calculation has not been setup yet
@@ -141,11 +144,21 @@ For example, to change the timestep, create a ``SomdConfig`` object and pass it 
     calc.update_engine_config_option(timestep=2.0) # fs
 
 .. warning::
-   After calling ``calc.setup()``, do not modify engine_config directly. 
+   After calling ``calc.setup()``, do not modify engine_config directly.
    Use ``calc.update_engine_config_option()`` instead.
 
 To see a complete list of available configuration options, run ``somd-freenrg --help-config``
 or inspect the :class:`a3.SomdConfig` API reference.
+
+To use GROMACS instead, pass the engine type to ``Calculation``:
+
+.. code-block:: python
+
+    calc = a3.Calculation(
+        engine_type=a3.EngineType.GROMACS,
+    )
+
+GROMACS currently supports non-adaptive production simulations only.
 
 System Preparation Configuration
 -----------------
@@ -180,7 +193,7 @@ also set other options:
 
 .. note::
 
-    The molecular dynamics simulations should be run on GPUs - they are unbearably slow on CPU. However, you may want to run the MBAR analysis on CPUs to minimise submissions to the CPU queue. 
+    The molecular dynamics simulations should be run on GPUs - they are unbearably slow on CPU. However, you may want to run the MBAR analysis on CPUs to minimise submissions to the CPU queue.
     To do this, you can supply an ``analysis_slurm_config`` which is different to the ``slurm_config``, which will only be used for the MBAR analysis.
 
     .. code-block:: python
@@ -214,6 +227,10 @@ three replicates. Note that this is expected to produce an erroneously favourabl
 Running Adaptive Calculations
 ******************************
 
+.. note::
+
+    Adaptive calculations are currently only supported with SOMD.
+
 You can also take advantage of the adaptive algorithms available with a3fe. The code below uses the automated lambda window selection,
 simulation time allocation, and equilibration detection algorithms.
 
@@ -226,7 +243,7 @@ simulation time allocation, and equilibration detection algorithms.
     # of 2 kcal mol-1
     calc.get_optimal_lam_vals(delta_er = 2)
     # Run adaptively with a runtime constant of 0.0005 kcal**2 mol-2 ns**-1
-    # Note that automatic equilibration detection with the paired t-test 
+    # Note that automatic equilibration detection with the paired t-test
     # method will also be carried out.
     calc.run(adaptive=True, runtime_constant = 0.0005)
     calc.wait()
@@ -244,7 +261,7 @@ simulation time allocation, and equilibration detection algorithms.
 
     During the adaptive allocation of simulation time, the allocated runtime is computed taking into account the relative simulation cost. To obtain
     comparable total simulation times to those described in the manuscript, you should set the reference simulation time to the cost (hr / ns) of the bound leg of the
-    MIF/ MIF180 complex ([input files here](https://github.com/michellab/Automated-ABFE-Paper/tree/main/simulations/initial_systems/mif/input)). The cost can be obtained 
+    MIF/ MIF180 complex ([input files here](https://github.com/michellab/Automated-ABFE-Paper/tree/main/simulations/initial_systems/mif/input)). The cost can be obtained
     by running a short simulation for the leg and checking the cost with e.g. ``ref_cost = calc.legs[0].tot_gpu_time / calc.legs[0].tot_simtime``. This should then be passed when
     optimising the lambda schedule with e.g. ``calc.get_optimal_lam_vals(delta_er = 2, reference_sim_cost = ref_cost)``.
 
@@ -255,7 +272,7 @@ Analysis can be performed with:
 
 .. code-block:: python
 
-    # Calculate the free energy changes using MBAR and 
+    # Calculate the free energy changes using MBAR and
     # generate a variety of plots to aid analysis.
     # Run through SLURM as MBAR can be computationally intensive.
     # Avoid costly RMSD analysis.
@@ -272,7 +289,7 @@ Analysis can be performed with:
 ``calc.analyse()`` generates a variety of outputs in the ``output`` directories of the calculation, leg, and stage directories. The most detailed
 information is given in the stage output directories. You can get a detailed breakdown of the results as a pandas dataframe by running ``calc.get_results_df()``.
 
-Convergence analysis involves repeatedly calculating the free energy changes with different subsets of the 
+Convergence analysis involves repeatedly calculating the free energy changes with different subsets of the
 data, and is computationally intensive. Hence, it is implemented in a different function. To run convergence
 analysis, enter ``calc.analyse_convergence()``. Plots of the free energy change against total simulation time
 will be created in each output directory.
@@ -317,7 +334,7 @@ You can run sets of calculations using the :class:`a3fe.run.CalcSet` class. To d
 ABFE with Charged Ligands
 *************************
 
-Since A3FE 0.2.0, ABFE calculations with charged ligands are supported using a co-alchemical ion approach. The charge of the ligand will be automatically detected, assuming that this is correctly specified in the input sdf. The only change in the input required is that the use of PME, rather than reaction field electrostatics, should be specified in ``SomdConfig`` as: e.g.:
+Since A3FE 0.2.0, ABFE calculations with charged ligands are supported using a co-alchemical ion approach. The charge of the ligand will be automatically detected, assuming that this is correctly specified in the input sdf. For SOMD, the only change in the input required is that the use of PME, rather than reaction field electrostatics, should be specified in ``SomdConfig``, e.g.:
 
 .. code-block:: python
 
@@ -326,3 +343,10 @@ Since A3FE 0.2.0, ABFE calculations with charged ligands are supported using a c
 
 The default ``SomdConfig`` uses reaction field instead of PME. This is faster (around twice as fast for some of our systems) and has been shown to give equivalent results for neutral ligands in RBFE calculations - see https://pubs.acs.org/doi/full/10.1021/acs.jcim.0c01424.
 
+For GROMACS, the co-alchemical ion is set up automatically when the engine is selected:
+
+.. code-block:: python
+
+    calc = a3.Calculation(
+        engine_type=a3.EngineType.GROMACS,
+    )
