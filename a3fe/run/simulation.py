@@ -1,4 +1,4 @@
-"""Functionality to run a single SOMD simulation."""
+"""Functionality to run a single simulation."""
 
 __all__ = ["Simulation"]
 
@@ -12,7 +12,6 @@ from typing import Optional as _Optional
 from typing import Tuple as _Tuple
 
 import numpy as _np
-from sire.units import k_boltz as _k_boltz
 
 from ..configuration import EngineType as _EngineType
 from ..configuration import JobStatus as _JobStatus
@@ -24,28 +23,10 @@ from ._virtual_queue import VirtualQueue as _VirtualQueue
 
 
 class Simulation(_SimulationRunner):
-    """Class to store information about a single SOMD simulation."""
-
-    required_input_files = [
-        "somd.prm7",
-        "somd.rst7",
-        "somd.pert",
-    ]
+    """Class to store information about a single simulation."""
 
     # Files to be cleaned by self.clean()
-    run_files = _SimulationRunner.run_files + [
-        "*.dcd",
-        "*.out",
-        "moves.dat",
-        "simfile.dat",
-        "simfile_equilibrated.dat",
-        "*.s3",
-        "*.s3.previous",
-        "latest.pdb",
-        "gradients.dat",
-        "equilibration_block_gradient.txt",
-        "equilibration_shrinking_block_gradient",
-    ]
+    run_files = _SimulationRunner.run_files + ["*.out"]
 
     def __init__(
         self,
@@ -136,7 +117,7 @@ class Simulation(_SimulationRunner):
             self._validate_input()
             self.job: _Optional[_Job] = None
             self._running: bool = False
-            # Select the correct rst7 and, if supplied, restraints
+            # Select the correct coordinate and, if supplied, restraint files
             self._select_input_files()
 
             # Save state and update log
@@ -174,26 +155,22 @@ class Simulation(_SimulationRunner):
             # Check that job finished successfully
             if self.job.status == _JobStatus.FINISHED:
                 self._logger.info(f"{self.job} finished successfully")
-            elif self.job.status == "FAILED":
+            elif self.job.status == _JobStatus.FAILED:
                 old_job = self.job
                 self._logger.info(f"{old_job} failed - resubmitting")
-                # Move log files and s3 files so that the job does not restart
-                _subprocess.run(["mkdir", f"{self.output_dir}/failure"])
-                for s3_file in _glob.glob(f"{self.output_dir}/*.s3"):
-                    _subprocess.run(
-                        [
-                            "mv",
-                            f"{self.output_dir}/{s3_file}",
-                            f"{self.output_dir}/failure",
-                        ]
-                    )
-                _subprocess.run(
-                    [
-                        "mv",
-                        old_job.slurm_outfile,
-                        f"{self.output_dir}/failure",
-                    ]
+                # Move log files and checkpoint files so that the job does not restart
+                _subprocess.run(["mkdir", "-p", f"{self.output_dir}/failure"])
+
+                restart_file_pattern = _os.path.join(
+                    self.output_dir, self.engine_backend.restart_file_pattern
                 )
+                for restart_file in _glob.glob(restart_file_pattern, recursive=True):
+                    _subprocess.run(["mv", restart_file, f"{self.output_dir}/failure"])
+
+                _subprocess.run(
+                    ["mv", old_job.slurm_outfile, f"{self.output_dir}/failure"]
+                )
+
                 # Now resubmit
                 cmd_list = old_job.command_list
                 self.job = self.virtual_queue.submit(
@@ -212,36 +189,35 @@ class Simulation(_SimulationRunner):
             raise FileNotFoundError("Input directory does not exist.")
 
         # Check that the required input files are present
-        for file in Simulation.required_input_files:
+        for file in self.engine_backend.required_input_files:
             if not _os.path.isfile(_os.path.join(self.input_dir, file)):
                 raise FileNotFoundError("Required input file " + file + " not found.")
 
     def _select_input_files(self) -> None:
-        """Select the correct rst7 and, if supplied, restraints,
-        according to the run number."""
+        """Select the coordinate and restraint files for this run."""
+        file_prefix, file_extension = (
+            self.engine_backend.coordinate_prefix_and_extension
+        )
 
-        # Check if we have multiple rst7 files, or only one
-        rst7_files = _glob.glob(_os.path.join(self.input_dir, "*.rst7"))
-        if len(rst7_files) == 0:
-            raise FileNotFoundError("No rst7 files found in input directory")
-        elif len(rst7_files) > 1:
-            # Rename the rst7 file for this run to somd.rst7 and delete any other
-            # rst7 files
-            self._logger.debug("Multiple rst7 files found - renaming")
-            _subprocess.run(
-                [
-                    "mv",
-                    _os.path.join(self.input_dir, f"somd_{self.run_no}.rst7"),
-                    _os.path.join(self.input_dir, "somd.rst7"),
-                ]
+        coordinate_files = _glob.glob(f"{self.input_dir}/*.{file_extension}")
+        if len(coordinate_files) == 0:
+            raise FileNotFoundError(
+                f"No {file_extension} files found in input directory"
             )
-            unwanted_rst7_files = _glob.glob(
-                _os.path.join(self.input_dir, "somd_?.rst7")
+        elif len(coordinate_files) > 1:
+            source_file = (
+                f"{self.input_dir}/{file_prefix}_{self.run_no}.{file_extension}"
             )
-            for file in unwanted_rst7_files:
+            target_file = f"{self.input_dir}/{file_prefix}.{file_extension}"
+            self._logger.debug(f"Multiple {file_extension} files found - renaming")
+            _subprocess.run(["mv", source_file, target_file])
+            unwanted_files = _glob.glob(
+                f"{self.input_dir}/{file_prefix}_?.{file_extension}"
+            )
+            for file in unwanted_files:
                 _subprocess.run(["rm", file])
         else:
-            self._logger.info("Only one rst7 file found - not renaming")
+            self._logger.info(f"Only one {file_extension} file found - not renaming")
 
         # Deal with restraints. Get the name of the restraint file for this run
         old_restr_file = _os.path.join(self.input_dir, f"restraint_{self.run_no}.txt")
@@ -284,14 +260,11 @@ class Simulation(_SimulationRunner):
         -------
         None
         """
-        # Write updated config to file
-        self.engine_config.write_config(
-            run_dir=self.output_dir,
-            lambda_val=self.lam,
+        self.engine_backend.write_run_config(
+            config=self.engine_config,
+            output_dir=self.output_dir,
+            lam=self.lam,
             runtime=runtime,
-            top_file="somd.prm7",  # TODO - make generic
-            coord_file="somd.rst7",  # TODO - make generic
-            morph_file="somd.pert",  # TODO - make generic
         )
 
         # Get the commands to run the simulation
@@ -306,63 +279,12 @@ class Simulation(_SimulationRunner):
         self._logger.info(f"Submitted with job {self.job}")
 
     def get_tot_simtime(self) -> float:
-        """
-        Get the total simulation time in ns
-
-        Returns
-        -------
-        tot_simtime : float
-            Total simulation time in ns.
-        """
-        data_simfile = f"{self.output_dir}/simfile.dat"
-        if not _pathlib.Path(data_simfile).is_file():
-            # Simuation has not been run, hence total simulation time is 0
-            return 0
-        elif _os.stat(data_simfile).st_size == 0:
-            # Simfile is empty, hence total simulation time is 0
-            return 0
-        else:
-            # Read last line of simfile with subprocess to make as fast as possible
-            step = int(
-                _subprocess.check_output(
-                    [
-                        "tail",
-                        "-1",
-                        f"{self.output_dir}/simfile.dat",
-                    ]
-                )
-                .decode("utf-8")
-                .strip()
-                .split()[0]
-            )
-            return step * (self.engine_config.timestep / 1_000_000)  # ns
+        """Get the total simulation time in ns."""
+        return self.engine_backend.get_tot_simtime(self.output_dir, self.engine_config)
 
     def get_tot_gpu_time(self) -> float:
-        """
-        Get the total simulation time in GPU hours
-
-        Returns
-        -------
-        tot_gpu_time : float
-            Total simulation time in GPU hours.
-        """
-        # Get output files
-        slurm_output_files = self.slurm_output_files
-
-        # If we don't have any output files, we haven't run any simulations
-        if len(slurm_output_files) == 0:
-            return 0
-
-        # Otherwise, add up the simulation time in seconds
-        tot_gpu_time = 0
-        for file in slurm_output_files:
-            with open(file, "rt") as file:
-                for line in file.readlines():
-                    if line.startswith("Simulation took"):
-                        tot_gpu_time += float(line.split(" ")[2])
-
-        # And convert to GPU hours
-        return tot_gpu_time / 3600
+        """Get the total simulation time in GPU hours."""
+        return self.engine_backend.get_tot_gpu_time(self.slurm_output_files)
 
     @property
     def tot_simtime(self) -> float:
@@ -377,29 +299,12 @@ class Simulation(_SimulationRunner):
 
     @property
     def failed(self) -> bool:
-        """Whether the simulation has failed"""
-        # Check if we are still running
-        if self.running:
+        """Whether the simulation has failed."""
+        if self.running or self.job is None:
             return False
-
-        # We are not running, so all slurm output files should contain the
-        # "Simulation took" line
-        if self.slurm_output_files:
-            for file in self.slurm_output_files:
-                with open(file, "rt") as file:
-                    failed = True
-                    for line in file.readlines():
-                        if line.startswith("Simulation took"):
-                            # File shows success, so continue to next file
-                            failed = False
-                            break
-                    # We haven't found "Simulation took" in this file, indicating failure
-                    if failed:
-                        return True
-
-        # Either We aren't running and have output files, all with the "Simulation took" line,
-        # or we aren't running and have no output files - either way, we haven't failed
-        return False
+        return not self.engine_backend.run_completed(
+            self.output_dir, self.slurm_output_files
+        )
 
     @property
     def slurm_output_files(self) -> _List[str]:
@@ -415,102 +320,23 @@ class Simulation(_SimulationRunner):
             self.virtual_queue.kill(self.job)
 
     def lighten(self) -> None:
-        """Lighten the simulation by deleting all restart
-        and trajectory files."""
-        delete_files = [
-            "*.dcd",
-            "*.s3",
-            "*.s3.previous",
-            "gradients.s3",
-            "simfile_equilibrated.dat",
-            "latest.pdb",
-        ]
-
-        for del_file in delete_files:
-            # Delete files in base directory
-            for file in _pathlib.Path(self.base_dir).glob(del_file):
-                self._logger.info(f"Deleting {file}")
-                _subprocess.run(["rm", file])
-
-            # Delete files in output directory
-            for file in _pathlib.Path(self.output_dir).glob(del_file):
-                self._logger.info(f"Deleting {file}")
-                _subprocess.run(["rm", file])
+        """Lighten the simulation by deleting restart and trajectory files."""
+        for directory in [self.base_dir, self.output_dir]:
+            for pattern in self.engine_backend.lighten_file_patterns:
+                for file in _pathlib.Path(directory).glob(pattern):
+                    self._logger.info(f"Deleting {file}")
+                    _subprocess.run(["rm", str(file)])
 
     def read_gradients(
         self, equilibrated_only: bool = False, endstate: bool = False
     ) -> _Tuple[_np.ndarray, _np.ndarray]:
-        """
-        Read the gradients from the output file. These can be either the infiniesimal gradients
-        at the given value of lambda, or the differences in energy between the end state
-        Hamiltonians.
-
-        Parameters
-        ----------
-        equilibrated_only : bool, Optional, default: False
-            Whether to read the gradients from the equilibrated region of the simulation (True)
-            or the whole simulation (False).
-        endstate : bool, Optional, default: False
-            Whether to return the difference in energy between the end state Hamiltonians (True)
-            or the infiniesimal gradients at the given value of lambda (False).
-
-        Returns
-        -------
-        times : np.ndarray
-            Array of times, in ns.
-        grads : np.ndarray
-            Array of gradients, in kcal/mol.
-        """
-        # Read the output file
-        if equilibrated_only:
-            with open(
-                _os.path.join(self.output_dir, "simfile_equilibrated.dat"), "r"
-            ) as ifile:
-                lines = ifile.readlines()
-        else:
-            with open(_os.path.join(self.output_dir, "simfile.dat"), "r") as ifile:
-                lines = ifile.readlines()
-
-        steps = []
-        grads = []
-        temp = None  # Temperature in K
-
-        for line in lines:
-            vals = line.split()
-            # Get the temperature, checking the units
-            if line.startswith("#Generating temperature is"):
-                temp = vals[3]
-                try:
-                    unit = vals[4]
-                except IndexError:
-                    # Must be °C
-                    temp, unit = temp.split("°")
-                if unit == "C":
-                    temp = float(temp) + 273.15  # Convert to K
-                else:
-                    temp = float(temp)
-            # Get the gradients
-            if not line.startswith("#"):
-                step = int(vals[0].strip())
-                if not endstate:  #  Return the infinitesimal gradients
-                    grad = float(vals[2].strip())
-                else:  # Return the difference in energy between the end state Hamiltonians
-                    energy_start = float(vals[5].strip())
-                    energy_end = float(vals[-1].strip())
-                    grad = energy_end - energy_start
-                steps.append(step)
-                grads.append(grad)
-
-        times = [
-            x * (self.engine_config.timestep / 1_000_000) for x in steps
-        ]  # Timestep already in ns
-
-        times_arr = _np.array(times)
-        grads_arr = _np.array(grads)
-        # convert gradients to kcal/mol by dividing by beta
-        grads_arr *= temp * _k_boltz.value()
-
-        return times_arr, grads_arr
+        """Read simulation times in ns and gradients in kcal/mol."""
+        return self.engine_backend.read_gradients(
+            output_dir=self.output_dir,
+            config=self.engine_config,
+            equilibrated_only=equilibrated_only,
+            endstate=endstate,
+        )
 
     def update_paths(self, old_sub_path: str, new_sub_path: str) -> None:
         """

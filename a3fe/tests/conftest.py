@@ -33,6 +33,31 @@ def restrain_stage():
 
 
 @pytest.fixture(scope="session")
+def gromacs_discharge_stage():
+    """Create a GROMACS stage object with analysis data to use in tests"""
+    with TemporaryDirectory() as dirname:
+        # Copy the input files to the temporary directory
+        subprocess.run(
+            [
+                "cp",
+                "-r",
+                "a3fe/data/example_gromacs_discharge_stage/",
+                dirname,
+            ],
+            check=True,
+        )
+        stage = a3.Stage(
+            base_dir=os.path.join(dirname, "example_gromacs_discharge_stage"),
+            stage_type=a3.enums.StageType.DISCHARGE,
+        )
+        # Ensure the tests don't try to use slurm
+        stage.recursively_set_attr("slurm_equil_detection", False, force=True)
+        # Must use yield so that the temporary directory is deleted after the tests
+        # by the context manager and does not persist
+        yield stage
+
+
+@pytest.fixture(scope="session")
 def calc_set():
     """Create a calculation set object to use in tests"""
     with TemporaryDirectory() as dirname:
@@ -128,6 +153,30 @@ def complex_sys():
         ]
     )
     yield complex_sys
+
+
+@pytest.fixture(scope="session")
+def charged_sys():
+    """Create a charged system object to use in tests"""
+    with TemporaryDirectory() as dirname:
+        # Copy the input files to the temporary directory
+        subprocess.run(
+            [
+                "cp",
+                "-r",
+                "a3fe/data/example_gromacs_discharge_stage/charged_input/",
+                dirname,
+            ],
+            check=True,
+        )
+        base_path = os.path.join(dirname, "charged_input")
+        charged_sys = BSS.IO.readMolecules(
+            [
+                os.path.join(base_path, file)
+                for file in ["free_preequil.prm7.gz", "free_preequil.rst7.gz"]
+            ]
+        )
+        yield charged_sys
 
 
 @pytest.fixture(scope="session")

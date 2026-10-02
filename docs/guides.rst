@@ -116,6 +116,9 @@ Once you have the required files in `input` as described above, you can run a st
     calc.analyse_convergence() # Slower convergence analysis
     calc.save()
 
+The default simulation engine is SOMD. To use GROMACS for production simulations, initialise the calculation with ``engine_type=a3.EngineType.GROMACS``.
+GROMACS calculations currently support non-adaptive runs only.
+
 We suggest running this through ipython (so that you can interact with the calculation while it is running) in a tmux session (so that the process
 is not killed when you log out).
 
@@ -147,14 +150,24 @@ For example, to change the timestep, create a ``SomdConfig`` object and pass it 
    rather than modifying ``engine_config`` directly.
 
 .. note::
-   ``nmoves`` and ``ncycles`` are computed properties derived from ``runtime``, ``timestep``, and
-   ``max_nmoves``; they cannot be set directly.
+   ``nmoves`` and ``ncycles`` are computed properties derived from ``runtime``, ``timestep``,
+   ``max_nmoves`` and ``energy_frequency``; they cannot be set directly.
 
 To see a complete list of available configuration options, run ``somd-freenrg --help-config``
 or inspect the :class:`a3.SomdConfig` API reference.
 
+To use GROMACS instead, pass the engine type to ``Calculation``:
+
+.. code-block:: python
+
+    calc = a3.Calculation(
+        engine_type=a3.EngineType.GROMACS,
+    )
+
+GROMACS currently supports non-adaptive production simulations only.
+
 System Preparation Configuration
------------------
+--------------------------------
 
 Calculation setup options, including the force fields, lambda schedules, and length of the equilibration steps, can be customised using :class:`a3fe.configuration.system_preparation.SomdSystemPreparationConfig`.
 For example, to use GAFF2 instead of OFF2 for the small molecule, set this in the config object and pass this to ``calc.setup()``:
@@ -219,6 +232,10 @@ three replicates. Note that this is expected to produce an erroneously favourabl
 
 Running Adaptive Calculations
 ******************************
+
+.. note::
+
+    Adaptive calculations are currently only supported with SOMD.
 
 You can also take advantage of the adaptive algorithms available with a3fe. The code below uses the automated lambda window selection,
 simulation time allocation, and equilibration detection algorithms.
@@ -323,7 +340,7 @@ You can run sets of calculations using the :class:`a3fe.run.CalcSet` class. To d
 ABFE with Charged Ligands
 *************************
 
-Since A3FE 0.2.0, ABFE calculations with charged ligands are supported using a co-alchemical ion approach. The charge of the ligand will be automatically detected, assuming that this is correctly specified in the input sdf. The only change in the input required is that the use of PME, rather than reaction field electrostatics, should be specified in ``SomdConfig`` as: e.g.:
+Since A3FE 0.2.0, ABFE calculations with charged ligands are supported using a co-alchemical ion approach. The charge of the ligand will be automatically detected, assuming that this is correctly specified in the input sdf. For SOMD, the only change in the input required is that the use of PME, rather than reaction field electrostatics, should be specified in ``SomdConfig``, e.g.:
 
 .. code-block:: python
 
@@ -331,3 +348,11 @@ Since A3FE 0.2.0, ABFE calculations with charged ligands are supported using a c
     calc = a3.Calculation(engine_config=engine_config) # Pass to Calculation
 
 The default ``SomdConfig`` uses reaction field instead of PME. This is faster (around twice as fast for some of our systems) and has been shown to give equivalent results for neutral ligands in RBFE calculations - see https://pubs.acs.org/doi/full/10.1021/acs.jcim.0c01424.
+
+For GROMACS, the co-alchemical ion is set up automatically when the engine is selected:
+
+.. code-block:: python
+
+    calc = a3.Calculation(
+        engine_type=a3.EngineType.GROMACS,
+    )

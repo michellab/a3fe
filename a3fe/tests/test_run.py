@@ -15,6 +15,7 @@ import pytest
 
 import a3fe as a3
 from a3fe.analyse.detect_equil import dummy_check_equil_multiwindow
+from a3fe.engines import engine_backend_registry as _engine_backend_registry
 
 LEGS_WITH_STAGES = {"bound": ["discharge", "vanish"], "free": ["discharge", "vanish"]}
 
@@ -82,6 +83,30 @@ def test_logging_level(calc):
     calc3.stream_log_level = logging.WARNING
     assert calc3._logger.handlers[1].level == logging.WARNING
     assert calc3._logger.handlers[0].level == logging.DEBUG
+
+
+def test_gromacs_nested_outputs_are_cleaned():
+    """Check that clean removes nested GROMACS outputs but retains inputs."""
+    with TemporaryDirectory() as dirname:
+        simulation = object.__new__(a3.Simulation)
+        simulation.base_dir = dirname
+        simulation.output_dir = dirname
+        simulation.engine_type = a3.EngineType.GROMACS
+        simulation._logger = logging.getLogger("test_gromacs_clean")
+
+        input_file = pathlib.Path(dirname, "gromacs.top")
+        input_file.touch()
+        for stage in ["em", "prod"]:
+            stage_dir = pathlib.Path(dirname, stage)
+            stage_dir.mkdir()
+            pathlib.Path(stage_dir, f"{stage}.cpt").touch()
+
+        simulation.clean()
+
+        assert input_file.exists()
+        assert all(
+            not any(pathlib.Path(dirname, stage).iterdir()) for stage in ["em", "prod"]
+        )
 
 
 def test_update_paths(calc):
@@ -296,6 +321,60 @@ def test_parameterisation_bound(t4l_calc, system_prep_config, engine_type):
     # Always delete Leg.pkl
     finally:
         os.remove(f"{bound_leg.base_dir}/Leg.pkl")
+
+
+def test_add_gromacs_alchemical_ions(charged_sys):
+    """Test that a counterion is made alchemical for a charged GROMACS ligand."""
+    system = charged_sys.copy()
+    ligand = BSS.Align.decouple(system[0], intramol=True)
+    system.updateMolecule(0, ligand)
+    ligand_charge = round(ligand.charge().value())
+
+    _engine_backend_registry[a3.EngineType.GROMACS].add_alchemical_ions(
+        system, ligand, ligand_charge
+    )
+
+    alchemical_ions = [
+        mol for mol in system if "AlchemicalIon" in mol._sire_object.property_keys()
+    ]
+    assert len(alchemical_ions) == 1
+
+    ion = alchemical_ions[0].getAtoms()[0]._sire_object
+    assert ion.property("charge0").value() == pytest.approx(-1)
+    assert ion.property("charge1").value() == pytest.approx(0)
+
+
+@pytest.mark.parametrize(
+    "stage_type, expected_gradients",
+    [
+        (a3.StageType.DISCHARGE, [1.0, 4.0]),
+        (a3.StageType.VANISH, [2.0, 5.0]),
+        (a3.StageType.RESTRAIN, [3.0, 6.0]),
+    ],
+)
+def test_gromacs_gradient_columns(stage_type, expected_gradients):
+    """Test that each GROMACS stage reads the corresponding gradient column."""
+    with TemporaryDirectory() as dirname:
+        prod_dir = pathlib.Path(dirname, "prod")
+        prod_dir.mkdir()
+        with open(prod_dir / "prod.xvg", "w") as f:
+            f.write("# time, energy, Coulomb, van der Waals, bonded, and delta H\n")
+            f.write("0.0 100.0 4.184 8.368 12.552 0.0 0.0\n")
+            f.write("200.0 200.0 16.736 20.920 25.104 0.0 0.0\n")
+
+        config = a3.GromacsConfig(lambda_values=[0.0, 1.0])
+        config.setup_lambda_arrays(stage_type)
+        times, gradients = _engine_backend_registry[
+            a3.EngineType.GROMACS
+        ].read_gradients(
+            output_dir=dirname,
+            config=config,
+            equilibrated_only=False,
+            endstate=False,
+        )
+
+        assert np.allclose(times, [0.0, 0.2])
+        assert np.allclose(gradients, expected_gradients)
 
 
 class TestCalcSetup:

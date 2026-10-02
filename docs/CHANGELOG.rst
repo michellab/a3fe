@@ -2,10 +2,16 @@
 Change Log
 ===============
 
+Unreleased
+====================
+
+- Added support for running and analysing non-adaptive ABFE calculations with GROMACS.
+- Added GROMACS support for charged ligands using the co-alchemical ion approach.
+
 0.4.2
 ====================
 - Added ``max_nmoves`` as a configurable field in ``SomdConfig`` and made ``nmoves``/``ncycles`` computed properties derived from ``runtime``, ``timestep``, ``max_nmoves`` and ``energy_frequency``.
-This prevents memory overflow from single-cycle long runtimes while keeping ``runtime`` the single source of truth.
+  This prevents memory overflow from single-cycle long runtimes while keeping ``runtime`` the single source of truth.
 
 0.4.1
 ====================

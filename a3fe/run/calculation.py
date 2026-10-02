@@ -355,6 +355,7 @@ class Calculation(_SimulationRunner):
         adaptive : bool, Optional, default: True
             If True, the stages will run until the simulations are equilibrated and perform analysis afterwards.
             If False, the stages will run for the specified runtime and analysis will not be performed.
+            Adaptive runs are not currently supported with GROMACS.
         runtime : float, Optional, default: None
             If adaptive is False, runtime must be supplied and stage will run for this number of nanoseconds.
         runtime_constant: float, Optional, default: None

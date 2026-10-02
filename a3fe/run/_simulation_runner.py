@@ -29,6 +29,8 @@ from ..analyse.plot import plot_sq_sem_convergence as _plot_sq_sem_convergence
 from ..configuration import EngineType as _EngineType
 from ..configuration import SlurmConfig as _SlurmConfig
 from ..configuration import _EngineConfig
+from ..engines import EngineBackend as _EngineBackend
+from ..engines import engine_backend_registry as _engine_backend_registry
 from ._logging_formatters import _A3feFileFormatter, _A3feStreamFormatter
 
 
@@ -186,7 +188,7 @@ class SimulationRunner(ABC):
                 else self.slurm_config.copy()
             )
 
-            # Create the SOMD config with default values if none is provided
+            # Create the engine config with default values if none is provided
             self.engine_config = (
                 engine_config
                 if engine_config is not None
@@ -235,6 +237,11 @@ class SimulationRunner(ABC):
         # Add the handlers to the logger
         self._logger.addHandler(file_handler)
         self._logger.addHandler(stream_handler)
+
+    @property
+    def engine_backend(self) -> _EngineBackend:
+        """Return the stateless backend for the configured engine."""
+        return _engine_backend_registry[self.engine_type]
 
     @property
     def input_dir(self) -> str:
@@ -935,7 +942,9 @@ class SimulationRunner(ABC):
         clean_logs : bool, default=False
             If True, also delete the log files.
         """
-        delete_files = self.__class__.run_files
+        delete_files = self.__class__.run_files + list(
+            self.engine_backend.clean_file_patterns
+        )
 
         for del_file in delete_files:
             # Delete files in base directory

@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 # https://packaging.python.org/en/latest/specifications/declaring-project-metadata/
 [project]
 name = "a3fe"
-description = "Automated Adaptive Absolute alchemical Free Energy calculator. A package for running adaptive alchemical absolute binding free energy calculations with SOMD."
+description = "Automated Adaptive Absolute alchemical Free Energy calculator. A package for running adaptive alchemical absolute binding free energy calculations with SOMD. GROMACS can also be used for non-adaptive ABFE calculations."
 dynamic = ["version"]
 readme = "README.md"
 authors = [
