@@ -5,6 +5,9 @@ Change Log
 Unreleased
 ====================
 
+0.5.0
+====================
+
 - Added support for running and analysing non-adaptive ABFE calculations with GROMACS.
 - Added GROMACS support for charged ligands using the co-alchemical ion approach.
 
