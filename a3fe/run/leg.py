@@ -560,7 +560,7 @@ class Leg(_SimulationRunner):
             _subprocess.run(
                 [
                     "mv",
-                    f"{outdir}/{coordinate_prefix}.{coordinate_extension}",
+                    f"{outdir}/{self.engine_backend.ensemble_equilibration_coordinate_file}",
                     f"{outdir}/{coordinate_prefix}_{equil_number}.{coordinate_extension}",
                 ],
                 check=True,
