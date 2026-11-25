@@ -5,6 +5,8 @@ Change Log
 Unreleased
 ====================
 
+- Fixed the GROMACS production runs starting from the pre-equilibrated structure instead of the final structures of the ensemble equilibration runs, and incomplete GROMACS ensemble equilibration runs not being detected.
+
 0.5.0
 ====================
 

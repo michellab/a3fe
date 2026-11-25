@@ -54,6 +54,13 @@ class EngineBackend(_ABC):
         """Return the files expected from ensemble equilibration."""
         pass
 
+    @property
+    def ensemble_equilibration_coordinate_file(self) -> str:
+        """Name of the file holding the final coordinates of an ensemble
+        equilibration run, which are the starting point of a production run."""
+        prefix, extension = self.coordinate_prefix_and_extension
+        return f"{prefix}.{extension}"
+
     @_abstractmethod
     def get_equilibrated_data_files(
         self, output_dir: str

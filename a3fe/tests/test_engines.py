@@ -46,13 +46,24 @@ def test_perturbation_types():
 
 
 def test_gromacs_equilibration_outputs():
-    """GROMACS only retains the trajectory for bound-leg equilibration."""
+    """GROMACS only retains the trajectory for bound-leg equilibration, and the
+    final coordinates (not the starting ones) mark a completed equilibration."""
     backend = engine_backend_registry[EngineType.GROMACS]
-    assert backend.ensemble_equilibration_output_files(LegType.FREE) == ["gromacs.gro"]
+    assert backend.ensemble_equilibration_coordinate_file == "gromacs_out.gro"
+    assert backend.ensemble_equilibration_output_files(LegType.FREE) == [
+        "gromacs_out.gro"
+    ]
     assert backend.ensemble_equilibration_output_files(LegType.BOUND) == [
-        "gromacs.gro",
+        "gromacs_out.gro",
         "gromacs.xtc",
     ]
+
+
+def test_somd_equilibration_coordinates():
+    """SOMD production runs start from the coordinates saved by a3fe."""
+    backend = engine_backend_registry[EngineType.SOMD]
+    assert backend.ensemble_equilibration_coordinate_file == "somd.rst7"
+    assert backend.ensemble_equilibration_output_files(LegType.BOUND) == ["somd.rst7"]
 
 
 def test_gromacs_charge_warning_policy():

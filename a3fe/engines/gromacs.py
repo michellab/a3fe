@@ -43,8 +43,16 @@ class GromacsBackend(_EngineBackend):
     def ignore_setup_warnings(self, ligand_charge: int) -> bool:
         return ligand_charge != 0
 
+    @property
+    def ensemble_equilibration_coordinate_file(self) -> str:
+        # BioSimSpace writes the starting coordinates to gromacs.gro and tells
+        # mdrun to write the final ones to gromacs_out.gro.
+        return "gromacs_out.gro"
+
     def ensemble_equilibration_output_files(self, leg_type: _LegType) -> _List[str]:
-        files = ["gromacs.gro"]
+        # gromacs.gro exists before the simulation starts, so only the final
+        # coordinates show that the simulation has completed.
+        files = [self.ensemble_equilibration_coordinate_file]
         if leg_type == _LegType.BOUND:
             files.append("gromacs.xtc")
         return files
